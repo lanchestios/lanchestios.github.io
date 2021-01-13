@@ -20,30 +20,45 @@
     var CONFIG = {"hostname":"lanchestios.giyhub.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="Leave a trace">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Lache&#39;s Blog">
-<meta property="og:url" content="http://lanchestios.giyhub.io/index.html">
+  <meta name="description" content="PoolChunk内存分配模拟内存数据结构为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。 12345678910111213&#x2F;&#x2F;memoryMap初始化memoryMap">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Netty 内存池优化原理">
+<meta property="og:url" content="http://lanchestios.giyhub.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/index.html">
 <meta property="og:site_name" content="Lache&#39;s Blog">
-<meta property="og:description" content="Leave a trace">
+<meta property="og:description" content="PoolChunk内存分配模拟内存数据结构为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。 12345678910111213&#x2F;&#x2F;memoryMap初始化memoryMap">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/MemoryMap.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/Subpage.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ChunkList.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ChunkListGroup.png">
+<meta property="article:published_time" content="2021-01-13T03:00:00.000Z">
+<meta property="article:modified_time" content="2021-01-13T11:27:50.745Z">
 <meta property="article:author" content="lanchestios">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="Memory Pool">
+<meta property="article:tag" content="PoolChunk">
+<meta property="article:tag" content="PoolSubPage">
+<meta property="article:tag" content="PoolChunkList">
+<meta property="article:tag" content="PoolArena">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://lanchestios.giyhub.io/images/Netty/MemoryMap.png">
 
-<link rel="canonical" href="http://lanchestios.giyhub.io/">
+<link rel="canonical" href="http://lanchestios.giyhub.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'en'
   };
 </script>
 
-  <title>Lache's Blog</title>
+  <title>Netty 内存池优化原理 | Lache's Blog</title>
   
 
 
@@ -151,85 +166,10 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/13/Netty-Channel%E5%92%8CUnsafe/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/13/Netty-Channel%E5%92%8CUnsafe/" class="post-title-link" itemprop="url">Netty Channel和Unsafe</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-              
-
-              <time title="Created: 2021-01-13 13:00:00 / Modified: 19:27:18" itemprop="dateCreated datePublished" datetime="2021-01-13T13:00:00+08:00">2021-01-13</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
 
     
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>提起 Channel，可以联想到<code>java.nio.SocketChannel</code>和<code>java.nio.ServerSocketChannel</code>，它们用于非阻塞的IO操作。类似于 NIO 的 Channel，Netty 提供了自己的 Channel 和其子类实现，用于异步 IO 操作和其他相关的操作。</p>
-<p>Unsafe 是个内部接口，聚合在 Channel 中协助进行网络读写相关的操作，因为它的设计初衷就是 Channel 的内部辅助类，不应该被 Netty 框架的上层使用者调用，所以被命名为 Unsafe。这里不能仅从字面理解认为它是不安全的操作，而要从整个架构的设计层面体会它的设计初衷和职责。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/13/Netty-Channel%E5%92%8CUnsafe/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
@@ -245,10 +185,9 @@
       <meta itemprop="name" content="Lache's Blog">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/" class="post-title-link" itemprop="url">Netty 内存池优化原理</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          Netty 内存池优化原理
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -281,7 +220,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h1 id="PoolChunk内存分配"><a href="#PoolChunk内存分配" class="headerlink" title="PoolChunk内存分配"></a>PoolChunk内存分配</h1><h2 id="模拟内存数据结构"><a href="#模拟内存数据结构" class="headerlink" title="模拟内存数据结构"></a>模拟内存数据结构</h2><p>为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。</p>
+        <h1 id="PoolChunk内存分配"><a href="#PoolChunk内存分配" class="headerlink" title="PoolChunk内存分配"></a>PoolChunk内存分配</h1><h2 id="模拟内存数据结构"><a href="#模拟内存数据结构" class="headerlink" title="模拟内存数据结构"></a>模拟内存数据结构</h2><p>为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//memoryMap初始化</span></span><br><span class="line">memoryMap = <span class="keyword">new</span> <span class="keyword">byte</span>[maxSubpageAllocs &lt;&lt; <span class="number">1</span>];</span><br><span class="line">depthMap = <span class="keyword">new</span> <span class="keyword">byte</span>[memoryMap.length];</span><br><span class="line"><span class="keyword">int</span> memoryMapIndex = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> d = <span class="number">0</span>; d &lt;= maxOrder; ++ d) &#123; <span class="comment">// move down the tree one level at a time</span></span><br><span class="line">    <span class="keyword">int</span> depth = <span class="number">1</span> &lt;&lt; d;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> p = <span class="number">0</span>; p &lt; depth; ++ p) &#123;</span><br><span class="line">        <span class="comment">// in each level traverse left to right and set value to the depth of subtree</span></span><br><span class="line">        memoryMap[memoryMapIndex] = (<span class="keyword">byte</span>) d;</span><br><span class="line">        depthMap[memoryMapIndex] = (<span class="keyword">byte</span>) d;</span><br><span class="line">        memoryMapIndex ++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>下图是 MemoryMap 的抽象表示</p>
 <p><img src="/images/Netty/MemoryMap.png"></p>
@@ -364,487 +303,41 @@
 <p>当应用在实际运行过程中，碰到访问高峰，这时需要分配的内存是平时的好几倍，当然也需要创建好几倍的 chunk，如果先从 q000 开始，这些在高峰期创建的 chunk 被回收的概率会大大降低，延缓了内存的回收进度，造成内存使用的浪费。</p>
 <p>而 q050 保存的是内存利用率 50%~100% 的 chunk，应该是个折中的选择！这样大部分情况下，chunk 的利用率都会保持在一个较高水平，提高整个应用的内存利用率；qInit 的 chunk 利用率低，但不会被回收；q075 和 q100 由于内存利用率太高，导致内存分配的成功率大大降低，因此放到最后。</p>
 
-      
     </div>
 
     
     
     
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
+          <div class="post-tags">
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/Memory-Pool/" rel="tag"># Memory Pool</a>
+              <a href="/tags/PoolChunk/" rel="tag"># PoolChunk</a>
+              <a href="/tags/PoolSubPage/" rel="tag"># PoolSubPage</a>
+              <a href="/tags/PoolChunkList/" rel="tag"># PoolChunkList</a>
+              <a href="/tags/PoolArena/" rel="tag"># PoolArena</a>
+          </div>
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/" class="post-title-link" itemprop="url">Netty ByteBuf及相关辅助类</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-01-12 18:28:05" itemprop="dateCreated datePublished" datetime="2021-01-12T18:28:05+08:00">2021-01-12</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2021-01-13 12:54:47" itemprop="dateModified" datetime="2021-01-13T12:54:47+08:00">2021-01-13</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>ByteBuf 是对 JDK 提供的 <code>java.nio.ByteBuffer</code> 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
         
-      
-    </div>
 
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/11/Netty-Future%E5%92%8CPromise/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/11/Netty-Future%E5%92%8CPromise/" class="post-title-link" itemprop="url">Netty Future-Listener机制</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-              
-
-              <time title="Created: 2021-01-11 22:03:11 / Modified: 22:12:47" itemprop="dateCreated datePublished" datetime="2021-01-11T22:03:11+08:00">2021-01-11</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>由于 Netty 消息通知都采用了异步的方式，因此需要引入 Future-Listener 机制，通过观察者模式将消息返还给结果验证方进行下一步事件的触发。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/11/Netty-Future%E5%92%8CPromise/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
         
-      
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/" rel="prev" title="Netty ByteBuf及相关辅助类">
+      <i class="fa fa-chevron-left"></i> Netty ByteBuf及相关辅助类
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/13/Netty-Channel%E5%92%8CUnsafe/" rel="next" title="Netty Channel和Unsafe">
+      Netty Channel和Unsafe <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
       </footer>
+    
   </article>
   
   
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/09/Netty-ChannelPipeline%E5%92%8CChannelHandler/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/09/Netty-ChannelPipeline%E5%92%8CChannelHandler/" class="post-title-link" itemprop="url">Netty ChannelPipeline和ChannelHandler</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-01-09 09:06:25" itemprop="dateCreated datePublished" datetime="2021-01-09T09:06:25+08:00">2021-01-09</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2021-01-13 13:27:56" itemprop="dateModified" datetime="2021-01-13T13:27:56+08:00">2021-01-13</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>Netty 的 ChannelPipeline 和 ChannelHandler 机制类似于 Servlet 和 Filter 过滤器，这类拦截器实际上是职责链模式的一种变形，主要是为了方便事件的拦截和用户业务逻辑的定制。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/09/Netty-ChannelPipeline%E5%92%8CChannelHandler/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/08/Netty-C-S-%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/08/Netty-C-S-%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96/" class="post-title-link" itemprop="url">Netty C/S创建与初始化</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-01-08 22:24:21" itemprop="dateCreated datePublished" datetime="2021-01-08T22:24:21+08:00">2021-01-08</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C/S 端。 这无疑大大减轻了工作量、降低了开发难度。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/08/Netty-C-S-%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/07/Network-IO%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/07/Network-IO%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/" class="post-title-link" itemprop="url">Network I/O模型与线程模型</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-01-07 20:53:45" itemprop="dateCreated datePublished" datetime="2021-01-07T20:53:45+08:00">2021-01-07</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2021-01-11 22:11:53" itemprop="dateModified" datetime="2021-01-11T22:11:53+08:00">2021-01-11</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Network/" itemprop="url" rel="index"><span itemprop="name">Network</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>网络应用程序框架，高性能之处主要来自于其 I/O 模型和线程处理模型，前者决定如何收发数据，后者决定如何处理数据。根据 UNIX 网络编程的 I/O 模型的分类，UNIX 提供了五种 I/O 模型：阻塞式 I/O 模型（blocking I/O）、非阻塞式 I/O 模型（non-blocking I/O）、I/O 复用模型（I/O multiplexing）、信号驱动式 I/O 模型（signal-driven I/O）、异步 I/O 模型（asynchronous I/O）</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/07/Network-IO%E6%A8%A1%E5%9E%8B%E4%B8%8E%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/03/HEXO-QUICK-START/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
-      <meta itemprop="description" content="Leave a trace">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/01/03/HEXO-QUICK-START/" class="post-title-link" itemprop="url">HEXO QUICK START</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-01-03 21:02:58" itemprop="dateCreated datePublished" datetime="2021-01-03T21:02:58+08:00">2021-01-03</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Hexo/" itemprop="url" rel="index"><span itemprop="name">Hexo</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/01/03/HEXO-QUICK-START/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-
   
 
 
@@ -897,6 +390,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolChunk%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">1.</span> <span class="nav-text">PoolChunk内存分配</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E6%8B%9F%E5%86%85%E5%AD%98%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">模拟内存数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E9%85%8D%E5%86%85%E5%AD%98"><span class="nav-number">1.2.</span> <span class="nav-text">分配内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E5%86%85%E5%AD%98"><span class="nav-number">1.3.</span> <span class="nav-text">释放内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E8%8A%82%E7%82%B9%E7%8A%B6%E6%80%81%E7%9A%84%E7%BB%B4%E6%8A%A4"><span class="nav-number">1.4.</span> <span class="nav-text">对节点状态的维护</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolSubPage%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">2.</span> <span class="nav-text">PoolSubPage内存分配</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%B3%E8%AF%B7Subpage%E7%A9%BA%E9%97%B4"><span class="nav-number">2.1.</span> <span class="nav-text">申请Subpage空间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Subpage%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">2.2.</span> <span class="nav-text">Subpage的初始化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">2.3.</span> <span class="nav-text">内存分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolChunkList%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">PoolChunkList内存管理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolArena%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">PoolArena内存管理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#PoolArena-%E7%9A%84%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.</span> <span class="nav-text">PoolArena 的内部结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#poolArena%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">4.2.</span> <span class="nav-text">poolArena内存分配</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
