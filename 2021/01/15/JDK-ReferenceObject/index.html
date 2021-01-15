@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lanchestios.giyhub.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="对 Java 的五种引用进行了概念上的介绍，着重介绍了 Reference 状态流转、ReferenceQueue 和 FinalReference 的内容。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JDK Reference Object">
+<meta property="og:url" content="http://lanchestios.giyhub.io/2021/01/15/JDK-ReferenceObject/index.html">
+<meta property="og:site_name" content="Lache&#39;s Blog">
+<meta property="og:description" content="对 Java 的五种引用进行了概念上的介绍，着重介绍了 Reference 状态流转、ReferenceQueue 和 FinalReference 的内容。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.giyhub.io/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png">
+<meta property="article:published_time" content="2021-01-15T01:23:35.000Z">
+<meta property="article:modified_time" content="2021-01-15T01:27:35.267Z">
+<meta property="article:author" content="lanchestios">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="Reference">
+<meta property="article:tag" content="ReferenceQueue">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://lanchestios.giyhub.io/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+
+<link rel="canonical" href="http://lanchestios.giyhub.io/2021/01/15/JDK-ReferenceObject/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>JDK Reference Object | Lache's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lache's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/15/JDK-ReferenceObject/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="lanchestios">
+      <meta itemprop="description" content="Leave a trace">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lache's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JDK Reference Object
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2021-01-15 09:23:35 / Modified: 09:27:35" itemprop="dateCreated datePublished" datetime="2021-01-15T09:23:35+08:00">2021-01-15</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/JDK/" itemprop="url" rel="index"><span itemprop="name">JDK</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>对 Java 的五种引用进行了概念上的介绍，着重介绍了 Reference 状态流转、ReferenceQueue 和 FinalReference 的内容。</p>
+<a id="more"></a>
+
+<h1 id="Reference-Object"><a href="#Reference-Object" class="headerlink" title="Reference Object"></a>Reference Object</h1><p>Java 引用有五种类型：强（strong）引用、软（soft）引用、弱（weak）引用、虚（phantom）引用、终（final）引用。除了强引用，其他几种引用均继承<code>java.lang.ref.Reference</code>。</p>
+<p><img src="/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p><strong>Strong Reference</strong></p>
+<p>最常用的引用类型，在执行下面的语句时，变量 <code>o</code> 即为一个强引用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Object o = <span class="keyword">new</span> Object();</span><br></pre></td></tr></table></figure>
+<h2 id="Reference基本用法"><a href="#Reference基本用法" class="headerlink" title="Reference基本用法"></a>Reference基本用法</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//T 被引用的对象</span></span><br><span class="line">Reference(T referent, ReferenceQueue&lt;? <span class="keyword">super</span> T&gt; queue) &#123;</span><br><span class="line">    <span class="keyword">this</span>.referent = referent;</span><br><span class="line">    <span class="keyword">this</span>.queue = (queue == <span class="keyword">null</span>) ? ReferenceQueue.NULL : queue;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果我们在创建一个引用对象时，指定了<code>ReferenceQueue</code>，那么当引用对象指向的对象达到合适的状态（根据引用类型不同而不同）时，GC 会把引用对象本身添加到这个队列中，方便我们处理它，因为引用对象指向的对象 GC 会自动清理，但是引用对象本身也是对象（是对象就占用一定资源），所以需要我们自己清理。</p>
+<p>例如：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Object o = <span class="keyword">new</span> Object();</span><br><span class="line">SoftReference&lt;Object&gt; sr = <span class="keyword">new</span> SoftReference&lt;&gt;(o , queue);</span><br></pre></td></tr></table></figure>
+<p><code>sr</code>为软引用，指向<code>o</code>这个对象，<code>o</code>会在一定时机被 GC 自动清理，但是<code>sr</code>对象本身的清理工作依赖于<code>queue</code>，当<code>sr</code>出现在<code>queue</code>中时，说明其指向的对象已经无效，可以放心清理了。</p>
+<h2 id="Reference的四种状态"><a href="#Reference的四种状态" class="headerlink" title="Reference的四种状态"></a>Reference的四种状态</h2><p>每一时刻，<code>Reference</code>对象都处于下面四种状态中。这四种状态用<code>Reference</code>的成员变量<code>queue</code>与<code>next</code>（类似于单链表中的next）来标示。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ReferenceQueue&lt;? <span class="keyword">super</span> T&gt; queue; </span><br><span class="line">Reference next;</span><br></pre></td></tr></table></figure>
+<p>Active：新创建的引用对象都是这个状态，在 GC 检测到引用对象已经到达合适的 reachability 时，GC 会根据引用对象是否在创建时制定<code>ReferenceQueue</code>参数进行状态转移，如果指定了，那么转移到<code>Pending</code>，如果没指定，转移到<code>Inactive</code>。在这个状态中</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//如果构造参数中没指定queue，那么queue为ReferenceQueue.NULL，否则为构造参数中传递过来的queue</span></span><br><span class="line">queue = ReferenceQueue || ReferenceQueue.NULL</span><br><span class="line">next = <span class="keyword">null</span></span><br></pre></td></tr></table></figure>
+<p>Pending：pending-Reference 列表中的引用都是这个状态，它们等着被内部线程<code>ReferenceHandler</code>处理（会调用<code>ReferenceQueue.enqueue</code>方法）。没有注册的实例不会进入这个状态。在这个状态中</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//构造参数参数中传递过来的queue</span></span><br><span class="line">queue = ReferenceQueue</span><br><span class="line">next = 该queue中的下一个引用，如果是该队列中的最后一个，那么为<span class="keyword">this</span></span><br></pre></td></tr></table></figure>
+<p>Enqueued：调用<code>ReferenceQueue.enqueued</code>方法后的引用处于这个状态中。没有注册的实例不会进入这个状态。在这个状态中</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">queue = ReferenceQueue.ENQUEUED;</span><br><span class="line">next = 该queue中的下一个引用，如果是该队列中的最后一个，那么为<span class="keyword">this</span>;</span><br></pre></td></tr></table></figure>
+<p>Inactive：最终状态，处于这个状态的引用对象，状态不会在改变。在这个状态中</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">queue = ReferenceQueue.NULL;</span><br><span class="line">next = <span class="keyword">this</span>;</span><br></pre></td></tr></table></figure>
+<p>有了这些约束，GC 只需要检测<code>next</code>字段就可以知道是否需要对该引用对象采取特殊处理</p>
+<ul>
+<li>如果<code>next</code>为<code>null</code>，那么说明该引用为<code>Active</code>状态</li>
+<li>如果<code>next</code>不为<code>null</code>，那么 GC 应该按其正常逻辑处理该引用。</li>
+</ul>
+<p><img src="/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png"></p>
+<blockquote>
+<p><strong>注意</strong></p>
+<ol>
+<li>如果构造函数中指定了<code>ReferenceQueue</code>，那么事后程序员可以通过该队列清理引用</li>
+<li>如果构造函数中没有指定了<code>ReferenceQueue</code>，那么 GC 会自动清理引用</li>
+</ol>
+</blockquote>
+<h1 id="Reference-Subclass"><a href="#Reference-Subclass" class="headerlink" title="Reference Subclass"></a>Reference Subclass</h1><h2 id="软引用（soft-reference）"><a href="#软引用（soft-reference）" class="headerlink" title="软引用（soft reference）"></a>软引用（soft reference）</h2><p>软引用指向的对象会在程序即将触发<code>OOM</code>时被 GC 清理掉，之后，引用对象会被放到<code>ReferenceQueue</code>中。软引用可用来实现内存敏感的高速缓存，比如网页缓存、图片缓存等。使用软引用能防止内存泄露，增强程序的健壮性。</p>
+<h2 id="弱引用（weak-reference）"><a href="#弱引用（weak-reference）" class="headerlink" title="弱引用（weak reference）"></a>弱引用（weak reference）</h2><p>当 GC 进行垃圾回收时，无论内存是否充足，都会回收被弱引用关联的对象，引用对象会被放到<code>ReferenceQueue</code>中。一般用来实现 canonicalizing mapping，也就是本文要讲的<code>WeakHashMap</code>。</p>
+<h2 id="虚引用（phantom-reference）"><a href="#虚引用（phantom-reference）" class="headerlink" title="虚引用（phantom reference）"></a>虚引用（phantom reference）</h2><p>虚引用并不影响对象的生命周期，在任何时候都可能被垃圾回收器回收。调用虚引用的<code>get</code>方法，总会返回<code>null</code>，与软引用和弱引用不同的是，虚引用被<code>enqueued</code>时，GC 并不会自动清理虚引用指向的对象，只有当指向该对象的所有虚引用全部被清理（enqueued后）后或其本身不可达时，该对象才会被清理。</p>
+<h2 id="终引用（final-reference）"><a href="#终引用（final-reference）" class="headerlink" title="终引用（final reference）"></a>终引用（final reference）</h2><p>FinalReference 在 JDK 的实现</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//类访问权限：package 不能直接对其进行扩展</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">FinalReference</span>&lt;<span class="title">T</span>&gt; <span class="keyword">extends</span> <span class="title">Reference</span>&lt;<span class="title">T</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">FinalReference</span><span class="params">(T referent, ReferenceQueue&lt;? <span class="keyword">super</span> T&gt; q)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>(referent, q);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>JDK 对 FinalReference 的扩展</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">Finalizer</span> <span class="keyword">extends</span> <span class="title">FinalReference</span> </span>&#123; <span class="comment">/* Package-private; must be in</span></span><br><span class="line"><span class="comment">                                                  same package as the Reference</span></span><br><span class="line"><span class="comment">                                                  class */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* A native method that invokes an arbitrary object&#x27;s finalize method is</span></span><br><span class="line"><span class="comment">       required since the finalize method is protected</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">static</span> <span class="keyword">native</span> <span class="keyword">void</span> <span class="title">invokeFinalizeMethod</span><span class="params">(Object o)</span> <span class="keyword">throws</span> Throwable</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> ReferenceQueue queue = <span class="keyword">new</span> ReferenceQueue();</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> Finalizer unfinalized = <span class="keyword">null</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Object lock = <span class="keyword">new</span> Object();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> Finalizer</span><br><span class="line">        next = <span class="keyword">null</span>,</span><br><span class="line">        prev = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line">     <span class="comment">/* Invoked by VM */</span></span><br><span class="line">    <span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">register</span><span class="params">(Object finalizee)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//调用Finalizer以及上层FinalReference构造</span></span><br><span class="line">        <span class="keyword">new</span> Finalizer(finalizee);</span><br><span class="line">    &#125;  </span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="title">Finalizer</span><span class="params">(Object finalizee)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>(finalizee, queue);</span><br><span class="line">        <span class="comment">//调用add方法：将当前对象插入到Finalizer对象链里，链里的对象和Finalizer类静态关联。</span></span><br><span class="line">        <span class="comment">//言外之意是在这个链里的对象都无法被GC掉，除非将这种引用关系剥离</span></span><br><span class="line">        <span class="comment">//（因为`Finalizer`类无法被unload）</span></span><br><span class="line">        add();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">synchronized</span> (lock) &#123;</span><br><span class="line">            <span class="keyword">if</span> (unfinalized != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">this</span>.next = unfinalized;</span><br><span class="line">                unfinalized.prev = <span class="keyword">this</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            unfinalized = <span class="keyword">this</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;    </span><br></pre></td></tr></table></figure>
+<p><strong>什么是Finalizer类</strong></p>
+<p>判断当前类是否为<code>Finalizer</code>类的标准是覆盖<code>finalize</code>方法，且该方法体必须非空。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//Object</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">finalize</span><span class="params">()</span> <span class="keyword">throws</span> Throwable </span>&#123; &#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>需要注意的是，JVM 在类加载的时候会遍历当前类的所有方法，包括父类的方法，只要重写非空<code>finalize</code>方法就认为这个类是 Finalizer 类。</p>
+<p>如果不是 Finalizer 类的话，该类在被 GC 回收时其实并不会调用它的<code>finalize</code>方法。</p>
+</blockquote>
+<p><strong>Finalizer类何时传到Finalizer.register方法</strong></p>
+<p>对象的创建其实是被拆分成多个步骤的，比如<code>A a=new A(2)</code>这样一条语句对应的字节码如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">0: new           #1                  &#x2F;&#x2F; class A</span><br><span class="line">3: dup</span><br><span class="line">4: iconst_2</span><br><span class="line">5: invokespecial #11                 &#x2F;&#x2F; Method &quot;&lt;init&gt;&quot;:(I)V</span><br></pre></td></tr></table></figure>
+<p>先执行 new 分配好对象空间，然后再执行 invokespecial 调用构造函数，JVM 里其实可以让用户在这两个时机中选择一个，将当前对象传递给<code>Finalizer.register</code>方法来注册到<code>Finalizer</code>对象链里，这个选择取决于是否设置了<code>RegisterFinalizersAtInit</code>这个vm参数，默认值为 true，也就是在构造函数返回之前调用<code>Finalizer.register</code>方法，如果通过<code>-XX:-RegisterFinalizersAtInit</code>关闭了该参数，那将在对象空间分配好之后将这个对象注册进去。</p>
+<p>另外需要提醒的是，当我们通过 clone 的方式复制一个对象时，如果当前类是一个f类，那么在 clone 完成时将调用<code>Finalizer.register</code>方法进行注册。</p>
+<p><strong>hotspot如何实现Finalizer类对象在构造函数执行完毕后调用Finalizer.register</strong></p>
+<p>执行一个构造函数时，会去调用父类的构造函数，主要是为了初始化继承自父类的属性，那么任何一个对象的初始化最终都会调用到<code>Object</code>的空构造函数里（任何空的构造函数其实并不空，会含有三条字节码指令，如下代码所示），为了不对所有类的构造函数都埋点调用<code>Finalizer.register</code>方法，hotspot 的实现是，在初始化<code>Object</code>类时将构造函数里的<code>return</code>指令替换为<code>_return_register_finalizer</code>指令，该指令并不是标准的字节码指令，是 hotspot 扩展的指令，这样在处理该指令时调用<code>Finalizer.register</code>方法，以很小的侵入性代价完美地解决了这个问题。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0: aload_0</span><br><span class="line">1: invokespecial #21                 &#x2F;&#x2F; Method java&#x2F;lang&#x2F;Object.&quot;&lt;init&gt;&quot;:()V</span><br><span class="line">4: return</span><br></pre></td></tr></table></figure>
+<p><strong>Finalizer类对象的GC回收</strong></p>
+<p>在<code>Finalizer</code>类的<code>clinit</code>方法（静态块）里，我们看到它会创建一个<code>FinalizerThread</code>守护线程，这个线程的优先级并不是最高的，意味着在CPU很紧张的情况下其被调度的优先级可能会受到影响</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">FinalizerThread</span> <span class="keyword">extends</span> <span class="title">Thread</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="keyword">boolean</span> running;</span><br><span class="line">    FinalizerThread(ThreadGroup g) &#123;</span><br><span class="line">        <span class="keyword">super</span>(g, <span class="string">&quot;Finalizer&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (running)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        running = <span class="keyword">true</span>;</span><br><span class="line">        <span class="keyword">for</span> (;;) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                Finalizer f = (Finalizer)queue.remove();</span><br><span class="line">                f.runFinalizer();</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException x) &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> &#123;</span><br><span class="line">    ThreadGroup tg = Thread.currentThread().getThreadGroup();</span><br><span class="line">    <span class="keyword">for</span> (ThreadGroup tgn = tg;</span><br><span class="line">         tgn != <span class="keyword">null</span>;</span><br><span class="line">         tg = tgn, tgn = tg.getParent());</span><br><span class="line">    Thread finalizer = <span class="keyword">new</span> FinalizerThread(tg);</span><br><span class="line">    finalizer.setPriority(Thread.MAX_PRIORITY - <span class="number">2</span>);</span><br><span class="line">    finalizer.setDaemon(<span class="keyword">true</span>);</span><br><span class="line">    finalizer.start();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个线程用来从queue里获取<code>Finalizer</code>对象，然后执行该对象的<code>runFinalizer</code>方法，该方法会将<code>Finalizer</code>对象从<code>Finalizer</code>对象链里剥离出来，这样意味着下次GC发生时就可以将其关联的<code>Finalizer</code>对象回收了，最后将这个<code>Finalizer</code>对象关联的<code>Finalizer</code>对象传给一个native方法<code>invokeFinalizeMethod</code></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">runFinalizer</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">synchronized</span> (<span class="keyword">this</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (hasBeenFinalized()) <span class="keyword">return</span>;</span><br><span class="line">        remove();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Object finalizee = <span class="keyword">this</span>.get();</span><br><span class="line">        <span class="keyword">if</span> (finalizee != <span class="keyword">null</span> &amp;&amp; !(finalizee <span class="keyword">instanceof</span> java.lang.Enum)) &#123;</span><br><span class="line">            invokeFinalizeMethod(finalizee);</span><br><span class="line">            <span class="comment">/* Clear stack slot containing this variable, to decrease</span></span><br><span class="line"><span class="comment">                   the chances of false retention with a conservative GC */</span></span><br><span class="line">            finalizee = <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Throwable x) &#123; &#125;</span><br><span class="line">    <span class="keyword">super</span>.clear();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">static</span> <span class="keyword">native</span> <span class="keyword">void</span> <span class="title">invokeFinalizeMethod</span><span class="params">(Object o)</span> <span class="keyword">throws</span> Throwable</span>;</span><br></pre></td></tr></table></figure>
+<p>其实<code>invokeFinalizeMethod</code>方法就是调了这个f对象的finalize方法.</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">JNIEXPORT <span class="keyword">void</span> JNICALL</span><br><span class="line">Java_java_lang_ref_Finalizer_invokeFinalizeMethod(JNIEnv *env, jclass clazz,</span><br><span class="line">                                                  jobject ob)</span><br><span class="line">&#123;</span><br><span class="line">    jclass cls;</span><br><span class="line">    jmethodID mid;</span><br><span class="line"></span><br><span class="line">    cls = (*env)-&gt;GetObjectClass(env, ob);</span><br><span class="line">    <span class="keyword">if</span> (cls == <span class="literal">NULL</span>) <span class="keyword">return</span>;</span><br><span class="line">    mid = (*env)-&gt;GetMethodID(env, cls, <span class="string">&quot;finalize&quot;</span>, <span class="string">&quot;()V&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (mid == <span class="literal">NULL</span>) <span class="keyword">return</span>;</span><br><span class="line">    (*env)-&gt;CallVoidMethod(env, ob, mid);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Finalizer对象的finalize方法会执行多次吗</strong></p>
+<p>如果我们在f对象的<code>finalize</code>方法里重新将当前对象赋值，变成可达对象，当这个f对象再次变成不可达时还会执行<code>finalize</code>方法吗？答案是否定的，因为在执行完第一次<code>finalize</code>方法后，这个<code>Finalizer</code>对象已经和之前的<code>Finalizer</code>对象剥离了，也就是下次GC的时候不会再发现<code>Finalizer</code>对象指向该<code>Finalizer</code>对象了，自然也就不会调用这个<code>Finalizer</code>对象的<code>finalize</code>方法了。</p>
+<p><strong>Finalizer对象何时被放到ReferenceQueue里</strong></p>
+<p>当 GC 发生时，GC 算法会判断<code>Finalizer</code>类对象是不是只被<code>Finalizer</code>类引用（<code>Finalizer</code>类对象被<code>Finalizer</code>对象引用，然后放到<code>Finalizer</code>对象链里），如果这个类仅仅被<code>Finalizer</code>对象引用，说明这个对象在不久的将来会被回收，现在可以执行它的<code>finalize</code>方法了，于是会将这个<code>Finalizer</code>对象放到<code>Finalizer</code>类的<code>ReferenceQueue</code>里，但是这个<code>Finalizer</code>类对象其实并没有被回收，因为<code>Finalizer</code>这个类还对它们保持引用，在GC完成之前，JVM会调用<code>ReferenceQueue</code>中 lock 对象的 notify 方法（当<code>ReferenceQueue</code>为空时，<code>FinalizerThread</code>线程会调用<code>ReferenceQueue</code>的 lock 对象的 wait 方法直到被 JVM 唤醒），此时就会执行上面 FinalizeThread 线程里看到的其他逻辑了。</p>
+<p><strong>Finalizer导致的内存泄露</strong></p>
+<p>这里举一个简单的例子，我们使用挺广的Socket通信，<code>SocksSocketImpl</code>的父类其实就实现了<code>finalize</code>方法:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;**</span><br><span class="line"> * Cleans up if the user forgets to close it.</span><br><span class="line"> *&#x2F;</span><br><span class="line">protected void finalize() throws IOException &#123;</span><br><span class="line">    close();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其实这么做的主要目的是万一用户忘记关闭Socket，那么在这个对象被回收时能主动关闭Socket来释放一些系统资源，但是如果用户真的忘记关闭，那这些<code>socket</code>对象可能因为<code>FinalizeThread</code>迟迟没有执行这些<code>socket</code>对象的<code>finalize</code>方法，而导致内存泄露。</p>
+<p><strong>Finalizer的客观评价</strong></p>
+<p>Java 里我们看到有构造函数，但是并没有看到析构函数一说，<code>Finalizer</code>其实是实现了析构函数的概念，我们在对象被回收前可以执行一些“收拾性”的逻辑，应该说是一个特殊场景的补充，但是这种概念的实现给<code>Finalizer</code>对象生命周期以及 GC 等带来了一些影响：</p>
+<ul>
+<li><code>Finalizer</code>对象因为<code>Finalizer</code>的引用而变成了一个临时的强引用，即使没有其他的强引用，还是无法立即被回收</li>
+<li><code>Finalizer</code>对象至少经历两次 GC 才能被回收，因为只有在<code>FinalizerThread</code>执行完了<code>Finalizer</code>对象的<code>finalize</code>方法的情况下才有可能被下次GC回收，而有可能期间已经经历过多次GC了，但是一直还没执行<code>Finalizer</code>对象的<code>finalize</code>方法</li>
+<li>CPU资源比较稀缺的情况下<code>FinalizerThread</code>线程有可能因为优先级比较低而延迟执行<code>Finalizer</code>对象的<code>finalize</code>方法</li>
+<li>因为<code>Finalizer</code>对象的<code>finalize</code>方法迟迟没有执行，有可能会导致大部分<code>Finalizer</code>对象进入到old分代，此时容易引发old分代的GC，甚至Full GC，GC暂停时间明显变长</li>
+<li><code>Finalizer</code>对象的<code>finalize</code>方法被调用后，这个对象其实还并没有被回收，虽然可能在不久的将来会被回收</li>
+</ul>
+<h1 id="ReferenceQueue"><a href="#ReferenceQueue" class="headerlink" title="ReferenceQueue"></a>ReferenceQueue</h1><p>引用队列，在检测到适当的可到达性更改后，垃圾回收器将已注册的引用对象添加到该队列中。</p>
+<p>ReferenceQueue 名义上是一个队列，但实际内部并非有实际的存储结构，它的存储是依赖于内部节点之间的关系来表达。可以理解为 queue 是一个类似于链表的结构，这里的节点其实就是 reference 本身。</p>
+<h2 id="pending和discovered"><a href="#pending和discovered" class="headerlink" title="pending和discovered"></a>pending和discovered</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//要处理的对象链表，通过discovered排队</span></span><br><span class="line"><span class="keyword">transient</span> <span class="keyword">private</span> Reference&lt;T&gt; discovered;  <span class="comment">/* used by VM */</span></span><br><span class="line"><span class="comment">//JVM 在 GC 时通过discovered不断地拿到下一个对象赋值给pending(因有两个线程访问，需加锁)</span></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> Reference&lt;Object&gt; pending = <span class="keyword">null</span>;</span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (pending != <span class="keyword">null</span>) &#123;</span><br><span class="line">     r = pending;</span><br><span class="line">    <span class="comment">// &#x27;instanceof&#x27; might throw OutOfMemoryError sometimes</span></span><br><span class="line">    <span class="comment">// so do this before un-linking &#x27;r&#x27; from the &#x27;pending&#x27; chain...</span></span><br><span class="line">    c = r <span class="keyword">instanceof</span> Cleaner ? (Cleaner) r : <span class="keyword">null</span>;</span><br><span class="line">    <span class="comment">// unlink &#x27;r&#x27; from &#x27;pending&#x27; chain</span></span><br><span class="line">    pending = r.discovered;</span><br><span class="line">    r.discovered = <span class="keyword">null</span>;</span><br></pre></td></tr></table></figure>
+<h2 id="重要方法"><a href="#重要方法" class="headerlink" title="重要方法"></a>重要方法</h2><h3 id="Clear方法"><a href="#Clear方法" class="headerlink" title="Clear方法"></a>Clear方法</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Clears this reference object.  Invoking this method will not cause this</span></span><br><span class="line"><span class="comment"> * object to be enqueued.</span></span><br><span class="line"><span class="comment"> *</span></span><br><span class="line"><span class="comment"> * &lt;p&gt; This method is invoked only by Java code; when the garbage collector</span></span><br><span class="line"><span class="comment"> * clears references it does so directly, without invoking this method.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">clear</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">this</span>.referent = <span class="keyword">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="ReferenceHandler线程"><a href="#ReferenceHandler线程" class="headerlink" title="ReferenceHandler线程"></a>ReferenceHandler线程</h3><p>这个线程在 Reference 类的 static 构造块中启动，并且被设置为高优先级和 daemon 状态。此线程要做的事情，是不断的检查 pending 是否为 null，如果 pending不为 null，则将 pending 进行 enqueue，否则线程进入 wait 状态。</p>
+<p>由此可见，pending 是由 JVM 来赋值的，当 Reference 内部的 referent 对象的可达状态改变时，JVM 会将 Reference 对象放入 pending 链表。并且这里 enqueue 的队列是我们在初始化（构造函数）Reference 对象时传进来的 queue，如果传入了 null（实际使用的是ReferenceQueue.NULL），则 ReferenceHandler 则不进行 enqueue 操作，所以只有非 RefernceQueue.NULL 的 queue 才会将 Reference 进行 enqueue。</p>
+<p>ReferenceQueue 是作为 JVM GC 与上层 Reference 对象管理之间的一个消息传递方式，它使得我们可以对所监听的对象引用可达发生变化时做一些处理</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> &#123;</span><br><span class="line">    ThreadGroup tg = Thread.currentThread().getThreadGroup();</span><br><span class="line">    <span class="keyword">for</span> (ThreadGroup tgn = tg;</span><br><span class="line">         tgn != <span class="keyword">null</span>;</span><br><span class="line">         tg = tgn, tgn = tg.getParent());</span><br><span class="line">    Thread handler = <span class="keyword">new</span> ReferenceHandler(tg, <span class="string">&quot;Reference Handler&quot;</span>);</span><br><span class="line">    <span class="comment">/* If there were a special system-only priority greater than</span></span><br><span class="line"><span class="comment">         * MAX_PRIORITY, it would be used here</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">    handler.setPriority(Thread.MAX_PRIORITY);</span><br><span class="line">    handler.setDaemon(<span class="keyword">true</span>);</span><br><span class="line">    handler.start();</span><br><span class="line"></span><br><span class="line">    <span class="comment">// provide access in SharedSecrets</span></span><br><span class="line">    SharedSecrets.setJavaLangRefAccess(<span class="keyword">new</span> JavaLangRefAccess() &#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">tryHandlePendingReference</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> tryHandlePending(<span class="keyword">false</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其优先级最高，可以理解为需要不断地处理引用对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">ReferenceHandler</span> <span class="keyword">extends</span> <span class="title">Thread</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">ensureClassInitialized</span><span class="params">(Class&lt;?&gt; clazz)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            Class.forName(clazz.getName(), <span class="keyword">true</span>, clazz.getClassLoader());</span><br><span class="line">        &#125; <span class="keyword">catch</span> (ClassNotFoundException e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> (Error) <span class="keyword">new</span> NoClassDefFoundError(e.getMessage()).initCause(e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> &#123;</span><br><span class="line">        <span class="comment">// pre-load and initialize InterruptedException and Cleaner classes</span></span><br><span class="line">        <span class="comment">// so that we don&#x27;t get into trouble later in the run loop if there&#x27;s</span></span><br><span class="line">        <span class="comment">// memory shortage while loading/initializing them lazily.</span></span><br><span class="line">        ensureClassInitialized(InterruptedException.class);</span><br><span class="line">        ensureClassInitialized(Cleaner.class);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ReferenceHandler(ThreadGroup g, String name) &#123;</span><br><span class="line">        <span class="keyword">super</span>(g, name);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">            tryHandlePending(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Try handle pending &#123;<span class="doctag">@link</span> Reference&#125; if there is one.&lt;p&gt;</span></span><br><span class="line"><span class="comment">     * Return &#123;<span class="doctag">@code</span> true&#125; as a hint that there might be another</span></span><br><span class="line"><span class="comment">     * &#123;<span class="doctag">@link</span> Reference&#125; pending or &#123;<span class="doctag">@code</span> false&#125; when there are no more pending</span></span><br><span class="line"><span class="comment">     * &#123;<span class="doctag">@link</span> Reference&#125;s at the moment and the program can do some other</span></span><br><span class="line"><span class="comment">     * useful work instead of looping.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> waitForNotify if &#123;<span class="doctag">@code</span> true&#125; and there was no pending</span></span><br><span class="line"><span class="comment">     *                      &#123;<span class="doctag">@link</span> Reference&#125;, wait until notified from VM</span></span><br><span class="line"><span class="comment">     *                      or interrupted; if &#123;<span class="doctag">@code</span> false&#125;, return immediately</span></span><br><span class="line"><span class="comment">     *                      when there is no pending &#123;<span class="doctag">@link</span> Reference&#125;.</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> &#123;<span class="doctag">@code</span> true&#125; if there was a &#123;<span class="doctag">@link</span> Reference&#125; pending and it</span></span><br><span class="line"><span class="comment">     *         was processed, or we waited for notification and either got it</span></span><br><span class="line"><span class="comment">     *         or thread was interrupted before being notified;</span></span><br><span class="line"><span class="comment">     *         &#123;<span class="doctag">@code</span> false&#125; otherwise.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">tryHandlePending</span><span class="params">(<span class="keyword">boolean</span> waitForNotify)</span> </span>&#123;</span><br><span class="line">    Reference&lt;Object&gt; r;</span><br><span class="line">    Cleaner c;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">synchronized</span> (lock) &#123;</span><br><span class="line">            <span class="keyword">if</span> (pending != <span class="keyword">null</span>) &#123;</span><br><span class="line">                r = pending;</span><br><span class="line">                <span class="comment">// &#x27;instanceof&#x27; might throw OutOfMemoryError sometimes</span></span><br><span class="line">                <span class="comment">// so do this before un-linking &#x27;r&#x27; from the &#x27;pending&#x27; chain...</span></span><br><span class="line">                c = r <span class="keyword">instanceof</span> Cleaner ? (Cleaner) r : <span class="keyword">null</span>;</span><br><span class="line">                <span class="comment">// unlink &#x27;r&#x27; from &#x27;pending&#x27; chain</span></span><br><span class="line">                pending = r.discovered;</span><br><span class="line">                r.discovered = <span class="keyword">null</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// The waiting on the lock may cause an OutOfMemoryError</span></span><br><span class="line">                <span class="comment">// because it may try to allocate exception objects.</span></span><br><span class="line">                <span class="keyword">if</span> (waitForNotify) &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">// retry if waited</span></span><br><span class="line">                <span class="keyword">return</span> waitForNotify;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (OutOfMemoryError x) &#123;</span><br><span class="line">        <span class="comment">// Give other threads CPU time so they hopefully drop some live references</span></span><br><span class="line">        <span class="comment">// and GC reclaims some space.</span></span><br><span class="line">        <span class="comment">// Also prevent CPU intensive spinning in case &#x27;r instanceof Cleaner&#x27; above</span></span><br><span class="line">        <span class="comment">// persistently throws OOME for some time...</span></span><br><span class="line">        Thread.yield();</span><br><span class="line">        <span class="comment">// retry</span></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (InterruptedException x) &#123;</span><br><span class="line">        <span class="comment">// retry</span></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Fast path for cleaners</span></span><br><span class="line">    <span class="keyword">if</span> (c != <span class="keyword">null</span>) &#123;</span><br><span class="line">        c.clean();</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ReferenceQueue&lt;? <span class="keyword">super</span> Object&gt; q = r.queue;</span><br><span class="line">    <span class="keyword">if</span> (q != ReferenceQueue.NULL) q.enqueue(r);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/Reference/" rel="tag"># Reference</a>
+              <a href="/tags/ReferenceQueue/" rel="tag"># ReferenceQueue</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/15/Netty-%E7%A7%81%E6%9C%89%E5%8D%8F%E8%AE%AE%E6%A0%88%E5%BC%80%E5%8F%91/" rel="prev" title="Netty 私有协议栈开发">
+      <i class="fa fa-chevron-left"></i> Netty 私有协议栈开发
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Reference-Object"><span class="nav-number">1.</span> <span class="nav-text">Reference Object</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Reference%E5%9F%BA%E6%9C%AC%E7%94%A8%E6%B3%95"><span class="nav-number">1.1.</span> <span class="nav-text">Reference基本用法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Reference%E7%9A%84%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81"><span class="nav-number">1.2.</span> <span class="nav-text">Reference的四种状态</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Reference-Subclass"><span class="nav-number">2.</span> <span class="nav-text">Reference Subclass</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BD%AF%E5%BC%95%E7%94%A8%EF%BC%88soft-reference%EF%BC%89"><span class="nav-number">2.1.</span> <span class="nav-text">软引用（soft reference）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%B1%E5%BC%95%E7%94%A8%EF%BC%88weak-reference%EF%BC%89"><span class="nav-number">2.2.</span> <span class="nav-text">弱引用（weak reference）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%99%9A%E5%BC%95%E7%94%A8%EF%BC%88phantom-reference%EF%BC%89"><span class="nav-number">2.3.</span> <span class="nav-text">虚引用（phantom reference）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%88%E5%BC%95%E7%94%A8%EF%BC%88final-reference%EF%BC%89"><span class="nav-number">2.4.</span> <span class="nav-text">终引用（final reference）</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ReferenceQueue"><span class="nav-number">3.</span> <span class="nav-text">ReferenceQueue</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#pending%E5%92%8Cdiscovered"><span class="nav-number">3.1.</span> <span class="nav-text">pending和discovered</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8D%E8%A6%81%E6%96%B9%E6%B3%95"><span class="nav-number">3.2.</span> <span class="nav-text">重要方法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Clear%E6%96%B9%E6%B3%95"><span class="nav-number">3.2.1.</span> <span class="nav-text">Clear方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ReferenceHandler%E7%BA%BF%E7%A8%8B"><span class="nav-number">3.2.2.</span> <span class="nav-text">ReferenceHandler线程</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">lanchestios</p>
+  <div class="site-description" itemprop="description">Leave a trace</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">11</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lanchestios</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
