@@ -17,21 +17,21 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"lanchestios.giyhub.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"lanchestios.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="ByteBuf 是对 JDK 提供的 java.nio.ByteBuffer 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Netty ByteBuf及相关辅助类">
-<meta property="og:url" content="http://lanchestios.giyhub.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/index.html">
+<meta property="og:url" content="http://lanchestios.github.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/index.html">
 <meta property="og:site_name" content="Lache&#39;s Blog">
 <meta property="og:description" content="ByteBuf 是对 JDK 提供的 java.nio.ByteBuffer 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://lanchestios.giyhub.io/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png">
 <meta property="article:published_time" content="2021-01-12T10:28:05.000Z">
 <meta property="article:modified_time" content="2021-01-15T01:42:34.000Z">
 <meta property="article:author" content="lanchestios">
@@ -43,9 +43,9 @@
 <meta property="article:tag" content="PooledByteBuf">
 <meta property="article:tag" content="ByteBuf辅助类">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.giyhub.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta name="twitter:image" content="http://lanchestios.github.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
 
-<link rel="canonical" href="http://lanchestios.giyhub.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
+<link rel="canonical" href="http://lanchestios.github.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
 
 
 <script id="page-configurations">
@@ -201,7 +201,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.giyhub.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
+    <link itemprop="mainEntityOfPage" href="http://lanchestios.github.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
