@@ -1556,6 +1556,176 @@
       </tags>
   </entry>
   <entry>
+    <title>Tomcat 总体架构</title>
+    <url>/2021/01/23/Tomcat-%E6%80%BB%E4%BD%93%E6%9E%B6%E6%9E%84/</url>
+    <content><![CDATA[<p>从最简单的单体 Server 架构，将模块化功能解耦，逐步演化为 Tomcat 现有的整体架构。从静态设计、动态设计和类加载机制三个方面介绍 Tomcat 的优势以及架构的优美。</p>
+<a id="more"></a>
+
+<h1 id="Tomcat总体架构"><a href="#Tomcat总体架构" class="headerlink" title="Tomcat总体架构"></a>Tomcat总体架构</h1><h2 id="静态设计"><a href="#静态设计" class="headerlink" title="静态设计"></a>静态设计</h2><h3 id="Server"><a href="#Server" class="headerlink" title="Server"></a>Server</h3><p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A11.png"></p>
+<h3 id="Connector和Container"><a href="#Connector和Container" class="headerlink" title="Connector和Container"></a>Connector和Container</h3><p><strong>目标</strong>：将网络协议和网络容器解耦</p>
+<ol>
+<li>拆分请求监听（Connector）和请求处理（Container）</li>
+</ol>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A12.png"></p>
+<p>缺点：需要维护Connector与Container的复杂映射关系，即请求连接和对应逻辑处理的关系</p>
+<ol start="2">
+<li>将系统和它对应的请求独立</li>
+</ol>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A13.png"></p>
+<p>来自Connector的请求只能由所属的Service维护的Container处理，一个Server包含多个Service，Service间相互独立但只共享一个JVM以及系统类库。</p>
+<ol start="3">
+<li><p>Container在Tomcat组件中对应的是Engine，表示整个Servlet引擎；而整个Servlet容器指的是Server。引擎只负责请求的处理，不需要考虑请求链接、协议等的处理。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A14.png"></p>
+</li>
+</ol>
+<h3 id="Container设计"><a href="#Container设计" class="headerlink" title="Container设计"></a>Container设计</h3><ol>
+<li><p>在Engine中支持管理Web应用，当接收到Connector请求时，Engine能找到一个合适的Web应用来处理。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A15.png"></p>
+</li>
+</ol>
+<p>Context来表示一个Web应用，并且一个Engine可以包含多个Context。</p>
+<blockquote>
+<p>注意：Context也拥有<code>start()</code>和<code>stop()</code>方法，用以在启动时加载资源以及在停止时释放资源。采用这种方式设计，我们将加载和卸载资源的过程分解到毎个组件当中，使组件充分解耦，提高服务器的可扩展性和可维护性。</p>
+</blockquote>
+<ol start="2">
+<li>独立Host域名服务/虚拟主机</li>
+</ol>
+<p>一台服务器承担多个域名服务，因此将每个域名视作一个虚拟主机（Host），在每个虚拟主机包括多个Web应用（Context）。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A16.png"></p>
+<ol start="3">
+<li>独立Wrapper</li>
+</ol>
+<p>Servlet规范中，一个Web应用中可包含多个Servlet实例以处理来自不同链接的请求。在Tomcat中， Servlet定义被称为Wrapper。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A17.png"></p>
+<p>使用Container来表示容器， Container可以添加并维护子容器，因此 Engine、Host、Context、Wrapper均继承自Container我们将它们之间的组合关系改为虚线，以表示它们之间是弱依赖的关系，即它们之间的关系是通过 Container的父子容器的概念体现的。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A18.png"></p>
+<p>Tomcat 的 Container还可以后台处理。在很多情况下，Container需要执行一些异步处理，而且是定期执行，Tomcat对于Web应用文件变更的扫描就是通过该机制实现的。 Tomcat针对后台处理，在 Container上定义了<code>backgroundProcess()</code>方法，并且其基础抽象类（ Container Base）确保在启动组件的同时，异步启动后台处理。因此，在绝大多数情况下，各个容器组件仅需要实现Container的<code>backgroundProcess()</code>方法即可，不必考虑创建异步线程。</p>
+<h3 id="Lifecycle"><a href="#Lifecycle" class="headerlink" title="Lifecycle"></a>Lifecycle</h3><p>我们针对所有拥有生命周期管理特性的组件抽象了一个Lifecycle通用接口，该接口定义了生命周期管理的核心方法。</p>
+<ul>
+<li>Init()：初始化组件</li>
+<li>start()：启动组件</li>
+<li>stop()：停止组件</li>
+<li>destroy()：销毁组件</li>
+</ul>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A19.png"></p>
+<p>接口支持组件状态以及状态之间的转换，支持添加事件监听器（ LifecycleListener）用于监听组件的状态变化。如此，我们可以采用一致的机制来初始化、启动、停止以及销毁各个组件。如Tomcat核心组件的默认实现均继承自LifecycleMBeanBase抽象类，该类不但负责组件各个状态的转换和事件处理，还将组件自身注册为MBean，以便通过Tomcat的管理工具进行动态维护。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A110.png"></p>
+<p>首先，每个生命周期方法可能对应数个状态的转换，以<code>start()</code>为例，即分为启动前、启动中、已启动，这3个状态之间自动转换（所有标识为auto的转换路径都是在生命周期方法中自动转换的，不再需要额外的方法调用）。其次，并不是每个状态都会触发生命周期事件，也不是所有生命周期事件均存在对应状态。</p>
+<p><img src="/images/Tomcat/Tomcat%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F%E4%BA%8B%E4%BB%B6%E4%B8%8E%E7%8A%B6%E6%80%81%E6%98%A0%E5%B0%84.png"></p>
+<p>Tomcat默认提供了3个与状态无关的事件类型，其中 PERIODIC_EVENT 主要用于 Container 的后台定时处理，每次调用后触发该事件。CONFIGURE_START_EVENT 和 CONFIGURE_STOP_EVENT 的使用在后续章节中将会讲到。</p>
+<h3 id="Pipeline和Value"><a href="#Pipeline和Value" class="headerlink" title="Pipeline和Value"></a>Pipeline和Value</h3><p>架构设计中，确保了整体架构的可伸缩性和可扩展性，还要考虑组件的灵活性和可扩展性。通过责任链模式实现客户端的请求处理，即 Tomcat 中每个 Container 组件通过执行一个职责链来完成具体的请求处理。而请求处理是责任链模式的典型应用场景之一。</p>
+<p>Tomcat定义了 Pipeline（管道）和 Valve（阀）两个接口。前者用于构造职责链，后者代表职责链上的每个处理器。当然，我们还可以从字面意思来理解这两个接口所扮演的角色—来自客户端的请求就像是流经管道的水一般，经过每个阀进行处理。</p>
+<p><img src="/images/Tomcat/Tomcat%E4%B8%AD%E7%9A%84%E8%B4%A3%E4%BB%BB%E9%93%BE%E8%AE%BE%E8%AE%A1.png"></p>
+<p>Pipeline 中维护了一个基础的 Valve，它始终位于 Pipeline 的末端（即最后执行），封装了具体的请求处理和输出响应的过程。然后，通过<code>addvalue()</code>方法，我们可以为 Pipeline 添加其他的 Valve。后添加的 Valve位于基础 Valve 之前，并按照添加顺序执行。 Pipeline 通过获得首个 Valve 来启动整个链条的执行。</p>
+<p>Tomcat 容器组件的灵活之处在于，每个层级的容器（Engine、Host、Context、Wrapper）均有对应的基础 Valve 实现，同时维护了一个 Pipeline 实例。也就是说，我们可以在任何层级的容器上针对请求处理进行扩展。</p>
+<p>由于 Tomcat 每个层级的容器均通过 Pipeline 和 Valve 进行请求处理，那么，我们很容易将一些通用的 Valve 实现根据需要添加到任何层级的容器上。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A111.png"></p>
+<h3 id="Connector设计"><a href="#Connector设计" class="headerlink" title="Connector设计"></a>Connector设计</h3><p>要想与 Container 配合实现一个完整的服务器功能， Connector至少要完成如下几项功能。</p>
+<ul>
+<li>监听服务器端口，读取来自客户端的请求。</li>
+<li>将请求数据按照指定协议进行解析。</li>
+<li>根据请求地址匹配正确的容器进行处理。</li>
+<li>将响应返回客户端。</li>
+</ul>
+<p>只有这样才能保证将接收到的客户端请求交由与请求地址匹配的容器处理。</p>
+<p>我们知道，Tomcat 支持多协议，默认支持 HTTP 和 AJP。同时，Tomcat 还支持多种 IO 方式，包括 BIO（8.5版本之后移除）、NIO、APR。而且在 Tomcat8 之后新增了对 NIO2 和 HTTP/2 协议的支持。因此，对协议和 I/O 进行抽象和建模是需要重点关注的。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A112.png"></p>
+<p>在 Tomcat 中， ProtocolHandler 表示一个协议处理器，针对不同协议和 I/O 方式，提供了不同的实现，如Http11NioProtocoL 表示基于 NIO 的 HTTP 协议处理器。ProtocolHandler 包含一个 Endpoint 用于启动  Socket 监听，该接口按照 I/O 方式进行分类实现，如 Nio2Endpoint 表示非阻塞式 Socket I/O。还包含一个 Processor 用于按照指定协议读取数据，并将请求交由容器处理，如 Http11NioProcessor 表示在 NIO 的方式下 HTTP 请求的处理类。</p>
+<p>注意：Tomcat 并没有 Endpoint 接口，仅有 AbstractEndpoint 抽象类，此处仅作为概念讨论，故将其视为 Endpoint接口。</p>
+<p>在 Connector 启动时， Endpoint 会启动线程来监听服务器端口，并在接收到请求后调用 Processor 进行数据读取。</p>
+<p>当 Processor 读取客户端请求后，需要按照请求地址映射到具体的容器进行处理，这个过程即为请求映射。由于 Tomcat 各个组件采用通用的生命周期管理，而且可以通过管理工具进行状态变更，因此请求映射除考虑映射规则的实现外，还要考虑容器组件的注册与销毁。</p>
+<p>Tomcat 通过 Mapper 和 MapperListener 两个类实现上述功能。前者用于维护容器映射信息，同时按照映射规则（Servlet规范定义）查找容器。后者实现了 ContainerListener 和 LifecycleListener，用于在容器组件状态发生变更时，注册或者取消对应的容器映射信息。为了实现上述功能， MapperListener实现了 Lifecycle 接口，当其启动时（在 Service启动时启动），会自动作为监听器注册到各个容器组件 上，同时将已创建的容器注册到 Mapper。</p>
+<blockquote>
+<p>注意：在 Tomcat7 及之前的版本中， Mapper 由 Connector 维护，而在 Tomcat8 中，改由 Service 维护，因为 Service 本来就是用于维护 Connector 和 Container 的组合，两者从概念上讲更密切一些。</p>
+</blockquote>
+<p>Tomcat 通过适配器模式（Adapter）实现了 Connector 与 Mapper、Container 的解耦。 Tomcat 默认的 Connector 实现（Coyote）对应的适配器为 CoyoteAdapter。也就是说，如果你希望使用 Tomcat 的链接器方案，但是又想脱离 Servlet 容器（虽然这种情况几乎不可能出现，但是从架构可扩展性的角度来讲，还是值得讨论一下），此时只需要实现我们自己的 Adapter 即可。当然，我们还需要按照 Container 的定义开发我们自己的容器实现（不一定遵从 Servlet 规范）。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A113.png"></p>
+<h3 id="Executor"><a href="#Executor" class="headerlink" title="Executor"></a>Executor</h3><p>首先，回顾已经讲解的 Tomcat 设计方案，既然 Tomcat 提供了一致的可插拔的组件环境，那么我们自然也希望线程池作为一个组件进行统一管理。因此， Tomcat 提供了 Executor 接口来表示个可以在组件间共享的线程池（默认使用了JDK5提供的线程池技术），该接口同样继承自Lifecycle，可按照通用的组件进行管理。在 Tomcat Executor 由 Service 维护，因此同一个 Service 中的组件可以共享一个线程池。</p>
+<p>当然，如果没有定义任何线程池，相关组件（如 Endpoint）会自动创建线程池，此时，线程池不再共享。<br>在 Tomcat中， Endpoint会启动一组线程来监听 Socket端口，当接收到客户端请求后，会创建请求处理对象，并交由线程池处理，由此支持并发处理客户端请求。</p>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A114.png"></p>
+<h3 id="Bootstrap和Catalina"><a href="#Bootstrap和Catalina" class="headerlink" title="Bootstrap和Catalina"></a>Bootstrap和Catalina</h3><p>Tomcat 的最核心的配置文件为<code>server.xml</code>。通过这个文件，我们可以修改 Tomcat 组件的配置参数甚至添加相关组件，这也是后续性能调优阶段重点涉及的文件。</p>
+<p>Tomcat 通过类 Catalina 提供了一个Shell 程序，用于解析<code>server.xml</code>创建各个组件，同时，负责启动、停止应用服务器（只需要启动 Tomcat 顶层组件 Server 即可）。</p>
+<p>Tomcat 使用 Digester 解析 XML 文件，包括<code>server.xml</code>以及<code>web.xml</code>等，具体可参见<code>http://commons.apache.org/proper/commons-digester/</code>。</p>
+<p>最后， Tomcat 提供了 Bootstrap 作为应用服务器启动入口。Bootstrap 负责创建 Catalina 实例，根据执行参数调用 Catalina 相关方法完成针对应用服务器的操作（启动、停止）。</p>
+<p>那为什么 Tomcat 不直接通过 Catalina 启动，而是又提供了 Bootstrap 呢？你可以查看一下 Tomcat 的发布包目录，Bootstrap 并不位于 Tomcat 的依赖库目录下（<code>$CATALINA_HOME/lib</code>），而是直接在<code>$CATALINA_HOME/bin</code>目录下。Bootstrap 与 Tomcat 应用服务器完全松耦合（通过反射调用 Catalina 实例），它可以直接依赖JRE运行并为 Tomcat 应用服务器创建共享类加载器，用于构造 Catalina 实例以及整个 Tomcat 服务器。</p>
+<blockquote>
+<p>注意：Tomcat 的启动方式可以作为非常好的示范来指导中间件产品设计。它实现了启动入口与核心环境的解耦，这样不仅简化了启动（不必配置各种依赖库，因为只有独立的几个API），而且便于我们更灵活地组织中间件产品的结构，尤其是类加载器的方案，否则，我们所有的依赖库将统一放置到一个类加载器中，而无法做到灵活定制。</p>
+</blockquote>
+<p><img src="/images/Tomcat/Tomcat%E6%80%BB%E4%BD%93%E8%AE%BE%E8%AE%A115.png"></p>
+<p>上述是 Tomcat 标准的启动方式。但是正如我们所说，既然 Server 及其子组件代表了应用服务器本身，那么我们就可以不通过 Bootstrap 和 Catalina 来启动服务器。</p>
+<p>Tomcat 提供了一个同名类<code>org.apache.catalina.startup.Tomcat</code>，使用它我们可以将 Tomcat 服务器嵌入到我们的应用系统中并进行启动。当然，你可以自己编写代码来启动 Server，也可以自定义其他配置方式启动，如YAML。这就是 Tomcat 灵活的架构设计带给我们的便利，也是我们设计中间件产品的架构关注点之一。</p>
+<h3 id="Tomcat组件说明"><a href="#Tomcat组件说明" class="headerlink" title="Tomcat组件说明"></a>Tomcat组件说明</h3><p><img src="/images/Tomcat/Tomcat%E7%BB%84%E4%BB%B6%E8%AF%B4%E6%98%8E.png"></p>
+<h2 id="动态设计"><a href="#动态设计" class="headerlink" title="动态设计"></a>动态设计</h2><h3 id="Tomcat（应用服务器）启动"><a href="#Tomcat（应用服务器）启动" class="headerlink" title="Tomcat（应用服务器）启动"></a>Tomcat（应用服务器）启动</h3><p>从图中我们可以看出，Tomcat 的启动过程非常标准化，统一按照生命周期管理接口 Lifecycle 的定义进行启动。首先，调用<code>init()</code>方法进行组件的逐级初始化，然后再调用<code>start()</code>方法进行启动。当然，每次调用均伴随着生命周期状态变更事件的触发。</p>
+<p>每一级组件除完成自身的处理外，还要负责调用子组件相应的生命周期管理方法，组件与组件之间是松耦合的设计，因此我们很容易通过配置进行修改和替换。</p>
+<p><img src="/images/Tomcat/%E5%BA%94%E7%94%A8%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B.png"></p>
+<h3 id="客户端的请求处理"><a href="#客户端的请求处理" class="headerlink" title="客户端的请求处理"></a>客户端的请求处理</h3><p>从本质上讲，应用服务器的请求处理开始于监听的 Socket 端口接收到数据，结束于将服务器处理结果写入 Socket输出流。</p>
+<p>在这个处理过程中，应用服务器需要将请求按照既定协议进行读取，并封装为与具体通信方案无关的请求对象。然后根据请求映射规则定位到具体的处理单元（在Java应用服务器中，多数是某个Web应用下的一个 Servlet）进行处理。当然，如果我们的应用不是基于简单的 Servlet APl，而是基于当前成熟的MVC框架（如 Apache Struts、 Spring MVC），那么在多数情况下请求将进一步匹配到 Servlet 下的一个控制器——这部分已经不属于应用服务器的处理范畴，而是由具体的MVC框架进行匹配。当 Servlet 或者控制器的业务处理结束后，处理结果将被写入一个与通信方案无关的响应对象。最后，该响应对象将按照既定协议写人输出流。</p>
+<p><img src="/images/Tomcat/%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png"></p>
+<h2 id="类加载机制"><a href="#类加载机制" class="headerlink" title="类加载机制"></a>类加载机制</h2><h3 id="J2SE标准类加载器"><a href="#J2SE标准类加载器" class="headerlink" title="J2SE标准类加载器"></a>J2SE标准类加载器</h3><p>我们都知道JVM默认提供了3个类加载器，它们以一种父子树的方式创建，同时使用委派模式确保应用程序可通过自身的类加载器（System）加载所有可见的Java类。</p>
+<p><img src="/images/Tomcat/J2SE%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8.png"></p>
+<ul>
+<li>Bootstrap：用于加载 JVM 提供的基础运行类，即位于<code>%JAVA_HOME%/jre/lib</code>目录下的核心类库。</li>
+<li>Extension：Java 提供的一个标准的扩展机制用于加载除核心类库外的Jar包，即只要复制到指定的扩展目录（可以多个）下的Jar，JVM 会自动加载（不需要通过-classpath指定）。默认的扩展目录是<code>%JAVA_HOME%/jre/lib/ext</code>。典型的应用场景就是，Java 使用该类加载器加载 JVM 默认提供的但是不属于核心类库的 Jar，如 JCE(Java加密扩展) 等。不推荐将应用程序依赖的类库放置到扩展目录下，因为该目录下的类库对所有基于该 JVM 运行的应用程序可见。</li>
+<li>System：用于加载环境变量 CLASSPATH（不推荐使用）指定目录下的或者-classpath运行参数指定的Jar包。System 类加载器通常用于加载应用程序 Jar 包及其启动入口类（Tomcat 的 Bootstrap 类即由 System 类加载器加载）</li>
+</ul>
+<p>应用程序在不自己构造类加载器的情况下，使用 System 作为默认的类加载器。如果应用程序自己构造类加载器，基本也以 System 作为父类加载器。</p>
+<p>除了支持类加载器按照层级创建外，JVM 还提供了一套称为 Endorsed Standards Overrid Mechanism 的机制用于允许替换 JCP 之外生成的 API。通过这个机制，应用程序可以提供新版本的 API 来覆盖 JVM 的默认实现。</p>
+<p>之所以存在这套机制是因为随着版本的不断更新，J2SE 包含越来越多的扩展，这些扩展由 JVM 加载供所有应用程序使用（如JAXP），甚至作为核心类库（位于<code>rt.jar</code>）由 Bootstrap 类加载器加载。因此，即便应用程序提供了新版本的 JAXP 包，该新版本也不会被使用。此时，我们便可以通过 Endorsed Standands 机制解决该问题。</p>
+<p>JVM 默认的 Endorsed 目录为<code>%JAVA_HOME%/lib/endorsed</code>，当然，我们可以通过指定启动参数<code>java.endorsed.dir</code>来修改。只要是复制到该目录下的Jar包，将优先于 JVM 中的类加载。</p>
+<p>我们之所以在此处提到 Endorsed Standands 机制，是因为很多应用服务器都使用了该机制来提供新版本的Jar包，如JBoss，它的默认 Endorsed 目录为<code>%JBOSS_HOME%/lib/endorsed</code>。虽然 Tomcat 没有相关的目录，但是在启动参数中是包含相关配置的，默认为<code>$CATALINA_HOME/endorsed</code>。</p>
+<p>当然，如上面所说，并不是所有的 Java 核心类库均可以被覆盖，只有部分类库被允许，具体参见：<code>https://docs.oracle.com/javase/1.5.0/docs/guide/standards/</code></p>
+<h3 id="Tomcat加载器"><a href="#Tomcat加载器" class="headerlink" title="Tomcat加载器"></a>Tomcat加载器</h3><p>应用服务器通常会自行创建类加载器以实现更灵活的控制，这一方面是对规范的实现（Servlet 规范要求每个 Web 应用都有一个独立的类加载器实例），另一方面也有架构层面的考虑。</p>
+<ol>
+<li><strong>规范层面上</strong></li>
+</ol>
+<ul>
+<li>隔离性：Web应用类库相互隔离，避免依赖库或者应用包相互影响。设想一下，如果我们有两个 Web 应用，一个采用了 Spring2.5，一个采用了 Spring4.0，而应用服务器使用一个类加载器加载，那么 Web 应用将会由于 Jar 包覆盖而导致无法启动成功</li>
+<li>灵活性：既然 Web 应用之间的类加载器相互独立，那么我们就能只针对一个 Web 应用进行重新部署，此时该 Web 应用的类加载器将会重新创建，而且不会影响其他 Web 应用。如果采用一个类加载器，显然无法实现，因为只有一个类加载器的时候，类之间的依赖是杂乱无章的，无法完整地移除某个 Web 应用的类。</li>
+<li>性能：由于每个 Web 应用都有一个类加载器，因此 Web 应用在加载类时，不会搜索其他 Web 应用包含的 Jar 包，性能自然高于应用服务器只有一个类加载器的情况。</li>
+</ul>
+<p><img src="/images/Tomcat/Tomcat%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%96%B9%E6%A1%88.png"></p>
+<p>除了每个 Web 应用的类加载器外，Tomcat 提供了3个基础的类加载器和 Web 应用类加载器，而且这3个类加载器指向的路径和包列表均可以由<code>catalina.properties</code>配置。</p>
+<ul>
+<li>Common：以 System 为父类加载器，是位于 Tomcat 应用服务器顶层的公用类加载器。其路径为<code>common.loader</code>，默认指向<code>$CATALINA_HOME/lib</code>下的包。</li>
+<li>Catalina：以 Common 为父加载器，是用于加载 Tomcat 应用服务器的类加载器，其路径为<code>server.loader</code>，默认为空。此时 Tomcat 使用 Common 类加载器加载应用服务器。</li>
+<li>Shared：以 Common 为父加载器，是所有 Web 应用的父加载器，其路径为<code>shared.loader</code>，默认为空。此时 Tomcat 使用 Common 类加载器作为 Web 应用的父加载器。</li>
+<li>Web应用：以 Shared 为父加载器，加载<code>/WEB-INF/classes</code>目录下的未压缩的Class和资源文件以及<code>/WEB-INF/lib</code>目录下的 Jar 包。如前所述，该类加载器只对当前 Web 应用可见，对其他 Web 应用均不可见。</li>
+</ul>
+<p>尽管默认情况下，这3个基础类加载器是同一个，但是我们可以通过配置创建3个不同的类加载器，使它们各司其职。</p>
+<p>首先， Common 类加载器负责加载 Tomcat 应用服务器内部和 Web 应用均可见的类，例如 Servlet规范相关包和一些通用的工具包。</p>
+<p>其次， Catalina 类加载器负责加载只有 Tomcat 应用服务器内部可见的类，这些类对 Web 应用不可见。如 Tomcat 的具体实现类，因为我们的 Web 应用最好与服务器松耦合，故不应该依赖应用服务器的内部类。</p>
+<p>再次， Shared 类加载器负责加载 Web 应用共享的类，这些类 Tomcat 服务器不会依赖。</p>
+<blockquote>
+<p>既然 Tomcat 提供了这个特性，那么我们什么时候可以考虑使用呢？举个例子，如果我们想实现自己的会话存储方案，而且该方案依赖了一些第三方包，我们不希望这些包对web应用可见（因为可能会存在包版本冲突之类的问题，也可能我们的Web应用根本不需要这些包）。此时，我们可以配置<code>server.loader</code>，创建独立的 Catalina 类加载器。</p>
+</blockquote>
+<p>最后， Tomcat服务器<code>$CATALINA_HOME/bin</code>目录下的包作为启动入口由 System 类加载器加载。通过将这几个启动包剥离， Tomcat简化了应用服务器的启动，同时增加了灵活性。</p>
+<ol start="2">
+<li><strong>架构层面上</strong></li>
+</ol>
+<ul>
+<li>共享：Tomcat 通过 Common 类加载器实现了 Jar 包在应用服务器以及 Web 应用之间共享，通过 Shared 类加载器实现了 Jar 包在 Web 应用之间的共享，通过 Catalina 类加载器加载服务器依赖的类。这样最大程度上实现了Jar包的共享，而且又确保了不会引入过多无用的包。</li>
+<li>隔离性：这里的隔离性区别于前者，指服务器与 Web 应用的隔离。理论上，除去 Servlet 规范定义的接口外，我们的 Web 应用不应依赖服务器的任何实现类，这样才有助于 Web 应用的可移植性。正因如此，Tomcat 支持通过 Catalina 类加载器加载服务器依赖的包（尽管 Tomcat默认并没有这么做），以便应用服务器与 Web 应用更好地隔离。</li>
+</ul>
+<p>既然在默认情况下，Tomcat 的 Common、Catalina、Shared 为同一个类加载器，那么它是如何禁止 Web 应用使用服务器相关实现类的呢？这是通过 JVM 的安全策略许可实现的，我们将在后续章节讲解</p>
+<h3 id="Web应用类加载器"><a href="#Web应用类加载器" class="headerlink" title="Web应用类加载器"></a>Web应用类加载器</h3><p>Java默认的类加载机制是委派模式，委派的过程如下<br>（1）从缓存中加载。<br>（2）如果缓存中没有，则从父类加载器中加载。<br>（3）如果父类加载器没有，则从当前类加载器加载。<br>（4）如果没有，则抛出异常。</p>
+<p>Tomcat 提供的 Web 应用类加载器与默认的委派模式稍有不同。当进行类加载时，除 JVM 基础类库外，它会首先尝试通过当前类加载器加载，然后才进行委派。 Servlet 规范相关 API 禁止通过 Web 应用类加载器加载，因此，不要在 Web 应用中包含这些包。</p>
+<p>所以，Web 应用类加载器默认加载顺序如下:<br>（1）从缓存中加载。<br>（2）如果没有，则从 JVM 的 Bootstrap 类加载器加载。<br>（3）如果没有，则从当前类加载器加载（按照<code>WEB-INF/classes</code>、<code>WEB-INF/lib</code>的顺序）<br>（4）如果没有，则从父类加载器加载，由于父类加载器采用默认的委派模式，所以加载顺序为 System、Common、Shared。</p>
+<p>Tomcat 提供了 delegate 属性用于控制是否启用 Java 委派模式，默认为 false（不启用）。当配置为 true 时， Tomcat 将使用 Java 默认的委派模式，即按如下顺序加载<br>（1）从缓存中加载。<br>（2）如果没有，从 JVM 的 Bootstrap 类加载器加载。<br>（3）如果没有，则从父类加载器加载（System、Common、Shared）<br>（4）如果没有，则从当前类加载器加载。</p>
+<p>除了可以通过 delegate 属性控制是否启用 Java 的委派模式外，Tomcat 还可以通过 packageTriggersDeny 属性只让某些包路径采用 Java 的委派模式，Web 应用类加载器对于符合 packageTriggersDeny 指定包路径的类强制采用 Java 的委派模式。</p>
+<p>Tomcat 通过该机制实现为 Web 应用中的 Jar 包覆盖服务器提供包的目的。如上所述，Java核心类库、Servlet规范相关类库是无法覆盖的，此外 Java 默认提供的诸如 XML 工具包，由于位于 JVM 的 Bootstrap 类加载器也无法覆盖，只能通过 endorsed 的方式实现。</p>
+]]></content>
+      <categories>
+        <category>Tomcat</category>
+      </categories>
+      <tags>
+        <tag>Tomcat</tag>
+        <tag>Architecture Design</tag>
+        <tag>Bootstrap</tag>
+        <tag>Request Processor</tag>
+        <tag>Class Loader</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>Netty 私有协议栈开发</title>
     <url>/2021/01/15/Netty-%E7%A7%81%E6%9C%89%E5%8D%8F%E8%AE%AE%E6%A0%88%E5%BC%80%E5%8F%91/</url>
     <content><![CDATA[<p>对自定义协议栈的网络拓扑图、通信模型、消息定义、链路的建立关闭、可靠性设计、安全性设计、可扩展性设计七个方面进行介绍，并通过 Netty 实现一套相应的简单的的通信协议，加强对网络传输和 Netty 的了解。</p>
