@@ -41,7 +41,7 @@
 <meta property="og:image" content="http://lanchestios.github.io/images/Redis/AOF%E6%96%87%E4%BB%B6%E9%87%8D%E5%86%99%E6%B5%81%E7%A8%8B.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Redis/RDB-AOF%E6%B7%B7%E5%90%88%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96.png">
 <meta property="article:published_time" content="2021-01-20T13:33:49.000Z">
-<meta property="article:modified_time" content="2021-01-20T14:00:23.761Z">
+<meta property="article:modified_time" content="2021-01-23T08:10:54.619Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="Redis">
 <meta property="article:tag" content="RDB">
@@ -227,10 +227,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2021-01-20 21:33:49 / Modified: 22:00:23" itemprop="dateCreated datePublished" datetime="2021-01-20T21:33:49+08:00">2021-01-20</time>
+              <time title="Created: 2021-01-20 21:33:49" itemprop="dateCreated datePublished" datetime="2021-01-20T21:33:49+08:00">2021-01-20</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-01-23 16:10:54" itemprop="dateModified" datetime="2021-01-23T16:10:54+08:00">2021-01-23</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -255,16 +261,70 @@
         <p>Redis 是内存数据库，数据都是存储在内存中，为了避免进程退出导致数据的永久丢失，需要定期将 Redis 中的数据以数据或命令的形式从内存保存到本地磁盘。当下次 Redis 重启时，利用持久化文件进行数据恢复。Redis 提供了 RDB 和 AOF 两种持久化机制，前者将当前的数据保存到磁盘，后者则是将每次执行的写命令保存到磁盘（类似于 MySQL 的 Binlog）。本文将详细介绍 RDB 和 AOF 两种持久化方案，包括操作方法和持久化的实现原理。</p>
 <a id="more"></a>
 
-<h1 id="Redis-数据库结构"><a href="#Redis-数据库结构" class="headerlink" title="Redis 数据库结构"></a>Redis 数据库结构</h1><p>Redis 是一个基于键值对（K-V）存储的数据库服务器，一个单机的 Redis 服务器默认情况下有 16 个数据库（0-15 号），数据库的个数是可配置的。Redis 默认使用的是 0 号数据库，可以使用 SELECT 命令切换数据库。</p>
+<h1 id="Redis数据库结构"><a href="#Redis数据库结构" class="headerlink" title="Redis数据库结构"></a>Redis数据库结构</h1><p>Redis 是一个基于键值对（K-V）存储的数据库服务器，一个单机的 Redis 服务器默认情况下有 16 个数据库（0-15 号），数据库的个数是可配置的。Redis 默认使用的是 0 号数据库，可以使用 SELECT 命令切换数据库。</p>
 <p><img src="/images/Redis/redis%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84.png"></p>
 <p>Redis 中的每个数据库都由一个 redis.h/redisDb 结构表示，它记录了单个 Redis 数据库的键空间、所有键的过期时间、处于阻塞状态和就绪状态的键、数据库编号等等。</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">redisDb</span> &#123;</span></span><br><span class="line">    <span class="comment">// 数据库键空间，保存着数据库中的所有键值对</span></span><br><span class="line">    dict *dict;</span><br><span class="line">    <span class="comment">// 键的过期时间，字典的键为键，字典的值为过期事件 UNIX 时间戳</span></span><br><span class="line">    dict *expires;</span><br><span class="line">    <span class="comment">// 正处于阻塞状态的键</span></span><br><span class="line">    dict *blocking_keys;</span><br><span class="line">    <span class="comment">// 可以解除阻塞的键</span></span><br><span class="line">    dict *ready_keys;</span><br><span class="line">    <span class="comment">// 正在被 WATCH 命令监视的键</span></span><br><span class="line">    dict *watched_keys;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">evictionPoolEntry</span> *<span class="title">eviction_pool</span>;</span></span><br><span class="line">    <span class="comment">// 数据库编号</span></span><br><span class="line">    <span class="keyword">int</span> id;</span><br><span class="line">    <span class="comment">// 数据库的键的平均 TTL，统计信息</span></span><br><span class="line">    <span class="keyword">long</span> <span class="keyword">long</span> avg_ttl;</span><br><span class="line">&#125; redisDb;</span><br></pre></td></tr></table></figure>
 <p>由于 Redis 是一个键值对数据库（key-value pairs database）， 所以它的数据库本身也是一个字典，对应的结构正是 redisDb。其中，dict 指向的是一个记录键值对数据的字典，它的键是一个字符串对象，它的值则可以是字符串、列表、哈希表、集合和有序集合在内的任意一种 Redis 类型对象。 expires 指向的是一个用于记录键的过期时间的字典，它的键为 dict 中的数据库键，它的值为这个数据库键的过期时间戳，这个值以 long long 类型表示。</p>
 <p><img src="/images/Redis/redis%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%842.png"></p>
-<h1 id="RDB-持久化"><a href="#RDB-持久化" class="headerlink" title="RDB 持久化"></a>RDB 持久化</h1><p>RDB 持久化（也称作快照持久化）是指将内存中的数据生成快照保存到磁盘里面，保存的文件后缀是 .rdb。rdb 文件是一个经过压缩的二进制文件，当 Redis 重新启动时，可以读取 rdb 快照文件恢复数据。RDB 功能最核心的是 rdbSave 和 rdbLoad 两个函数， 前者用于生成 RDB 文件并保存到磁盘，而后者则用于将 RDB 文件中的数据重新载入到内存中：</p>
+<h2 id="对数据库键的增删改查"><a href="#对数据库键的增删改查" class="headerlink" title="对数据库键的增删改查"></a>对数据库键的增删改查</h2><p>与正常集合操作相同</p>
+<h2 id="对过期键的删除策略"><a href="#对过期键的删除策略" class="headerlink" title="对过期键的删除策略"></a>对过期键的删除策略</h2><p>数据库键的过期时间都保存在过期字典中，当键过期后有三种不同的策略：</p>
+<ol>
+<li>定时删除：在设置键的过期时间的同时，创建一个定时器（timer），过期立即删除。</li>
+<li>惰性删除：当从键空间中获取键时，根据取得的键是否过期，来判断是删除还是返回。</li>
+<li>定期删除：每隔一段时间，程序就对数据库进行一次检査，删除里面的过期键。至于要删除多少过期键，以及要检查多少个数据库，则由算法决定。</li>
+</ol>
+<p><strong>三种策略优缺点对比</strong></p>
+<table>
+<thead>
+<tr>
+<th>删除策略</th>
+<th>内存</th>
+<th>CPU</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>定时删除</td>
+<td>键及时删除、释放内存</td>
+<td>占用CPU，影响服务器的响应时间和吞吐量</td>
+</tr>
+<tr>
+<td>惰性删除</td>
+<td>可能会导致键不释放，无限制的占用内存</td>
+<td>几乎不占用CPU</td>
+</tr>
+<tr>
+<td>定期删除</td>
+<td>周期性删除过期键有效地减少了因为过期键而带来的内存浪费</td>
+<td>周期性删除过期键，限制删除操作执行的时长和频率来减少删除操作对CPU时间的影响</td>
+</tr>
+</tbody></table>
+<p>定期删除策略可以说是前两种策略的折中，它的难点是确定删除操作执行的时长和频率：</p>
+<ul>
+<li>如果删除操作执行得太频繁，或者执行的时间太长，定期删除策略就会退化成定时删除策略，以至于将CPU时间过多地消耗在删除过期键上面</li>
+<li>如果删除操作执行得太少，或者执行的时间太短，定期删除策略又会和惰性删除策略一样，出现浪费内存的情况。</li>
+</ul>
+<h2 id="AOF、RDB和复制功能对过期键的处理"><a href="#AOF、RDB和复制功能对过期键的处理" class="headerlink" title="AOF、RDB和复制功能对过期键的处理"></a>AOF、RDB和复制功能对过期键的处理</h2><h3 id="生成RDB文件"><a href="#生成RDB文件" class="headerlink" title="生成RDB文件"></a>生成RDB文件</h3><p>在执行 SAVE 命令或者 BGSAVE 命令创建一个新的 RDB 文件时，程序会对数据库中的键进行检查，已过期的键不会被保存到新创建的 RDB 文件中。</p>
+<h3 id="载入RDB文件"><a href="#载入RDB文件" class="headerlink" title="载入RDB文件"></a>载入RDB文件</h3><p>在启动 Redis 服务器时，如果服务器开启了 RDB 功能，那么服务器将对 RDB 文件进行载入：</p>
+<ul>
+<li>如果服务器以主服务器模式运行，那么在载入 RDB 文件时，程序会对文件中保存的键进行检查，未过期的键会被载入到数据库中，而过期键则会被忽略。</li>
+<li>如果服务器以从服务器模式运行，那么在载入RDB文件时，文件中保存的所有键，不论是否过期，都会被载入到数据库中。不过，因为主从服务器在进行数据同步的时候，从服务器的数据库就会被清空，所以一般来讲，过期键对载入RDB文件的从服务器也不会造成影响。</li>
+</ul>
+<h3 id="AOF文件写入"><a href="#AOF文件写入" class="headerlink" title="AOF文件写入"></a>AOF文件写入</h3><p>当服务器以 AOF 持久化模式运行时，如果数据库中的某个键已经过期，但它还没有被惰性删除或者定期删除，那么 AOF 文件不会因为这个过期键而产生任何影响。</p>
+<p>当过期键被惰性删除或者定期删除之后，程序会向 AOF 文件追加（append）一条 DEL 命令，来显式地记录该键已被删除。</p>
+<h3 id="AOF重写"><a href="#AOF重写" class="headerlink" title="AOF重写"></a>AOF重写</h3><p>在执行 AOF 重写的过程中，会检查数据库中的键，已过期的键不会被保存到重写后的 AOF 文件中。</p>
+<h3 id="主从复制"><a href="#主从复制" class="headerlink" title="主从复制"></a>主从复制</h3><p>当服务器运行在复制模式下时，从服务器的过期键删除动作由主服务器控制：</p>
+<ul>
+<li>主服务器在删除一个过期键之后，会显式地向所有从服务器发送一个 DEL 命令，告知从服务器删除这个过期键。</li>
+<li>从服务器在执行客户端发送的读命令时，即使碰到过期键也不会将过期键删除，而是继续像处理未过期的键一样来处理过期键。</li>
+<li>从服务器只有在接到主服务器发来的 DEL 命令之后，才会删除过期键。</li>
+</ul>
+<p>通过由主服务器来控制从服务器统一地删除过期键，可以保证主从服务器数据的一致性，也正是因为这个原因，当一个过期键仍然存在于主服务器的数据库时，这个过期键在从服务器里的复制品也会继续存在。如果这时有客户端向从服务器请求过期键，还可以正常返回。</p>
+<h2 id="数据库通知"><a href="#数据库通知" class="headerlink" title="数据库通知"></a>数据库通知</h2><p>数据库通知是 Redis2.8 版本新增加的功能，这个功能可以让客户端通过订阅给定的频道或者模式，来获知数据库中键的变化，以及数据库中命令的执行情况。它们分别对应两种通知事件：键空间通知（key-space notification）以及键事件通知（key-event notification）。键空间通知关注的是”某个键执行了什么命令”，键事件通知关注的是”某个命令被什么键执行了”。服务器配置的 notify-keyspace-events 选项可以决定了服务器所发送通知的类型。</p>
+<h1 id="RDB持久化"><a href="#RDB持久化" class="headerlink" title="RDB持久化"></a>RDB持久化</h1><p>RDB 持久化（也称作快照持久化）是指将内存中的数据生成快照保存到磁盘里面，保存的文件后缀是 .rdb。rdb 文件是一个经过压缩的二进制文件，当 Redis 重新启动时，可以读取 rdb 快照文件恢复数据。RDB 功能最核心的是 rdbSave 和 rdbLoad 两个函数， 前者用于生成 RDB 文件并保存到磁盘，而后者则用于将 RDB 文件中的数据重新载入到内存中：</p>
 <p><img src="/images/Redis/RDB%E6%8C%81%E4%B9%85%E5%8C%96%E8%BF%87%E7%A8%8B.png"></p>
 <p>RDB 文件是一个单文件的全量数据，很适合数据的容灾备份与恢复，通过 RDB 文件恢复数据库耗时较短，通常 1G 的快照文件载入内存只需 20s 左右。Redis 提供了手动触发保存、自动保存间隔两种 RDB 文件的生成方式，下面先介绍 RDB 的创建和载入过程。</p>
-<h2 id="RDB-的创建和载入"><a href="#RDB-的创建和载入" class="headerlink" title="RDB 的创建和载入"></a>RDB 的创建和载入</h2><p>Redis 服务器默认是通过 RDB 方式完成持久化的，对应 redis.conf 文件的配置项如下：</p>
+<h2 id="RDB的创建和载入"><a href="#RDB的创建和载入" class="headerlink" title="RDB的创建和载入"></a>RDB的创建和载入</h2><p>Redis 服务器默认是通过 RDB 方式完成持久化的，对应 redis.conf 文件的配置项如下：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># RDB文件的名称</span></span><br><span class="line">dbfilename dump.rdb</span><br><span class="line"><span class="comment"># 备份RDB和AOF文件存放路径</span></span><br><span class="line">dir /usr/<span class="built_in">local</span>/var/db/redis/</span><br></pre></td></tr></table></figure>
 <h3 id="手动触发保存"><a href="#手动触发保存" class="headerlink" title="手动触发保存"></a>手动触发保存</h3><p>Redis 提供了两个用于生成 RDB 文件的命令，一个是 SAVE，另一个是 BGSAVE。而触发 Redis 进行 RDB 备份的方式有两种，一种是通过 SAVE 命令、BGSAVE 命令手动触发快照生成的方式，另一种是配置保存时间和写入次数，由 Redis 根据条件自动触发保存操作。</p>
 <p><strong>SAVE 命令</strong></p>
@@ -349,7 +409,7 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ redis-server /usr/<span class="built_in">local</span>/etc/redis.conf</span><br><span class="line">6266:M 15 Sep 2019 08:30:41.832 <span class="comment"># Server initialized</span></span><br><span class="line">6266:M 15 Sep 2019 08:30:41.833 * DB loaded from disk: 0.001 seconds</span><br><span class="line">6266:M 15 Sep 2019 08:30:41.833 * Ready to accept connections</span><br></pre></td></tr></table></figure>
 <p>由于 AOF 文件属于增量的写入命令备份，RDB 文件属于全量的数据备份，所以更新频率比 RDB 文件的更新频率高。所以如果 Redis 服务器开启了 AOF 持久化功能，那么服务器会优先使用 AOF 文件来还原数据库状态；只有在 AOF 的持久化功能处于关闭状态时，服务器才会使用使用 RDB 文件还原数据库状态。</p>
 <p><img src="/images/Redis/Redis%E8%87%AA%E5%8A%A8%E8%BD%BD%E5%85%A5%E9%85%8D%E7%BD%AE.png"></p>
-<h2 id="RDB-的文件结构"><a href="#RDB-的文件结构" class="headerlink" title="RDB 的文件结构"></a>RDB 的文件结构</h2><p>RDB 文件是经过压缩的二进制文件，下面介绍关于 RDB 文件内部构造的一些细节。</p>
+<h2 id="RDB的文件结构"><a href="#RDB的文件结构" class="headerlink" title="RDB的文件结构"></a>RDB的文件结构</h2><p>RDB 文件是经过压缩的二进制文件，下面介绍关于 RDB 文件内部构造的一些细节。</p>
 <h3 id="存储路径"><a href="#存储路径" class="headerlink" title="存储路径"></a>存储路径</h3><p>SAVE 命令和 BGSAVE 命令都只会备份当前数据库，备份文件名默认为 dump.rdb，可通过配置文件修改备份文件名 dbfilename xxx.rdb。可以通过以下命令查看备份文件目录和 RDB 文件名称：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ redis-cli -h 127.0.0.1 -p 6379</span><br><span class="line">127.0.0.1:6379&gt; CONFIG GET dir</span><br><span class="line">1) <span class="string">&quot;dir&quot;</span></span><br><span class="line">2) <span class="string">&quot;/usr/local/var/db/redis&quot;</span></span><br><span class="line">127.0.0.1:6379&gt; CONFIG GET dbfilename</span><br><span class="line">1) <span class="string">&quot;dbfilename&quot;</span></span><br><span class="line">2) <span class="string">&quot;dump.rdb&quot;</span></span><br></pre></td></tr></table></figure>
 <p>RDB 文件的存储路径既可以在启动前配置，也可以通过命令动态设定。</p>
@@ -426,7 +486,7 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; SAVE</span><br><span class="line">OK</span><br></pre></td></tr></table></figure>
 <p>通过 Linux 的 od 命令将二进制文件 dump.rdb 中的数据转换为 ASCII 格式输出，跟前面提到的存储格式大致是一样的：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">$ od -c dump.rdb</span><br><span class="line">0000000    R   E   D   I   S   0   0   0   9 372  \t   r   e   d   i   s</span><br><span class="line">0000020    -   v   e   r 005   5   .   0   .   5 372  \n   r   e   d   i</span><br><span class="line">0000040    s   -   b   i   t   s 300   @ 372 005   c   t   i   m   e 200</span><br><span class="line">0000060  200 200 231   ] 372  \b   u   s   e   d   -   m   e   m 302 200</span><br><span class="line">0000100   \v 020  \0 372  \f   a   o   f   -   p   r   e   a   m   b   l</span><br><span class="line">0000120    e 300  \0 376  \0 373 003  \0  \0 003   m   s   g 005   h   e</span><br><span class="line">0000140    l   l   o 016  \a   n   u   m   b   e   r   s 001 027 027  \0</span><br><span class="line">0000160   \0  \0 022  \0  \0  \0 003  \0  \0 300  \0 002 004 300  \0 001</span><br><span class="line">0000200  004 300 200  \0 377 002 006   f   r   u   i   t   s 003 006   o</span><br><span class="line">0000220    r   a   n   g   e 005   a   p   p   l   e 006   b   a   n   a</span><br><span class="line">0000240    n   a 377 214      **   3 366   &lt;   r   X</span><br><span class="line">0000253</span><br></pre></td></tr></table></figure>
-<h3 id="RDB-常用的配置项"><a href="#RDB-常用的配置项" class="headerlink" title="RDB 常用的配置项"></a>RDB 常用的配置项</h3><p>下面是 redis.conf 文件中和 RDB 文件相关的常用配置项（以及默认值）：</p>
+<h3 id="RDB常用的配置项"><a href="#RDB常用的配置项" class="headerlink" title="RDB常用的配置项"></a>RDB常用的配置项</h3><p>下面是 redis.conf 文件中和 RDB 文件相关的常用配置项（以及默认值）：</p>
 <ul>
 <li>save m n：bgsave 自动触发的条件；如果没有 save m n 配置，相当于自动的 RDB 持久化关闭，不过此时仍可以通过其他方式触发。</li>
 <li>stop-writes-on-bgsave-error yes：当 bgsave 出现错误时，Redis 是否停止执行写命令。如果设置为 yes，则当硬盘出现问题时，可以及时发现，避免数据的大量丢失；如果设置为 no，则 Redis 忽略 bgsave 的错误继续执行写命令，当对 Redis 服务器的系统（尤其是硬盘）使用了监控时，该选项考虑设置为 no。</li>
@@ -435,24 +495,24 @@
 <li>dbfilename dump.rdb：设置 RDB 的文件名。</li>
 <li>dir ./：设置 RDB 文件和 AOF 文件所在目录。</li>
 </ul>
-<h1 id="AOF-持久化"><a href="#AOF-持久化" class="headerlink" title="AOF 持久化"></a>AOF 持久化</h1><p>RDB 持久化是定期把内存中的数据全量写入到文件中，除此之外，RDB 还提供了基于 AOF（Append Only File）的持久化功能。AOF 会把 Redis 服务器每次执行的写命令记录到一个日志文件中，当服务器重启时再次执行 AOF 文件中的命令来恢复数据。</p>
+<h1 id="AOF持久化"><a href="#AOF持久化" class="headerlink" title="AOF持久化"></a>AOF持久化</h1><p>RDB 持久化是定期把内存中的数据全量写入到文件中，除此之外，RDB 还提供了基于 AOF（Append Only File）的持久化功能。AOF 会把 Redis 服务器每次执行的写命令记录到一个日志文件中，当服务器重启时再次执行 AOF 文件中的命令来恢复数据。</p>
 <p><img src="/images/Redis/AOF%E6%8C%81%E4%B9%85%E5%8C%96%E8%BF%87%E7%A8%8B.png"></p>
 <p>AOF 的主要作用是解决了数据持久化的实时性，目前已经成为了 Redis 持久化的主流方式。</p>
-<h2 id="AOF-的创建和载入"><a href="#AOF-的创建和载入" class="headerlink" title="AOF 的创建和载入"></a>AOF 的创建和载入</h2><p>默认情况下 AOF 功能是关闭的，Redis 只会通过 RDB 完成数据持久化的。开启 AOF 功能需要 redis.conf 文件中将 appendonly 配置项修改为 yes，这样在开启 AOF 持久化功能的同时，将基于 RDB 的快照持久化置于低优先级。修改 redis.conf 如下：</p>
+<h2 id="AOF的创建和载入"><a href="#AOF的创建和载入" class="headerlink" title="AOF的创建和载入"></a>AOF的创建和载入</h2><p>默认情况下 AOF 功能是关闭的，Redis 只会通过 RDB 完成数据持久化的。开启 AOF 功能需要 redis.conf 文件中将 appendonly 配置项修改为 yes，这样在开启 AOF 持久化功能的同时，将基于 RDB 的快照持久化置于低优先级。修改 redis.conf 如下：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 此选项为AOF功能的开关，默认为no，通过yes来开启aof功能</span></span><br><span class="line">appendonly yes</span><br><span class="line"><span class="comment"># 指定AOF文件名称</span></span><br><span class="line">appendfilename appendonly.aof</span><br><span class="line"><span class="comment"># 备份RDB和AOF文件存放路径</span></span><br><span class="line">dir /usr/<span class="built_in">local</span>/var/db/redis/</span><br></pre></td></tr></table></figure>
-<h3 id="AOF-的创建"><a href="#AOF-的创建" class="headerlink" title="AOF 的创建"></a>AOF 的创建</h3><p>重启 Redis 服务器进程以后，dir 目录下会生成一个 appendonly.aof 文件，由于此时服务器未执行任何写指令，因此 AOF 文件是空的。执行以下命令写入几条测试数据：</p>
+<h3 id="AOF的创建"><a href="#AOF的创建" class="headerlink" title="AOF的创建"></a>AOF的创建</h3><p>重启 Redis 服务器进程以后，dir 目录下会生成一个 appendonly.aof 文件，由于此时服务器未执行任何写指令，因此 AOF 文件是空的。执行以下命令写入几条测试数据：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; SADD fruits <span class="string">&quot;apple&quot;</span> <span class="string">&quot;banana&quot;</span> <span class="string">&quot;orange&quot;</span></span><br><span class="line">(<span class="built_in">integer</span>) 3</span><br><span class="line">127.0.0.1:6379&gt; LPUSH numbers 128 256 512</span><br><span class="line">(<span class="built_in">integer</span>) 3</span><br><span class="line">127.0.0.1:6379&gt; SET msg <span class="string">&quot;hello&quot;</span></span><br><span class="line">OK</span><br></pre></td></tr></table></figure>
 <p>AOF 文件是纯文本格式的，上述写命令按顺序被写入了 appendonly.aof 文件（省掉换行符 ‘\r\n’）：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">/usr/<span class="built_in">local</span>/var/db/redis$ cat appendonly.aof</span><br><span class="line">*2 <span class="variable">$6</span> SELECT <span class="variable">$1</span> 0</span><br><span class="line">*5 <span class="variable">$4</span> SADD <span class="variable">$6</span> fruits <span class="variable">$5</span> apple <span class="variable">$6</span> banana <span class="variable">$6</span> orange</span><br><span class="line">*5 <span class="variable">$5</span> LPUSH <span class="variable">$7</span> numbers <span class="variable">$3</span> 128 <span class="variable">$3</span> 256 <span class="variable">$3</span> 512</span><br><span class="line">*3 <span class="variable">$3</span> SET <span class="variable">$3</span> msg <span class="variable">$5</span> hello</span><br></pre></td></tr></table></figure>
 <p>RDB 持久化的方式是将 apple、banana、orange 的键值对数据保存为 RDB 的二进制文件，而 AOF 是通过把 Redis 服务器执行的 SADD、LPUSH、SET 等命令保存到 AOF 的文本文件中。下图是 AOF 文件内部的构造图：</p>
 <p><img src="/images/Redis/AOF%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84.png"></p>
-<h3 id="AOF-的载入"><a href="#AOF-的载入" class="headerlink" title="AOF 的载入"></a>AOF 的载入</h3><p>再次重启 Redis 服务器进程，观察启动日志会发现 Redis 会通过 AOF 文件加载数据：</p>
+<h3 id="AOF的载入"><a href="#AOF的载入" class="headerlink" title="AOF的载入"></a>AOF的载入</h3><p>再次重启 Redis 服务器进程，观察启动日志会发现 Redis 会通过 AOF 文件加载数据：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">52580:M 15 Sep 2019 16:09:47.015 <span class="comment"># Server initialized</span></span><br><span class="line">52580:M 15 Sep 2019 16:09:47.015 * DB loaded from append only file: 0.001 seconds</span><br><span class="line">52580:M 15 Sep 2019 16:09:47.015 * Ready to accept connections</span><br></pre></td></tr></table></figure>
 <p>下图是 AOF 载入的流程</p>
 <p><img src="/images/Redis/AOF%E8%BD%BD%E5%85%A5%E6%B5%81%E7%A8%8B.png"></p>
 <p>通过命令读取 AOF 文件还原的键值对数据：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; SMEMBERS fruits</span><br><span class="line">1) <span class="string">&quot;apple&quot;</span></span><br><span class="line">2) <span class="string">&quot;orange&quot;</span></span><br><span class="line">3) <span class="string">&quot;banana&quot;</span></span><br><span class="line">127.0.0.1:6379&gt; LRANGE numbers 0 -1</span><br><span class="line">1) <span class="string">&quot;512&quot;</span></span><br><span class="line">2) <span class="string">&quot;256&quot;</span></span><br><span class="line">3) <span class="string">&quot;128&quot;</span></span><br><span class="line">127.0.0.1:6379&gt; GET msg</span><br><span class="line"><span class="string">&quot;hello&quot;</span></span><br></pre></td></tr></table></figure>
-<h2 id="AOF-的执行流程"><a href="#AOF-的执行流程" class="headerlink" title="AOF 的执行流程"></a>AOF 的执行流程</h2><p>AOF 不需要设置任何触发条件，对 Redis 服务器的所有写命令都会自动记录到 AOF 文件中，下面介绍 AOF 持久化的执行流程。</p>
+<h2 id="AOF的执行流程"><a href="#AOF的执行流程" class="headerlink" title="AOF的执行流程"></a>AOF的执行流程</h2><p>AOF 不需要设置任何触发条件，对 Redis 服务器的所有写命令都会自动记录到 AOF 文件中，下面介绍 AOF 持久化的执行流程。</p>
 <p><img src="/images/Redis/AOF%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B.png"></p>
 <p>AOF 文件的写入流程可以分为以下 3 个步骤：</p>
 <ol>
@@ -537,7 +597,7 @@
 <li>无效的命令不再写入 AOF 文件。比如：重复为数据设值（set mykey v1, set mykey v2）、删除键值对数据（sadd myset v1, del myset）等等</li>
 <li>多条命令可以合并为单个。比如：sadd myset v1, sadd myset v2, sadd myset v3 可以合并为 sadd myset v1 v2 v3。不过为了防止单条命令过大造成客户端缓冲区溢出，对于 list、set、hash、zset 类型的 key，并不一定只使用单条命令，而是以某个 Redis 定义的一个常量为界，将命令拆分为多条</li>
 </ul>
-<h2 id="AOF-常用的配置项"><a href="#AOF-常用的配置项" class="headerlink" title="AOF 常用的配置项"></a>AOF 常用的配置项</h2><p>下面是 redis.conf 文件中和 AOF 文件相关的常用配置项（以及默认值）：</p>
+<h2 id="AOF常用的配置项"><a href="#AOF常用的配置项" class="headerlink" title="AOF常用的配置项"></a>AOF常用的配置项</h2><p>下面是 redis.conf 文件中和 AOF 文件相关的常用配置项（以及默认值）：</p>
 <ul>
 <li>appendonly no：是否开启 AOF 持久化功能</li>
 <li>appendfilename “appendonly.aof”：AOF 文件的名称</li>
@@ -561,7 +621,7 @@
 <li>当 AOF 功能开启，且 AOF 文件不存在时，即使 RDB 文件存在也不会加载，Redis 服务器启动日志：</li>
 </ul>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">9326:M 15 Sep 2019 22:49:24.203 <span class="comment"># Server initialized</span></span><br><span class="line">9326:M 15 Sep 2019 22:49:24.203 * Ready to accept connections</span><br></pre></td></tr></table></figure>
-<h2 id="RDB-AOF-混合策略持久化"><a href="#RDB-AOF-混合策略持久化" class="headerlink" title="RDB-AOF 混合策略持久化"></a>RDB-AOF 混合策略持久化</h2><p>在重启 Redis 服务器时，一般很少使用 RDB 快照文件来恢复内存状态，因为会丢失大量数据。更多的是使用 AOF 文件进行命令重放，但是执行 AOF 命令性能相对 RDB 来说要慢很多。这样在 Redis 数据很大的情况下，启动需要消耗大量的时间。</p>
+<h2 id="RDB-AOF混合策略持久化"><a href="#RDB-AOF混合策略持久化" class="headerlink" title="RDB-AOF混合策略持久化"></a>RDB-AOF混合策略持久化</h2><p>在重启 Redis 服务器时，一般很少使用 RDB 快照文件来恢复内存状态，因为会丢失大量数据。更多的是使用 AOF 文件进行命令重放，但是执行 AOF 命令性能相对 RDB 来说要慢很多。这样在 Redis 数据很大的情况下，启动需要消耗大量的时间。</p>
 <p>鉴于 RDB 快照可能会造成数据丢失，AOF 指令恢复数据慢，Redis 4.0 版本提供了一套基于 AOF-RDB 的混合持久化机制，保留了两种持久化机制的优点。这样重写的 AOF 文件由两部份组成，一部分是 RDB 格式的头部数据，另一部分是 AOF 格式的尾部指令。</p>
 <p>Redis 4.0 版本的混合持久化功能默认是关闭的，通过配置 aof-use-rdb-preamble 为 yes 开启此功能：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 开启AOF-RDB混合持久化机制</span></span><br><span class="line">aof-use-rdb-preamble yes</span><br></pre></td></tr></table></figure>
@@ -570,7 +630,7 @@
 <p>如图所示，将 RDB 数据文件的内容和增量的 AOF 命令文件存在一起。这里的 AOF 命令不再是全量的命令，而是自持久化开始到持久化结束的这段时间服务器进程执行的增量 AOF 命令，通常这部分 AOF 命令很小。</p>
 <p><img src="/images/Redis/RDB-AOF%E6%B7%B7%E5%90%88%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96.png"></p>
 <p>在 Redis 服务器重启的时候，可以预先加载 AOF 文件头部全量的 RDB 数据，然后再重放 AOF 文件尾部增量的 AOF 命令，从而大大减少了重启过程中数据还原的时间。</p>
-<h2 id="持久化策略选择"><a href="#持久化策略选择" class="headerlink" title="持久化策略选择"></a>持久化策略选择</h2><h3 id="RDB-和-AOF-性能开销"><a href="#RDB-和-AOF-性能开销" class="headerlink" title="RDB 和 AOF 性能开销"></a>RDB 和 AOF 性能开销</h3><p>在介绍持久化策略之前，首先要明白无论是 RDB 还是 AOF 方式，开启持久化都是会造成性能开销的。</p>
+<h2 id="持久化策略选择"><a href="#持久化策略选择" class="headerlink" title="持久化策略选择"></a>持久化策略选择</h2><h3 id="RDB和-AOF性能开销"><a href="#RDB和-AOF性能开销" class="headerlink" title="RDB和 AOF性能开销"></a>RDB和 AOF性能开销</h3><p>在介绍持久化策略之前，首先要明白无论是 RDB 还是 AOF 方式，开启持久化都是会造成性能开销的。</p>
 <ul>
 <li>RDB 持久化：<ul>
 <li>BGSAVE 命令在进行 fork 操作时，Redis 服务器主进程会发生阻塞</li>
@@ -613,7 +673,7 @@
 <li>主从部署，可以定时在 master 节点上执行 BGSAVE 操作，然后将 RDB 文件拷贝到远程机器，或者在 slave 节点上执行 bgrewriteaof 命令重写 AOF 文件后，将 AOF 文件拷贝到远程机器上。</li>
 </ul>
 <p>由于 RDB 文件文件小、恢复速度快，灾难恢复一般采用 RDB 方式；异地备份的频率根据数据安全性的需要及其它条件来确定，但最好不要低于一天一次。</p>
-<h2 id="RDB-和-AOF-对比"><a href="#RDB-和-AOF-对比" class="headerlink" title="RDB 和 AOF 对比"></a>RDB 和 AOF 对比</h2><table>
+<h1 id="RDB和AOF整体对比"><a href="#RDB和AOF整体对比" class="headerlink" title="RDB和AOF整体对比"></a>RDB和AOF整体对比</h1><table>
 <thead>
 <tr>
 <th>持久化机制</th>
@@ -732,7 +792,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis-%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">Redis 数据库结构</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RDB-%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">RDB 持久化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-%E7%9A%84%E5%88%9B%E5%BB%BA%E5%92%8C%E8%BD%BD%E5%85%A5"><span class="nav-number">2.1.</span> <span class="nav-text">RDB 的创建和载入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%8B%E5%8A%A8%E8%A7%A6%E5%8F%91%E4%BF%9D%E5%AD%98"><span class="nav-number">2.1.1.</span> <span class="nav-text">手动触发保存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E8%A7%A6%E5%8F%91%E4%BF%9D%E5%AD%98"><span class="nav-number">2.1.2.</span> <span class="nav-text">自动触发保存</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E8%87%AA%E5%8A%A8%E8%BD%BD%E5%85%A5"><span class="nav-number">2.2.</span> <span class="nav-text">启动自动载入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-%E7%9A%84%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84"><span class="nav-number">2.3.</span> <span class="nav-text">RDB 的文件结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E8%B7%AF%E5%BE%84"><span class="nav-number">2.3.1.</span> <span class="nav-text">存储路径</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F"><span class="nav-number">2.3.2.</span> <span class="nav-text">文件格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RDB-%E5%B8%B8%E7%94%A8%E7%9A%84%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">2.3.3.</span> <span class="nav-text">RDB 常用的配置项</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#AOF-%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">3.</span> <span class="nav-text">AOF 持久化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF-%E7%9A%84%E5%88%9B%E5%BB%BA%E5%92%8C%E8%BD%BD%E5%85%A5"><span class="nav-number">3.1.</span> <span class="nav-text">AOF 的创建和载入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF-%E7%9A%84%E5%88%9B%E5%BB%BA"><span class="nav-number">3.1.1.</span> <span class="nav-text">AOF 的创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF-%E7%9A%84%E8%BD%BD%E5%85%A5"><span class="nav-number">3.1.2.</span> <span class="nav-text">AOF 的载入</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF-%E7%9A%84%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">AOF 的执行流程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%BD%E4%BB%A4%E8%BF%BD%E5%8A%A0"><span class="nav-number">3.2.1.</span> <span class="nav-text">命令追加</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E5%86%99%E5%85%A5%E5%92%8C%E6%96%87%E4%BB%B6%E5%90%8C%E6%AD%A5"><span class="nav-number">3.2.2.</span> <span class="nav-text">文件写入和文件同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E9%87%8D%E5%86%99"><span class="nav-number">3.2.3.</span> <span class="nav-text">文件重写</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="nav-number">3.2.3.1.</span> <span class="nav-text">触发机制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%87%8D%E5%86%99%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.3.2.</span> <span class="nav-text">重写流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E6%9C%BA%E5%88%B6"><span class="nav-number">3.2.3.3.</span> <span class="nav-text">压缩机制</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF-%E5%B8%B8%E7%94%A8%E7%9A%84%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.3.</span> <span class="nav-text">AOF 常用的配置项</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%81%A2%E5%A4%8D%E6%9C%BA%E5%88%B6"><span class="nav-number">4.</span> <span class="nav-text">数据恢复机制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-AOF%E5%8D%95%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">4.1.</span> <span class="nav-text">RDB&#x2F;AOF单策略持久化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-AOF-%E6%B7%B7%E5%90%88%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">4.2.</span> <span class="nav-text">RDB-AOF 混合策略持久化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%81%E4%B9%85%E5%8C%96%E7%AD%96%E7%95%A5%E9%80%89%E6%8B%A9"><span class="nav-number">4.3.</span> <span class="nav-text">持久化策略选择</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RDB-%E5%92%8C-AOF-%E6%80%A7%E8%83%BD%E5%BC%80%E9%94%80"><span class="nav-number">4.3.1.</span> <span class="nav-text">RDB 和 AOF 性能开销</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%81%E4%B9%85%E5%8C%96%E7%AD%96%E7%95%A5"><span class="nav-number">4.3.2.</span> <span class="nav-text">持久化策略</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BC%93%E5%AD%98"><span class="nav-number">4.3.2.1.</span> <span class="nav-text">数据库缓存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8D%95%E6%9C%BA%E7%8E%AF%E5%A2%83"><span class="nav-number">4.3.2.2.</span> <span class="nav-text">单机环境</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E9%83%A8%E7%BD%B2"><span class="nav-number">4.3.2.3.</span> <span class="nav-text">主从部署</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BC%82%E5%9C%B0%E5%A4%87%E7%81%BE"><span class="nav-number">4.3.2.4.</span> <span class="nav-text">异地备灾</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-%E5%92%8C-AOF-%E5%AF%B9%E6%AF%94"><span class="nav-number">4.4.</span> <span class="nav-text">RDB 和 AOF 对比</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BB%93%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">Redis数据库结构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E6%95%B0%E6%8D%AE%E5%BA%93%E9%94%AE%E7%9A%84%E5%A2%9E%E5%88%A0%E6%94%B9%E6%9F%A5"><span class="nav-number">1.1.</span> <span class="nav-text">对数据库键的增删改查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E8%BF%87%E6%9C%9F%E9%94%AE%E7%9A%84%E5%88%A0%E9%99%A4%E7%AD%96%E7%95%A5"><span class="nav-number">1.2.</span> <span class="nav-text">对过期键的删除策略</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF%E3%80%81RDB%E5%92%8C%E5%A4%8D%E5%88%B6%E5%8A%9F%E8%83%BD%E5%AF%B9%E8%BF%87%E6%9C%9F%E9%94%AE%E7%9A%84%E5%A4%84%E7%90%86"><span class="nav-number">1.3.</span> <span class="nav-text">AOF、RDB和复制功能对过期键的处理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%9F%E6%88%90RDB%E6%96%87%E4%BB%B6"><span class="nav-number">1.3.1.</span> <span class="nav-text">生成RDB文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%BD%E5%85%A5RDB%E6%96%87%E4%BB%B6"><span class="nav-number">1.3.2.</span> <span class="nav-text">载入RDB文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF%E6%96%87%E4%BB%B6%E5%86%99%E5%85%A5"><span class="nav-number">1.3.3.</span> <span class="nav-text">AOF文件写入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF%E9%87%8D%E5%86%99"><span class="nav-number">1.3.4.</span> <span class="nav-text">AOF重写</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E5%A4%8D%E5%88%B6"><span class="nav-number">1.3.5.</span> <span class="nav-text">主从复制</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93%E9%80%9A%E7%9F%A5"><span class="nav-number">1.4.</span> <span class="nav-text">数据库通知</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RDB%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">RDB持久化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB%E7%9A%84%E5%88%9B%E5%BB%BA%E5%92%8C%E8%BD%BD%E5%85%A5"><span class="nav-number">2.1.</span> <span class="nav-text">RDB的创建和载入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%8B%E5%8A%A8%E8%A7%A6%E5%8F%91%E4%BF%9D%E5%AD%98"><span class="nav-number">2.1.1.</span> <span class="nav-text">手动触发保存</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E8%A7%A6%E5%8F%91%E4%BF%9D%E5%AD%98"><span class="nav-number">2.1.2.</span> <span class="nav-text">自动触发保存</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E8%87%AA%E5%8A%A8%E8%BD%BD%E5%85%A5"><span class="nav-number">2.2.</span> <span class="nav-text">启动自动载入</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB%E7%9A%84%E6%96%87%E4%BB%B6%E7%BB%93%E6%9E%84"><span class="nav-number">2.3.</span> <span class="nav-text">RDB的文件结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%98%E5%82%A8%E8%B7%AF%E5%BE%84"><span class="nav-number">2.3.1.</span> <span class="nav-text">存储路径</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F"><span class="nav-number">2.3.2.</span> <span class="nav-text">文件格式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RDB%E5%B8%B8%E7%94%A8%E7%9A%84%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">2.3.3.</span> <span class="nav-text">RDB常用的配置项</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#AOF%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">3.</span> <span class="nav-text">AOF持久化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF%E7%9A%84%E5%88%9B%E5%BB%BA%E5%92%8C%E8%BD%BD%E5%85%A5"><span class="nav-number">3.1.</span> <span class="nav-text">AOF的创建和载入</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF%E7%9A%84%E5%88%9B%E5%BB%BA"><span class="nav-number">3.1.1.</span> <span class="nav-text">AOF的创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOF%E7%9A%84%E8%BD%BD%E5%85%A5"><span class="nav-number">3.1.2.</span> <span class="nav-text">AOF的载入</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF%E7%9A%84%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">AOF的执行流程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%BD%E4%BB%A4%E8%BF%BD%E5%8A%A0"><span class="nav-number">3.2.1.</span> <span class="nav-text">命令追加</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E5%86%99%E5%85%A5%E5%92%8C%E6%96%87%E4%BB%B6%E5%90%8C%E6%AD%A5"><span class="nav-number">3.2.2.</span> <span class="nav-text">文件写入和文件同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E9%87%8D%E5%86%99"><span class="nav-number">3.2.3.</span> <span class="nav-text">文件重写</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="nav-number">3.2.3.1.</span> <span class="nav-text">触发机制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%87%8D%E5%86%99%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.3.2.</span> <span class="nav-text">重写流程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8E%8B%E7%BC%A9%E6%9C%BA%E5%88%B6"><span class="nav-number">3.2.3.3.</span> <span class="nav-text">压缩机制</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AOF%E5%B8%B8%E7%94%A8%E7%9A%84%E9%85%8D%E7%BD%AE%E9%A1%B9"><span class="nav-number">3.3.</span> <span class="nav-text">AOF常用的配置项</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%81%A2%E5%A4%8D%E6%9C%BA%E5%88%B6"><span class="nav-number">4.</span> <span class="nav-text">数据恢复机制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-AOF%E5%8D%95%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">4.1.</span> <span class="nav-text">RDB&#x2F;AOF单策略持久化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RDB-AOF%E6%B7%B7%E5%90%88%E7%AD%96%E7%95%A5%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">4.2.</span> <span class="nav-text">RDB-AOF混合策略持久化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%81%E4%B9%85%E5%8C%96%E7%AD%96%E7%95%A5%E9%80%89%E6%8B%A9"><span class="nav-number">4.3.</span> <span class="nav-text">持久化策略选择</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RDB%E5%92%8C-AOF%E6%80%A7%E8%83%BD%E5%BC%80%E9%94%80"><span class="nav-number">4.3.1.</span> <span class="nav-text">RDB和 AOF性能开销</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%81%E4%B9%85%E5%8C%96%E7%AD%96%E7%95%A5"><span class="nav-number">4.3.2.</span> <span class="nav-text">持久化策略</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93%E7%BC%93%E5%AD%98"><span class="nav-number">4.3.2.1.</span> <span class="nav-text">数据库缓存</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8D%95%E6%9C%BA%E7%8E%AF%E5%A2%83"><span class="nav-number">4.3.2.2.</span> <span class="nav-text">单机环境</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E9%83%A8%E7%BD%B2"><span class="nav-number">4.3.2.3.</span> <span class="nav-text">主从部署</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BC%82%E5%9C%B0%E5%A4%87%E7%81%BE"><span class="nav-number">4.3.2.4.</span> <span class="nav-text">异地备灾</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#RDB%E5%92%8CAOF%E6%95%B4%E4%BD%93%E5%AF%B9%E6%AF%94"><span class="nav-number">5.</span> <span class="nav-text">RDB和AOF整体对比</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -746,7 +806,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">15</span>
+          <span class="site-state-item-count">16</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -759,7 +819,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">42</span>
+        <span class="site-state-item-count">47</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
