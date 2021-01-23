@@ -142,8 +142,8 @@
         <category>JDK</category>
       </categories>
       <tags>
-        <tag>JDK</tag>
         <tag>Collections Framework</tag>
+        <tag>JDK</tag>
         <tag>Fail-Fast</tag>
         <tag>Rehash</tag>
       </tags>
@@ -2020,7 +2020,7 @@
 
 <h2 id="ASK错误"><a href="#ASK错误" class="headerlink" title="ASK错误"></a>ASK错误</h2><p>在进行重新分片期间，源节点向目标节点迁移一个槽的过程中，可能会出现这样一种情况：属于被迁移槽的一部分键值对保存在源节点里面，而另部分键值对则保存在目标节点里面。</p>
 <p><img src="/images/Redis/%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E5%8F%91%E9%80%81ASK%E9%94%99%E8%AF%AF.png"></p>
-<h3 id="IMPORTING和命令实现"><a href="#IMPORTING和命令实现" class="headerlink" title="IMPORTING和命令实现"></a>IMPORTING和命令实现</h3><p>clusterState 结构的 importing_slots_from 数组记录了当前节点正在从其他节点导入的槽。<br>clusterState 结构的 migrating_slots_from 数组记录了当前节点正在迁移至其他节点的槽。</p>
+<h3 id="IMPORTING和MIGRATING命令实现"><a href="#IMPORTING和MIGRATING命令实现" class="headerlink" title="IMPORTING和MIGRATING命令实现"></a>IMPORTING和MIGRATING命令实现</h3><p>clusterState 结构的 importing_slots_from 数组记录了当前节点正在从其他节点导入的槽。<br>clusterState 结构的 migrating_slots_from 数组记录了当前节点正在迁移至其他节点的槽。</p>
 <figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterState</span> &#123;</span></span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">    </span><br><span class="line">    clusterNode *importing_slots_from[<span class="number">16384</span>];</span><br><span class="line">    </span><br><span class="line">    clusterNode *migrating_slots_from[<span class="number">16384</span>];</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125; clusterstate;</span><br></pre></td></tr></table></figure>
 <p>如果 importing_slots_from[i] 的值不为 NULL，而是指向一个 clusterNode 结构，那么表示当前节点正在从 clusterNode 所代表的节点导入槽 i。如果 migrating_slots_to[i] 的值不为 NULL，而是指向一个 clusterNode 结构，那么表示当前节点正在将槽 i 迁移至 clusterNode 所代表的节点。</p>
 <p>在对集群进行重新分片的时候，向目标节点发送命令：<code>CLUSTER SETSLOT &lt;i&gt; IMPORTING &lt;source_id&gt;</code>，可以将目标节点 clusterState.importing_slots_from[i] 的值设置为 source_id 所代表节点的 clusterNode 结构。同时向源节点发送命令：<code>CLUSTER SETSLOT &lt;i&gt; MIGRATING &lt;target_id&gt;</code>，可以将源节点 migrating_slots_to[i] 的值设置为 target_id 所代表节点的 clusterNode 结构。</p>
