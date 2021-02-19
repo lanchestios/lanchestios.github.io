@@ -27,9 +27,9 @@
 <meta property="og:site_name" content="Lache&#39;s Blog">
 <meta property="og:description" content="对 Java 的五种引用（强引用、软引用、弱引用、虚引用、终引用）进行了概念上的介绍，着重介绍了 Reference 配合 ReferenceQueue 的状态流转、ReferenceQueue 的原理介绍和 FinalReference 与 JVM 的调用关系和原理。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.github.io/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/JDK/%E6%A0%91%E5%BD%A2%E5%BC%95%E7%94%A8%E9%93%BE.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/Reference继承关系.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/Reference四种状态.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/树形引用链.png">
 <meta property="article:published_time" content="2021-01-15T01:23:35.000Z">
 <meta property="article:modified_time" content="2021-01-17T15:04:30.106Z">
 <meta property="article:author" content="lanchestios">
@@ -37,7 +37,7 @@
 <meta property="article:tag" content="Reference">
 <meta property="article:tag" content="ReferenceQueue">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.github.io/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta name="twitter:image" content="http://lanchestios.github.io/images/JDK/Reference继承关系.png">
 
 <link rel="canonical" href="http://lanchestios.github.io/2021/01/15/JDK-ReferenceObject/">
 
@@ -250,9 +250,8 @@
       
         <p>对 Java 的五种引用（强引用、软引用、弱引用、虚引用、终引用）进行了概念上的介绍，着重介绍了 Reference 配合 ReferenceQueue 的状态流转、ReferenceQueue 的原理介绍和 FinalReference 与 JVM 的调用关系和原理。</p>
 <a id="more"></a>
-
 <h1 id="Reference-Object"><a href="#Reference-Object" class="headerlink" title="Reference Object"></a>Reference Object</h1><p>Java 引用有五种类型：强（strong）引用、软（soft）引用、弱（weak）引用、虚（phantom）引用、终（final）引用。除了强引用，其他几种引用均继承<code>java.lang.ref.Reference</code>。</p>
-<p><img src="/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/JDK/Reference继承关系.png" alt=""></p>
 <p><strong>Strong Reference</strong></p>
 <p>最常用的引用类型，在执行下面的语句时，变量 <code>o</code> 即为一个强引用。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Object o = <span class="keyword">new</span> Object();</span><br></pre></td></tr></table></figure>
@@ -276,7 +275,7 @@
 <li>如果<code>next</code>为<code>null</code>，那么说明该引用为<code>Active</code>状态</li>
 <li>如果<code>next</code>不为<code>null</code>，那么 GC 应该按其正常逻辑处理该引用。</li>
 </ul>
-<p><img src="/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png"></p>
+<p><img src="/images/JDK/Reference四种状态.png" alt=""></p>
 <blockquote>
 <p><strong>注意</strong></p>
 <ol>
@@ -335,7 +334,7 @@
 <li>单条引用路径可及性判断：在这条路径中，最弱的一个引用决定对象的可及性。</li>
 <li>多条引用路径可及性判断：几条路径中，最强的一条的引用决定对象的可及性。</li>
 </ol>
-<p><img src="/images/JDK/%E6%A0%91%E5%BD%A2%E5%BC%95%E7%94%A8%E9%93%BE.png"></p>
+<p><img src="/images/JDK/树形引用链.png" alt=""></p>
 <p>在这个树形的引用链中，箭头的方向代表了引用的方向，所指向的对象是被引用对象。</p>
 <p>假设在树形引用链中，「路径1」和 「路径3」为强引用，「路径2」为软引用，「路径4」为弱引用。</p>
 <p>对于「对象5」按照这两个判断原则，「路径1-2」取最弱的引用（也就是「路径2」的软引用），因此该路径对「对象5」的引用为软引用。同样，「路径3-4」为弱引用。在这两条路径之间取最强的引用，于是「对象5」是一个软可及对象。</p>
@@ -351,10 +350,6 @@
 <p>其优先级最高，可以理解为需要不断地处理引用对象。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">ReferenceHandler</span> <span class="keyword">extends</span> <span class="title">Thread</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">ensureClassInitialized</span><span class="params">(Class&lt;?&gt; clazz)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            Class.forName(clazz.getName(), <span class="keyword">true</span>, clazz.getClassLoader());</span><br><span class="line">        &#125; <span class="keyword">catch</span> (ClassNotFoundException e) &#123;</span><br><span class="line">            <span class="keyword">throw</span> (Error) <span class="keyword">new</span> NoClassDefFoundError(e.getMessage()).initCause(e);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> &#123;</span><br><span class="line">        <span class="comment">// pre-load and initialize InterruptedException and Cleaner classes</span></span><br><span class="line">        <span class="comment">// so that we don&#x27;t get into trouble later in the run loop if there&#x27;s</span></span><br><span class="line">        <span class="comment">// memory shortage while loading/initializing them lazily.</span></span><br><span class="line">        ensureClassInitialized(InterruptedException.class);</span><br><span class="line">        ensureClassInitialized(Cleaner.class);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ReferenceHandler(ThreadGroup g, String name) &#123;</span><br><span class="line">        <span class="keyword">super</span>(g, name);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">            tryHandlePending(<span class="keyword">true</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * Try handle pending &#123;<span class="doctag">@link</span> Reference&#125; if there is one.&lt;p&gt;</span></span><br><span class="line"><span class="comment">     * Return &#123;<span class="doctag">@code</span> true&#125; as a hint that there might be another</span></span><br><span class="line"><span class="comment">     * &#123;<span class="doctag">@link</span> Reference&#125; pending or &#123;<span class="doctag">@code</span> false&#125; when there are no more pending</span></span><br><span class="line"><span class="comment">     * &#123;<span class="doctag">@link</span> Reference&#125;s at the moment and the program can do some other</span></span><br><span class="line"><span class="comment">     * useful work instead of looping.</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> waitForNotify if &#123;<span class="doctag">@code</span> true&#125; and there was no pending</span></span><br><span class="line"><span class="comment">     *                      &#123;<span class="doctag">@link</span> Reference&#125;, wait until notified from VM</span></span><br><span class="line"><span class="comment">     *                      or interrupted; if &#123;<span class="doctag">@code</span> false&#125;, return immediately</span></span><br><span class="line"><span class="comment">     *                      when there is no pending &#123;<span class="doctag">@link</span> Reference&#125;.</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> &#123;<span class="doctag">@code</span> true&#125; if there was a &#123;<span class="doctag">@link</span> Reference&#125; pending and it</span></span><br><span class="line"><span class="comment">     *         was processed, or we waited for notification and either got it</span></span><br><span class="line"><span class="comment">     *         or thread was interrupted before being notified;</span></span><br><span class="line"><span class="comment">     *         &#123;<span class="doctag">@code</span> false&#125; otherwise.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">boolean</span> <span class="title">tryHandlePending</span><span class="params">(<span class="keyword">boolean</span> waitForNotify)</span> </span>&#123;</span><br><span class="line">    Reference&lt;Object&gt; r;</span><br><span class="line">    Cleaner c;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">synchronized</span> (lock) &#123;</span><br><span class="line">            <span class="keyword">if</span> (pending != <span class="keyword">null</span>) &#123;</span><br><span class="line">                r = pending;</span><br><span class="line">                <span class="comment">// &#x27;instanceof&#x27; might throw OutOfMemoryError sometimes</span></span><br><span class="line">                <span class="comment">// so do this before un-linking &#x27;r&#x27; from the &#x27;pending&#x27; chain...</span></span><br><span class="line">                c = r <span class="keyword">instanceof</span> Cleaner ? (Cleaner) r : <span class="keyword">null</span>;</span><br><span class="line">                <span class="comment">// unlink &#x27;r&#x27; from &#x27;pending&#x27; chain</span></span><br><span class="line">                pending = r.discovered;</span><br><span class="line">                r.discovered = <span class="keyword">null</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// The waiting on the lock may cause an OutOfMemoryError</span></span><br><span class="line">                <span class="comment">// because it may try to allocate exception objects.</span></span><br><span class="line">                <span class="keyword">if</span> (waitForNotify) &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">// retry if waited</span></span><br><span class="line">                <span class="keyword">return</span> waitForNotify;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (OutOfMemoryError x) &#123;</span><br><span class="line">        <span class="comment">// Give other threads CPU time so they hopefully drop some live references</span></span><br><span class="line">        <span class="comment">// and GC reclaims some space.</span></span><br><span class="line">        <span class="comment">// Also prevent CPU intensive spinning in case &#x27;r instanceof Cleaner&#x27; above</span></span><br><span class="line">        <span class="comment">// persistently throws OOME for some time...</span></span><br><span class="line">        Thread.yield();</span><br><span class="line">        <span class="comment">// retry</span></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (InterruptedException x) &#123;</span><br><span class="line">        <span class="comment">// retry</span></span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Fast path for cleaners</span></span><br><span class="line">    <span class="keyword">if</span> (c != <span class="keyword">null</span>) &#123;</span><br><span class="line">        c.clean();</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ReferenceQueue&lt;? <span class="keyword">super</span> Object&gt; q = r.queue;</span><br><span class="line">    <span class="keyword">if</span> (q != ReferenceQueue.NULL) q.enqueue(r);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-
-
-
 
     </div>
 
@@ -454,20 +449,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">36</span>
+          <span class="site-state-item-count">37</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">116</span>
+        <span class="site-state-item-count">122</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
@@ -553,6 +548,8 @@
 
 
 
+
+  
 
   
 

@@ -27,9 +27,9 @@
 <meta property="og:site_name" content="Lache&#39;s Blog">
 <meta property="og:description" content="JMM 中关于 synchronized 有如下规定，线程加锁时，必须清空工作内存中共享变量的值，从而使得被监视器保护的临界区代码必须从主内存中读取共享变量；线程在解锁时，需要把工作内存中最新的共享变量的值写入到主存，以此来保证共享变量的可见性。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java%E5%AF%B9%E8%B1%A1%E7%BB%93%E6%9E%84.png">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/%E8%8E%B7%E5%8F%96%E9%94%81%E8%BF%87%E7%A8%8B.png">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/MUTEX%E5%B7%A5%E4%BD%9C%E6%96%B9%E5%BC%8F.png">
+<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java对象结构.png">
+<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/获取锁过程.png">
+<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/MUTEX工作方式.png">
 <meta property="og:image" content="https://pic4.zhimg.com/80/v2-f038bb24708478e76d2240267bec56bf_720w.jpg">
 <meta property="og:image" content="https://pic3.zhimg.com/80/v2-5d58112c4ead326066a836941a2857c2_720w.jpg">
 <meta property="article:published_time" content="2021-02-12T03:18:40.000Z">
@@ -41,7 +41,7 @@
 <meta property="article:tag" content="JMM">
 <meta property="article:tag" content="Mutex Lock">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java%E5%AF%B9%E8%B1%A1%E7%BB%93%E6%9E%84.png">
+<meta name="twitter:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java对象结构.png">
 
 <link rel="canonical" href="http://lanchestios.github.io/2021/02/12/JUC-SYNC%E5%85%B3%E9%94%AE%E5%AD%97/">
 
@@ -248,7 +248,6 @@
       
         <p>JMM 中关于 synchronized 有如下规定，线程加锁时，必须清空工作内存中共享变量的值，从而使得被监视器保护的临界区代码必须从主内存中读取共享变量；线程在解锁时，需要把工作内存中最新的共享变量的值写入到主存，以此来保证共享变量的可见性。</p>
 <a id="more"></a>
-
 <h1 id="SYNC的应用方式"><a href="#SYNC的应用方式" class="headerlink" title="SYNC的应用方式"></a>SYNC的应用方式</h1><ol>
 <li>修饰实例方法，作用于当前实例加锁，进入同步方法前要获取当前实例的锁</li>
 <li>修饰静态方法，作用于当前类对象加锁，进入同步方法前要获得当前类对象的锁</li>
@@ -264,8 +263,9 @@
 <li>实例变量：存放类的属性数据信息，包括父类的属性信息，如果是数组的实例部分还包括数组的长度，这部分内存按 4 字节对齐。</li>
 <li>填充数据：由于虚拟机要求对象起始地址必须是 8 字节的整数倍。填充数据不是必须存在的，仅仅是为了字节对齐。</li>
 </ul>
-<p><img src="../images/JDK/Java%E5%AF%B9%E8%B1%A1%E7%BB%93%E6%9E%84.png"></p>
+<p><img src="../images/JDK/Java对象结构.png" alt=""></p>
 <p>而对于 Java 头对象，它实现 synchronized 的锁对象的基础。一般而言，synchronized 使用的锁对象是存储在 Java 对象头里的，JVM 中采用 2 个字来存储对象头（如果对象是数组则会分配 3 个字，多出来的 1 个字记录的是数组长度），其主要结构是由 Mark Word 和 Class Metadata Address 组成，其结构说明如下表：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -274,7 +274,8 @@
 <th>说明</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>32/64bit</td>
 <td>Mark Word</td>
 <td>存储对象的 hashCode、锁信息或分代年龄或 GC 标志等信息</td>
@@ -284,8 +285,11 @@
 <td>Class Metadata Address</td>
 <td>类型指针指向对象的类元数据，JVM 通过这个指针确定该对象是哪个类的实例。</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>其中 Mark Word 在默认情况下存储着对象的 HashCode、分代年龄、锁标记位等以下是 32 位 JVM 的 Mark Word 默认存储结构</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -296,16 +300,19 @@
 <th>2bit 锁标志位</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>无锁状态</td>
 <td>对象HashCode</td>
 <td>对象分代年龄</td>
 <td>0</td>
 <td>01</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>由于对象头的信息是与对象自身定义的数据没有关系的额外存储成本，因此考虑到 JVM 的空间效率，Mark Word 被设计成为一个非固定的数据结构，以便存储更多有效的数据，它会根据对象本身的状态复用自己的存储空间，如 32 位 JVM 下，除了上述列出的 Mark Word 默认存储结构外，还有如下可能变化的结构：</p>
-<table border="1" cellspacing="0">
+<p><table border="1" cellspacing="0">
     <tbody>
         <tr>
             <td rowspan="2"> 
@@ -409,12 +416,10 @@
             </td>
         </tr>
     </tbody>
-</table>
-其中轻量级锁和偏向锁是 Java 6 对 synchronized 锁进行优化后新增加的。下面主要分析的是重量级锁也就是通常说 synchronized 的对象锁，锁标识位为 10，其中指针指向的是 monitor 对象（也称为管程）的起始地址。每个对象都存在着一个 monitor 与之关联，对象与其 monitor 之间的关系有存在多种实现方式，如 monitor 可以与对象一起创建销毁或当线程试图获取对象锁时自动生成，但当一个 monitor 被某个线程持有后，它便处于锁定状态。在 Java 虚拟机（HotSpot）中，monitor 是由 ObjectMonitor 实现的，其主要数据结构如下（位于 HotSpot 虚拟机源码 ObjectMonitor.hpp 文件，C++实现的）
-
+</table><br>其中轻量级锁和偏向锁是 Java 6 对 synchronized 锁进行优化后新增加的。下面主要分析的是重量级锁也就是通常说 synchronized 的对象锁，锁标识位为 10，其中指针指向的是 monitor 对象（也称为管程）的起始地址。每个对象都存在着一个 monitor 与之关联，对象与其 monitor 之间的关系有存在多种实现方式，如 monitor 可以与对象一起创建销毁或当线程试图获取对象锁时自动生成，但当一个 monitor 被某个线程持有后，它便处于锁定状态。在 Java 虚拟机（HotSpot）中，monitor 是由 ObjectMonitor 实现的，其主要数据结构如下（位于 HotSpot 虚拟机源码 ObjectMonitor.hpp 文件，C++实现的）</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">ObjectMonitor() &#123;</span><br><span class="line">    _header       = NULL;</span><br><span class="line">    _count        = <span class="number">0</span>; <span class="comment">//记录个数</span></span><br><span class="line">    _waiters      = <span class="number">0</span>,</span><br><span class="line">    _recursions   = <span class="number">0</span>;</span><br><span class="line">    _object       = NULL;</span><br><span class="line">    _owner        = NULL;</span><br><span class="line">    _WaitSet      = NULL; <span class="comment">//处于wait状态的线程，会被加入到_WaitSet</span></span><br><span class="line">    _WaitSetLock  = <span class="number">0</span> ;</span><br><span class="line">    _Responsible  = NULL ;</span><br><span class="line">    _succ         = NULL ;</span><br><span class="line">    _cxq          = NULL ;</span><br><span class="line">    FreeNext      = NULL ;</span><br><span class="line">    _EntryList    = NULL ; <span class="comment">//处于等待锁block状态的线程，会被加入到该列表</span></span><br><span class="line">    _SpinFreq     = <span class="number">0</span> ;</span><br><span class="line">    _SpinClock    = <span class="number">0</span> ;</span><br><span class="line">    OwnerIsThread = <span class="number">0</span> ;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>ObjectMonitor 中有两个队列，<code>_WaitSet</code>和<code>_EntryList</code>，用来保存 ObjectWaiter 对象列表（每个等待锁的线程都会被封装成 ObjectWaiter 对象），<code>_owner</code>指向持有 ObjectMonitor 对象的线程，当多个线程同时访问一段同步代码时，首先会进入<code>_EntryList</code>集合，当线程获取到对象的 monitor 后进入<code>_owner</code>区域并把 monitor 中的 owner 变量设置为当前线程，同时 monitor 中的计数器 count 加 1，若线程调用 wait() 方法，将释放当前持有的 monitor，<code>_owner</code>变量恢复为 null，count 自减 1，同时该线程进入 WaitSet 集合中等待被唤醒。若当前线程执行完毕也将释放 monitor（锁）并复位变量的值，以便其他线程进入获取 monitor（锁）。过程如下图所示</p>
-<p><img src="../images/JDK/%E8%8E%B7%E5%8F%96%E9%94%81%E8%BF%87%E7%A8%8B.png"></p>
+<p><img src="../images/JDK/获取锁过程.png" alt=""></p>
 <p>由此看来，monitor 对象存在于每个Java对象的对象头中（存储的指针的指向），synchronized 锁便是通过这种方式获取锁的，也是为什么 Java 中任意对象可以作为锁的原因，同时也是 notify/notifyAll/wait 等方法存在于顶级对象 Object 中的原因。</p>
 <h2 id="Mutex-Lock"><a href="#Mutex-Lock" class="headerlink" title="Mutex Lock"></a>Mutex Lock</h2><p>监视器锁（Monitor）本质是依赖于底层的操作系统的 Mutex Lock（互斥锁）来实现的。每个对象都对应于一个可称为 “互斥锁” 的标记，这个标记用来保证在任一时刻，只能有一个线程访问该对象。</p>
 <blockquote>
@@ -422,7 +427,7 @@
 <p>用于保护临界区，确保同一时间只有一个线程访问数据。对共享资源的访问，先对互斥量进行加锁，如果互斥量已经上锁，调用线程会阻塞，直到互斥量被解锁。在完成了对共享资源的访问后，要对互斥量进行解锁。</p>
 </blockquote>
 <p>mutex 的工作方式：</p>
-<p><img src="../images/JDK/MUTEX%E5%B7%A5%E4%BD%9C%E6%96%B9%E5%BC%8F.png"></p>
+<p><img src="../images/JDK/MUTEX工作方式.png" alt=""></p>
 <ol>
 <li>申请 mutex</li>
 <li>如果成功，则持有该 mutex</li>
@@ -478,13 +483,13 @@
 <li>在代码进入同步块的时候，如果同步对象锁状态为无锁状态（锁标志位为“01”状态，是否为偏向锁为“0”），虚拟机首先将在当前线程的栈帧中建立一个名为锁记录（Lock Record）的空间，用于存储锁对象目前的 Mark Word 的拷贝，官方称之为 Displaced Mark Word。这时候线程堆栈与对象头的状态如下图所示。</li>
 </ol>
 <p><img src="https://pic4.zhimg.com/80/v2-f038bb24708478e76d2240267bec56bf_720w.jpg" alt="img"></p>
-<ol start="2">
+<ol>
 <li>拷贝对象头中的 Mark Word 复制到锁记录中。</li>
 <li>拷贝成功后，虚拟机将使用 CAS 操作尝试将对象的 Mark Word 更新为指向 Lock Record 的指针，并将 Lock Record 里的 owner 指针指向 object mark word。如果更新成功，则执行步骤 3，否则执行步骤 4。</li>
 <li>如果这个更新动作成功了，那么这个线程就拥有了该对象的锁，并且对象 Mark Word 的锁标志位设置为“00”，即表示此对象处于轻量级锁定状态，这时候线程堆栈与对象头的状态如下图所示。</li>
 </ol>
 <p><img src="https://pic3.zhimg.com/80/v2-5d58112c4ead326066a836941a2857c2_720w.jpg" alt="img"></p>
-<ol start="5">
+<ol>
 <li>如果这个更新操作失败了，虚拟机首先会检查对象的 Mark Word 是否指向当前线程的栈帧，如果是就说明当前线程已经拥有了这个对象的锁，那就可以直接进入同步块继续执行。否则说明多个线程竞争锁，若当前只有一个等待线程，则可通过自旋稍微等待一下，可能另一个线程很快就会释放锁。 但是当自旋超过一定的次数，或者一个线程在持有锁，一个在自旋，又有第三个来访时，轻量级锁膨胀为重量级锁，重量级锁使除了拥有锁的线程以外的线程都阻塞，防止 CPU 空转，锁标志的状态值变为“10”，Mark Word 中存储的就是指向重量级锁（互斥量）的指针，后面等待锁的线程也要进入阻塞状态。</li>
 </ol>
 <p><strong>轻量级锁的解锁过程：</strong></p>
@@ -618,20 +623,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">36</span>
+          <span class="site-state-item-count">37</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">116</span>
+        <span class="site-state-item-count">122</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
@@ -717,6 +722,8 @@
 
 
 
+
+  
 
   
 
