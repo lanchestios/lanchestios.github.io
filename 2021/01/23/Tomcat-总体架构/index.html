@@ -50,7 +50,7 @@
 <meta property="og:image" content="http://lanchestios.github.io/images/Tomcat/J2SE类加载器.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Tomcat/Tomcat类加载方案.png">
 <meta property="article:published_time" content="2021-01-23T12:30:43.000Z">
-<meta property="article:modified_time" content="2021-01-23T12:39:32.854Z">
+<meta property="article:modified_time" content="2021-02-23T09:24:41.000Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="Tomcat">
 <meta property="article:tag" content="Architecture Design">
@@ -238,10 +238,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2021-01-23 20:30:43 / Modified: 20:39:32" itemprop="dateCreated datePublished" datetime="2021-01-23T20:30:43+08:00">2021-01-23</time>
+              <time title="Created: 2021-01-23 20:30:43" itemprop="dateCreated datePublished" datetime="2021-01-23T20:30:43+08:00">2021-01-23</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-02-23 17:24:41" itemprop="dateModified" datetime="2021-02-23T17:24:41+08:00">2021-02-23</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -400,9 +406,9 @@
 <p>其次， Catalina 类加载器负责加载只有 Tomcat 应用服务器内部可见的类，这些类对 Web 应用不可见。如 Tomcat 的具体实现类，因为我们的 Web 应用最好与服务器松耦合，故不应该依赖应用服务器的内部类。</p>
 <p>再次， Shared 类加载器负责加载 Web 应用共享的类，这些类 Tomcat 服务器不会依赖。</p>
 <blockquote>
-<p>既然 Tomcat 提供了这个特性，那么我们什么时候可以考虑使用呢？举个例子，如果我们想实现自己的会话存储方案，而且该方案依赖了一些第三方包，我们不希望这些包对web应用可见（因为可能会存在包版本冲突之类的问题，也可能我们的Web应用根本不需要这些包）。此时，我们可以配置<code>server.loader</code>，创建独立的 Catalina 类加载器。</p>
+<p>既然 Tomcat 提供了这个特性，那么我们什么时候可以考虑使用呢？举个例子，如果我们想实现自己的会话存储方案，而且该方案依赖了一些第三方包，我们不希望这些包对 Web 应用可见（因为可能会存在包版本冲突之类的问题，也可能我们的 Web 应用根本不需要这些包）。此时，我们可以配置<code>server.loader</code>，创建独立的 Catalina 类加载器。</p>
 </blockquote>
-<p>最后， Tomcat服务器<code>$CATALINA_HOME/bin</code>目录下的包作为启动入口由 System 类加载器加载。通过将这几个启动包剥离， Tomcat简化了应用服务器的启动，同时增加了灵活性。</p>
+<p>最后， Tomcat 服务器<code>$CATALINA_HOME/bin</code>目录下的包作为启动入口由 System 类加载器加载。通过将这几个启动包剥离，Tomcat 简化了应用服务器的启动，同时增加了灵活性。</p>
 <ol>
 <li><strong>架构层面上</strong></li>
 </ol>
@@ -410,13 +416,34 @@
 <li>共享：Tomcat 通过 Common 类加载器实现了 Jar 包在应用服务器以及 Web 应用之间共享，通过 Shared 类加载器实现了 Jar 包在 Web 应用之间的共享，通过 Catalina 类加载器加载服务器依赖的类。这样最大程度上实现了Jar包的共享，而且又确保了不会引入过多无用的包。</li>
 <li>隔离性：这里的隔离性区别于前者，指服务器与 Web 应用的隔离。理论上，除去 Servlet 规范定义的接口外，我们的 Web 应用不应依赖服务器的任何实现类，这样才有助于 Web 应用的可移植性。正因如此，Tomcat 支持通过 Catalina 类加载器加载服务器依赖的包（尽管 Tomcat默认并没有这么做），以便应用服务器与 Web 应用更好地隔离。</li>
 </ul>
-<p>既然在默认情况下，Tomcat 的 Common、Catalina、Shared 为同一个类加载器，那么它是如何禁止 Web 应用使用服务器相关实现类的呢？这是通过 JVM 的安全策略许可实现的，我们将在后续章节讲解</p>
-<h2 id="Web应用类加载器"><a href="#Web应用类加载器" class="headerlink" title="Web应用类加载器"></a>Web应用类加载器</h2><p>Java默认的类加载机制是委派模式，委派的过程如下<br>（1）从缓存中加载。<br>（2）如果缓存中没有，则从父类加载器中加载。<br>（3）如果父类加载器没有，则从当前类加载器加载。<br>（4）如果没有，则抛出异常。</p>
+<p>既然在默认情况下，Tomcat 的 Common、Catalina、Shared 为同一个类加载器，那么它是如何禁止 Web 应用使用服务器相关实现类的呢？这是通过 JVM 的安全策略许可实现的，我们将在后续章节讲解。</p>
+<h2 id="Web应用类加载器"><a href="#Web应用类加载器" class="headerlink" title="Web应用类加载器"></a>Web应用类加载器</h2><p>Java默认的类加载机制是委派模式，委派的过程如下</p>
+<ol>
+<li>从缓存中加载。</li>
+<li>如果缓存中没有，则从父类加载器中加载。</li>
+<li>如果父类加载器没有，则从当前类加载器加载。</li>
+<li>如果没有，则抛出异常。</li>
+</ol>
 <p>Tomcat 提供的 Web 应用类加载器与默认的委派模式稍有不同。当进行类加载时，除 JVM 基础类库外，它会首先尝试通过当前类加载器加载，然后才进行委派。 Servlet 规范相关 API 禁止通过 Web 应用类加载器加载，因此，不要在 Web 应用中包含这些包。</p>
-<p>所以，Web 应用类加载器默认加载顺序如下:<br>（1）从缓存中加载。<br>（2）如果没有，则从 JVM 的 Bootstrap 类加载器加载。<br>（3）如果没有，则从当前类加载器加载（按照<code>WEB-INF/classes</code>、<code>WEB-INF/lib</code>的顺序）<br>（4）如果没有，则从父类加载器加载，由于父类加载器采用默认的委派模式，所以加载顺序为 System、Common、Shared。</p>
-<p>Tomcat 提供了 delegate 属性用于控制是否启用 Java 委派模式，默认为 false（不启用）。当配置为 true 时， Tomcat 将使用 Java 默认的委派模式，即按如下顺序加载<br>（1）从缓存中加载。<br>（2）如果没有，从 JVM 的 Bootstrap 类加载器加载。<br>（3）如果没有，则从父类加载器加载（System、Common、Shared）<br>（4）如果没有，则从当前类加载器加载。</p>
+<p>所以，Web 应用类加载器默认加载顺序如下:</p>
+<ol>
+<li>从缓存中加载。</li>
+<li>如果没有，则从 JVM 的 Bootstrap 类加载器加载。</li>
+<li>如果没有，则从当前类加载器加载（按照<code>WEB-INF/classes</code>、<code>WEB-INF/lib</code>的顺序）</li>
+<li>如果没有，则从父类加载器加载，由于父类加载器采用默认的委派模式，所以加载顺序为 System、Common、Shared。</li>
+</ol>
+<p>Tomcat 提供了 delegate 属性用于控制是否启用 Java 委派模式，默认为 false（不启用）。当配置为 true 时， Tomcat 将使用 Java 默认的委派模式，即按如下顺序加载</p>
+<ol>
+<li>从缓存中加载。</li>
+<li>如果没有，从 JVM 的 Bootstrap 类加载器加载。</li>
+<li>如果没有，则从父类加载器加载（System、Common、Shared）</li>
+<li>如果没有，则从当前类加载器加载。</li>
+</ol>
 <p>除了可以通过 delegate 属性控制是否启用 Java 的委派模式外，Tomcat 还可以通过 packageTriggersDeny 属性只让某些包路径采用 Java 的委派模式，Web 应用类加载器对于符合 packageTriggersDeny 指定包路径的类强制采用 Java 的委派模式。</p>
 <p>Tomcat 通过该机制实现为 Web 应用中的 Jar 包覆盖服务器提供包的目的。如上所述，Java核心类库、Servlet规范相关类库是无法覆盖的，此外 Java 默认提供的诸如 XML 工具包，由于位于 JVM 的 Bootstrap 类加载器也无法覆盖，只能通过 endorsed 的方式实现。</p>
+<blockquote>
+<p>对于 Tomcat 的 6.x 版本，只有指定了<code>tomcat/conf/catalina.properties</code>配置文件的<code>server.loader</code>和<code>share.loader</code>项后才会真正建立 CatalinaClassLoader 和 SharedClassLoader 的实例，否则会用到这两个类加载器的地方都会用 Common Class Loader 的实例代替，而默认的配置文件中没有设置这两个 loader 项，所以 Tomcat 6.x 顺理成章地把<code>/common</code>、<code>/server</code>和<code>/shared</code>三个用录默认合并到一起变成一个<code>/lib</code>目录，这个目录里的类库相当于以前<code>/common</code>目录中类库的作用。这是 Tomcat 设计团队为了简化大多数的部署场景所做的一项改进，如果默认设置不能满足需要，用户可以通过修改配置文件指定<code>server.loader</code>和<code>share.loader</code>的方式重新启用 Tomcat 5.x 的加载器架构。</p>
+</blockquote>
 
     </div>
 
@@ -518,7 +545,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">40</span>
+          <span class="site-state-item-count">41</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -531,7 +558,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">129</span>
+        <span class="site-state-item-count">133</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
