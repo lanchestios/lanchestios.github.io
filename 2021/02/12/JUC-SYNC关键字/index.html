@@ -27,13 +27,13 @@
 <meta property="og:site_name" content="Lache&#39;s Blog">
 <meta property="og:description" content="JMM 中关于 synchronized 有如下规定，线程加锁时，必须清空工作内存中共享变量的值，从而使得被监视器保护的临界区代码必须从主内存中读取共享变量；线程在解锁时，需要把工作内存中最新的共享变量的值写入到主存，以此来保证共享变量的可见性。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java对象结构.png">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/获取锁过程.png">
-<meta property="og:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/MUTEX工作方式.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/Java对象结构.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/获取锁过程.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/JDK/MUTEX工作方式.png">
 <meta property="og:image" content="https://pic4.zhimg.com/80/v2-f038bb24708478e76d2240267bec56bf_720w.jpg">
 <meta property="og:image" content="https://pic3.zhimg.com/80/v2-5d58112c4ead326066a836941a2857c2_720w.jpg">
 <meta property="article:published_time" content="2021-02-12T03:18:40.000Z">
-<meta property="article:modified_time" content="2021-02-12T04:22:30.297Z">
+<meta property="article:modified_time" content="2021-02-26T13:44:20.291Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="JUC">
@@ -41,7 +41,7 @@
 <meta property="article:tag" content="JMM">
 <meta property="article:tag" content="Mutex Lock">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.github.io/2021/02/12/images/JDK/Java对象结构.png">
+<meta name="twitter:image" content="http://lanchestios.github.io/images/JDK/Java对象结构.png">
 
 <link rel="canonical" href="http://lanchestios.github.io/2021/02/12/JUC-SYNC%E5%85%B3%E9%94%AE%E5%AD%97/">
 
@@ -221,10 +221,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2021-02-12 11:18:40 / Modified: 12:22:30" itemprop="dateCreated datePublished" datetime="2021-02-12T11:18:40+08:00">2021-02-12</time>
+              <time title="Created: 2021-02-12 11:18:40" itemprop="dateCreated datePublished" datetime="2021-02-12T11:18:40+08:00">2021-02-12</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-02-26 21:44:20" itemprop="dateModified" datetime="2021-02-26T21:44:20+08:00">2021-02-26</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -263,7 +269,7 @@
 <li>实例变量：存放类的属性数据信息，包括父类的属性信息，如果是数组的实例部分还包括数组的长度，这部分内存按 4 字节对齐。</li>
 <li>填充数据：由于虚拟机要求对象起始地址必须是 8 字节的整数倍。填充数据不是必须存在的，仅仅是为了字节对齐。</li>
 </ul>
-<p><img src="../images/JDK/Java对象结构.png" alt=""></p>
+<p><img src="/images/JDK/Java对象结构.png" alt=""></p>
 <p>而对于 Java 头对象，它实现 synchronized 的锁对象的基础。一般而言，synchronized 使用的锁对象是存储在 Java 对象头里的，JVM 中采用 2 个字来存储对象头（如果对象是数组则会分配 3 个字，多出来的 1 个字记录的是数组长度），其主要结构是由 Mark Word 和 Class Metadata Address 组成，其结构说明如下表：</p>
 <div class="table-container">
 <table>
@@ -419,7 +425,7 @@
 </table><br>其中轻量级锁和偏向锁是 Java 6 对 synchronized 锁进行优化后新增加的。下面主要分析的是重量级锁也就是通常说 synchronized 的对象锁，锁标识位为 10，其中指针指向的是 monitor 对象（也称为管程）的起始地址。每个对象都存在着一个 monitor 与之关联，对象与其 monitor 之间的关系有存在多种实现方式，如 monitor 可以与对象一起创建销毁或当线程试图获取对象锁时自动生成，但当一个 monitor 被某个线程持有后，它便处于锁定状态。在 Java 虚拟机（HotSpot）中，monitor 是由 ObjectMonitor 实现的，其主要数据结构如下（位于 HotSpot 虚拟机源码 ObjectMonitor.hpp 文件，C++实现的）</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">ObjectMonitor() &#123;</span><br><span class="line">    _header       = NULL;</span><br><span class="line">    _count        = <span class="number">0</span>; <span class="comment">//记录个数</span></span><br><span class="line">    _waiters      = <span class="number">0</span>,</span><br><span class="line">    _recursions   = <span class="number">0</span>;</span><br><span class="line">    _object       = NULL;</span><br><span class="line">    _owner        = NULL;</span><br><span class="line">    _WaitSet      = NULL; <span class="comment">//处于wait状态的线程，会被加入到_WaitSet</span></span><br><span class="line">    _WaitSetLock  = <span class="number">0</span> ;</span><br><span class="line">    _Responsible  = NULL ;</span><br><span class="line">    _succ         = NULL ;</span><br><span class="line">    _cxq          = NULL ;</span><br><span class="line">    FreeNext      = NULL ;</span><br><span class="line">    _EntryList    = NULL ; <span class="comment">//处于等待锁block状态的线程，会被加入到该列表</span></span><br><span class="line">    _SpinFreq     = <span class="number">0</span> ;</span><br><span class="line">    _SpinClock    = <span class="number">0</span> ;</span><br><span class="line">    OwnerIsThread = <span class="number">0</span> ;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>ObjectMonitor 中有两个队列，<code>_WaitSet</code>和<code>_EntryList</code>，用来保存 ObjectWaiter 对象列表（每个等待锁的线程都会被封装成 ObjectWaiter 对象），<code>_owner</code>指向持有 ObjectMonitor 对象的线程，当多个线程同时访问一段同步代码时，首先会进入<code>_EntryList</code>集合，当线程获取到对象的 monitor 后进入<code>_owner</code>区域并把 monitor 中的 owner 变量设置为当前线程，同时 monitor 中的计数器 count 加 1，若线程调用 wait() 方法，将释放当前持有的 monitor，<code>_owner</code>变量恢复为 null，count 自减 1，同时该线程进入 WaitSet 集合中等待被唤醒。若当前线程执行完毕也将释放 monitor（锁）并复位变量的值，以便其他线程进入获取 monitor（锁）。过程如下图所示</p>
-<p><img src="../images/JDK/获取锁过程.png" alt=""></p>
+<p><img src="/images/JDK/获取锁过程.png" alt=""></p>
 <p>由此看来，monitor 对象存在于每个Java对象的对象头中（存储的指针的指向），synchronized 锁便是通过这种方式获取锁的，也是为什么 Java 中任意对象可以作为锁的原因，同时也是 notify/notifyAll/wait 等方法存在于顶级对象 Object 中的原因。</p>
 <h2 id="Mutex-Lock"><a href="#Mutex-Lock" class="headerlink" title="Mutex Lock"></a>Mutex Lock</h2><p>监视器锁（Monitor）本质是依赖于底层的操作系统的 Mutex Lock（互斥锁）来实现的。每个对象都对应于一个可称为 “互斥锁” 的标记，这个标记用来保证在任一时刻，只能有一个线程访问该对象。</p>
 <blockquote>
@@ -427,7 +433,7 @@
 <p>用于保护临界区，确保同一时间只有一个线程访问数据。对共享资源的访问，先对互斥量进行加锁，如果互斥量已经上锁，调用线程会阻塞，直到互斥量被解锁。在完成了对共享资源的访问后，要对互斥量进行解锁。</p>
 </blockquote>
 <p>mutex 的工作方式：</p>
-<p><img src="../images/JDK/MUTEX工作方式.png" alt=""></p>
+<p><img src="/images/JDK/MUTEX工作方式.png" alt=""></p>
 <ol>
 <li>申请 mutex</li>
 <li>如果成功，则持有该 mutex</li>
