@@ -39,7 +39,7 @@
 <meta property="og:image" content="http://lanchestios.github.io/images/JDK/基于栈的解释器执行过程6.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/JDK/基于栈的解释器执行过程7.png">
 <meta property="article:published_time" content="2021-02-22T14:42:32.000Z">
-<meta property="article:modified_time" content="2021-02-23T09:25:28.000Z">
+<meta property="article:modified_time" content="2021-03-01T12:06:40.000Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="JVM">
@@ -234,7 +234,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2021-02-23 17:25:28" itemprop="dateModified" datetime="2021-02-23T17:25:28+08:00">2021-02-23</time>
+                <time title="Modified: 2021-03-01 20:06:40" itemprop="dateModified" datetime="2021-03-01T20:06:40+08:00">2021-03-01</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -351,7 +351,7 @@
 <li>由于 MethodHandle 是对字节码的方法指令调用的模拟，所以理论上虚拟机在这方面做的各种优化（如方法内联），在 MethodHandle 上也应当可以采用类似思路去支持（但目前实现还不完善）。而通过反射去调用方法则不行。</li>
 </ul>
 <p>MethodHandle 与 Reflection 除了上面列举的区别外，最关键的一点还在于去掉前面讨论施加的前提“仅站在Java语言的角度来看”：Reflection API 的设计目标是只为 Java 语言服务的，而 MethodHandle 则设计成可服务于所有 Java 虚拟机之上的语言，其中也包括 Java 语言。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Dispatch</span> </span>&#123;</span><br><span class="line">    <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">ClassA</span></span>&#123;</span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">println</span><span class="params">(String s)</span> </span>&#123;</span><br><span class="line">            System.out.println(s);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">        getPrintlnMH(<span class="keyword">new</span> ClassA()).invokeExact(<span class="string">&quot;sads&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> MethodHandle <span class="title">getPrintlnMH</span><span class="params">(Object receiver)</span> <span class="keyword">throws</span> NoSuchMethodException, IllegalAccessException </span>&#123;</span><br><span class="line">        MethodHandles.Lookup lookup = MethodHandles.lookup();</span><br><span class="line">        MethodType mt = MethodType.methodType(<span class="keyword">void</span>.class, String.class);</span><br><span class="line">        <span class="keyword">return</span> lookup.findVirtual(receiver.getClass(), <span class="string">&quot;println&quot;</span>, mt).bindTo(receiver);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">Solution</span> </span>&#123;</span><br><span class="line">    <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">ClassA</span></span>&#123;</span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">println</span><span class="params">(String s)</span> </span>&#123;</span><br><span class="line">            System.out.println(s);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">        getPrintlnMH(<span class="keyword">new</span> ClassA()).invokeExact(<span class="string">&quot;sads&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> MethodHandle <span class="title">getPrintlnMH</span><span class="params">(Object receiver)</span> <span class="keyword">throws</span> NoSuchMethodException, IllegalAccessException </span>&#123;</span><br><span class="line">        MethodHandles.Lookup lookup = MethodHandles.lookup();</span><br><span class="line">        MethodType mt = MethodType.methodType(<span class="keyword">void</span>.class, String.class);</span><br><span class="line">        <span class="keyword">return</span> lookup.findVirtual(receiver.getClass(), <span class="string">&quot;println&quot;</span>, mt).bindTo(receiver);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <h3 id="invokedynamic指令"><a href="#invokedynamic指令" class="headerlink" title="invokedynamic指令"></a>invokedynamic指令</h3><p>JDK1.7 为了更好地支持动态类型语言引入了字节码指令 invokedynamic，但我们一直没有再见到它，甚至把上述 MethodHandle 的示例代码反编译后也不会看见 invokedynamic 的身影，它的应用之处在哪里呢？</p>
 <p>在某种程度上，invokedynamic 指令与 MethodHandle 机制的作用是一样的，都是为了解决原有4条<code>invoke*</code>指令方法分派规则固化在虚拟机之中的问题，把如何查找目标方法的决定权从虚拟机转嫁到具体用户代码之中，让用户（包含其他语言的设计者）有更高的自由度。而且，它们两者的思路也是可类比的，可以把它们想象成为了达成同一个目的，一个采用上层 Java 代码和 API 来实现，另一用字节码和 Class 中其他属性、常量来完成。因此，如果理解了前面的 MethodHandie 例子，那么理解 invokedynamic 指令也并不困难。</p>
 <p>每一处含有 invokedynamic 指令的位置都称做“动态调用点”（Dynamic Call Site），这条指令的第一个参数不再是代表方法符号引用的 CONSTANT_Methodref_info 常量，而是变为 JDK1.7 新加入的 CONSTANT_InvokeDynamic_info 常量，从这个新常量中可以得到 3 项信息：引导方法（Bootstrap Method，此方法存放在新增的 BootstrapMethods 属性中）、方法类型（MethodType）和名称。引导方法是有固定的参数，并且返回值是<code>java.lang.invoke.CallSite</code>对象，这个代表貞正要执行的目标方法调用。根据 CONSTANT_InvokeDynamic_info 常量中提供的信息，虚拟机可以找到并且执行引导方法，从而获得一个 CallSite 对象最终调用要执行的目标方法。</p>
@@ -477,20 +477,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-count">45</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-count">13</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">140</span>
+        <span class="site-state-item-count">149</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
