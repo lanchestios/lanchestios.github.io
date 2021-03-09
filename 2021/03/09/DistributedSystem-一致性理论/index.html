@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lanchestios.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="分布式系统（distributed system）是建立在网络之上的软件系统。正是因为软件的特性，所以分布式系统具有高度的内聚性和透明性。因此，网络和分布式系统之间的区别更多的在于高层软件（特别是操作系统），而不是硬件。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Distributed System 一致性理论">
+<meta property="og:url" content="http://lanchestios.github.io/2021/03/09/DistributedSystem-%E4%B8%80%E8%87%B4%E6%80%A7%E7%90%86%E8%AE%BA/index.html">
+<meta property="og:site_name" content="Lache&#39;s Blog">
+<meta property="og:description" content="分布式系统（distributed system）是建立在网络之上的软件系统。正是因为软件的特性，所以分布式系统具有高度的内聚性和透明性。因此，网络和分布式系统之间的区别更多的在于高层软件（特别是操作系统），而不是硬件。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/DTP分布式事务模型.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/XA结构.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/CAP模型.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/CAP定理应用.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/4种隔离级别示意图.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/隔离级别对比.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/二阶段提交事务提交示意图.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/二阶段提交事务中断示意图.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/ZooKeeper/三阶段提交协议流程示意图.png">
+<meta property="article:published_time" content="2021-03-09T13:44:14.000Z">
+<meta property="article:modified_time" content="2021-03-09T13:45:38.235Z">
+<meta property="article:author" content="lanchestios">
+<meta property="article:tag" content="ACID">
+<meta property="article:tag" content="Distributed System">
+<meta property="article:tag" content="2PC">
+<meta property="article:tag" content="3PC">
+<meta property="article:tag" content="BASE">
+<meta property="article:tag" content="CAP">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://lanchestios.github.io/images/ZooKeeper/DTP分布式事务模型.png">
+
+<link rel="canonical" href="http://lanchestios.github.io/2021/03/09/DistributedSystem-%E4%B8%80%E8%87%B4%E6%80%A7%E7%90%86%E8%AE%BA/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Distributed System 一致性理论 | Lache's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lache's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://lanchestios.github.io/2021/03/09/DistributedSystem-%E4%B8%80%E8%87%B4%E6%80%A7%E7%90%86%E8%AE%BA/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="lanchestios">
+      <meta itemprop="description" content="Leave a trace">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lache's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Distributed System 一致性理论
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2021-03-09 21:44:14 / Modified: 21:45:38" itemprop="dateCreated datePublished" datetime="2021-03-09T21:44:14+08:00">2021-03-09</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Distributed-System/" itemprop="url" rel="index"><span itemprop="name">Distributed System</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>分布式系统（distributed system）是建立在网络之上的软件系统。正是因为软件的特性，所以分布式系统具有高度的内聚性和透明性。因此，网络和分布式系统之间的区别更多的在于高层软件（特别是操作系统），而不是硬件。 </p>
+<a id="more"></a>
+<h1 id="分布式事务"><a href="#分布式事务" class="headerlink" title="分布式事务"></a>分布式事务</h1><h2 id="分布式事务-1"><a href="#分布式事务-1" class="headerlink" title="分布式事务"></a>分布式事务</h2><p>分布式事务是指事务的参与者、支持事务的服务器、资源服务器以及事务管理器分别位于分布式系统的不同节点之上。通常一个分布式事务中会涉及对多个数据源或业务系统的操作。</p>
+<p>我们可以设想一个最典型的分布式事务场景：一个跨银行的转账操作涉及调用两个异地的银行服务，其中一个是本地银行提供的取款服务，另一个则是目标银行提供的存款服务，这两个服务本身是无状态并且是互相独立的，共同构成了一个完整的分布式事务。如果从本地银行取款成功，但是因为某种原因存款服务失败了，那么就必须回滚到取款前的状态，否则用户可能会发现自己的钱不翼而飞了。</p>
+<p>从上面这个例子中，一个分布式事务可以看作是由多个分布式的操作序列组成的，例如上面例子中的取款服务和存款服务，通常可以把这一系列分布式的操作序列称为子事务。因此，分布式事务也可以被定义为一种嵌套型的事务，同时也就具有了 ACID 事务特性。但由于在分布式事务中，各个子事务的执行是分布式的，因此要实现一种能够保证 ACID 特性的分布式事务处理系统就显得格外复杂。</p>
+<p>X/Open 组织定义了分布式事务的模型（DTP）和 分布式事务协议（XA）。</p>
+<h2 id="分布式事务模型-DTP"><a href="#分布式事务模型-DTP" class="headerlink" title="分布式事务模型 DTP"></a>分布式事务模型 DTP</h2><p>DTP 由以下几个模型元素组成</p>
+<ul>
+<li>AP（Application 应用程序）：用于定义事务边界（即定义事务的开始和结束），并且在事务边界内对资源进行操作</li>
+<li>TM（Transaction Manager 事务管理器）：负责分配事务唯一标识，监控事务的执行进度，并负责事务的提交、回滚等</li>
+<li>RM（Resource Manager 资源管理器）：如数据库、文件系统等，并提供访问资源的方式</li>
+<li>CRM（Communication Resource Manager 通信资源管理器）：控制一个TM域（TM domain）内或者跨 TM 域的分布式应用之间的通信</li>
+<li>CP（Communication Protocol 通信协议）：提供 CRM 提供的分布式应用节点之间的底层通信服务</li>
+</ul>
+<p>在 DTP 分布式事务模型中，基本组成需要涵盖 AP、TM、RMS（不需要 CRM、CP 也是可以的），如下图所示</p>
+<p><img src="/images/ZooKeeper/DTP分布式事务模型.png" alt=""></p>
+<h2 id="分布式事务协议-XA"><a href="#分布式事务协议-XA" class="headerlink" title="分布式事务协议 XA"></a>分布式事务协议 XA</h2><p>XA 规范最重要的作用就是定义 RM（资源管理器）与 TM（事务管理器）之间的交互接口。另外，XA 规范除了定义 2PC 之间的交互接口外，同时对 2PC 进行了优化</p>
+<p><img src="/images/ZooKeeper/XA结构.png" alt=""></p>
+<h2 id="DTP、XA、2PC-之间的关系"><a href="#DTP、XA、2PC-之间的关系" class="headerlink" title="DTP、XA、2PC 之间的关系"></a>DTP、XA、2PC 之间的关系</h2><p>DTP 规定了分布式事务中的角色模型，并在其中指定了全局事务的控制需要使用 2PC 协议来保证数据的一致性。</p>
+<p>2PC 是 Two-Phase Commit 的缩写，即二阶段提交，是计算机网络尤其是数据库领域内，为了保证分布式系统架构下所有节点在进行事务处理过程中能够保证原子性和一致性而设计的一种算法。同时，2PC 也被认为是一种一致性协议，用来保证分布式系统数据的一致性。</p>
+<p>XA 规范是 X/Open 组织提出的分布式事务处理规范，XA 规范定义了 2PC（两阶段提交协议）中需要用到的接口，也就是上图中 RM 和 TM 之间的交互。2PC 和 XA 两者最容易混淆，可以这么理解，DTP 模型定义 TM 和 RM 之间通讯的接口规范叫 XA，然后关系数据库（比如 MySQL）基于 X/Open 提出的的 XA 规范（核心依赖于 2PC 算法）被称为 XA 方案。</p>
+<h1 id="一致性理论"><a href="#一致性理论" class="headerlink" title="一致性理论"></a>一致性理论</h1><h2 id="CAP定理"><a href="#CAP定理" class="headerlink" title="CAP定理"></a>CAP定理</h2><p>一个分布式系统不可能同时满足一致性（C：Consistency）、可用性（A：Availability）和分区容错性（P：Partition tolerance）这三个基本需求，最多只能同时满足其中的两项。</p>
+<p><img src="/images/ZooKeeper/CAP模型.png" alt=""></p>
+<h3 id="一致性"><a href="#一致性" class="headerlink" title="一致性"></a>一致性</h3><p>在分布式环境中，一致性是指数据在多个副本之间是否能够保持一致的特性。在一致性的需求下，当一个系统在数据一致的状态下执行更新操作后，应该保证系统的数据仍然处于一致的状态。</p>
+<p>对于一个将数据副本分布在不同分布式节点上的系统来说，如果对第一个节点的数据进行了更新操作并且更新成功后，却没有使得第二个节点上的数据得到相应的更新，于是在对第二个节点的数据进行读取操作时，获取的依然是老数据（或称为脏数据），这就是典型的分布式数据不一致情况。在分布式系统中，如果能够做到针对一个数据项的更新操作执行成功后，所有的用户都可以读取到其最新的值，那么这样的系统就被认为具有强一致性（或严格的一致性）。</p>
+<h3 id="可用性"><a href="#可用性" class="headerlink" title="可用性"></a>可用性</h3><p>可用性是指系统提供的服务必须一直处于可用的状态，对于用户的每一个操作请求总是能够在有限的时间内返回结果。这里我们重点看下“有限的时间内”和“返回结果”。</p>
+<p>“有限的时间内”是指，对于用户的一个操作请求，系统必须能够在指定的时间（即响应时间）内返回对应的处理结果，如果超过了这个时间范围，那么系统就被认为是不可用的。</p>
+<p>“返回结果”是可用性的另一个非常重要的指标，它要求系统在完成对用户请求的处理后，返回一个正常的响应结果。正常的响应结果通常能够明确地反映出对请求的处理结果，即成功或失败，而不是一个让用户感到困惑的返回结果。</p>
+<h3 id="分区容错性"><a href="#分区容错性" class="headerlink" title="分区容错性"></a>分区容错性</h3><p>分区容错性约束了一个分布式系统需要具有如下特性：分布式系统在遇到任何网络分区故障的时候，仍然需要能够保证对外提供满足一致性和可用性的服务，除非是整个网络环境都发生了故障。</p>
+<p>网络分区是指在分布式系统中，不同的节点分布在不同的子网络（机房或异地网络等）中，由于一些特殊的原因导致这些子网络之间出现网络不连通的状况，但各个子网络的内部网络是正常的，从而导致整个系统的网络环境被切分成了若干个孤立的区域。需要注意的是，组成一个分布式系统的每个节点的加入与退出都可以看作是一个特殊的网络分区。</p>
+<h3 id="定理应用"><a href="#定理应用" class="headerlink" title="定理应用"></a>定理应用</h3><p><img src="/images/ZooKeeper/CAP定理应用.png" alt=""></p>
+<p>从 CAP 定理中我们可以看出，一个分布式系统不可能同时满足一致性、可用性和分区容错性这三个需求。另一方面，需要明确的一点是，对于一个分布式系统而言，分区容错性可以说是一个最基本的要求。为什么这样说，其实很简单，因为既然是一个分布式系统，那么分布式系统中的组件必然需要被部署到不同的节点，否则也就无所谓分布式系统了，因此必然出现子网络。而对于分布式系统而言，网络问题又是一个必定会出现的异常情况，因此分区容错性也就成为了一个分布式系统必然需要面对和解决的问题因此系统架构设计师往往需要把精力花在如何根据业务特点在 C（一致性）和 A（可用性）之间寻求平衡。</p>
+<h2 id="ACID（强一致模型）"><a href="#ACID（强一致模型）" class="headerlink" title="ACID（强一致模型）"></a>ACID（强一致模型）</h2><p>事务（Transaction）是由一系列对系统中数据进行访问与更新的操作所组成的一个程序执行逻辑单元（Unit），狭义上的事务特指数据库事务。一方面，当多个应用程序并发访问数据库时，事务可以在这些应用程序之间提供一个隔离方法，以防止彼此的操作互相干扰。另一方面，事务为数据库操作序列提供了一个从失败中恢复到正常状态的方法，同时提供了数据库即使在异常状态下仍能保持数据一致性的方法。</p>
+<p>事务具有四个特征，分别是原子性（Atomicity）、一致性（Consistency）、隔离性（Isolation）和持久性（Durability），简称为事务的 ACID 特性。</p>
+<h3 id="原子性"><a href="#原子性" class="headerlink" title="原子性"></a>原子性</h3><p>事务的原子性是指事务必须是一个原子的操作序列单元。事务中包含的各项操作在一次执行过程中，只允许全部成功或全部失败。任何一项操作失败都将导致整个事务失败，同时其他已经被执行的操作都将被撤销并回滚，只有所有的操作全部成功，整个事务才算是成功完成。</p>
+<h3 id="一致性-1"><a href="#一致性-1" class="headerlink" title="一致性"></a>一致性</h3><p>事务的一致性是指事务的执行不能破坏数据库数据的完整性和一致性，一个事务在执行之前和执行之后，数据库都必须处于一致性状态。也就是说，事务执行的结果必须是使数据库从一个一致性状态转变到另一个一致性状态，因此当数据库只包含成功事务提交的结果时，就能说数据库处于一致性状态。而如果数据库系统在运行过程中发生故障，有些事务尚未完成就被迫中断，这些未完成的事务对数据库所做的修改有一部分已写入物理数据库，这时数据库就处于一种不正确的状态，或者说是不一致的状态。</p>
+<h3 id="隔离性"><a href="#隔离性" class="headerlink" title="隔离性"></a>隔离性</h3><p>事务的隔离性是指在并发环境中，并发的事务是相互隔离的，一个事务的执行不能被其他事务干扰。也就是说，不同的事务并发操纵相同的数据时，每个事务都有各自完整的数据空间，即一个事务内部的操作及使用的数据对其他并发事务是隔离的，并发执行的各个事务之间不能互相干扰。</p>
+<p>在标准 SQL 规范中，定义了 4 个事务隔离级别，不同的隔离级别对事务的处理不同，如未授权读取、授权读取、可重复读取和串行化。</p>
+<p><em>未授权读取</em></p>
+<p>未授权读取也被称为读未提交（Read Uncommitted），该隔离级别允许脏读取，其隔离级别最低。换句话说，如果一个事务正在处理某一数据，并对其进行了更新，但同时尚未完成事务，因此还没有进行事务提交；而与此同时，允许另一个事务也能够访问该数据。举个例子来说，事务 A 和事务 B 同时进行，事务 A 在整个执行阶段，会将某数据项的值从 1 开始，做一系列加法操作（比如说加 1 操作）直到变成 10 之后进行事务提交，此时，事务 B 能够看到这个数据项在事务 A 操作过程中的所有中间值（如 1 变成 2、2 变成 3 等），而对这一系列的中间值的读取就是未授权读取。</p>
+<p><em>授权读取</em></p>
+<p>授权读取也被称为读已提交（Read Committed），它和未授权读取非常相近，唯一的区别就是授权读取只允许获取已经被提交的数据。同样以上面的例子来说，事务 A 和事务 B 同时进行，事务 A 进行与上述同样的操作，此时，事务 B 无法看到这个数据项在事务 A 操作过程中的所有中间值，只能看到最终的 10。另外，如果说有一个事务 C，和事务 A 进行非常类似的操作，只是事务 C 是将数据项从 10 加到 20，此时事务 B 也同样可以读取到 20，即授权读取允许不可重复读取。</p>
+<p><em>可重复读取</em></p>
+<p>可重复读取（Repeatable Read），简单地说，就是保证在事务处理过程中，多次读取同一个数据时，其值都和事务开始时刻是一致的。因此该事务级别禁止了不可重复读取和脏读取，但是有可能岀现幻影数据。所谓幻影数据，就是指同样的事务操作，在前后两个时间段內执行对同一个数据项的读取，可能出现不一致的结果。在上面的例子，可重复读取隔离级别能够保证事务 B 在第一次事务操作过程中，始终对数据项读取到 1，但是在下一次事务操作中，即使事务 B（注意，事务名字虽然相同但是指的是另一次事务操作）采用同样的查询方式，就可能会读取到 10 或 20。</p>
+<p><em>串行化</em></p>
+<p>串行化（Serializable）是最严格的事务隔离级别。它要求所有事务都被串行执行，即事务只能一个接一个地进行处理，不能并发执行。</p>
+<p><img src="/images/ZooKeeper/4种隔离级别示意图.png" alt=""></p>
+<p>以上 4 个隔离级别的隔离性依次增强，分别解决不同的问题，下表对这 4 个隔离级别进行了一个对比。</p>
+<p><img src="/images/ZooKeeper/隔离级别对比.png" alt=""></p>
+<p>事务隔离级别越高，就越能保证数据的完整性和一致性，但同时对并发性能的影响也越大。通常，对于绝大多数的应用程序来说，可以优先考虑将数据库系统的隔离级别设置为授杈读取，这能够在避免脏读取的同时保证较好的并发性能。尽管这种事务隔离级别会导致不可重复读、虚读和第二类丢失更新等并发问题，但较为科学的做法是在可能出现这类问题的个别场合中，由应用程序主动采用悲观锁或乐观锁来进行事务控制。</p>
+<h3 id="持久性"><a href="#持久性" class="headerlink" title="持久性"></a>持久性</h3><p>事务的持久性也被称为永久性，是指一个事务一旦提交，它对数据库中对应数据的状态变更就应该是永久性的。换句话说，一旦某个事务成功结束，那么它对数据库所做的更新就必须被永久保存下来——即使发生系统崩溃或机器宕机等故障，只要数据库能够重新启动，那么一定能够将其恢复到事务成功结束时的状态。</p>
+<h2 id="BASE理论（弱一致模型）"><a href="#BASE理论（弱一致模型）" class="headerlink" title="BASE理论（弱一致模型）"></a>BASE理论（弱一致模型）</h2><p>BASE是 Basically Available（基本可用）、Soft state（软状态）和 Eventually consistent（最终一致性）三个短语的简写。BASE 是对 CAP 中一致性和可用性权衡的结果，其来源于对大规模互联网系统分布式实践的总结，是基于 CAP 定理逐步演化而来的，其核心思想是即使无法做到强一致性（Strong consistency），但每个应用都可以根据自身的业务特点，采用适当的方式来使系统达到最终一致性（Eventual consistency）。</p>
+<h3 id="基本可用"><a href="#基本可用" class="headerlink" title="基本可用"></a>基本可用</h3><p>基本可用是指分布式系统在出现不可预知故障的时候，允许损失部分可用性 —— 但请注意，这绝不等价于系统不可用。以下两个就是“基本可用”的典型例子。</p>
+<ul>
+<li>响应时间上的损失：正常情况下，一个在线搜索引擎需要在 0.5 秒之内返回给用户相应的査询结果，但由于出现故障（比如系统部分机房发生断电或断网故障），査询结果的响应时间增加到了 1~2 秒。</li>
+<li>功能上的损失：正常情况下，在一个电子商务网站上进行购物，消费者几乎能够顺利地完成每一笔订单，但是在一些节日大促购物高峰的时候，由于消费者的购物行为激增，为了保护购物系统的稳定性，部分消费者可能会被引导到一个降级页面。</li>
+</ul>
+<h3 id="弱状态"><a href="#弱状态" class="headerlink" title="弱状态"></a>弱状态</h3><p>弱状态也称为软状态，和硬状态相对，是指允许系统中的数据存在中间状态，并认为该中间状态的存在不会影响系统的整体可用性，即允许系统在不同节点的数据副本之间进行数据同步的过程存在延时。</p>
+<h3 id="最终一致性"><a href="#最终一致性" class="headerlink" title="最终一致性"></a>最终一致性</h3><p>最终一致性强调的是系统中所有的数据副本，在经过一段时间的同步后，最终能够达到个一致的状态。因此，最终一致性的本质是需要系统保证最终数据能够达到一致，而不需要实时保证系统数据的强一致性。最终一致性是一种特殊的弱一致性：系统能够保证在没有其他新的更新操作的情况下，数据最终一定能够达到一致的状态，因此所有客户端对系统的数据访问都能够获取到最新的值。同时，在没有发生故障的前提下，数据达到一致状态的时间延迟，取决于网络延迟、系统负载和数据复制方案设计等因素。</p>
+<p>在实际工程实践中，最终一致性存在以下五类主要变种。</p>
+<p><em>因果一致性（Causal consistency）</em></p>
+<p>因果一致性是指，如果进程 A 在更新完某个数据项后通知了进程 B，那么进程 B 之后对该数据项的访问都应该能够获取到进程 A 更新后的最新值，并且如果进程 B 要对该数据项进行更新操作的话，务必基于进程 A 更新后的最新值，即不能发生丢失更新情况。与此同时，与进程 A 无因果关系的进程 C 的数据访问则没有这样的限制。</p>
+<p><em>读己之所写（Read your writes）</em></p>
+<p>读己之所写是指，进程 A 更新一个数据项之后，它自己总是能够访问到更新过的最新值，而不会看到旧值。也就是说，对于单个数据获取者来说，其读取到的数据，一定不会比自己上次写入的值旧。因此，读己之所写也可以看作是一种特殊的因果一致性。</p>
+<p><em>会话一致性（Session consistency）</em></p>
+<p>会话一致性将对系统数据的访问过程框定在了一个会话当中：系统能保证在同一个有效的会话中实现“读己之所写”的一致性，也就是说，执行更能操作之后，客户端能够在同一个会话中始终读取到该数据项的最新值。</p>
+<p><em>单调读一致性（Monotonic read consistency）</em></p>
+<p>单调读一致性是指如果一个进程从系统中读取出一个数据项的某个值后，那么系统对于该进程后续的任何数据访问都不应该返回更旧的值。</p>
+<p><em>单调写一致性（Monotonic write consistency）</em></p>
+<p>单调写一致性是指，一个系统需要能够保证来自同一个进程的写操作被顺序地执行。</p>
+<h3 id="BASE与ACID关系"><a href="#BASE与ACID关系" class="headerlink" title="BASE与ACID关系"></a>BASE与ACID关系</h3><p>以上就是最终一致性的五类常见的变种，在实际系统实践中，可以将其中的若干个变种互相结合起来，以构建一个具有最终一致性特性的分布式系统。事实上，最终一致性并不是只有那些大型分布式系统才涉及的特性，许多现代的关系型数据库都采用了最终一致性模型。在现代关系型数据库中，大多都会采用同步和异步方式来实现主备数据复制技术。在同步方式中，数据的复制过程通常是更新事务的一部分，因此在事务完成后，主备数据库的数据就会达到一致。而在异步方式中，备库的更新往往会存在延时，这取决于事务日志在主备数据库之间传输的时间长短，如果传输时间过长或者甚至在日志传输过程中出现异常导致无法及时将事务应用到备库上，那么很显然，从备库中读取的数据将是旧的，因此就出现了数据不一致的情况。当然，无论是采用多次重试还是人为数据订正，关系型数据库还是能够保证最终数据达到一致 —— 这就是系统提供最终一致性保证的经典案例。</p>
+<p>总的来说，BASE 理论面向的是大型高可用可扩展的分布式系统，和传统事务的 ACID 特性是相反的，它完全不同于 ACID 的强一致性模型，而是提出通过牺牲强一致性来获得可用性，并允许数据在一段时间内是不一致的，但最终达到一致状态。但同时，在实际的分布式场景中，不同业务单元和组件对数据一致性的要求是不同的，因此在具体的分布式系统架构设计过程中，ACID 特性与 BASE 理论往往又会结合在一起使用。</p>
+<h1 id="一致性协议"><a href="#一致性协议" class="headerlink" title="一致性协议"></a>一致性协议</h1><p>在分布式系统中，每一个机器节点虽然都能够明确地知道自己在进行事务操作过程中的结果是成功或失败，但却无法直接获取到其他分布式节点的操作结果。因此，当一个事务操作需要跨越多个分布式节点的时候，为了保持事务处理的 ACID 特性，就需要引入个称为协调者（Coordinator）的组件来统一调度所有分布式节点的执行逻辑，这些被调度的分布式节点则被称为参与者（Participant）。协调者负责调度参与者的行为，并最终决定这些参与者是否要把事务真正进行提交。基于这个思想，衍生出了二阶段提交和三阶段提交两种协议。</p>
+<h2 id="Two-Phase-Commit"><a href="#Two-Phase-Commit" class="headerlink" title="Two-Phase Commit"></a>Two-Phase Commit</h2><p>2PC，是 Two-Phase Commit 的缩写，即二阶段提交，是计算机网络尤其是在数据库领域内，为了使基于分布式系统架构下的所有节点在进行事务处理过程中能够保持原子性和一致性而设计的一种算法。通常，二阶段提交协议也被认为是一种一致性协议，用来保证分布式系统数据的一致性。目前，绝大部分的关系型数据库都是采用二阶段提交协议来完成分布式事务处理的，利用该协议能够非常方便地完成所有分布式事务参与者的协调，统一决定事务的提交或回滚，从而能够有效地保证分布式数据一致性，因此二阶段提交协议被广泛地应用在许多分布式系统中。</p>
+<p>顾名思义，二阶段提交协议是将事务的提交过程分成了提交事务请求和执行提交事务两个阶段来进行处理。</p>
+<h3 id="阶段1：提交事务请求"><a href="#阶段1：提交事务请求" class="headerlink" title="阶段1：提交事务请求"></a>阶段1：提交事务请求</h3><ol>
+<li><p>事务询问</p>
+<p> 协调者向所有的参与者发送事务内容，询问是否可以执行事务提交操作，并开始等待各参与者的响应</p>
+</li>
+<li><p>执行事务</p>
+<p> 各参与者节点执行事务操作，并将 Undo 和 Redo 信息记入事务日志中。</p>
+</li>
+<li><p>各参与者向协调者反馈事务询问的响应</p>
+<p> 如果参与者成功执行了事务操作，那么就反馈给协调者 Yes 响应，表示事务可以执行；如果参与者没有成功执行事务，那么就反馈给协调者 No 响应，表示事务不可以执行。</p>
+</li>
+</ol>
+<p>由于上面讲述的内容在形式上近似是协调者组织各参与者对一次事务操作的投票表态过程，因此二阶段提交协议的阶段一也被称为“投票阶段”，即各参与者投票表明是否要继续执行接下去的事务提交操作。</p>
+<h3 id="阶段2：执行事务提交"><a href="#阶段2：执行事务提交" class="headerlink" title="阶段2：执行事务提交"></a>阶段2：执行事务提交</h3><p>在阶段二中，协调者会根据各参与者的反馈情况来决定最终是否可以进行事务提交操作，正常情况下，包含以下两种可能。</p>
+<p><em>可能一：执行事务提交</em></p>
+<p>假如协调者从所有的参与者获得的反馈都是 Yes 响应，那么就会执行事务提交。</p>
+<ol>
+<li><p>发送提交请求</p>
+<p> 协调者向所有参与者节点发出 Commit 请求。</p>
+</li>
+<li><p>事务提交<br> 参与者接收到 Commit 请求后，会正式执行事务提交操作，并在完成提交之后释放在整个事务执行期间占用的事务资源。</p>
+</li>
+<li><p>反馈事务</p>
+<p> 提交结果参与者在完成事务提交之后，向协调者发送 ACK 消息</p>
+</li>
+<li><p>完成事务</p>
+<p> 协调者接收到所有参与者反馈的 ACK 消息后，完成事务。</p>
+</li>
+</ol>
+<p><img src="/images/ZooKeeper/二阶段提交事务提交示意图.png" style="zoom:150%;" /></p>
+<p><em>可能二：中断事务</em></p>
+<p>假如任何一个参与者向协调者反馈了 No 响应，或者在等待超时之后，协调者尚无法接收到所有参与者的反馈响应，那么就会中断事务。</p>
+<ol>
+<li><p>发送回滚请求</p>
+<p> 协调者向所有参与者节点发出 Rollback 请求。</p>
+</li>
+<li><p>事务回滚<br> 参与者接收到 Rollback 请求后，会利用其在阶段一中记录的Undo信息来执行事务回滚操作，并在完成回滚之后释放在整个事务执行期间占用的资源</p>
+</li>
+<li><p>反馈事务回滚结果<br> 参与者在完成事务回滚之后，向协调者发送 ACK 消息。</p>
+</li>
+<li><p>中断事务<br> 协调者接收到所有参与者反馈的 ACK 消息后，完成事务中断。</p>
+</li>
+</ol>
+<p>简单地讲，二阶段提交将一个事务的处理过程分为了投票和执行两个阶段，其核心是对每个事务都采用先尝试后提交的处理方式，因此也可以将二阶段提交看作一个强一致性的算法。</p>
+<p><img src="/images/ZooKeeper/二阶段提交事务中断示意图.png" style="zoom:150%;" /></p>
+<h3 id="优缺点"><a href="#优缺点" class="headerlink" title="优缺点"></a>优缺点</h3><blockquote>
+<p>二阶段提交协议的优点：原理简单，实现方便。<br>二阶段提交协议的缺点：同步阻塞、单点问题、脑裂、太过保守。</p>
+</blockquote>
+<p><em>同步阻塞</em></p>
+<p>二阶段提交协议存在的最明显也是最大的一个问题就是同步阻塞，这会极大地限制分布式系统的性能。在二阶段提交的执行过程中，所有参与该事务操作的逻辑都处于阻塞状态，也就是说，各个参与者在等待其他参与者响应的过程中，将无法进行其他任何操作。</p>
+<p><em>单点问题</em></p>
+<p>协调者的角色在整个二阶段提交协议中起到了非常重要的作用。一旦协调者出现问题，那么整个二阶段提交流程将无法运转，更为严重的是，如果协调者是在阶段二中出现问题的话，那么其他参与者将会一直处于锁定事务资源的状态中，而无法继续完成事务操作。</p>
+<p><em>数据不一致</em></p>
+<p>在二阶段提交协议的阶段二，即执行事务提交的时候，当协调者向所有的参与者发送 Commit 请求之后，发生了局部网络异常或者是协调者在尚未发送完 Commit 请求之前自身发生了崩溃，导致最终只有部分参与者收到了 Commit 请求。于是，这部分收到了 Commit 请求的参与者就会进行事务的提交，而其他没有收到 Commit 请求的参与者则无法进行事务提交，于是整个分布式系统便出现了数据不一致性现象。</p>
+<p><em>太过保守</em></p>
+<p>如果在协调者指示参与者进行事务提交询问的过程中，参与者出现故障而导致协调者始终无法获取到所有参与者的响应信息的话，这时协调者只能依靠其自身的超时机制来判断是否需要中断事务，这样的策略显得比较保守。换句话说，二阶段提交协议没有设计较为完善的容错机制，任意一个节点的失败都会导致整个事务的失败</p>
+<h2 id="Three-Phase-Commit"><a href="#Three-Phase-Commit" class="headerlink" title="Three-Phase Commit"></a>Three-Phase Commit</h2><p>3PC，是 Three-Phase Commit 的缩写，即三阶段提交，是 2PC 的改进版，其将二阶段提交协议的“提交事务请求”过程一分为二，形成了由 CanCommit、PreCommit 和 do commit 三个阶段组成的事务处理协议，其协议设计如下图所示。</p>
+<p><img src="/images/ZooKeeper/三阶段提交协议流程示意图.png" alt=""></p>
+<h3 id="阶段1：CanCommit"><a href="#阶段1：CanCommit" class="headerlink" title="阶段1：CanCommit"></a>阶段1：CanCommit</h3><ol>
+<li><p>事务询问</p>
+<p> 协调者向所有的参与者发送一个包含事务内容的 CanCommit 请求，询问是否可以执行事务提交操作，并开始等待各参与者的响应。</p>
+</li>
+<li><p>各参与者向协调者反馈事务询问的响应</p>
+<p> 参与者在接收到来自协调者的 CanCommit 请求后，正常情况下，如果其自身认为可以顺利执行事务，那么会反馈 Yes 响应，并进入预备状态，否则反馈 No 响应。</p>
+</li>
+</ol>
+<h3 id="阶段2：PreCommit"><a href="#阶段2：PreCommit" class="headerlink" title="阶段2：PreCommit"></a>阶段2：PreCommit</h3><p>在阶段二中，协调者会根据各参与者的反馈情况来决定是否可以进行事务的 PreCommit 操作，正常情况下，包含两种可能。</p>
+<p><em>执行事务预提交</em></p>
+<p>假如协调者从所有的参与者获得的反馈都是 Yes 响应，那么就会执行事务预提交。</p>
+<ol>
+<li><p>发送预提交请求</p>
+<p> 协调者向所有参与者节点发出 PreCommit 的请求，并进入 Prepared 阶段。</p>
+</li>
+<li><p>事务预提交</p>
+<p> 参与者接收到 PreCommit 请求后，会执行事务操作，并将 Undo 和 Redo 信息记录到事务日志中。</p>
+</li>
+<li><p>各参与者向协调者反馈事务执行的响应</p>
+<p> 如果参与者成功执行了事务操作，那么就会反馈给协调者 ACK 响应，同时等待最终的指令：提交（commit）或中止（abort）。</p>
+</li>
+</ol>
+<p><em>中断事务</em></p>
+<p>假如任何一个参与者向协调者反馈了 No 响应，或者在等待超时之后，协调者尚无法接收到所有参与者的反馈响应，那么就会中断事务。</p>
+<ol>
+<li><p>发送中断请求</p>
+<p> 协调者向所有参与者节点发出 abort 请求。</p>
+</li>
+<li><p>中断事务</p>
+<p> 无论是收到来自协调者的 abort 请求，或者是在等待协调者请求过程中出现超时，参与者都会中断事务。</p>
+</li>
+</ol>
+<h3 id="阶段3：DoCommit"><a href="#阶段3：DoCommit" class="headerlink" title="阶段3：DoCommit"></a>阶段3：DoCommit</h3><p>该阶段将进行真正的事务提交，会存在以下两种可能的情况。</p>
+<p><em>执行提交</em></p>
+<ol>
+<li><p>发送提交请求</p>
+<p> 进入这一阶段，假设协调者处于正常工作状态，并且它接收到了来自所有参与者的 ACK 响应，那么它将从“预提交”状态转换到“提交”状态，并向所有的参与者发送 DoCommit 请求</p>
+</li>
+<li><p>事务提交</p>
+<p> 参与者接收到 DoCommit 请求后，会正式执行事务提交操作，并在完成提交之后释放在整个事务执行期间占用的事务资源。</p>
+</li>
+<li><p>反馈事务提交结果</p>
+<p> 参与者在完成事务提交之后，向协调者发送 ACK 消息。</p>
+</li>
+<li><p>完成事务</p>
+<p> 协调者接收到所有参与者反馈的 ACK 消息后，完成事务。</p>
+</li>
+</ol>
+<p><em>中断事务</em></p>
+<p>进入这一阶段，假设协调者处于正常工作状态，并且有任意一个参与者向协调者反馈了 No 响应，或者在等待超时之后，协调者尚无法接收到所有参与者的反馈响应那么就会中断事务。</p>
+<ol>
+<li><p>发送中断请求</p>
+<p> 协调者向所有的参与者节点发送 abort 请求。</p>
+</li>
+<li><p>事务回滚</p>
+<p> 参与者接收到 abort 请求后，会利用其在阶段二中记录的 Undo 信息来执行事务回滚操作，并在完成回滚之后释放在整个事务执行期间占用的资源。</p>
+</li>
+<li><p>反馈事务回滚结果</p>
+<p> 参与者在完成事务回滚之后，向协调者发送 ACK 消息</p>
+</li>
+<li><p>中断事务</p>
+<p> 协调者接收到所有参与者反馈的 ACK 消息后，中断事务。</p>
+</li>
+</ol>
+<p>需要注意的是，一旦进入阶段三，可能会存在以下两种故障。</p>
+<ul>
+<li>协调者出现问题</li>
+<li>协调者和参与者之间的网络出现故障</li>
+</ul>
+<p>无论出现哪种情况，最终都会导致参与者无法及时接收到来自协调者的 DoCommit 或是 Abort 请求，针对这样的异常情况，参与者都会在等待超时之后，继续进行事务提交。</p>
+<h3 id="优缺点-1"><a href="#优缺点-1" class="headerlink" title="优缺点"></a>优缺点</h3><p>三阶段提交协议的优点：相较于二阶段提交协议，三阶段提交协议最大的优点就是降低了参与者的阻塞范围，并且能够在出现单点故障后继续达成一致。</p>
+<p>三阶段提交协议的缺点：三阶段提交协议在去除阻塞的同时也引入了新的问题，那就是在参与者接收到 PreCommit 消息后，如果网络出现分区，此时协调者所在的节点和参与者无法进行正常的网络通信，在这种情况下，该参与者依然会进行事务的提交，这必然出现数据的不一致性。</p>
+<h2 id="Raft"><a href="#Raft" class="headerlink" title="Raft"></a>Raft</h2><blockquote>
+<p>见《Distributed System Raft算法》</p>
+</blockquote>
+<h2 id="Paxos"><a href="#Paxos" class="headerlink" title="Paxos"></a>Paxos</h2><blockquote>
+<p>见《Distributed System Paxos算法》</p>
+</blockquote>
+<h2 id="ZAB"><a href="#ZAB" class="headerlink" title="ZAB"></a>ZAB</h2><blockquote>
+<p>见《Distributed System ZAB算法》</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/ACID/" rel="tag"># ACID</a>
+              <a href="/tags/Distributed-System/" rel="tag"># Distributed System</a>
+              <a href="/tags/2PC/" rel="tag"># 2PC</a>
+              <a href="/tags/3PC/" rel="tag"># 3PC</a>
+              <a href="/tags/BASE/" rel="tag"># BASE</a>
+              <a href="/tags/CAP/" rel="tag"># CAP</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/06/ZooKeeper-%E5%85%B8%E5%9E%8B%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/" rel="prev" title="ZooKeeper 典型应用场景">
+      <i class="fa fa-chevron-left"></i> ZooKeeper 典型应用场景
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1"><span class="nav-number">1.</span> <span class="nav-text">分布式事务</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1-1"><span class="nav-number">1.1.</span> <span class="nav-text">分布式事务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E6%A8%A1%E5%9E%8B-DTP"><span class="nav-number">1.2.</span> <span class="nav-text">分布式事务模型 DTP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%8D%8F%E8%AE%AE-XA"><span class="nav-number">1.3.</span> <span class="nav-text">分布式事务协议 XA</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DTP%E3%80%81XA%E3%80%812PC-%E4%B9%8B%E9%97%B4%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">1.4.</span> <span class="nav-text">DTP、XA、2PC 之间的关系</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7%E7%90%86%E8%AE%BA"><span class="nav-number">2.</span> <span class="nav-text">一致性理论</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#CAP%E5%AE%9A%E7%90%86"><span class="nav-number">2.1.</span> <span class="nav-text">CAP定理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">2.1.1.</span> <span class="nav-text">一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%AF%E7%94%A8%E6%80%A7"><span class="nav-number">2.1.2.</span> <span class="nav-text">可用性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E5%AE%B9%E9%94%99%E6%80%A7"><span class="nav-number">2.1.3.</span> <span class="nav-text">分区容错性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9A%E7%90%86%E5%BA%94%E7%94%A8"><span class="nav-number">2.1.4.</span> <span class="nav-text">定理应用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ACID%EF%BC%88%E5%BC%BA%E4%B8%80%E8%87%B4%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">2.2.</span> <span class="nav-text">ACID（强一致模型）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%9F%E5%AD%90%E6%80%A7"><span class="nav-number">2.2.1.</span> <span class="nav-text">原子性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7-1"><span class="nav-number">2.2.2.</span> <span class="nav-text">一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9A%94%E7%A6%BB%E6%80%A7"><span class="nav-number">2.2.3.</span> <span class="nav-text">隔离性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%81%E4%B9%85%E6%80%A7"><span class="nav-number">2.2.4.</span> <span class="nav-text">持久性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#BASE%E7%90%86%E8%AE%BA%EF%BC%88%E5%BC%B1%E4%B8%80%E8%87%B4%E6%A8%A1%E5%9E%8B%EF%BC%89"><span class="nav-number">2.3.</span> <span class="nav-text">BASE理论（弱一致模型）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E5%8F%AF%E7%94%A8"><span class="nav-number">2.3.1.</span> <span class="nav-text">基本可用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%B1%E7%8A%B6%E6%80%81"><span class="nav-number">2.3.2.</span> <span class="nav-text">弱状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%80%E7%BB%88%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">2.3.3.</span> <span class="nav-text">最终一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BASE%E4%B8%8EACID%E5%85%B3%E7%B3%BB"><span class="nav-number">2.3.4.</span> <span class="nav-text">BASE与ACID关系</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7%E5%8D%8F%E8%AE%AE"><span class="nav-number">3.</span> <span class="nav-text">一致性协议</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Two-Phase-Commit"><span class="nav-number">3.1.</span> <span class="nav-text">Two-Phase Commit</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B51%EF%BC%9A%E6%8F%90%E4%BA%A4%E4%BA%8B%E5%8A%A1%E8%AF%B7%E6%B1%82"><span class="nav-number">3.1.1.</span> <span class="nav-text">阶段1：提交事务请求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B52%EF%BC%9A%E6%89%A7%E8%A1%8C%E4%BA%8B%E5%8A%A1%E6%8F%90%E4%BA%A4"><span class="nav-number">3.1.2.</span> <span class="nav-text">阶段2：执行事务提交</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%98%E7%BC%BA%E7%82%B9"><span class="nav-number">3.1.3.</span> <span class="nav-text">优缺点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Three-Phase-Commit"><span class="nav-number">3.2.</span> <span class="nav-text">Three-Phase Commit</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B51%EF%BC%9ACanCommit"><span class="nav-number">3.2.1.</span> <span class="nav-text">阶段1：CanCommit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B52%EF%BC%9APreCommit"><span class="nav-number">3.2.2.</span> <span class="nav-text">阶段2：PreCommit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B6%E6%AE%B53%EF%BC%9ADoCommit"><span class="nav-number">3.2.3.</span> <span class="nav-text">阶段3：DoCommit</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%98%E7%BC%BA%E7%82%B9-1"><span class="nav-number">3.2.4.</span> <span class="nav-text">优缺点</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft"><span class="nav-number">3.3.</span> <span class="nav-text">Raft</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Paxos"><span class="nav-number">3.4.</span> <span class="nav-text">Paxos</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ZAB"><span class="nav-number">3.5.</span> <span class="nav-text">ZAB</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">lanchestios</p>
+  <div class="site-description" itemprop="description">Leave a trace</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">174</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">lanchestios</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
