@@ -20,23 +20,36 @@
     var CONFIG = {"hostname":"lanchestios.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="Redis 缓存高并发场景下出现的问题：缓存穿透：缓存穿透是指缓存和数据库中都没有的数据被高并发的访问。由于查询在缓存中并未命中，于是向持久层数据库查询，高并发的场景下会造成持久层数据库过大的压力。缓存击穿：缓存击穿是指一个 Key 非常热点，高并发集中对这一热点进行访问，当这一热点在失效的瞬间，持续的高并发会穿破缓存，直接请求持久层数据库，对其造成过大的压力。缓存雪崩：缓存雪崩是指缓存层不可用或">
+  <meta name="description" content="Redis 缓存高并发场景下出现的问题：缓存穿透、缓存击穿、缓存雪崩、并发竞争Key、双写一致性。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis 高并发场景缓存问题">
 <meta property="og:url" content="http://lanchestios.github.io/2021/03/01/Redis-%E9%AB%98%E5%B9%B6%E5%8F%91%E5%9C%BA%E6%99%AF%E7%BC%93%E5%AD%98%E9%97%AE%E9%A2%98/index.html">
 <meta property="og:site_name" content="Lache&#39;s Blog">
-<meta property="og:description" content="Redis 缓存高并发场景下出现的问题：缓存穿透：缓存穿透是指缓存和数据库中都没有的数据被高并发的访问。由于查询在缓存中并未命中，于是向持久层数据库查询，高并发的场景下会造成持久层数据库过大的压力。缓存击穿：缓存击穿是指一个 Key 非常热点，高并发集中对这一热点进行访问，当这一热点在失效的瞬间，持续的高并发会穿破缓存，直接请求持久层数据库，对其造成过大的压力。缓存雪崩：缓存雪崩是指缓存层不可用或">
+<meta property="og:description" content="Redis 缓存高并发场景下出现的问题：缓存穿透、缓存击穿、缓存雪崩、并发竞争Key、双写一致性。">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://lanchestios.github.io/images/Redis/缓存穿透-布隆过滤器.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Redis/缓存穿透-缓存空对象.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Redis/缓存雪崩.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis基本读取方式.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先更新数据库后删除缓存1.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先更新数据库后删除缓存2.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先更新数据库后删除缓存3.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先删除缓存后更新数据库1.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先删除缓存后更新数据库2.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis先删除缓存后更新数据库3.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/缓存延时双删策略1.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/缓存延时双删策略2.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis与数据库数据一致性消息队列方案.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Redis/Redis与数据库数据一致性Binlog订阅方案.png">
 <meta property="article:published_time" content="2021-03-01T13:50:46.000Z">
-<meta property="article:modified_time" content="2021-03-01T13:52:12.256Z">
+<meta property="article:modified_time" content="2021-03-10T15:00:20.382Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="Redis">
 <meta property="article:tag" content="缓存穿透">
 <meta property="article:tag" content="缓存击穿">
 <meta property="article:tag" content="缓存雪崩">
+<meta property="article:tag" content="并发竞争Key">
+<meta property="article:tag" content="双写一致性">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://lanchestios.github.io/images/Redis/缓存穿透-布隆过滤器.png">
 
@@ -218,10 +231,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2021-03-01 21:50:46 / Modified: 21:52:12" itemprop="dateCreated datePublished" datetime="2021-03-01T21:50:46+08:00">2021-03-01</time>
+              <time title="Created: 2021-03-01 21:50:46" itemprop="dateCreated datePublished" datetime="2021-03-01T21:50:46+08:00">2021-03-01</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-03-10 23:00:20" itemprop="dateModified" datetime="2021-03-10T23:00:20+08:00">2021-03-10</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -243,7 +262,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>Redis 缓存高并发场景下出现的问题：<strong>缓存穿透</strong>：缓存穿透是指缓存和数据库中都没有的数据被高并发的访问。由于查询在缓存中并未命中，于是向持久层数据库查询，高并发的场景下会造成持久层数据库过大的压力。<strong>缓存击穿</strong>：缓存击穿是指一个 Key 非常热点，高并发集中对这一热点进行访问，当这一热点在失效的瞬间，持续的高并发会穿破缓存，直接请求持久层数据库，对其造成过大的压力。<strong>缓存雪崩</strong>：缓存雪崩是指缓存层不可用或大多数不可用导致高并发请求未命中到达持久层。持久层数据库调用量暴增，造成过高的压力。</p>
+        <p>Redis 缓存高并发场景下出现的问题：缓存穿透、缓存击穿、缓存雪崩、并发竞争Key、双写一致性。</p>
 <a id="more"></a>
 <h1 id="缓存穿透"><a href="#缓存穿透" class="headerlink" title="缓存穿透"></a>缓存穿透</h1><h2 id="缓存穿透原理"><a href="#缓存穿透原理" class="headerlink" title="缓存穿透原理"></a>缓存穿透原理</h2><p>缓存穿透是指缓存和数据库中都没有的数据被高并发的访问。由于查询在缓存中并未命中，于是向持久层数据库查询，高并发的场景下会造成持久层数据库过大的压力。和缓存击穿不同的是，缓存击穿是热点数据失效后，高并发穿过缓存压垮数据库；穿透是访问并没有的数据造成的数据库读。</p>
 <h2 id="缓存穿透解决方案"><a href="#缓存穿透解决方案" class="headerlink" title="缓存穿透解决方案"></a>缓存穿透解决方案</h2><h3 id="布隆过滤器"><a href="#布隆过滤器" class="headerlink" title="布隆过滤器"></a>布隆过滤器</h3><p>先对所有可能查询的参数以 hash 形式存储，当用户查询请求到达时，使用布隆过滤器发现不在集合中，就直接丢弃，不再对持久层查询。</p>
@@ -278,6 +297,86 @@
 </ol>
 <h3 id="数据备份和数据预热"><a href="#数据备份和数据预热" class="headerlink" title="数据备份和数据预热"></a>数据备份和数据预热</h3><p>数据加热的含义就是在正式部署之前，把热点数据先预先缓存，这样部分可能大量访问的数据就会加载到缓存中。缓存数据的过期时间设置随机，防止同一时间大量数据过期现象发生。根据需要，可以将热点数据设置为永不过期。</p>
 <h3 id="提前演练"><a href="#提前演练" class="headerlink" title="提前演练"></a>提前演练</h3><p>在项目上线前，演练缓存层宕掉后，应用以及后端的负载情况以及可能出现的问题，对高可用提前预演，提前发现问题。</p>
+<h1 id="并发竞争Key"><a href="#并发竞争Key" class="headerlink" title="并发竞争Key"></a>并发竞争Key</h1><p>同时有多个子系统去 Set 一个 Key。不太推荐使用 Redis 的事务机制。</p>
+<ol>
+<li><p>如果对这个 Key 操作，不要求顺序。</p>
+<p>这种情况下，准备一个分布式锁，大家去抢锁，抢到锁就做 Set 操作即可。</p>
+</li>
+<li><p>如果对这个 Key 操作，要求顺序。</p>
+<p>假设有一个 Key1，系统 A 需要将 Key1 设置为 ValueA；系统 B 需要将 Key1 设置为 ValueB；系统 C 需要将 Key1 设置为 ValueC。期望按照 Key1 的 Value 值按照 ValueA→ValueB→ValueC 的顺序变化。</p>
+<p>这种时候我们在数据写入数据库的时候，需要保存一个时间戳/版本号。假设时间戳如下</p>
+<p>系统A Key1 <code>&#123;ValueA 3:00&#125;</code><br>系统B Key1 <code>&#123;ValueB 3:05&#125;</code><br>系统C Key1 <code>&#123;ValueC 3:10&#125;</code></p>
+<p>那么，假设这会系统 B 先抢到锁，将 Key1 设置为 <code>&#123;ValueB 3:05&#125;</code>。接下来系统 A 抢到锁，发现自己的 ValueA 的时间戳早于缓存中的时间戳，那就不做 Set 操作了。以此类推。</p>
+<p>其他方法，比如利用队列，将 set 方法变成串行访问也可以。总之，灵活变通。</p>
+</li>
+</ol>
+<h1 id="缓存与库双写一致"><a href="#缓存与库双写一致" class="headerlink" title="缓存与库双写一致"></a>缓存与库双写一致</h1><p>需要注意的是，如果对数据有强一致性的要求，不能放在缓存中。</p>
+<h2 id="为什么不先更新数据库再更新缓存"><a href="#为什么不先更新数据库再更新缓存" class="headerlink" title="为什么不先更新数据库再更新缓存"></a>为什么不先更新数据库再更新缓存</h2><p><strong>线程安全角度</strong></p>
+<p>同时有请求 A 和请求 B 进行更新操作，那么会出现</p>
+<ol>
+<li>线程 A 更新了数据库</li>
+<li>线程 B 更新了数据库</li>
+<li>线程 B 更新了缓存</li>
+<li>线程 A 更新了缓存</li>
+</ol>
+<p>这就出现请求 A 更新缓存应该比请求 B 更新缓存早才对，但是因为网络等原因，B 却比 A 更早更新了缓存。这就导致了脏数据，因此不考虑。</p>
+<p><strong>业务场景角度</strong></p>
+<p>有如下两点：</p>
+<ol>
+<li>如果你是一个写数据库场景比较多，而读数据场景比较少的业务需求，采用这种方案就会导致，数据压根还没读到，缓存就被频繁的更新，浪费性能。</li>
+<li>如果你写入数据库的值，并不是直接写入缓存的，而是要经过一系列复杂的计算再写入缓存。那么，每次写入数据库后，都再次计算写入缓存的值，无疑是浪费性能的。显然，删除缓存更为适合。</li>
+</ol>
+<h2 id="旁路缓存策略"><a href="#旁路缓存策略" class="headerlink" title="旁路缓存策略"></a>旁路缓存策略</h2><p>这是一种最经典的缓存+数据库读写的模式，英文是这样 Cache Aside Pattern，可能你见过。</p>
+<p>这种模式对应的使用方式有两种情况，一读一写：</p>
+<ul>
+<li>基本读取方式；</li>
+<li>先更新数据库，后删除缓存。</li>
+</ul>
+<h3 id="基本读取方式"><a href="#基本读取方式" class="headerlink" title="基本读取方式"></a>基本读取方式</h3><p>这部分相信大家已经轻车熟路：先读缓存，缓存中没有数据的话就去数据库读取，然后再存入缓存中，同时返回响应。</p>
+<p><img src="/images/Redis/Redis基本读取方式.png" alt="图片"></p>
+<h3 id="先更新数据库，后删除缓存"><a href="#先更新数据库，后删除缓存" class="headerlink" title="先更新数据库，后删除缓存"></a>先更新数据库，后删除缓存</h3><p>你可能会问了，为什么不在更新完数据库后，采取更新缓存的方案，而是将其删除。原因有这么几点：</p>
+<ul>
+<li><p>频繁更新浪费资源</p>
+<p>如果修改库中的某个字段，一段时间内频繁进行更新。那么你修改多少次，缓存也跟着更新多少次。但是这个缓存数据在这段时间内也就被偶尔使用了几次。</p>
+</li>
+<li><p>缓存数据计算复杂</p>
+<p>还有一种情况，如果这个缓存的数据计算成本比较高。比如为了一个数据，要通过多张表来计算才能得到结果。那么每修改一次，为了更新缓存还要再查询多张表来算一次。</p>
+</li>
+<li><p>两种情况都具备</p>
+</li>
+</ul>
+<p>既然更新缓存的方式不可行，那么我们换个思路，删除掉呢？还是按照上边的步骤，先更新数据库，只是我们把更新缓存的操作换成了删除。在这种情况下，读请求过来的时候，发现 Redis 中没有数据，就会去数据库里读取，然后写入缓存中。这也是一种懒加载方式，只有缓存被需要的时候才会去计算。这样可以避免大量计算及频繁更新。</p>
+<p>但是，这样会有什么隐患的问题？如果数据更新成功，但是删除缓存失败怎么办？</p>
+<p><img src="/images/Redis/Redis先更新数据库后删除缓存1.png" alt=""></p>
+<p><img src="/images/Redis/Redis先更新数据库后删除缓存2.png" alt=""></p>
+<p><img src="/images/Redis/Redis先更新数据库后删除缓存3.png" alt=""></p>
+<p>如图中所示，刚开始时（初始），数据库和缓存中的数据是一致的，但是在写请求过来后，数据库更新成功，而缓存删除失败。这就导致数据库中的数据是最新的，但缓存中却依然存着旧数据。这时，如果读请求过来，就会直接读取缓存中的旧数据返回了。</p>
+<h2 id="双写一致方案"><a href="#双写一致方案" class="headerlink" title="双写一致方案"></a>双写一致方案</h2><h3 id="先删除缓存，后更新数据库"><a href="#先删除缓存，后更新数据库" class="headerlink" title="先删除缓存，后更新数据库"></a>先删除缓存，后更新数据库</h3><p>既然问题的原因是删除缓存失败了，那么我们先确保把缓存删除成功了，再去更新数据库。也就是说我们先删除缓存，后更新数据库。</p>
+<p><strong>可能一：数据库更新失败</strong></p>
+<p>可能你会问了，如果我数据库更新失败了呢？如下图所示。</p>
+<p><img src="/images/Redis/Redis先删除缓存后更新数据库1.png" alt=""></p>
+<p><img src="/images/Redis/Redis先删除缓存后更新数据库2.png" alt=""></p>
+<p><img src="/images/Redis/Redis先删除缓存后更新数据库3.png" alt=""></p>
+<p>缓存删除成功后为空了，但是数据库却失败了，还是原来的旧数据。如果这时候有请求过来的话，一看缓存中没有数据，于是就到数据库读取了旧数据更新到缓存中。</p>
+<p><strong>可能二：线程安全问题</strong></p>
+<p>同时有一个请求 A 进行更新操作，另一个请求 B 进行查询操作。那么会出现如下情形:</p>
+<ol>
+<li>请求 A 进行写操作，删除缓存</li>
+<li>请求 B 查询发现缓存不存在</li>
+<li>请求 B 去数据库查询得到旧值</li>
+<li>请求 B 将旧值写入缓存</li>
+<li>请求 A 将新值写入数据库</li>
+</ol>
+<h3 id="缓存延时双删策略"><a href="#缓存延时双删策略" class="headerlink" title="缓存延时双删策略"></a>缓存延时双删策略</h3><p>如果同时来了两个请求，一个写请求，一个读请求。写请求先删除 Redis 中的数据，然后去数据库进行更新操作。读请求判断 Redis 中有没有数据，没有数据时去请求数据库，拿到数据后写入缓存中。但是写请求此时并没有更新成功，或者执行了一个事务还没有成功。这样的话，读请求拿到未修改的旧数据写入缓存。过了一会儿，写请求将数据库更新成功了，那么此时缓存与库中的数据就不一致了。</p>
+<p><img src="/images/Redis/缓存延时双删策略1.png" alt=""></p>
+<p>解决方案呢？延时双删策略：</p>
+<p><img src="/images/Redis/缓存延时双删策略2.png" alt=""></p>
+<p>写请求过来先把 Redis缓存删掉，等数据库更新成功后，异步等待一段时间再次把缓存删掉。这种方案读取速度快，但是会出现短时间的脏数据。</p>
+<h2 id="一些有效的双写一致性思路"><a href="#一些有效的双写一致性思路" class="headerlink" title="一些有效的双写一致性思路"></a>一些有效的双写一致性思路</h2><p>主要是给失败的操作提供一个保障的重试机制。</p>
+<h3 id="使用消息队列提供重试机制"><a href="#使用消息队列提供重试机制" class="headerlink" title="使用消息队列提供重试机制"></a>使用消息队列提供重试机制</h3><p><img src="/images/Redis/Redis与数据库数据一致性消息队列方案.png" alt=""></p>
+<p>然而，该方案有一个缺点，对业务线代码造成大量的侵入。于是有了方案二，在方案二中，启动一个订阅程序去订阅数据库的 binlog，获得需要操作的数据。在应用程序中，另起一段程序，获得这个订阅程序传来的信息，进行删除缓存操作。</p>
+<h3 id="订阅binlog来执行删除缓存操作"><a href="#订阅binlog来执行删除缓存操作" class="headerlink" title="订阅binlog来执行删除缓存操作"></a>订阅binlog来执行删除缓存操作</h3><p><img src="/images/Redis/Redis与数据库数据一致性Binlog订阅方案.png" alt=""></p>
+<p>备注说明：上述的订阅 binlog 程序在 mysql 中有现成的中间件叫 canal，可以完成订阅 binlog 日志的功能。</p>
 
     </div>
 
@@ -291,6 +390,8 @@
               <a href="/tags/%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F/" rel="tag"># 缓存穿透</a>
               <a href="/tags/%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF/" rel="tag"># 缓存击穿</a>
               <a href="/tags/%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9/" rel="tag"># 缓存雪崩</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91%E7%AB%9E%E4%BA%89Key/" rel="tag"># 并发竞争Key</a>
+              <a href="/tags/%E5%8F%8C%E5%86%99%E4%B8%80%E8%87%B4%E6%80%A7/" rel="tag"># 双写一致性</a>
           </div>
 
         
@@ -364,7 +465,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F"><span class="nav-number">1.</span> <span class="nav-text">缓存穿透</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E5%8E%9F%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">缓存穿透原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.2.</span> <span class="nav-text">缓存穿透解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.2.1.</span> <span class="nav-text">布隆过滤器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BA%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.2.2.</span> <span class="nav-text">缓存空对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%A0%A1%E9%AA%8C"><span class="nav-number">1.2.3.</span> <span class="nav-text">业务校验</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF"><span class="nav-number">2.</span> <span class="nav-text">缓存击穿</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF%E5%8E%9F%E7%90%86"><span class="nav-number">2.1.</span> <span class="nav-text">缓存击穿原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">2.2.</span> <span class="nav-text">缓存击穿解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E4%BA%92%E6%96%A5%E9%94%81"><span class="nav-number">2.2.1.</span> <span class="nav-text">使用互斥锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E7%83%AD%E7%82%B9%E6%95%B0%E6%8D%AE%E6%B0%B8%E4%B8%8D%E8%BF%87%E6%9C%9F"><span class="nav-number">2.2.2.</span> <span class="nav-text">设置热点数据永不过期</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9"><span class="nav-number">3.</span> <span class="nav-text">缓存雪崩</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9%E5%8E%9F%E7%90%86"><span class="nav-number">3.1.</span> <span class="nav-text">缓存雪崩原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">3.2.</span> <span class="nav-text">缓存雪崩解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis%E5%88%86%E5%B8%83%E5%BC%8F%E3%80%81%E9%AB%98%E5%8F%AF%E7%94%A8"><span class="nav-number">3.2.1.</span> <span class="nav-text">Redis分布式、高可用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%99%8D%E7%BA%A7"><span class="nav-number">3.2.2.</span> <span class="nav-text">缓存降级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%A4%87%E4%BB%BD%E5%92%8C%E6%95%B0%E6%8D%AE%E9%A2%84%E7%83%AD"><span class="nav-number">3.2.3.</span> <span class="nav-text">数据备份和数据预热</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%90%E5%89%8D%E6%BC%94%E7%BB%83"><span class="nav-number">3.2.4.</span> <span class="nav-text">提前演练</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F"><span class="nav-number">1.</span> <span class="nav-text">缓存穿透</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E5%8E%9F%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">缓存穿透原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">1.2.</span> <span class="nav-text">缓存穿透解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.2.1.</span> <span class="nav-text">布隆过滤器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E7%A9%BA%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.2.2.</span> <span class="nav-text">缓存空对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%A0%A1%E9%AA%8C"><span class="nav-number">1.2.3.</span> <span class="nav-text">业务校验</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF"><span class="nav-number">2.</span> <span class="nav-text">缓存击穿</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF%E5%8E%9F%E7%90%86"><span class="nav-number">2.1.</span> <span class="nav-text">缓存击穿原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%87%BB%E7%A9%BF%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">2.2.</span> <span class="nav-text">缓存击穿解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E4%BA%92%E6%96%A5%E9%94%81"><span class="nav-number">2.2.1.</span> <span class="nav-text">使用互斥锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E7%83%AD%E7%82%B9%E6%95%B0%E6%8D%AE%E6%B0%B8%E4%B8%8D%E8%BF%87%E6%9C%9F"><span class="nav-number">2.2.2.</span> <span class="nav-text">设置热点数据永不过期</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9"><span class="nav-number">3.</span> <span class="nav-text">缓存雪崩</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9%E5%8E%9F%E7%90%86"><span class="nav-number">3.1.</span> <span class="nav-text">缓存雪崩原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%9B%AA%E5%B4%A9%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="nav-number">3.2.</span> <span class="nav-text">缓存雪崩解决方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis%E5%88%86%E5%B8%83%E5%BC%8F%E3%80%81%E9%AB%98%E5%8F%AF%E7%94%A8"><span class="nav-number">3.2.1.</span> <span class="nav-text">Redis分布式、高可用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E9%99%8D%E7%BA%A7"><span class="nav-number">3.2.2.</span> <span class="nav-text">缓存降级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%A4%87%E4%BB%BD%E5%92%8C%E6%95%B0%E6%8D%AE%E9%A2%84%E7%83%AD"><span class="nav-number">3.2.3.</span> <span class="nav-text">数据备份和数据预热</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%90%E5%89%8D%E6%BC%94%E7%BB%83"><span class="nav-number">3.2.4.</span> <span class="nav-text">提前演练</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E7%AB%9E%E4%BA%89Key"><span class="nav-number">4.</span> <span class="nav-text">并发竞争Key</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E4%B8%8E%E5%BA%93%E5%8F%8C%E5%86%99%E4%B8%80%E8%87%B4"><span class="nav-number">5.</span> <span class="nav-text">缓存与库双写一致</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%E5%86%8D%E6%9B%B4%E6%96%B0%E7%BC%93%E5%AD%98"><span class="nav-number">5.1.</span> <span class="nav-text">为什么不先更新数据库再更新缓存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%81%E8%B7%AF%E7%BC%93%E5%AD%98%E7%AD%96%E7%95%A5"><span class="nav-number">5.2.</span> <span class="nav-text">旁路缓存策略</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E8%AF%BB%E5%8F%96%E6%96%B9%E5%BC%8F"><span class="nav-number">5.2.1.</span> <span class="nav-text">基本读取方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%88%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93%EF%BC%8C%E5%90%8E%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98"><span class="nav-number">5.2.2.</span> <span class="nav-text">先更新数据库，后删除缓存</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8C%E5%86%99%E4%B8%80%E8%87%B4%E6%96%B9%E6%A1%88"><span class="nav-number">5.3.</span> <span class="nav-text">双写一致方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%88%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98%EF%BC%8C%E5%90%8E%E6%9B%B4%E6%96%B0%E6%95%B0%E6%8D%AE%E5%BA%93"><span class="nav-number">5.3.1.</span> <span class="nav-text">先删除缓存，后更新数据库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%93%E5%AD%98%E5%BB%B6%E6%97%B6%E5%8F%8C%E5%88%A0%E7%AD%96%E7%95%A5"><span class="nav-number">5.3.2.</span> <span class="nav-text">缓存延时双删策略</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E4%BA%9B%E6%9C%89%E6%95%88%E7%9A%84%E5%8F%8C%E5%86%99%E4%B8%80%E8%87%B4%E6%80%A7%E6%80%9D%E8%B7%AF"><span class="nav-number">5.4.</span> <span class="nav-text">一些有效的双写一致性思路</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97%E6%8F%90%E4%BE%9B%E9%87%8D%E8%AF%95%E6%9C%BA%E5%88%B6"><span class="nav-number">5.4.1.</span> <span class="nav-text">使用消息队列提供重试机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A2%E9%98%85binlog%E6%9D%A5%E6%89%A7%E8%A1%8C%E5%88%A0%E9%99%A4%E7%BC%93%E5%AD%98%E6%93%8D%E4%BD%9C"><span class="nav-number">5.4.2.</span> <span class="nav-text">订阅binlog来执行删除缓存操作</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -378,7 +479,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">48</span>
+          <span class="site-state-item-count">49</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -391,7 +492,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">174</span>
+        <span class="site-state-item-count">179</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
