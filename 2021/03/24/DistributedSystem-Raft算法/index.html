@@ -52,6 +52,18 @@
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/日志复制5.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/日志复制6.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/日志复制7.jpg">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志1.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志2.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志3.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志4.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志5.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志6.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志7.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志8.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志9.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志10.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志11.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/Raft网络分区复制日志12.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/日志不一致场景.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/对提交限制的原因.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/新节点扩展的过程.png">
@@ -63,7 +75,7 @@
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/非线性一致性系统的例子3.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/DistributedSystem/非线性一致性系统的例子4.png">
 <meta property="article:published_time" content="2021-03-24T13:00:14.000Z">
-<meta property="article:modified_time" content="2021-03-24T13:00:31.820Z">
+<meta property="article:modified_time" content="2021-03-27T14:22:42.230Z">
 <meta property="article:author" content="lanchestios">
 <meta property="article:tag" content="Distributed System">
 <meta property="article:tag" content="Raft">
@@ -248,10 +260,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2021-03-24 21:00:14 / Modified: 21:00:31" itemprop="dateCreated datePublished" datetime="2021-03-24T21:00:14+08:00">2021-03-24</time>
+              <time title="Created: 2021-03-24 21:00:14" itemprop="dateCreated datePublished" datetime="2021-03-24T21:00:14+08:00">2021-03-24</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-03-27 22:22:42" itemprop="dateModified" datetime="2021-03-27T22:22:42+08:00">2021-03-27</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -276,6 +294,7 @@
         <p>不同于 Paxos 算法直接从分布式一致性问题出发推导出来，Raft 算法则是从多副本状态机的角度提出，用于管理多副本状态机的日志复制。Raft 实现了和 Paxos 相同的功能，它将一致性分解为多个子问题：Leader 选举（Leader election）、日志同步（Log replication）、安全性（Safety）、日志压缩（Log compaction）、成员变更（Membership change）等。同时，Raft 算法使用了更强的假设来减少了需要考虑的状态，使之变的易于理解和实现。</p>
 <a id="more"></a>
 <h1 id="Raft-基本概念"><a href="#Raft-基本概念" class="headerlink" title="Raft 基本概念"></a>Raft 基本概念</h1><blockquote>
+<p>Raft动画讲解 <a target="_blank" rel="noopener" href="http://thesecretlivesofdata.com/raft/">http://thesecretlivesofdata.com/raft/</a></p>
 <p>Raft算法(Java 实现)-蚂蚁金服开源 <a target="_blank" rel="noopener" href="https://github.com/sofastack/sofa-jraft">sofastack/sofa-jraft</a></p>
 </blockquote>
 <p>Raft 使用 Quorum 机制来实现共识和容错，我们将对 Raft 集群的操作称为提案，每当发起一个提案，必须得到大多数（&gt; N/2）节点的同意才能提交。</p>
@@ -312,46 +331,46 @@
 <p><strong>Follower 状态转换过程</strong></p>
 <p>Raft 的选主基于一种心跳机制，集群中每个节点刚启动时都是 follower 身份（<strong>Step: starts up</strong>），leader 会周期性的向所有节点发送心跳包来维持自己的权威，那么首个 leader 是如何被选举出来的呢？方法是如果一个 follower 在一段时间内没有收到任何心跳，也就是选举超时，那么它就会主观认为系统中没有可用的 leader，并发起新的选举（<strong>Step: times out, starts election</strong>）。</p>
 <p>这里有一个问题，即这个“选举超时时间”该如何制定？如果所有节点在同一时刻启动，经过同样的超时时间后同时发起选举，整个集群会变得低效不堪，极端情况下甚至会一直选不出一个主节点。Raft 巧妙的使用了一个随机化的定时器，让每个节点的“超时时间”在一定范围内随机生成，这样就大大的降低了多个节点同时发起选举的可能性。</p>
-<p><img src="/images/DistributedSystem/无Leader等待超时后选举.png" alt=""></p>
+<p><img src="/images/DistributedSystem/无Leader等待超时后选举.png" style="zoom: 50%;" /></p>
 <p><em>图：一个五节点 Raft 集群的初始状态，所有节点都是 follower 身份，term 为 1，且每个节点的选举超时定时器不同</em></p>
 <p>若 follower 想发起一次选举，follower 需要先增加自己的当前 term，并将身份切换为 candidate。然后它会向集群其它节点发送“请给自己投票”的消息（RequestVote RPC）。</p>
-<p><img src="/images/DistributedSystem/单节点超时发起选举.png" alt=""></p>
+<p><img src="/images/DistributedSystem/单节点超时发起选举.png" style="zoom:50%;" /></p>
 <p><em>图：S1 率先超时，变为 candidate，term + 1，并向其它节点发出拉票请求</em></p>
 <p><strong>Candicate 状态转换过程</strong></p>
 <p>Follower 切换为 candidate 并向集群其他节点发送“请给自己投票”的消息后，接下来会有三种可能的结果，也即上面<strong>节点状态图中 candidate 状态向外伸出的三条线</strong>。</p>
 <p><strong>1. 选举成功（Step: receives votes from majority of servers）</strong></p>
 <p>当candicate从整个集群的<strong>大多数</strong>（N/2+1）节点获得了针对同一 term 的选票时，它就赢得了这次选举，立刻将自己的身份转变为 leader 并开始向其它节点发送心跳来维持自己的权威。</p>
-<p><img src="/images/DistributedSystem/选举成功.png" alt=""></p>
+<p><img src="/images/DistributedSystem/选举成功.png" style="zoom:50%;" /></p>
 <p><em>图：“大部分”节点都给了 S1 选票</em></p>
-<p><img src="/images/DistributedSystem/Leader给Follower发送心跳包维持权威.png" alt=""></p>
+<p><img src="/images/DistributedSystem/Leader给Follower发送心跳包维持权威.png" style="zoom:50%;" /></p>
 <p><em>图：S1 变为 leader，开始发送心跳维持权威</em></p>
 <p>每个节点针对每个 term 只能投出一张票，并且按照先到先得的原则。这个规则确保只有一个 candidate 会成为 leader。</p>
 <p><strong>2. 选举失败（Step: discovers current leader or new term）</strong></p>
 <p>Candidate 在等待投票回复的时候，可能会突然收到其它自称是 leader 的节点发送的心跳包，如果这个心跳包里携带的 term <strong>不小于</strong> candidate 当前的 term，那么 candidate 会承认这个 leader，并将身份切回 follower。这说明其它节点已经成功赢得了选举，我们只需立刻跟随即可。但如果心跳包中的 term 比自己小，candidate 会拒绝这次请求并保持选举状态。</p>
-<p><img src="/images/DistributedSystem/S2S4依次开始选举.png" alt=""></p>
+<p><img src="/images/DistributedSystem/S2S4依次开始选举.png" style="zoom:50%;" /></p>
 <p><em>图：S4、S2 依次开始选举</em></p>
-<p><img src="/images/DistributedSystem/S4成为Leader.png" alt=""></p>
+<p><img src="/images/DistributedSystem/S4成为Leader.png" style="zoom:50%;" /></p>
 <p><em>图：S4 成为 leader，S2 在收到 S4 的心跳包后，由于 term 不小于自己当前的 term，因此会立刻切为 follower 跟随 S4</em></p>
 <p><strong>3. 选举超时（Step: times out, new election）</strong></p>
 <p>第三种可能的结果是 candidate 既没有赢也没有输。如果有多个 follower 同时成为 candidate，选票是可能被瓜分的，如果没有任何一个 candidate 能得到大多数节点的支持，那么每一个 candidate 都会超时。此时 candidate 需要增加自己的 term，然后发起新一轮选举。如果这里不做一些特殊处理，选票可能会一直被瓜分，导致选不出 leader 来。这里的“特殊处理”指的就是前文所述的<strong>随机化选举超时时间</strong>。</p>
-<p><img src="/images/DistributedSystem/全部参与选举.png" alt=""></p>
+<p><img src="/images/DistributedSystem/全部参与选举.png" style="zoom:50%;" /></p>
 <p><em>图：S1 ~ S5 都在参与选举</em></p>
-<p><img src="/images/DistributedSystem/没有任何节点愿意给其他人投票.png" alt=""></p>
+<p><img src="/images/DistributedSystem/没有任何节点愿意给其他人投票.png" style="zoom:50%;" /></p>
 <p><em>图：没有任何节点愿意给他人投票</em></p>
-<p><img src="/images/DistributedSystem/没有随机化时间节点继续开始全部参与选举.png" alt=""></p>
+<p><img src="/images/DistributedSystem/没有随机化时间节点继续开始全部参与选举.png" style="zoom:50%;" /></p>
 <p><em>图：如果没有随机化超时时间，所有节点将会继续同时发起选举……</em></p>
 <p><strong>Leader 状态转换过程</strong></p>
 <p>节点状态图中的最后一条线是：<strong>discovers server with higher term</strong>。想象一个场景：当 leader 节点发生了宕机或网络断连，此时其它 follower 会收不到 leader 心跳，首个触发超时的节点会变为 candidate 并开始拉票（由于随机化各个 follower 超时时间不同），由于该 candidate 的 term 大于原 leader 的 term，因此所有 follower 都会投票给它，这名 candidate 会变为新的 leader。一段时间后原 leader 恢复了，收到了来自新leader 的心跳包，发现心跳中的 term 大于自己的 term，此时该节点会立刻切换为 follower 并跟随的新 leader。</p>
 <p>上述流程的动画模拟如下：</p>
-<p><img src="/images/DistributedSystem/作为Leader的节点宕机.png" alt=""></p>
+<p><img src="/images/DistributedSystem/作为Leader的节点宕机.png" style="zoom:50%;" /></p>
 <p><em>图：S4 作为 term2 的 leader</em></p>
-<p><img src="/images/DistributedSystem/作为Leader的节点宕机2.png" alt=""></p>
+<p><img src="/images/DistributedSystem/作为Leader的节点宕机2.png" style="zoom:50%;" /></p>
 <p><em>图：S4 宕机，S5 即将率先超时</em></p>
-<p><img src="/images/DistributedSystem/S5当选Term3的Leader.png" alt=""></p>
+<p><img src="/images/DistributedSystem/S5当选Term3的Leader.png" style="zoom:50%;" /></p>
 <p><em>图：S5 当选 term3 的 leader</em></p>
-<p><img src="/images/DistributedSystem/S4宕机恢复后收到了来自S5的term3心跳.png" alt=""></p>
+<p><img src="/images/DistributedSystem/S4宕机恢复后收到了来自S5的term3心跳.png" style="zoom:50%;" /></p>
 <p><em>图：S4 宕机恢复后收到了来自 S5 的 term3 心跳</em></p>
-<p><img src="/images/DistributedSystem/S4立刻变为S5的follower.png" alt=""></p>
+<p><img src="/images/DistributedSystem/S4立刻变为S5的follower.png" style="zoom:50%;" /></p>
 <p><em>图：S4 立刻变为 S5 的 follower</em></p>
 <p>以上就是 Raft 的选主逻辑，但还有一些细节（譬如是否给该 candidate 投票还有一些其它条件）依赖算法的其它部分基础，我们会在后续“安全性”一章描述。</p>
 <p>当票选出 leader 后，leader 也该承担起相应的责任了，这个责任是什么？就是下一章将介绍的“日志复制”。</p>
@@ -387,6 +406,28 @@
 <p>leader 后续会持续发送心跳包给 followers，心跳包中会携带当前<strong>已经安全复制（我们称之为 committed）的日志索引</strong>，此处为 (term2, index1)。</p>
 <p><img src="/images/DistributedSystem/日志复制7.jpg" alt=""></p>
 <p>所有 follower 都通过心跳包得知 (term2, index1) 的 log 已经成功复制 （committed），因此所有节点中该日志条目的边框均变为实线。</p>
+<h3 id="Network-Partition情况下进行复制日志"><a href="#Network-Partition情况下进行复制日志" class="headerlink" title="Network Partition情况下进行复制日志"></a>Network Partition情况下进行复制日志</h3><p>在 Network Partition 的情况下，部分节点之间没办法互相通信，Raft 也能保证在这种情况下数据的一致性。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志1.png" alt=""></p>
+<p>一开始有 5 个节点处于同一网络状态下。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志2.png" alt=""></p>
+<p>Network Partition 将节点分成两边，一边有两个节点，一边三个节点。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志3.png" alt=""></p>
+<p>两个节点这边已经有 Leader 了，来自客户端的数据 “bob” 通过 Leader 同步到 Follower。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志4.png" alt=""></p>
+<p>因为只有两个节点，少于3个节点，所以 “bob” 的状态仍是 Uncommitted。所以在这里，服务器会返回错误给客户端</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志5.png" alt=""></p>
+<p>另外一个 Partition 有三个节点，进行重新选主。客户端数据 “tom” 发到新的 Leader，通过和上节网络状态下相似的过程，同步到另外两个 Follower。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志6.png" alt=""></p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志7.png" alt=""></p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志8.png" alt=""></p>
+<p>因为这个 Partition 有3个节点，超过半数，所以数据 “tom” 都 Commit 了。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志9.png" alt=""></p>
+<p>网络状态恢复，5个节点再次处于同一个网络状态下。但是这里出现了数据冲突 “bob” 和 “tom”</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志10.png" alt=""></p>
+<p>三个节点的 Leader 广播 AppendEntries</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志11.png" alt=""></p>
+<p>两个节点 Partition 的 Leader 自动降级为 Follower，因为这个 Partition 的数据 “bob” 没有 Commit，返回给客户端的是错误，客户端知道请求没有成功，所以 Follower 在收到 AppendEntries 请求时，可以把 “bob“ 删除，然后同步 ”tom”，通过这么一个过程，就完成了在 Network Partition 情况下的复制日志，保证了数据的一致性。</p>
+<p><img src="/images/DistributedSystem/Raft网络分区复制日志12.png" alt=""></p>
 <h3 id="对日志一致性的保证"><a href="#对日志一致性的保证" class="headerlink" title="对日志一致性的保证"></a>对日志一致性的保证</h3><p>前边我们使用了 (term2, index1) 这种方式来表示一条日志条目，这里为什么要带上 term，而不仅仅是使用 index？原因是 term 可以用来检查不同节点间日志是否存在不一致的情况，阅读下一节后会更容易理解这句话。</p>
 <p>Raft 保证：<strong>如果不同的节点日志集合中的两个日志条目拥有相同的 term 和 index，那么它们一定存储了相同的指令</strong>。</p>
 <p>为什么可以作出这种保证？因为 Raft 要求 leader 在一个 term 内针对同一个 index 只能创建一条日志，并且永远不会修改它。</p>
@@ -605,7 +646,10 @@
     <a href="/2021/03/24/Netty-%E9%AB%98%E5%8F%AF%E7%94%A8%E4%B9%8B%E9%81%93/" rel="prev" title="Netty 高可用之道">
       <i class="fa fa-chevron-left"></i> Netty 高可用之道
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/27/JVM-%E8%AF%AD%E6%B3%95%E7%B3%96/" rel="next" title="JVM 语法糖">
+      JVM 语法糖 <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -664,7 +708,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Raft-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">1.</span> <span class="nav-text">Raft 基本概念</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%89%E4%B8%BB"><span class="nav-number">2.</span> <span class="nav-text">选主</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E9%80%89%E4%B8%BB"><span class="nav-number">2.1.</span> <span class="nav-text">什么是选主</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%BF%9B%E8%A1%8C%E9%80%89%E4%B8%BB%EF%BC%9F"><span class="nav-number">2.2.</span> <span class="nav-text">Raft 为什么要进行选主？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E9%80%89%E4%B8%BB%E8%BF%87%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">Raft 选主过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8A%82%E7%82%B9%E8%A7%92%E8%89%B2"><span class="nav-number">2.3.1.</span> <span class="nav-text">节点角色</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E6%9C%9F"><span class="nav-number">2.3.2.</span> <span class="nav-text">任期</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8A%82%E7%82%B9%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2"><span class="nav-number">2.3.3.</span> <span class="nav-text">节点状态转换</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6"><span class="nav-number">3.</span> <span class="nav-text">日志复制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6"><span class="nav-number">3.1.</span> <span class="nav-text">什么是日志复制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%9C%BA%E5%88%B6%E8%A7%A3%E6%9E%90"><span class="nav-number">3.2.</span> <span class="nav-text">Raft 日志复制机制解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90"><span class="nav-number">3.2.1.</span> <span class="nav-text">整体流程解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%B5%81%E7%A8%8B%E5%9B%BE%E8%A7%A3"><span class="nav-number">3.2.2.</span> <span class="nav-text">日志复制流程图解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E6%97%A5%E5%BF%97%E4%B8%80%E8%87%B4%E6%80%A7%E7%9A%84%E4%BF%9D%E8%AF%81"><span class="nav-number">3.2.3.</span> <span class="nav-text">对日志一致性的保证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%AF%E8%83%BD%E5%87%BA%E7%8E%B0%E7%9A%84%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4%E5%9C%BA%E6%99%AF"><span class="nav-number">3.2.4.</span> <span class="nav-text">可能出现的日志不一致场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4"><span class="nav-number">3.2.5.</span> <span class="nav-text">如何处理日志不一致</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E6%80%A7%E5%8F%8A%E6%AD%A3%E7%A1%AE%E6%80%A7"><span class="nav-number">4.</span> <span class="nav-text">安全性及正确性</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E9%80%89%E4%B8%BE%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">4.1.</span> <span class="nav-text">对选举的限制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E6%8F%90%E4%BA%A4%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">4.2.</span> <span class="nav-text">对提交的限制</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4%E4%B8%8E%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">5.</span> <span class="nav-text">集群成员变更与日志压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4"><span class="nav-number">5.1.</span> <span class="nav-text">集群成员变更</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.1.</span> <span class="nav-text">直接切换集群成员配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A4%E9%98%B6%E6%AE%B5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.2.</span> <span class="nav-text">两阶段切换集群成员配置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">5.2.</span> <span class="nav-text">日志压缩</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">6.</span> <span class="nav-text">线性一致性与读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%EF%BC%9F"><span class="nav-number">6.1.</span> <span class="nav-text">什么是线性一致性？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E8%AF%BB"><span class="nav-number">6.2.</span> <span class="nav-text">Raft 线性一致性读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%BB%8E%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">6.2.1.</span> <span class="nav-text">写主读从缺陷分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%B8%BB%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">6.2.2.</span> <span class="nav-text">写主读主缺陷分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Raft-Log-Read"><span class="nav-number">6.2.3.</span> <span class="nav-text">Raft Log Read</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">6.3.</span> <span class="nav-text">Raft 读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Read-Index"><span class="nav-number">6.3.1.</span> <span class="nav-text">Read Index</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Lease-Read"><span class="nav-number">6.3.2.</span> <span class="nav-text">Lease Read</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Follower-Read"><span class="nav-number">6.3.3.</span> <span class="nav-text">Follower Read</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Raft-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">1.</span> <span class="nav-text">Raft 基本概念</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%89%E4%B8%BB"><span class="nav-number">2.</span> <span class="nav-text">选主</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E9%80%89%E4%B8%BB"><span class="nav-number">2.1.</span> <span class="nav-text">什么是选主</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%BF%9B%E8%A1%8C%E9%80%89%E4%B8%BB%EF%BC%9F"><span class="nav-number">2.2.</span> <span class="nav-text">Raft 为什么要进行选主？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E9%80%89%E4%B8%BB%E8%BF%87%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">Raft 选主过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8A%82%E7%82%B9%E8%A7%92%E8%89%B2"><span class="nav-number">2.3.1.</span> <span class="nav-text">节点角色</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E6%9C%9F"><span class="nav-number">2.3.2.</span> <span class="nav-text">任期</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8A%82%E7%82%B9%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2"><span class="nav-number">2.3.3.</span> <span class="nav-text">节点状态转换</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6"><span class="nav-number">3.</span> <span class="nav-text">日志复制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6"><span class="nav-number">3.1.</span> <span class="nav-text">什么是日志复制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%9C%BA%E5%88%B6%E8%A7%A3%E6%9E%90"><span class="nav-number">3.2.</span> <span class="nav-text">Raft 日志复制机制解析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90"><span class="nav-number">3.2.1.</span> <span class="nav-text">整体流程解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%B5%81%E7%A8%8B%E5%9B%BE%E8%A7%A3"><span class="nav-number">3.2.2.</span> <span class="nav-text">日志复制流程图解</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Network-Partition%E6%83%85%E5%86%B5%E4%B8%8B%E8%BF%9B%E8%A1%8C%E5%A4%8D%E5%88%B6%E6%97%A5%E5%BF%97"><span class="nav-number">3.2.3.</span> <span class="nav-text">Network Partition情况下进行复制日志</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E6%97%A5%E5%BF%97%E4%B8%80%E8%87%B4%E6%80%A7%E7%9A%84%E4%BF%9D%E8%AF%81"><span class="nav-number">3.2.4.</span> <span class="nav-text">对日志一致性的保证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%AF%E8%83%BD%E5%87%BA%E7%8E%B0%E7%9A%84%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4%E5%9C%BA%E6%99%AF"><span class="nav-number">3.2.5.</span> <span class="nav-text">可能出现的日志不一致场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4"><span class="nav-number">3.2.6.</span> <span class="nav-text">如何处理日志不一致</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E6%80%A7%E5%8F%8A%E6%AD%A3%E7%A1%AE%E6%80%A7"><span class="nav-number">4.</span> <span class="nav-text">安全性及正确性</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E9%80%89%E4%B8%BE%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">4.1.</span> <span class="nav-text">对选举的限制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E6%8F%90%E4%BA%A4%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">4.2.</span> <span class="nav-text">对提交的限制</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4%E4%B8%8E%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">5.</span> <span class="nav-text">集群成员变更与日志压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4"><span class="nav-number">5.1.</span> <span class="nav-text">集群成员变更</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.1.</span> <span class="nav-text">直接切换集群成员配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%A4%E9%98%B6%E6%AE%B5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.2.</span> <span class="nav-text">两阶段切换集群成员配置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">5.2.</span> <span class="nav-text">日志压缩</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">6.</span> <span class="nav-text">线性一致性与读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%EF%BC%9F"><span class="nav-number">6.1.</span> <span class="nav-text">什么是线性一致性？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E8%AF%BB"><span class="nav-number">6.2.</span> <span class="nav-text">Raft 线性一致性读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%BB%8E%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">6.2.1.</span> <span class="nav-text">写主读从缺陷分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%B8%BB%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">6.2.2.</span> <span class="nav-text">写主读主缺陷分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Raft-Log-Read"><span class="nav-number">6.2.3.</span> <span class="nav-text">Raft Log Read</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Raft-%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">6.3.</span> <span class="nav-text">Raft 读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Read-Index"><span class="nav-number">6.3.1.</span> <span class="nav-text">Read Index</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Lease-Read"><span class="nav-number">6.3.2.</span> <span class="nav-text">Lease Read</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Follower-Read"><span class="nav-number">6.3.3.</span> <span class="nav-text">Follower Read</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -678,7 +722,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">63</span>
+          <span class="site-state-item-count">65</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -691,7 +735,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">207</span>
+        <span class="site-state-item-count">210</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
