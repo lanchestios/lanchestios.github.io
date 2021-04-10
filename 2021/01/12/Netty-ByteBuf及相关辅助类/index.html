@@ -28,11 +28,11 @@
 <meta property="og:site_name" content="Lache&#39;s Blog">
 <meta property="og:description" content="ByteBuf 是对 JDK 提供的 java.nio.ByteBuffer 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Buffer继承关系.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBuf继承关系.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufHolder继承关系.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator继承关系.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator主要API.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png">
 <meta property="article:published_time" content="2021-01-12T10:28:05.000Z">
 <meta property="article:modified_time" content="2021-01-15T01:42:34.000Z">
 <meta property="article:author" content="lanchestios">
@@ -44,7 +44,7 @@
 <meta property="article:tag" content="PooledByteBuf">
 <meta property="article:tag" content="ByteBuf辅助类">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.github.io/images/Netty/Buffer继承关系.png">
+<meta name="twitter:image" content="http://lanchestios.github.io/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
 
 <link rel="canonical" href="http://lanchestios.github.io/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
 
@@ -257,8 +257,9 @@
       
         <p>ByteBuf 是对 JDK 提供的 <code>java.nio.ByteBuffer</code> 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。</p>
 <a id="more"></a>
+
 <h1 id="ByteBuf功能说明"><a href="#ByteBuf功能说明" class="headerlink" title="ByteBuf功能说明"></a>ByteBuf功能说明</h1><p>在处理数据传输过程中，需要用到 JDK NIO 类库提供的<code>java.nio.Buffer</code>，它的实现如下图</p>
-<p><img src="/images/Netty/Buffer继承关系.png" alt=""></p>
+<p><img src="/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
 <p>但对于 NIO 编程来说，ByteBuffer完全可以满足处理数据的需要，但是由于NIO编程的复杂性， ByteBuffer 也有其局限性，它的主要缺点如下：</p>
 <ol>
 <li>ByteBuffer 长度固定，一旦分配完成，它的容量不能动态扩展和收缩，当需要编码的 POJO 对象大于 ByteBuffer 的容量时，会发生索引越界异常</li>
@@ -291,7 +292,7 @@
 <p>You can process I/O streams by refering it to ByteBufInputStream and ByteBufOutputStream </p>
 <h3 id="Increase-capacity-dynamically"><a href="#Increase-capacity-dynamically" class="headerlink" title="Increase capacity dynamically"></a>Increase capacity dynamically</h3><p>Netty encapsulate the operation of writing which is supported by java.nio package. Before executing base implementation of writing operation, it always check the capacity of current buffer and extend it if necessary.</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> ByteBuf <span class="title">ensureWritable</span><span class="params">(<span class="keyword">int</span> minWritableBytes)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (minWritableBytes &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(String.format(</span><br><span class="line">                <span class="string">&quot;minWritableBytes: %d (expected: &gt;= 0)&quot;</span>, minWritableBytes));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (minWritableBytes &lt;= writableBytes()) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (minWritableBytes &gt; maxCapacity - writerIndex) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> IndexOutOfBoundsException(String.format(</span><br><span class="line">                <span class="string">&quot;writerIndex(%d) + minWritableBytes(%d) exceeds maxCapacity(%d): %s&quot;</span>,</span><br><span class="line">                writerIndex, minWritableBytes, maxCapacity, <span class="keyword">this</span>));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Normalize the current capacity to the power of 2.</span></span><br><span class="line">    <span class="keyword">int</span> newCapacity = calculateNewCapacity(writerIndex + minWritableBytes);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Adjust to the new capacity.</span></span><br><span class="line">    capacity(newCapacity);</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h1 id="ByteBuf源码分析"><a href="#ByteBuf源码分析" class="headerlink" title="ByteBuf源码分析"></a>ByteBuf源码分析</h1><h2 id="ByteBuf主要类继承关系"><a href="#ByteBuf主要类继承关系" class="headerlink" title="ByteBuf主要类继承关系"></a>ByteBuf主要类继承关系</h2><p><img src="/images/Netty/ByteBuf继承关系.png" alt=""></p>
+<h1 id="ByteBuf源码分析"><a href="#ByteBuf源码分析" class="headerlink" title="ByteBuf源码分析"></a>ByteBuf源码分析</h1><h2 id="ByteBuf主要类继承关系"><a href="#ByteBuf主要类继承关系" class="headerlink" title="ByteBuf主要类继承关系"></a>ByteBuf主要类继承关系</h2><p><img src="/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
 <p>从内存分配的角度看，ByteBuf 可以分为两类。</p>
 <ol>
 <li>堆内存（ HeapByteBuf ）字节缓冲区：特点是内存的分配和回收速度快，可以被JVM自动回收；缺点就是如果进行 Socket 的 I/O读写，需要额外做一次内存复制，将堆内存对应的缓冲区复制到内核 Channel 中，性能会有一定程度的下降。<strong>一般在后端业务消息的编解码模块</strong></li>
@@ -318,7 +319,7 @@
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">int</span> <span class="title">calculateNewCapacity</span><span class="params">(<span class="keyword">int</span> minNewCapacity)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> maxCapacity = <span class="keyword">this</span>.maxCapacity;</span><br><span class="line">    <span class="keyword">final</span> <span class="keyword">int</span> threshold = <span class="number">1048576</span> * <span class="number">4</span>; <span class="comment">// 4 MiB page</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (minNewCapacity == threshold) &#123;</span><br><span class="line">        <span class="keyword">return</span> threshold;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// If over threshold, do not double but just increase by threshold.</span></span><br><span class="line">    <span class="keyword">if</span> (minNewCapacity &gt; threshold) &#123;</span><br><span class="line">        <span class="keyword">int</span> newCapacity = minNewCapacity / threshold * threshold;</span><br><span class="line">        <span class="keyword">if</span> (newCapacity &gt; maxCapacity - threshold) &#123;</span><br><span class="line">            newCapacity = maxCapacity;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            newCapacity += threshold;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> newCapacity;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Not over threshold. Double up to 4 MiB, starting from 64.</span></span><br><span class="line">    <span class="keyword">int</span> newCapacity = <span class="number">64</span>;</span><br><span class="line">    <span class="keyword">while</span> (newCapacity &lt; minNewCapacity) &#123;</span><br><span class="line">        newCapacity &lt;&lt;= <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> Math.min(newCapacity, maxCapacity);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>如果扩容后的新容量小于阈值，则以 64 为计数进行倍增，直到倍增后的结果大于或等于需要的容量值。</p>
 <p>采用倍增或者步进算法的原因如下：如果以 minNewCapacity 作为目标容量，则本次扩容后的可写字节数刚好够本次写入使用。写入完成后，它的可写字节数会变为0，下次做写入操作的时候，需要再次动态扩张。这样就会形成第一次动态扩张后，每次写入操作都会进行动态扩张，由于动态扩张需要进行内存复制，频繁的内存复制会导致性能下降。</p>
-<p>采用先倍增后步进的原因如下：当内存比较小的情况下，倍增操作并不会带来太多的内存浪费，例如 64字节 —&gt; 128字节 —&gt; 256字节，这样的内存扩张方式对于大多数应用系统是可以接受的。但是，当内存增长到一定阈值后，再进行倍增就可能会带来额外的内存浪费，例如 10MB，采用倍增后变为 20MB。但很有可能系统只需要 12MB，则扩张到 20MB 后会带来 8MB 的内存浪费。由于每个客户端连接都可能维护自己独立的接收和发送缓冲区，这样随着客户读的线性增长，内存浪费也会成比例地增加，因此，达到某个阈值后就需要以步进的方式对内存进行平滑的扩张。</p>
+<p>采用先倍增后步进的原因如下：当内存比较小的情况下，倍增操作并不会带来太多的内存浪费，例如 64字节 –&gt; 128字节 –&gt; 256字节，这样的内存扩张方式对于大多数应用系统是可以接受的。但是，当内存增长到一定阈值后，再进行倍增就可能会带来额外的内存浪费，例如 10MB，采用倍增后变为 20MB。但很有可能系统只需要 12MB，则扩张到 20MB 后会带来 8MB 的内存浪费。由于每个客户端连接都可能维护自己独立的接收和发送缓冲区，这样随着客户读的线性增长，内存浪费也会成比例地增加，因此，达到某个阈值后就需要以步进的方式对内存进行平滑的扩张。</p>
 <p>这个阈值是个经验值，不同的应用场景，这个值可能不同，此处， ByteBuf 取值为4MB。</p>
 <p>重新计算完动态扩张后的目标容量后，需要重新创建个新的缓冲区，将原缓冲区的内容复制到新创建的 ByteBuf 中，最后设置读写索引和 mark 标签等。由于不同的子类会对应不同的复制操作，所以该方法依然是个抽象方法，由子类负责实现。</p>
 <h3 id="操作索引"><a href="#操作索引" class="headerlink" title="操作索引"></a>操作索引</h3><p>直接设置索引值即可，如同使用 setter 方法</p>
@@ -358,12 +359,12 @@
 <h2 id="ByteBuf辅助类介绍"><a href="#ByteBuf辅助类介绍" class="headerlink" title="ByteBuf辅助类介绍"></a>ByteBuf辅助类介绍</h2><h3 id="ByteBufHolder"><a href="#ByteBufHolder" class="headerlink" title="ByteBufHolder"></a>ByteBufHolder</h3><p>ByteBufHolder 是 ByteBuf 的容器，在 Netty 中，它非常有用。例如 HTTP 协议的请求消息和应答消息都可以携带消息体，这个消息体在 NIO ByteBuffer 中就是个 ByteBuffer 对象，在 Netty 中就是 ByteBuf 对象。由于不同的协议消息体可以包含不同的协议字段和功能，因此，需要对 ByteBuf 进行包装和抽象，不同的子类可以有不同的实现。</p>
 <p>为了满足这些定制化的需求，Netty 抽象出了 ByteBufHolder 对象，它包含了一个 ByteBuf，另外还提供了一些其他实用的方法，使用者继承 ByteBufHolder 接口后可以按需封装自己的实现。</p>
 <p>下图是相关类库的继承关系（部分）</p>
-<p><img src="/images/Netty/ByteBufHolder继承关系.png" alt=""></p>
+<p><img src="/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
 <h3 id="ByteBufAllocator"><a href="#ByteBufAllocator" class="headerlink" title="ByteBufAllocator"></a>ByteBufAllocator</h3><p>ByteBufAllocator 是字节缓冲区分配器，按照 Netty 的缓冲区实现不同，共有两种不同的分配器：基于内存池的字节缓冲区分配器和普通的字节缓冲区分配器。</p>
 <p>下图为ByteBufAllocator的继承关系</p>
-<p><img src="/images/Netty/ByteBufAllocator继承关系.png" alt=""></p>
+<p><img src="/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
 <p>下图为ByteBufAllocator主要API</p>
-<p><img src="/images/Netty/ByteBufAllocator主要API.png" alt=""></p>
+<p><img src="/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png"></p>
 <h3 id="CompositeByteBuf"><a href="#CompositeByteBuf" class="headerlink" title="CompositeByteBuf"></a>CompositeByteBuf</h3><p>CompositeByteBuf 允许将多个 ByteBuf 的实例组装到一起，形成一个统一的视图，有点类似于数据库将多个表的字段组装到一起统一用视图展示。</p>
 <p>CompositeByteBuf在一些场景下非常有用，例如某个协议 POJO 对象包含两部分；消息头和消息体，它们都是 ByteBuf 对象。当需要对消息进行编码的时候需要进行整合，如果使用 JDK 的默认能力，有以下两种方式</p>
 <ol>
@@ -491,13 +492,13 @@
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">217</span>
+        <span class="site-state-item-count">216</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

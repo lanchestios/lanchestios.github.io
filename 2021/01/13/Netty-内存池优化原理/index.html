@@ -29,10 +29,10 @@
 <meta property="og:description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://lanchestios.github.io/images/Netty/MemoryMap.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty内存池内存分配过程.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Netty/Subpage.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Netty/ChunkList.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty内存池内存的类别.png">
+<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
 <meta property="og:image" content="http://lanchestios.github.io/images/Netty/ChunkListGroup.png">
 <meta property="article:published_time" content="2021-01-13T03:00:00.000Z">
 <meta property="article:modified_time" content="2021-01-15T01:32:20.000Z">
@@ -257,10 +257,11 @@
       
         <p>为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。</p>
 <a id="more"></a>
+
 <h1 id="PoolChunk内存分配"><a href="#PoolChunk内存分配" class="headerlink" title="PoolChunk内存分配"></a>PoolChunk内存分配</h1><h2 id="模拟内存数据结构"><a href="#模拟内存数据结构" class="headerlink" title="模拟内存数据结构"></a>模拟内存数据结构</h2><p>为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//memoryMap初始化</span></span><br><span class="line">memoryMap = <span class="keyword">new</span> <span class="keyword">byte</span>[maxSubpageAllocs &lt;&lt; <span class="number">1</span>];</span><br><span class="line">depthMap = <span class="keyword">new</span> <span class="keyword">byte</span>[memoryMap.length];</span><br><span class="line"><span class="keyword">int</span> memoryMapIndex = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">int</span> d = <span class="number">0</span>; d &lt;= maxOrder; ++ d) &#123; <span class="comment">// move down the tree one level at a time</span></span><br><span class="line">    <span class="keyword">int</span> depth = <span class="number">1</span> &lt;&lt; d;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> p = <span class="number">0</span>; p &lt; depth; ++ p) &#123;</span><br><span class="line">        <span class="comment">// in each level traverse left to right and set value to the depth of subtree</span></span><br><span class="line">        memoryMap[memoryMapIndex] = (<span class="keyword">byte</span>) d;</span><br><span class="line">        depthMap[memoryMapIndex] = (<span class="keyword">byte</span>) d;</span><br><span class="line">        memoryMapIndex ++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>下图是 MemoryMap 的抽象表示</p>
-<p><img src="/images/Netty/MemoryMap.png" alt=""></p>
+<p><img src="/images/Netty/MemoryMap.png"></p>
 <p>PoolChunk 默认由 2048 个 Page 组成，一个 Page 默认大小为 8k，图中树节点的值为在数组 memoryMap 的下标。</p>
 <h2 id="分配内存"><a href="#分配内存" class="headerlink" title="分配内存"></a>分配内存</h2><p><strong>向PoolChunk分配内存</strong></p>
 <p>PoolChunk 内部会保证每次分配内存大小为<code>8K*(2^n)</code>，为了分配一个大小为<code>chunkSize/(2^k)</code>的节点，需要在深度为 k 的层从左开始匹配节点，下面是申请内存的大概流程：</p>
@@ -271,11 +272,11 @@
 </ol>
 <p>需要说明的是，寻找合适内存的行为是基于深度优先算法的，但是对子节点的选取上是采用的随机选取，而不是常用的依次遍历。</p>
 <p><strong>申请后更新节点层级</strong></p>
-<p><img src="/images/Netty/Netty内存池内存分配过程.png" alt=""></p>
+<p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png"></p>
 <h2 id="释放内存"><a href="#释放内存" class="headerlink" title="释放内存"></a>释放内存</h2><p>也就是释放相应资源并且根据申请内存过程的原理对节点及其父节点值进行更新。</p>
 <h2 id="对节点状态的维护"><a href="#对节点状态的维护" class="headerlink" title="对节点状态的维护"></a>对节点状态的维护</h2><p>无论是 Chunk 还是 Page，都通过状态位来标识内存是否可用，不同之处是 Chunk 通过在二叉树上对节点进行标识实现，Page 是通过维护块的使用状态标识来实现。</p>
 <h1 id="PoolSubPage内存分配"><a href="#PoolSubPage内存分配" class="headerlink" title="PoolSubPage内存分配"></a>PoolSubPage内存分配</h1><p>在 PoolChunk 中支持分配一块大于 pageSize 的内存，但在实际应用中，存在很多分配小内存的情况，如果也占用一个 page，明显很浪费。针对这种情况，Netty 提供了 PoolSubpage 把 PoolChunk 的一个 page 节点 8k 内存划分成更小的内存段，通过对每个内存段的标记与清理标记进行内存的分配与释放。</p>
-<p><img src="/images/Netty/Subpage.png" alt=""></p>
+<p><img src="/images/Netty/Subpage.png"></p>
 <p>Page 中存储区域的使用状态通过一个 long 数组来维护，数组中每个 long 的每一位表示一个块存储区域的占用情况：0 表示未占用，1 表示以占用。对于一个 4 字节的 Page 来说，如果这个 Page 用来分配 1 个字节的存储区域，那么 long 数组中就只有一个 long 类型的元素，这个数值的低 4 位用来指示各个存储区域的占用情况。对于一个 128 字节的 Page 来说，如果这个 Page 也是用来分配 1 个字节的存储区域，那么 long 数组中就会包含 2 个元素，总共 128 位，每一位代表一个区域的占用情况。</p>
 <h2 id="申请Subpage空间"><a href="#申请Subpage空间" class="headerlink" title="申请Subpage空间"></a>申请Subpage空间</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">PoolSubpage</span>&lt;<span class="title">T</span>&gt; </span>&#123;</span><br><span class="line">    <span class="comment">// 当前page在chunk中的id</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> memoryMapIdx; </span><br><span class="line">    <span class="comment">// 当前page在chunk.memory的偏移量</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> runOffset;    </span><br><span class="line">    <span class="comment">// page大小</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> pageSize;</span><br><span class="line">    <span class="comment">//通过对每一个二进制位的标记来修改一段内存的占用状态</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">long</span>[] bitmap; </span><br><span class="line">    </span><br><span class="line">    PoolSubpage&lt;T&gt; prev;     </span><br><span class="line">    PoolSubpage&lt;T&gt; next;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">boolean</span> doNotDestroy;    </span><br><span class="line">    <span class="comment">// 该page切分后每一段的大小</span></span><br><span class="line">    <span class="keyword">int</span> elemSize;   </span><br><span class="line">    <span class="comment">// 该page包含的段数量</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">int</span> maxNumElems;        </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">int</span> bitmapLength;</span><br><span class="line">    <span class="comment">// 下一个可用的位置</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">int</span> nextAvail;</span><br><span class="line">    <span class="comment">// 可用的段数量</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">int</span> numAvail;       </span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>假设目前需要申请大小为4096的内存：</p>
@@ -292,7 +293,7 @@
 <h1 id="PoolChunkList内存管理"><a href="#PoolChunkList内存管理" class="headerlink" title="PoolChunkList内存管理"></a>PoolChunkList内存管理</h1><p>PoolChunkList 负责管理多个 chunk 的生命周期，在此基础上对内存分配进行进一步的优化。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">PoolChunkList</span>&lt;<span class="title">T</span>&gt; <span class="keyword">implements</span> <span class="title">PoolChunkListMetric</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> PoolArena&lt;T&gt; arena;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> PoolChunkList&lt;T&gt; nextList;</span><br><span class="line">    PoolChunkList&lt;T&gt; prevList;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> minUsage;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> maxUsage;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> PoolChunk&lt;T&gt; head;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>每个 PoolChunkList 实例维护了一个 PoolChunk 链表，自身也形成一个链表，为何要这么实现？</p>
-<p><img src="/images/Netty/ChunkList.png" alt=""></p>
+<p><img src="/images/Netty/ChunkList.png"></p>
 <p>随着 chunk 中 page 的不断分配和释放，会导致很多碎片内存段，大大增加了之后分配一段连续内存的失败率，针对这种情况，可以把内存使用率超过 maxUsage 的 chunk 移动到下一个 PoolChunkList 链表</p>
 <figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">boolean <span class="title">allocate</span>(<span class="params">PooledByteBuf&lt;T&gt; buf, <span class="built_in">int</span> reqCapacity, <span class="built_in">int</span> normCapacity</span>)</span> &#123;</span><br><span class="line">    <span class="keyword">if</span> (head == <span class="literal">null</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (PoolChunk&lt;T&gt; cur = head;;) &#123;</span><br><span class="line">        <span class="built_in">long</span> handle = cur.allocate(normCapacity);</span><br><span class="line">        <span class="keyword">if</span> (handle &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            cur = cur.next;</span><br><span class="line">            <span class="keyword">if</span> (cur == <span class="literal">null</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            cur.initBuf(buf, handle, reqCapacity);</span><br><span class="line">            <span class="keyword">if</span> (cur.usage() &gt;= maxUsage) &#123;</span><br><span class="line">                <span class="keyword">remove</span>(cur);</span><br><span class="line">                nextList.<span class="keyword">add</span>(cur);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>但是，随着 chunk 中内存的释放，其内存使用率也会随着下降，当下降到 minUsage 时，该 chunk 会移动到前一个列表中</p>
@@ -305,7 +306,7 @@
 <p>应用层的内存分配主要通过如下实现，但最终还是委托给 PoolArena 实现。</p>
 <figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="selector-tag">PooledByteBufAllocator</span><span class="selector-class">.DEFAULT</span><span class="selector-class">.directBuffer</span>(128);</span><br></pre></td></tr></table></figure>
 <p>由于 Netty 通常应用于高并发系统，不可避免的有多线程进行同时内存分配，可能会极大的影响内存分配的效率，为了缓解线程竞争，可以通过创建多个 PoolArena 细化锁的粒度，提高并发执行的效率。</p>
-<h2 id="PoolArena-的内部结构"><a href="#PoolArena-的内部结构" class="headerlink" title="PoolArena 的内部结构"></a>PoolArena 的内部结构</h2><p><img src="/images/Netty/Netty内存池内存的类别.png" alt=""></p>
+<h2 id="PoolArena-的内部结构"><a href="#PoolArena-的内部结构" class="headerlink" title="PoolArena 的内部结构"></a>PoolArena 的内部结构</h2><p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png"></p>
 <p>poolArena提供了两种方式进行内存分配</p>
 <ol>
 <li><p>PoolSubpage用于分配小于8k的内存</p>
@@ -321,7 +322,7 @@
 <li><p>poolChunkList用于分配大于8k的内存</p>
 </li>
 </ol>
-<p><img src="/images/Netty/ChunkListGroup.png" alt=""></p>
+<p><img src="/images/Netty/ChunkListGroup.png"></p>
 <blockquote>
 <p><strong>注意</strong></p>
 <ol>
@@ -448,13 +449,13 @@
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">217</span>
+        <span class="site-state-item-count">216</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
