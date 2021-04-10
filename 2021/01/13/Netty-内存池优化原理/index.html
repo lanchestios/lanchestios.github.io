@@ -18,25 +18,25 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"lanchestios.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"elijahte.gitee.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Netty 内存池优化原理">
-<meta property="og:url" content="http://lanchestios.github.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/index.html">
-<meta property="og:site_name" content="Lache&#39;s Blog">
+<meta property="og:url" content="http://elijahte.gitee.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/index.html">
+<meta property="og:site_name" content="Elijah&#39;s Blog">
 <meta property="og:description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/MemoryMap.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Subpage.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ChunkList.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
-<meta property="og:image" content="http://lanchestios.github.io/images/Netty/ChunkListGroup.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/MemoryMap.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/Subpage.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/ChunkList.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/ChunkListGroup.png">
 <meta property="article:published_time" content="2021-01-13T03:00:00.000Z">
 <meta property="article:modified_time" content="2021-01-15T01:32:20.000Z">
-<meta property="article:author" content="lanchestios">
+<meta property="article:author" content="Elijah">
 <meta property="article:tag" content="Netty">
 <meta property="article:tag" content="Memory Pool">
 <meta property="article:tag" content="PoolChunk">
@@ -44,9 +44,9 @@
 <meta property="article:tag" content="PoolChunkList">
 <meta property="article:tag" content="PoolArena">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://lanchestios.github.io/images/Netty/MemoryMap.png">
+<meta name="twitter:image" content="http://elijahte.gitee.io/images/Netty/MemoryMap.png">
 
-<link rel="canonical" href="http://lanchestios.github.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
+<link rel="canonical" href="http://elijahte.gitee.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
 
 
 <script id="page-configurations">
@@ -59,7 +59,7 @@
   };
 </script>
 
-  <title>Netty 内存池优化原理 | Lache's Blog</title>
+  <title>Netty 内存池优化原理 | Elijah's Blog</title>
   
 
 
@@ -110,7 +110,7 @@
 
     <a href="/" class="brand" rel="start">
       <span class="logo-line-before"><i></i></span>
-      <h1 class="site-title">Lache's Blog</h1>
+      <h1 class="site-title">Elijah's Blog</h1>
       <span class="logo-line-after"><i></i></span>
     </a>
   </div>
@@ -202,16 +202,16 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://lanchestios.github.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
+    <link itemprop="mainEntityOfPage" href="http://elijahte.gitee.io/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="lanchestios">
+      <meta itemprop="name" content="Elijah">
       <meta itemprop="description" content="Leave a trace">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lache's Blog">
+      <meta itemprop="name" content="Elijah's Blog">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
@@ -434,7 +434,7 @@
 
       <div class="site-overview-wrap sidebar-panel">
         <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">lanchestios</p>
+  <p class="site-author-name" itemprop="name">Elijah</p>
   <div class="site-description" itemprop="description">Leave a trace</div>
 </div>
 <div class="site-state-wrap motion-element">
@@ -486,7 +486,7 @@
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
-  <span class="author" itemprop="copyrightHolder">lanchestios</span>
+  <span class="author" itemprop="copyrightHolder">Elijah</span>
 </div>
   <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
   </div>
