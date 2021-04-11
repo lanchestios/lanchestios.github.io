@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"elijahte.gitee.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="ProtoBuf 作为一种跨平台、语言无关、可扩展的序列化结构数据的方法，已广泛应用于网络数据交换及存储。随着互联网的发展，系统的异构性会愈发突出，跨语言的需求会愈加明显，同时 gRPC 也大有取代 Restful 之势，而 ProtoBuf 作为 gRPC 跨语言、高性能的法宝，我们技术人有必要深入理解 ProtoBuf 原理，为以后的技术更新和选型打下基础。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RPC ProtoBuf">
+<meta property="og:url" content="http://elijahte.gitee.io/2021/04/11/Rpc-Protobuf/index.html">
+<meta property="og:site_name" content="Elijah&#39;s Blog">
+<meta property="og:description" content="ProtoBuf 作为一种跨平台、语言无关、可扩展的序列化结构数据的方法，已广泛应用于网络数据交换及存储。随着互联网的发展，系统的异构性会愈发突出，跨语言的需求会愈加明显，同时 gRPC 也大有取代 Restful 之势，而 ProtoBuf 作为 gRPC 跨语言、高性能的法宝，我们技术人有必要深入理解 ProtoBuf 原理，为以后的技术更新和选型打下基础。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://elijahte.gitee.io/images/Netty/%E4%B8%89%E7%A7%8D%E7%BC%96%E8%A7%A3%E7%A0%81%E6%96%B9%E5%BC%8F%E6%AF%94%E8%BE%83.png">
+<meta property="article:published_time" content="2021-04-11T13:39:00.000Z">
+<meta property="article:modified_time" content="2021-04-11T13:39:46.219Z">
+<meta property="article:author" content="Elijah">
+<meta property="article:tag" content="RPC">
+<meta property="article:tag" content="ProtoBuf">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://elijahte.gitee.io/images/Netty/%E4%B8%89%E7%A7%8D%E7%BC%96%E8%A7%A3%E7%A0%81%E6%96%B9%E5%BC%8F%E6%AF%94%E8%BE%83.png">
+
+<link rel="canonical" href="http://elijahte.gitee.io/2021/04/11/Rpc-Protobuf/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>RPC ProtoBuf | Elijah's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Elijah's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://elijahte.gitee.io/2021/04/11/Rpc-Protobuf/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Elijah">
+      <meta itemprop="description" content="Leave a trace">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Elijah's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RPC ProtoBuf
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2021-04-11 21:39:00 / Modified: 21:39:46" itemprop="dateCreated datePublished" datetime="2021-04-11T21:39:00+08:00">2021-04-11</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/RPC/" itemprop="url" rel="index"><span itemprop="name">RPC</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>ProtoBuf 作为一种跨平台、语言无关、可扩展的序列化结构数据的方法，已广泛应用于网络数据交换及存储。随着互联网的发展，系统的异构性会愈发突出，跨语言的需求会愈加明显，同时 gRPC 也大有取代 Restful 之势，而 ProtoBuf 作为 gRPC 跨语言、高性能的法宝，我们技术人有必要深入理解 ProtoBuf 原理，为以后的技术更新和选型打下基础。</p>
+<a id="more"></a>
+
+<h1 id="序列化框架"><a href="#序列化框架" class="headerlink" title="序列化框架"></a>序列化框架</h1><h2 id="如何评价"><a href="#如何评价" class="headerlink" title="如何评价"></a>如何评价</h2><p>我们评判一个编解码框架的优劣时，往往会考虑以下几个因素。</p>
+<ul>
+<li>是否支持跨语言，支持的语言种类是否丰富</li>
+<li>编码后的码流大小编解码的性能</li>
+<li>类库是否小巧，API使用是否方便</li>
+<li>使用者需要手工开发的工作量和难度</li>
+</ul>
+<h2 id="Java序列化的缺点"><a href="#Java序列化的缺点" class="headerlink" title="Java序列化的缺点"></a>Java序列化的缺点</h2><p>基于 Java 提供的对象输入输出流 ObjectInputStream 和 ObjectOutputStream，实现了 Java 对象实例的编解码。但在 RPC 场景下，很少直接使用 Java 序列化进行消息的编解码和传输，主要因为以下这两个方面：</p>
+<ul>
+<li>无法跨语言</li>
+<li>序列化后码流太大</li>
+</ul>
+<h2 id="常用的序列化方式"><a href="#常用的序列化方式" class="headerlink" title="常用的序列化方式"></a>常用的序列化方式</h2><p>三种常用序列化方式优缺点，如下所示：</p>
+<p><img src="/images/Netty/%E4%B8%89%E7%A7%8D%E7%BC%96%E8%A7%A3%E7%A0%81%E6%96%B9%E5%BC%8F%E6%AF%94%E8%BE%83.png"></p>
+<p>首先我们来看下为什么不使用 XML，尽管 XML 的可读性和可扩展性非常好，也非常适合描述数据结构，但是 XML 解析的时间开销和 XML 为了可读性而牺牲的空间开销都非常大，因此不适合做高性能的通信协议。Protobuf 使用二进制编码，在空间和性能上具有更大的优势。</p>
+<p>Protobuf 另一个比较吸引人的地方就是它的数据描述文件和代码生成机制，利用数据描述文件对数据结构进行说明的优点如下：</p>
+<ul>
+<li>文本化的数据结构描述语言，可以实现语言和平台无关，特别适合异构系统间的集成</li>
+<li>通过标识字段的顺序，可以实现协议的前向兼容</li>
+<li>自动代码生成，不需要手工编写同样数据结构的不同语言版本</li>
+<li>方便后续的管理和维护。相比于代码，结构化的文档更容易管理和维护。</li>
+</ul>
+<h1 id="Google-Protobuf"><a href="#Google-Protobuf" class="headerlink" title="Google Protobuf"></a>Google Protobuf</h1><p>Protobuf 全称 Google Protocol Buffers，它将数据结构以<code>.proto</code>文件进行描述，通过代码生成工具可以生成对应数据结构的 POJO 对象和 Protobuf 相关的方法和属性。</p>
+<blockquote>
+<p>官方文档见 <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/">Protocol Buffers Introduction</a></p>
+<p>API 文档见 <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/reference/java">Protocol Buffers API Documents</a></p>
+</blockquote>
+<h2 id="数据类型"><a href="#数据类型" class="headerlink" title="数据类型"></a>数据类型</h2><h3 id="基本数据类型"><a href="#基本数据类型" class="headerlink" title="基本数据类型"></a>基本数据类型</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//采用proto3的语法</span></span><br><span class="line">syntax = <span class="string">&quot;proto3&quot;</span>;</span><br><span class="line"><span class="comment">//结构体</span></span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">SearchRequest</span> </span>&#123;</span><br><span class="line">  <span class="built_in">string</span> query = <span class="number">1</span>;</span><br><span class="line">  <span class="built_in">int32</span> page_number = <span class="number">2</span>;</span><br><span class="line">  <span class="built_in">int32</span> result_per_page = <span class="number">3</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>下表为 protobuf 支持的基本数据类型</p>
+<table>
+<thead>
+<tr>
+<th align="left">.proto Type</th>
+<th align="left">Notes</th>
+<th align="left">C++ Type</th>
+<th align="left">Java Type</th>
+<th align="left">Go Type</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">double</td>
+<td align="left"></td>
+<td align="left">double</td>
+<td align="left">double</td>
+<td align="left">float64</td>
+</tr>
+<tr>
+<td align="left">float</td>
+<td align="left"></td>
+<td align="left">float</td>
+<td align="left">float</td>
+<td align="left">float32</td>
+</tr>
+<tr>
+<td align="left">int32</td>
+<td align="left">Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead.</td>
+<td align="left">int32</td>
+<td align="left">int</td>
+<td align="left">int32</td>
+</tr>
+<tr>
+<td align="left">int64</td>
+<td align="left">Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead.</td>
+<td align="left">int64</td>
+<td align="left">long</td>
+<td align="left">int64</td>
+</tr>
+<tr>
+<td align="left">uint32</td>
+<td align="left">Uses variable-length encoding.</td>
+<td align="left">uint32</td>
+<td align="left">int[1]</td>
+<td align="left">uint32</td>
+</tr>
+<tr>
+<td align="left">uint64</td>
+<td align="left">Uses variable-length encoding.</td>
+<td align="left">uint64</td>
+<td align="left">long[1]</td>
+<td align="left">uint64</td>
+</tr>
+<tr>
+<td align="left">sint32</td>
+<td align="left">Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s.</td>
+<td align="left">int32</td>
+<td align="left">int</td>
+<td align="left">int32</td>
+</tr>
+<tr>
+<td align="left">sint64</td>
+<td align="left">Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s.</td>
+<td align="left">int64</td>
+<td align="left">long</td>
+<td align="left">int64</td>
+</tr>
+<tr>
+<td align="left">fixed32</td>
+<td align="left">Always four bytes. More efficient than uint32 if values are often greater than 228.</td>
+<td align="left">uint32</td>
+<td align="left">int[1]</td>
+<td align="left">uint32</td>
+</tr>
+<tr>
+<td align="left">fixed64</td>
+<td align="left">Always eight bytes. More efficient than uint64 if values are often greater than 256.</td>
+<td align="left">uint64</td>
+<td align="left">long[1]</td>
+<td align="left">uint64</td>
+</tr>
+<tr>
+<td align="left">sfixed32</td>
+<td align="left">Always four bytes.</td>
+<td align="left">int32</td>
+<td align="left">int</td>
+<td align="left">int32</td>
+</tr>
+<tr>
+<td align="left">sfixed64</td>
+<td align="left">Always eight bytes.</td>
+<td align="left">int64</td>
+<td align="left">long</td>
+<td align="left">int64</td>
+</tr>
+<tr>
+<td align="left">bool</td>
+<td align="left"></td>
+<td align="left">bool</td>
+<td align="left">boolean</td>
+<td align="left">bool</td>
+</tr>
+<tr>
+<td align="left">string</td>
+<td align="left">A string must always contain UTF-8 encoded or 7-bit ASCII text, and cannot be longer than 232.</td>
+<td align="left">string</td>
+<td align="left">String</td>
+<td align="left">string</td>
+</tr>
+<tr>
+<td align="left">bytes</td>
+<td align="left">May contain any arbitrary sequence of bytes no longer than 232.</td>
+<td align="left">string</td>
+<td align="left">ByteString</td>
+<td align="left">[]byte</td>
+</tr>
+</tbody></table>
+<h3 id="枚举类型"><a href="#枚举类型" class="headerlink" title="枚举类型"></a>枚举类型</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">SearchRequest</span> </span>&#123;</span><br><span class="line">  <span class="built_in">string</span> query = <span class="number">1</span>;</span><br><span class="line">  <span class="built_in">int32</span> page_number = <span class="number">2</span>;</span><br><span class="line">  <span class="built_in">int32</span> result_per_page = <span class="number">3</span>;</span><br><span class="line">  </span><br><span class="line">  <span class="class"><span class="keyword">enum</span> <span class="title">Corpus</span> </span>&#123;</span><br><span class="line">  	<span class="comment">//Enum&#x27;s first constant must map to zero, </span></span><br><span class="line">  	<span class="comment">//so that we can use 0 as a numeric default value.</span></span><br><span class="line">    UNIVERSAL = <span class="number">0</span>;</span><br><span class="line">    WEB = <span class="number">1</span>;</span><br><span class="line">    IMAGES = <span class="number">2</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  Corpus corpus = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>注：定义在其他 message 中的 Enumerator 可通过<code>_MessageType_._EnumType_</code>访问。</p>
+</blockquote>
+<p><strong>配置项：allow_alias</strong></p>
+<p>通过配置<code>allow_alias = true</code>可以让不同的枚举项映射到同一个值。 </p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">MyMessage1</span> </span>&#123;</span><br><span class="line">  <span class="class"><span class="keyword">enum</span> <span class="title">EnumAllowingAlias</span> </span>&#123;</span><br><span class="line">    <span class="keyword">option</span> allow_alias = <span class="literal">true</span>;</span><br><span class="line">    UNKNOWN = <span class="number">0</span>;</span><br><span class="line">    STARTED = <span class="number">1</span>;</span><br><span class="line">    RUNNING = <span class="number">1</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">MyMessage2</span> </span>&#123;</span><br><span class="line">  <span class="class"><span class="keyword">enum</span> <span class="title">EnumNotAllowingAlias</span> </span>&#123;</span><br><span class="line">    UNKNOWN = <span class="number">0</span>;</span><br><span class="line">    STARTED = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// RUNNING = 1;  // Uncommenting this line will cause a compile error inside Google and a warning message outside.</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="字典类型"><a href="#字典类型" class="headerlink" title="字典类型"></a>字典类型</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">map&lt;key_type, value_type&gt; map_field = field_numbers;</span><br></pre></td></tr></table></figure>
+<p><code>key_type</code> 支持任何整型和字符串类型（即，排除 floating point types、enum and <code>bytes</code>）.<code>value_type</code> 支持除了 map 类型的任何类型。</p>
+<blockquote>
+<p>详细内容见 <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/proto3#maps">Maps</a></p>
+</blockquote>
+<blockquote>
+<p>向后兼容</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">MapFieldEntry</span> </span>&#123;</span><br><span class="line">  key_type key = <span class="number">1</span>;</span><br><span class="line">  value_type value = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">repeated</span> MapFieldEntry map_field = N;</span><br></pre></td></tr></table></figure>
+</blockquote>
+<h2 id="数据编码"><a href="#数据编码" class="headerlink" title="数据编码"></a>数据编码</h2><h3 id="Base-128-Varints"><a href="#Base-128-Varints" class="headerlink" title="Base 128 Varints"></a>Base 128 Varints</h3><p>Varints 即可变整型，根据提出的 msb 概念进行数据的切分。</p>
+<blockquote>
+<p>Varints are a method of serializing integers using one or more bytes. Smaller numbers take a smaller number of bytes.</p>
+<p>Each byte in a varint, except the last byte, has the <em>most significant bit</em> (msb) set – this indicates that there are further bytes to come. The lower 7 bits of each byte are used to store the two’s complement representation of the number in groups of 7 bits, <strong>least significant group first</strong>.</p>
+</blockquote>
+<p>例一：计算 <code>01</code> 的值</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">01 -&gt; 0000 0001</span><br><span class="line">   -&gt;  000 0001 (delete msb)</span><br><span class="line">   -&gt; (varint 1)</span><br></pre></td></tr></table></figure>
+<p>例二：计算 <code>9E A7 05</code> 的值</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">9E A7 05 -&gt; 1001 1110 (original 9E)  1010 0111 (original A7)  0000 0101 (original 05)</span><br><span class="line">         -&gt;  001 1110 (original 9E)   010 0111 (original A7)   000 0101 (original 05)</span><br><span class="line">         -&gt;       101 (original 05) + 010 0111 (original A7) + 001 1110 (original 9E)</span><br><span class="line">         -&gt; 101 010 0111 001 1110</span><br><span class="line">         -&gt; (varint 86942)</span><br></pre></td></tr></table></figure>
+<p>简单的来说，msb 为 0 是代表整个可变整型组的最后一个数据，而 msb 为 1 是代表整个可变整型组的第一或中间的数据。</p>
+<blockquote>
+<p>注：对于使用 msb 来分离数据的方式，计算过程其实有两种：</p>
+<p>一种是对当前数左移与之前结果进行或操作</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">result |= data[i] &lt;&lt; offset;</span><br><span class="line">offset += <span class="number">7</span>;</span><br></pre></td></tr></table></figure>
+
+<p>另一种是对当前结果左移与当前数进行或操作</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">result &lt;&lt;= offset;</span><br><span class="line">result |= data[i];</span><br></pre></td></tr></table></figure>
+
+<p>但是测试结果很神奇！居然是第二种方式计算效率高于第一种？难道 Protobuf 一顿编码猛如虎，实际操作 0-5 ？</p>
+</blockquote>
+<h3 id="Message-Structure"><a href="#Message-Structure" class="headerlink" title="Message Structure"></a>Message Structure</h3><p>message 中字段的编码结构为 <code>(field_number &lt;&lt; 3) | wire_type</code> <code>varint</code>。</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Request</span> </span>&#123;</span><br><span class="line">	<span class="comment">//int32 对应 wire_type</span></span><br><span class="line">	<span class="comment">//1 对应 field_number</span></span><br><span class="line">	<span class="comment">//该字段的值对应 varint</span></span><br><span class="line">	<span class="built_in">int32</span> id = <span class="number">1</span>;	</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The available wire types are as follows:</p>
+<table>
+<thead>
+<tr>
+<th align="left">Type</th>
+<th align="left">Meaning</th>
+<th align="left">Used For</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">0</td>
+<td align="left">Varint</td>
+<td align="left">int32, int64, uint32, uint64, sint32, sint64, bool, enum</td>
+</tr>
+<tr>
+<td align="left">1</td>
+<td align="left">64-bit</td>
+<td align="left">fixed64, sfixed64, double</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">Length-delimited</td>
+<td align="left">string, bytes, embedded messages, packed repeated fields</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">Start group</td>
+<td align="left">groups (deprecated)</td>
+</tr>
+<tr>
+<td align="left">4</td>
+<td align="left">End group</td>
+<td align="left">groups (deprecated)</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">32-bit</td>
+<td align="left">fixed32, sfixed32, float</td>
+</tr>
+</tbody></table>
+<h2 id="More-Value-Types"><a href="#More-Value-Types" class="headerlink" title="More Value Types"></a>More Value Types</h2><h3 id="Signed-Integers"><a href="#Signed-Integers" class="headerlink" title="Signed Integers"></a>Signed Integers</h3><p>我们需要了解 the signed int types (<code>sint32</code> and <code>sint64</code>) and the “standard” int types (<code>int32</code> and <code>int64</code>) 的区别。将负数编码时，如果使用 the standard int types，作为结果的变长整型将固定为 10 bytes 的长度。而如果使用 the signed int types，作为结果的变长整型将采用更高效的 ZigZag 编码。</p>
+<p>下表为 ZigZag 编码的示例及计算方式</p>
+<table>
+<thead>
+<tr>
+<th align="left">Signed Original</th>
+<th align="left">Encoded As</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">0</td>
+<td align="left">0</td>
+</tr>
+<tr>
+<td align="left">-1</td>
+<td align="left">1</td>
+</tr>
+<tr>
+<td align="left">1</td>
+<td align="left">2</td>
+</tr>
+<tr>
+<td align="left">-2</td>
+<td align="left">3</td>
+</tr>
+<tr>
+<td align="left">2147483647</td>
+<td align="left">4294967294</td>
+</tr>
+<tr>
+<td align="left">-2147483648</td>
+<td align="left">4294967295</td>
+</tr>
+</tbody></table>
+<p>在<code>sint32</code>中，ZigZag 编码计算方式为</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(n &lt;&lt; <span class="number">1</span>) ^ (n &gt;&gt; <span class="number">31</span>)</span><br></pre></td></tr></table></figure>
+<p>在<code>sint64</code>中，ZigZag 编码计算方式为</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(n &lt;&lt; <span class="number">1</span>) ^ (n &gt;&gt; <span class="number">63</span>)</span><br></pre></td></tr></table></figure>
+<h3 id="Strings"><a href="#Strings" class="headerlink" title="Strings"></a>Strings</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Test2</span> </span>&#123;</span><br><span class="line">  <span class="keyword">optional</span> <span class="built_in">string</span> b = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编码分析</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">12 07 [74 65 73 74 69 6e 67]</span><br><span class="line"></span><br><span class="line">0x12</span><br><span class="line">-&gt; 0001 0010  (binary representation)</span><br><span class="line">-&gt; 00010 010  (regroup bits)</span><br><span class="line">-&gt; field_number = 2, wire_type = 2</span><br><span class="line"></span><br><span class="line">0x07</span><br><span class="line">-&gt; 0000 0111</span><br><span class="line">-&gt; group_len = 7</span><br></pre></td></tr></table></figure>
+<p>其中，组中的数字为对应字符的 UTF-8 编码。</p>
+<h3 id="Embedded-Messages"><a href="#Embedded-Messages" class="headerlink" title="Embedded Messages"></a>Embedded Messages</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Test1</span> </span>&#123;</span><br><span class="line">  <span class="keyword">optional</span> <span class="built_in">int32</span> a = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Test3</span> </span>&#123;</span><br><span class="line">  <span class="keyword">optional</span> Test1 c = <span class="number">3</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>Test3 编码分析</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">1a 03 08 96 01</span><br><span class="line"></span><br><span class="line">0x1a</span><br><span class="line">-&gt; 00011 010 -&gt; field_number = 3, wire_type = 2</span><br><span class="line">0x03</span><br><span class="line">-&gt; group_len = 3</span><br><span class="line">[08 96 01]</span><br><span class="line">-&gt; 08 -&gt; 0000 1000 -&gt; field_number = 1, wire_type = 0</span><br><span class="line">-&gt; 96 01 -&gt; 150</span><br></pre></td></tr></table></figure>
+<p>整体过程可以解释为，为 Test3 设置其成员变量 Test1，为 Test1 中 field_number 为 1 的字段设置值 150。</p>
+<h3 id="Optional-Elements"><a href="#Optional-Elements" class="headerlink" title="Optional Elements"></a>Optional Elements</h3><p>在 proto3 语法中，Optional Elements 即不带 repeated 对于一个没有用 repeated 关键字标注的字段，其值只会出现 0 或 1 次。</p>
+<blockquote>
+<p>However, parsers are expected to handle the case in which they do. For numeric types and strings, if the same field appears multiple times, the parser accepts the <em>last</em> value it sees. For embedded message fields, the parser merges multiple instances of the same field, as if with the method – that is, all singular scalar fields in the latter instance replace those in the former, singular embedded messages are merged, and repeated fields are concatenated. The effect of these rules is that parsing the concatenation of two encoded messages produces exactly the same result as if you had parsed the two messages separately and merged the resulting objects. That is, this:<code>Message::MergeFrom</code></p>
+</blockquote>
+<h3 id="Repeated-Elements"><a href="#Repeated-Elements" class="headerlink" title="Repeated Elements"></a>Repeated Elements</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Test4</span> </span>&#123;</span><br><span class="line">  <span class="keyword">repeated</span> <span class="built_in">int32</span> d = <span class="number">4</span> [packed=<span class="literal">true</span>];</span><br><span class="line">  <span class="comment">//与上相同</span></span><br><span class="line">  <span class="comment">//repeated int32 d = 4</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在 proto3 语法当中，只有使用到 varint, 32-bit, or 64-bit wire type 的类型可以声明 packed 参数，且默认为 true。其作用主要体现在，当 repeated 字段进行编码时，如果 packed 参数为 true 且不包含任何元素时，不对该字段进行编码。</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">22</span>        <span class="comment">// key (field number 4, wire type 2)</span></span><br><span class="line"><span class="number">06</span>        <span class="comment">// payload size (6 bytes)</span></span><br><span class="line"><span class="number">03</span>        <span class="comment">// first element (varint 3)</span></span><br><span class="line"><span class="number">8</span>E <span class="number">02</span>     <span class="comment">// second element (varint 270)</span></span><br><span class="line"><span class="number">9</span>E A7 <span class="number">05</span>  <span class="comment">// third element (varint 86942)</span></span><br></pre></td></tr></table></figure>
+<h2 id="Importing-Definitions"><a href="#Importing-Definitions" class="headerlink" title="Importing Definitions"></a>Importing Definitions</h2><p><strong>Note that this feature is not available in Java.</strong></p>
+<p>In the above example, the <code>Result</code> message type is defined in the same file as <code>SearchResponse</code> – what if the message type you want to use as a field type is already defined in another <code>.proto</code> file?</p>
+<p>You can use definitions from other <code>.proto</code> files by <em>importing</em> them. To import another <code>.proto</code>‘s definitions, you add an import statement to the top of your file:</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="string">&quot;myproject/other_protos.proto&quot;</span>;</span><br></pre></td></tr></table></figure>
+<p>By default you can only use definitions from directly imported <code>.proto</code> files. However, sometimes you may need to move a <code>.proto</code> file to a new location. Instead of moving the <code>.proto</code> file directly and updating all the call sites in a single change, now you can put a dummy <code>.proto</code> file in the old location to forward all the imports to the new location using the <code>import public</code> notion. <code>import public</code> dependencies can be transitively relied upon by anyone importing the proto containing the <code>import public</code> statement. For example:</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// new.proto</span></span><br><span class="line"><span class="comment">// All definitions are moved here</span></span><br><span class="line"><span class="comment">// old.proto</span></span><br><span class="line"><span class="comment">// This is the proto that all clients are importing.</span></span><br><span class="line"><span class="keyword">import</span> public <span class="string">&quot;new.proto&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;other.proto&quot;</span>;</span><br><span class="line"><span class="comment">// client.proto</span></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;old.proto&quot;</span>;</span><br><span class="line"><span class="comment">// You use definitions from old.proto and new.proto, but not other.proto</span></span><br></pre></td></tr></table></figure>
+<p>The protocol compiler searches for imported files in a set of directories specified on the protocol compiler command line using the <code>-I</code>/<code>--proto_path</code> flag. If no flag was given, it looks in the directory in which the compiler was invoked. In general you should set the <code>--proto_path</code> flag to the root of your project and use fully qualified names for all imports.</p>
+<p><strong>Using proto2 Message Types</strong></p>
+<p>It’s possible to import <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/proto">proto2</a> message types and use them in your proto3 messages, and vice versa. However, proto2 enums cannot be used directly in proto3 syntax (it’s okay if an imported proto2 message uses them).</p>
+<h2 id="Nested-Types"><a href="#Nested-Types" class="headerlink" title="Nested Types"></a>Nested Types</h2><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">SearchResponse</span> </span>&#123;</span><br><span class="line">  <span class="class"><span class="keyword">message</span> <span class="title">Result</span> </span>&#123;</span><br><span class="line">    <span class="built_in">string</span> url = <span class="number">1</span>;</span><br><span class="line">    <span class="built_in">string</span> title = <span class="number">2</span>;</span><br><span class="line">    <span class="keyword">repeated</span> <span class="built_in">string</span> snippets = <span class="number">3</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">repeated</span> Result results = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以通过 <code>_Parent_._Type_</code> 的形式来重用 message 结构体</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">SomeOtherMessage</span> </span>&#123;</span><br><span class="line">  SearchResponse.Result result = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>嵌套的规则就是保证不会有同级的重名 message 结构体即可</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Outer</span> </span>&#123;                  <span class="comment">// Level 0</span></span><br><span class="line">  <span class="class"><span class="keyword">message</span> <span class="title">MiddleAA</span> </span>&#123;  <span class="comment">// Level 1</span></span><br><span class="line">    <span class="class"><span class="keyword">message</span> <span class="title">Inner</span> </span>&#123;   <span class="comment">// Level 2</span></span><br><span class="line">      <span class="built_in">int64</span> ival = <span class="number">1</span>;</span><br><span class="line">      <span class="built_in">bool</span>  booly = <span class="number">2</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="class"><span class="keyword">message</span> <span class="title">MiddleBB</span> </span>&#123;  <span class="comment">// Level 1</span></span><br><span class="line">    <span class="class"><span class="keyword">message</span> <span class="title">Inner</span> </span>&#123;   <span class="comment">// Level 2</span></span><br><span class="line">      <span class="built_in">int32</span> ival = <span class="number">1</span>;</span><br><span class="line">      <span class="built_in">bool</span>  booly = <span class="number">2</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<h2 id="更新Message须知"><a href="#更新Message须知" class="headerlink" title="更新Message须知"></a>更新Message须知</h2><ul>
+<li><p>别改变已有的 field numbers</p>
+</li>
+<li><p>新增字段不会对旧版本 message 有影响。</p>
+<blockquote>
+<p>最初，proto3 消息在解析过程中总是丢弃未知字段，但在版本 3.5 中，我们重新引入了未知字段的保存，以匹配原始 2 行为。在版本 3.5 及以后，‎‎未知字段在分析过程中保留，并包含在序列化输出中。‎</p>
+</blockquote>
+</li>
+<li><p>字段可以被删除，但在后续更新的过程中不能重用其 field_numbers。</p>
+<blockquote>
+<p>可以使用自定义前缀标识其无效性，或者使用 reserved 关键字占位。</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Foo</span> </span>&#123;</span><br><span class="line">  reserved <span class="number">2</span>, <span class="number">15</span>, <span class="number">9</span> to <span class="number">11</span>;</span><br><span class="line">  reserved <span class="string">&quot;foo&quot;</span>, <span class="string">&quot;bar&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></blockquote>
+</li>
+<li><p><code>int32</code>, <code>uint32</code>, <code>int64</code>, <code>uint64</code>, and <code>bool</code> 是相互兼容的。<code>sint32</code> and <code>sint64</code> 相互兼容，但不与其他 int 类型兼容。<code>string</code> and <code>bytes</code> 在字节长度及编码都为 UTF-8 时相互兼容。<code>fixed32</code> 兼容 <code>sfixed32</code> 并且 <code>fixed64</code> 兼容 <code>sfixed64</code>.</p>
+</li>
+<li><p>Embedded messages 与一个包含 message 编码版本号的 <code>bytes</code>兼容。</p>
+</li>
+<li><p><code>enum</code> is compatible with <code>int32</code>, <code>uint32</code>, <code>int64</code>, and <code>uint64</code> in terms of wire format. 兼容是在存储格式上兼容，但反序列化时的展现形式是 language-dependent 的。</p>
+</li>
+<li><p>Changing a single value into a member of a <strong>new</strong> <code>oneof</code> is safe and binary compatible. Moving multiple fields into a new <code>oneof</code> may be safe if you are sure that no code sets more than one at a time. Moving any fields into an existing <code>oneof</code> is not safe.</p>
+</li>
+</ul>
+<h2 id="Any"><a href="#Any" class="headerlink" title="Any"></a>Any</h2><p>message 类型 Any 可以在没有<code>.proto</code>定义的情况下使用其内容</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">import &quot;google&#x2F;protobuf&#x2F;any.proto&quot;;</span><br><span class="line"></span><br><span class="line">message ErrorStatus &#123;</span><br><span class="line">  string message &#x3D; 1;</span><br><span class="line">  repeated google.protobuf.Any details &#x3D; 2;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="Oneof"><a href="#Oneof" class="headerlink" title="Oneof"></a>Oneof</h2><p>如果有一条包含许多字段的消息，并且最多同时设置一个字段，您可以使用其中 oneof 来强制执行此行为并节省内存。</p>
+<p>Oneof 字段类似于常规字段，除了 Oneof 共享内存的所有字段之外，最多可以同时设置一个字段。设置 Oneof 的任何成员都会自动清除所有其他成员。您可以使用 case() 或 WhichOneof() 方法检查 Oneof 中的哪个值被设置（如果有的话），具体取决于选择的语言。</p>
+<h3 id="使用Oneof"><a href="#使用Oneof" class="headerlink" title="使用Oneof"></a>使用Oneof</h3><figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">SampleMessage</span> </span>&#123;</span><br><span class="line">  <span class="keyword">oneof</span> test_oneof &#123;</span><br><span class="line">    <span class="built_in">string</span> name = <span class="number">4</span>;</span><br><span class="line">    SubMessage sub_message = <span class="number">9</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="向后兼容性问题"><a href="#向后兼容性问题" class="headerlink" title="向后兼容性问题"></a>向后兼容性问题</h3><p>添加或删除 oneof 字段时要小心。如果检查 oneof 的值会返回 None / NOT _ SET，这可能意味着其中一个没有被设置，或者它已经被设置为 oneof 的不同版本中的字段。没有办法区分这两者，因为没有办法知道线上的未知区域是否是oneof的成员。</p>
+<h3 id="Tag-Reuse-Issues"><a href="#Tag-Reuse-Issues" class="headerlink" title="Tag Reuse Issues"></a>Tag Reuse Issues</h3><ul>
+<li><strong>Move fields into or out of a oneof</strong>: You may lose some of your information (some fields will be cleared) after the message is serialized and parsed. However, you can safely move a single field into a <strong>new</strong> oneof and may be able to move multiple fields if it is known that only one is ever set.</li>
+<li><strong>Delete a oneof field and add it back</strong>: This may clear your currently set oneof field after the message is serialized and parsed.</li>
+<li><strong>Split or merge oneof</strong>: This has similar issues to moving regular fields.</li>
+</ul>
+<h2 id="Packages"><a href="#Packages" class="headerlink" title="Packages"></a>Packages</h2><p>通过设置 package 选项，可以防止协议消息类型之间的命名冲突。</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> foo.bar;</span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Open</span> </span>&#123; ... &#125;</span><br></pre></td></tr></table></figure>
+<p>在定义时，可以在定义消息类型的字段上使用包名:</p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Foo</span> </span>&#123;</span><br><span class="line">  ...</span><br><span class="line">  foo.bar.Open open = <span class="number">1</span>;</span><br><span class="line">  ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The way a package specifier affects the generated code depends on your chosen language:</p>
+<ul>
+<li>In <strong>C++</strong> the generated classes are wrapped inside a C++ namespace. For example, <code>Open</code> would be in the namespace <code>foo::bar</code>.</li>
+<li>In <strong>Java</strong>, the package is used as the Java package, unless you explicitly provide an <code>option java_package</code> in your <code>.proto</code> file.</li>
+<li>In <strong>Go</strong>, the package is used as the Go package name, unless you explicitly provide an <code>option go_package</code> in your <code>.proto</code> file.</li>
+</ul>
+<h2 id="Defining-Services"><a href="#Defining-Services" class="headerlink" title="Defining Services"></a>Defining Services</h2><p>如果要将消息类型用于 RPC（远程过程调用）系统，可以在<code>.proto</code>文件中定义 RPC 服务接口和协议缓冲编译器将使用您选择的语言生成服务接口代码和存根。因此，如果您想用一种接受您的搜索请求并返回搜索响应的方法来定义 RPC 服务，您可以在 .proto 文件中定义它。 如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">service SearchService &#123;</span><br><span class="line">  rpc Search (SearchRequest) returns (SearchResponse);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>与协议缓冲区一起使用的最直接的 RPC 系统是 gRPC : Google 开发的语言和平台无关的开源 RPC 系统。gRPC 与协议缓冲区配合得特别好，并允许您直接从使用特殊协议缓冲编译插件的 .proto 文件中生成相关的 RPC 代码。</p>
+<p>如果你不想使用gRPC，也可以在你自己的RPC实现中使用协议缓冲区。你可以在  <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/proto#services">Proto2 Language Guide</a> 中找到更多关于这一点的信息。</p>
+<h2 id="Options"><a href="#Options" class="headerlink" title="Options"></a>Options</h2><p>Options 的全部内容被定义在 <code>google/protobuf/descriptor.proto</code>。下表是 Options 级别：</p>
+<ul>
+<li>file-level meaning  they should be written at the top-level scope</li>
+<li>message-level  meaning they should be written inside message definitions</li>
+<li>field-level  meaning they should be written inside field definitions</li>
+</ul>
+<p>Options can also be written on enum types, enum values, oneof fields, service types, and service methods; however, no useful options currently exist for any of these.</p>
+<blockquote>
+<p>详细内容见 <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/proto3#options">Options</a></p>
+</blockquote>
+<h2 id="JSON-Mapping"><a href="#JSON-Mapping" class="headerlink" title="JSON Mapping"></a>JSON Mapping</h2><p>Proto3 支持转化为 JSON 格式映射。</p>
+<table>
+<thead>
+<tr>
+<th align="left">proto3</th>
+<th align="left">JSON</th>
+<th align="left">JSON example</th>
+<th align="left">Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">message</td>
+<td align="left">object</td>
+<td align="left"><code>&#123;&quot;fooBar&quot;: v, &quot;g&quot;: null, …&#125;</code></td>
+<td align="left">Generates JSON objects. Message field names are mapped to lowerCamelCase and become JSON object keys. If the <code>json_name</code> field option is specified, the specified value will be used as the key instead. Parsers accept both the lowerCamelCase name (or the one specified by the <code>json_name</code> option) and the original proto field name. <code>null</code> is an accepted value for all field types and treated as the default value of the corresponding field type.</td>
+</tr>
+<tr>
+<td align="left">enum</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;FOO_BAR&quot;</code></td>
+<td align="left">The name of the enum value as specified in proto is used. Parsers accept both enum names and integer values.</td>
+</tr>
+<tr>
+<td align="left">map&lt;K,V&gt;</td>
+<td align="left">object</td>
+<td align="left"><code>&#123;&quot;k&quot;: v, …&#125;</code></td>
+<td align="left">All keys are converted to strings.</td>
+</tr>
+<tr>
+<td align="left">repeated V</td>
+<td align="left">array</td>
+<td align="left"><code>[v, …]</code></td>
+<td align="left"><code>null</code> is accepted as the empty list <code>[]</code>.</td>
+</tr>
+<tr>
+<td align="left">bool</td>
+<td align="left">true, false</td>
+<td align="left"><code>true, false</code></td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">string</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;Hello World!&quot;</code></td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">bytes</td>
+<td align="left">base64 string</td>
+<td align="left"><code>&quot;YWJjMTIzIT8kKiYoKSctPUB+&quot;</code></td>
+<td align="left">JSON value will be the data encoded as a string using standard base64 encoding with paddings. Either standard or URL-safe base64 encoding with/without paddings are accepted.</td>
+</tr>
+<tr>
+<td align="left">int32, fixed32, uint32</td>
+<td align="left">number</td>
+<td align="left"><code>1, -10, 0</code></td>
+<td align="left">JSON value will be a decimal number. Either numbers or strings are accepted.</td>
+</tr>
+<tr>
+<td align="left">int64, fixed64, uint64</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;1&quot;, &quot;-10&quot;</code></td>
+<td align="left">JSON value will be a decimal string. Either numbers or strings are accepted.</td>
+</tr>
+<tr>
+<td align="left">float, double</td>
+<td align="left">number</td>
+<td align="left"><code>1.1, -10.0, 0, &quot;NaN&quot;, &quot;Infinity&quot;</code></td>
+<td align="left">JSON value will be a number or one of the special string values “NaN”, “Infinity”, and “-Infinity”. Either numbers or strings are accepted. Exponent notation is also accepted. -0 is considered equivalent to 0.</td>
+</tr>
+<tr>
+<td align="left">Any</td>
+<td align="left"><code>object</code></td>
+<td align="left"><code>&#123;&quot;@type&quot;: &quot;url&quot;, &quot;f&quot;: v, … &#125;</code></td>
+<td align="left">If the Any contains a value that has a special JSON mapping, it will be converted as follows: <code>&#123;&quot;@type&quot;: xxx, &quot;value&quot;: yyy&#125;</code>. Otherwise, the value will be converted into a JSON object, and the <code>&quot;@type&quot;</code> field will be inserted to indicate the actual data type.</td>
+</tr>
+<tr>
+<td align="left">Timestamp</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;1972-01-01T10:00:20.021Z&quot;</code></td>
+<td align="left">Uses RFC 3339, where generated output will always be Z-normalized and uses 0, 3, 6 or 9 fractional digits. Offsets other than “Z” are also accepted.</td>
+</tr>
+<tr>
+<td align="left">Duration</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;1.000340012s&quot;, &quot;1s&quot;</code></td>
+<td align="left">Generated output always contains 0, 3, 6, or 9 fractional digits, depending on required precision, followed by the suffix “s”. Accepted are any fractional digits (also none) as long as they fit into nano-seconds precision and the suffix “s” is required.</td>
+</tr>
+<tr>
+<td align="left">Struct</td>
+<td align="left"><code>object</code></td>
+<td align="left"><code>&#123; … &#125;</code></td>
+<td align="left">Any JSON object. See <code>struct.proto</code>.</td>
+</tr>
+<tr>
+<td align="left">Wrapper types</td>
+<td align="left">various types</td>
+<td align="left"><code>2, &quot;2&quot;, &quot;foo&quot;, true, &quot;true&quot;, null, 0, …</code></td>
+<td align="left">Wrappers use the same representation in JSON as the wrapped primitive type, except that <code>null</code> is allowed and preserved during data conversion and transfer.</td>
+</tr>
+<tr>
+<td align="left">FieldMask</td>
+<td align="left">string</td>
+<td align="left"><code>&quot;f.fooBar,h&quot;</code></td>
+<td align="left">See <code>field_mask.proto</code>.</td>
+</tr>
+<tr>
+<td align="left">ListValue</td>
+<td align="left">array</td>
+<td align="left"><code>[foo, bar, …]</code></td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">Value</td>
+<td align="left">value</td>
+<td align="left"></td>
+<td align="left">Any JSON value. Check <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Value">google.protobuf.Value</a> for details.</td>
+</tr>
+<tr>
+<td align="left">NullValue</td>
+<td align="left">null</td>
+<td align="left"></td>
+<td align="left">JSON null</td>
+</tr>
+<tr>
+<td align="left">Empty</td>
+<td align="left">object</td>
+<td align="left"><code>&#123;&#125;</code></td>
+<td align="left">An empty JSON object</td>
+</tr>
+</tbody></table>
+<p><strong>JSON options</strong></p>
+<p>A proto3 JSON implementation may provide the following options:</p>
+<ul>
+<li><strong>Emit fields with default values</strong>: Fields with default values are omitted by default in proto3 JSON output. An implementation may provide an option to override this behavior and output fields with their default values.</li>
+<li><strong>Ignore unknown fields</strong>: Proto3 JSON parser should reject unknown fields by default but may provide an option to ignore unknown fields in parsing.</li>
+<li><strong>Use proto field name instead of lowerCamelCase name</strong>: By default proto3 JSON printer should convert the field name to lowerCamelCase and use that as the JSON name. An implementation may provide an option to use proto field name as the JSON name instead. Proto3 JSON parsers are required to accept both the converted lowerCamelCase name and the proto field name.</li>
+<li><strong>Emit enum values as integers instead of strings</strong>: The name of an enum value is used by default in JSON output. An option may be provided to use the numeric value of the enum value instead.</li>
+</ul>
+<h2 id="生成Skeleton"><a href="#生成Skeleton" class="headerlink" title="生成Skeleton"></a>生成Skeleton</h2><p>详细内容见 <a target="_blank" rel="noopener" href="https://developers.google.cn/protocol-buffers/docs/proto3#generating">Generating Your Classes</a></p>
+<h1 id="各序列化框架性能测试"><a href="#各序列化框架性能测试" class="headerlink" title="各序列化框架性能测试"></a>各序列化框架性能测试</h1><p><strong>SIMPLE/GENERIC:</strong><br>Serializes any POJO tree without class specific optimization. Serialized classes are known in advance. No cycle detection/shared object detection is done.</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">                                   create     ser   deser   total   size  +dfl</span><br><span class="line">java-built-in                          63    5838   30208   36046    889   514</span><br><span class="line">hessian                                63    3881    6176   10057    501   313</span><br><span class="line">kryo                                   63     655     838    1493    212   132</span><br><span class="line">fast-serialization                     63     704     864    1568    252   166</span><br><span class="line">jboss-serialization                    63    6466    6643   13110    932   582</span><br><span class="line">jboss-marshalling-river                63    4656   23892   28548    694   400</span><br><span class="line">protostuff                             82     495     732    1227    239   150</span><br><span class="line">msgpack-databind                       62     830    1370    2200    233   146</span><br><span class="line">json/jackson/databind                  62    1895    2600    4496    485   261</span><br><span class="line">json/jackson/db-afterburner            63    1513    1988    3501    485   261</span><br><span class="line">json/protostuff-runtime                63    1532    2138    3670    469   243</span><br><span class="line">json/google-gson/databind              63    5633    4844   10477    486   259</span><br><span class="line">json/svenson-databind                  63    5270   10358   15628    495   272</span><br><span class="line">json/flexjson/databind                 63   19445   25394   44838    503   273</span><br><span class="line">json/fastjson/databind                 63    1316    1149    2465    486   262</span><br><span class="line">smile/jackson/databind                 63    1768    1891    3659    338   241</span><br><span class="line">smile/jackson/db-afterburner           64    1448    1492    2940    352   252</span><br><span class="line">bson/jackson/databind                  64    5376    6812   12188    506   286</span><br><span class="line">xml/xstream+c                          64    6476   13505   19981    487   244</span><br><span class="line">xml/jackson/databind-aalto             63    3001    5516    8517    683   286</span><br></pre></td></tr></table></figure>
+<p><strong>DEFAULT:</strong><br>Serializes arbitrary object graphs, cycle detection enabled. Nothing is known in advance about the classes to serialize. Only serializers supporting full object graph serialization are included.</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">                                   create     ser   deser   total   size  +dfl</span><br><span class="line">java-built-in-serializer               64    5723   29259   34982    889   514</span><br><span class="line">hessian                                64    3611    6169    9780    501   313</span><br><span class="line">kryo-serializer                        64    1711    1499    3210    311   198</span><br><span class="line">fast-serialization-shared              64    1621    1592    3212    341   212</span><br><span class="line">jboss-serialization                    64    6442    6339   12781    932   582</span><br></pre></td></tr></table></figure>
+<p><strong>SIMPLE/SPECIFC:</strong><br>Serializes only specific classes using code generation or other special knowledge about the class.</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">                                   create     ser   deser   total   size  +dfl</span><br><span class="line">kryo-opt                               64     658     864    1522    209   129</span><br><span class="line">wobly                                  43     886     536    1422    251   151</span><br><span class="line">wobly-compact                          43     903     569    1471    225   139</span><br><span class="line">protobuf                              130    1225     701    1926    239   149</span><br><span class="line">protostuff                             82     488     678    1166    239   150</span><br><span class="line">protobuf/protostuff                    83     598     692    1290    239   149</span><br><span class="line">thrift                                126    1796     795    2591    349   197</span><br><span class="line">thrift-compact                        126    1555     963    2518    240   148</span><br><span class="line">avro                                   89    1616    1415    3031    221   133</span><br><span class="line">json/json-lib-databind                 63   26330  103150  129479    485   263</span><br><span class="line">json/jsonij-jpath                      63   38015   12325   50339    478   259</span><br></pre></td></tr></table></figure>
+<p><strong>MANUAL:</strong><br>Serializes only specific classes using hand written serialization code.</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">                                   create     ser   deser   total   size  +dfl</span><br><span class="line">java-manual                            63     847     632    1480    255   147</span><br><span class="line">kryo-manual                            63     555     616    1171    211   131</span><br><span class="line">protostuff-manual                      63     465     711    1176    239   150</span><br><span class="line">avro-generic                          379    1822    1125    2947    221   133</span><br><span class="line">json/jackson/manual                    63    1097    1539    2636    468   253</span><br><span class="line">json/protostuff-manual                 63    1345    1816    3161    449   233</span><br><span class="line">json/google-gson/manual                63    3696    3756    7452    468   253</span><br><span class="line">json/json.simple/manual                63    6184    8059   14243    495   269</span><br><span class="line">json/json-smart/manual/tree            63    5314    4088    9402    495   269</span><br><span class="line">json/org.json/manual/tree              63    6989    8413   15403    485   259</span><br><span class="line">json/argo-manual/tree                  63   66575   14578   81153    485   263</span><br><span class="line">smile/jackson/manual                   63     939    1092    2031    341   244</span><br><span class="line">bson/mongodb                           64    3422    7762   11184    495   278</span><br><span class="line">xml/woodstox-manual                    63    3159    4578    7737    653   304</span><br><span class="line">xml/aalto-manual                       63    2077    3093    5170    653   304</span><br><span class="line">xml/xstream+c-woodstox                 63    5638   10506   16144    525   273</span><br><span class="line">xml/xstream+c-aalto                    63    4893    8912   13805    525   273</span><br><span class="line">xml/xstream+c-fastinfo                 63    8451    7971   16422    345   264</span><br><span class="line">xml/javolution                         64    5544    8538   14082    504   263</span><br><span class="line">xml/fastinfo-manual                    64    6959    5420   12379    377   284</span><br></pre></td></tr></table></figure>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RPC/" rel="tag"># RPC</a>
+              <a href="/tags/ProtoBuf/" rel="tag"># ProtoBuf</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/10/Go-%E5%9F%BA%E7%A1%80%E8%AF%AD%E6%B3%95%E9%83%A8%E5%88%86/" rel="prev" title="Go 基础语法部分">
+      <i class="fa fa-chevron-left"></i> Go 基础语法部分
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BA%8F%E5%88%97%E5%8C%96%E6%A1%86%E6%9E%B6"><span class="nav-number">1.</span> <span class="nav-text">序列化框架</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E8%AF%84%E4%BB%B7"><span class="nav-number">1.1.</span> <span class="nav-text">如何评价</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Java%E5%BA%8F%E5%88%97%E5%8C%96%E7%9A%84%E7%BC%BA%E7%82%B9"><span class="nav-number">1.2.</span> <span class="nav-text">Java序列化的缺点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E7%9A%84%E5%BA%8F%E5%88%97%E5%8C%96%E6%96%B9%E5%BC%8F"><span class="nav-number">1.3.</span> <span class="nav-text">常用的序列化方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Google-Protobuf"><span class="nav-number">2.</span> <span class="nav-text">Google Protobuf</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">数据类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.1.1.</span> <span class="nav-text">基本数据类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9E%9A%E4%B8%BE%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.1.2.</span> <span class="nav-text">枚举类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%97%E5%85%B8%E7%B1%BB%E5%9E%8B"><span class="nav-number">2.1.3.</span> <span class="nav-text">字典类型</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E7%BC%96%E7%A0%81"><span class="nav-number">2.2.</span> <span class="nav-text">数据编码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Base-128-Varints"><span class="nav-number">2.2.1.</span> <span class="nav-text">Base 128 Varints</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Message-Structure"><span class="nav-number">2.2.2.</span> <span class="nav-text">Message Structure</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#More-Value-Types"><span class="nav-number">2.3.</span> <span class="nav-text">More Value Types</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Signed-Integers"><span class="nav-number">2.3.1.</span> <span class="nav-text">Signed Integers</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Strings"><span class="nav-number">2.3.2.</span> <span class="nav-text">Strings</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Embedded-Messages"><span class="nav-number">2.3.3.</span> <span class="nav-text">Embedded Messages</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Optional-Elements"><span class="nav-number">2.3.4.</span> <span class="nav-text">Optional Elements</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Repeated-Elements"><span class="nav-number">2.3.5.</span> <span class="nav-text">Repeated Elements</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Importing-Definitions"><span class="nav-number">2.4.</span> <span class="nav-text">Importing Definitions</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Nested-Types"><span class="nav-number">2.5.</span> <span class="nav-text">Nested Types</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0Message%E9%A1%BB%E7%9F%A5"><span class="nav-number">2.6.</span> <span class="nav-text">更新Message须知</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Any"><span class="nav-number">2.7.</span> <span class="nav-text">Any</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Oneof"><span class="nav-number">2.8.</span> <span class="nav-text">Oneof</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8Oneof"><span class="nav-number">2.8.1.</span> <span class="nav-text">使用Oneof</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%91%E5%90%8E%E5%85%BC%E5%AE%B9%E6%80%A7%E9%97%AE%E9%A2%98"><span class="nav-number">2.8.2.</span> <span class="nav-text">向后兼容性问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Tag-Reuse-Issues"><span class="nav-number">2.8.3.</span> <span class="nav-text">Tag Reuse Issues</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Packages"><span class="nav-number">2.9.</span> <span class="nav-text">Packages</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Defining-Services"><span class="nav-number">2.10.</span> <span class="nav-text">Defining Services</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Options"><span class="nav-number">2.11.</span> <span class="nav-text">Options</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JSON-Mapping"><span class="nav-number">2.12.</span> <span class="nav-text">JSON Mapping</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%9F%E6%88%90Skeleton"><span class="nav-number">2.13.</span> <span class="nav-text">生成Skeleton</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%84%E5%BA%8F%E5%88%97%E5%8C%96%E6%A1%86%E6%9E%B6%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95"><span class="nav-number">3.</span> <span class="nav-text">各序列化框架性能测试</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Elijah</p>
+  <div class="site-description" itemprop="description">Leave a trace</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">70</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">218</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Elijah</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
