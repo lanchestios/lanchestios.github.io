@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"elijahte.gitee.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="随着微服务和云原生相关技术的发展，应用程序的架构模式已从传统的单体架构或分层架构转向了分布式的计算架构。尽管分布式架构本身有一定的开发成本和运维成本，但它所带来的收益是显而易见的。正是在这样的背景下，gRPC应运而生并成为云原生计算基金会的孵化项目广泛应用于众多开源项目和企业级项目中。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RPC gRPC框架用法">
+<meta property="og:url" content="http://elijahte.gitee.io/2021/04/11/RPC-GRPC%E6%A1%86%E6%9E%B6%E7%94%A8%E6%B3%95/index.html">
+<meta property="og:site_name" content="Elijah&#39;s Blog">
+<meta property="og:description" content="随着微服务和云原生相关技术的发展，应用程序的架构模式已从传统的单体架构或分层架构转向了分布式的计算架构。尽管分布式架构本身有一定的开发成本和运维成本，但它所带来的收益是显而易见的。正是在这样的背景下，gRPC应运而生并成为云原生计算基金会的孵化项目广泛应用于众多开源项目和企业级项目中。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-04-11T13:39:00.000Z">
+<meta property="article:modified_time" content="2021-04-25T15:29:35.717Z">
+<meta property="article:author" content="Elijah">
+<meta property="article:tag" content="RPC">
+<meta property="article:tag" content="gRPC">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://elijahte.gitee.io/2021/04/11/RPC-GRPC%E6%A1%86%E6%9E%B6%E7%94%A8%E6%B3%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>RPC gRPC框架用法 | Elijah's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Elijah's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://elijahte.gitee.io/2021/04/11/RPC-GRPC%E6%A1%86%E6%9E%B6%E7%94%A8%E6%B3%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Elijah">
+      <meta itemprop="description" content="Leave a trace">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Elijah's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RPC gRPC框架用法
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-04-11 21:39:00" itemprop="dateCreated datePublished" datetime="2021-04-11T21:39:00+08:00">2021-04-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2021-04-25 23:29:35" itemprop="dateModified" datetime="2021-04-25T23:29:35+08:00">2021-04-25</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/RPC/" itemprop="url" rel="index"><span itemprop="name">RPC</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>随着微服务和云原生相关技术的发展，应用程序的架构模式已从传统的单体架构或分层架构转向了分布式的计算架构。尽管分布式架构本身有一定的开发成本和运维成本，但它所带来的收益是显而易见的。正是在这样的背景下，gRPC应运而生并成为云原生计算基金会的孵化项目广泛应用于众多开源项目和企业级项目中。</p>
+<a id="more"></a>
+
+<h1 id="进程间通信技术的演化"><a href="#进程间通信技术的演化" class="headerlink" title="进程间通信技术的演化"></a>进程间通信技术的演化</h1><h2 id="传统的RPC"><a href="#传统的RPC" class="headerlink" title="传统的RPC"></a>传统的RPC</h2><p>在构建客户端–服务器端应用程序方面，RPC 是很流行的进程间通信技术。借助 RPC，客户端能够像调用本地方法那样远程调用某个方法的功能。早期有一些很流行的 RPC 实现，比如通用对象请求代理体系结构 (common object request broker architecture，CORBA) 和 Java 远程方法调用 (remote method invocation，RMI)，它们都用来构建和连接服务或应用程序。但是，大多数传统的 RPC 实现极其复杂，因为它们构建在 TCP 这样的通信协议之上，而这会妨碍互操作性，并且它们还有大量的规范限制。</p>
+<h2 id="SOAP"><a href="#SOAP" class="headerlink" title="SOAP"></a>SOAP</h2><p>鉴于 CORBA 等传统 RPC 实现的局限性，简单对象访问协议(simple object access protocol，SOAP)应运而生，并且得到了微软、IBM 等企业的大力推广。SOAP 是面向服务的架构(service-oriented architecture，SOA)中的标准通信技术，用于在服务(在 SOA 中通常叫作 Web 服务)之间交换基于 XML 的结构化数据，并且能够基于任意的底层通信协议进行通信，其中最常用的协议是 HTTP。</p>
+<p>通过 SOAP，可以定义服务接口、服务的操作以及调用这些操作的 XML 消息格式。SOAP 曾是一项非常流行的技术，但其消息格式的复杂性以及围绕 SOAP 所构建的各种规范的复杂性，妨碍了构建分布式应用程序的敏捷性。因此，在现代分布式应用程序开发中，SOAP Web 服务被认为是一种遗留技术。大多数现有的分布式应用程序采用 REST 架构风格，而非 SOAP。</p>
+<h2 id="REST"><a href="#REST" class="headerlink" title="REST"></a>REST</h2><p>描述性状态迁移(representational state transfer，REST)架构风格起源于 Roy Fielding 的博士论文。Fielding 是 HTTP 规范的主要作者之一，也是 REST 架构风格的创始人。REST 是面向资源的架构(resource-oriented architecture，ROA)的基础，在这种架构中，需要将分布式应用程序建模为资源集合，访问这些资源的客户端可以变更这些资源的状态(创建、读取、更新或删除)。</p>
+<p>REST 的通用实现是 HTTP，通过 HTTP，可以将 RESTful Web 应用程序建模为能够通过唯一标识符访问的资源集合。应用于资源的状态变更操作会采用 HTTP 动词(GET、POST、PUT、DELETE、PATCH 等)的形式，资源的状态会以文本的格式来表述，如 JSON、XML、HTML、YAML 等。</p>
+<p>实际上，通过 HTTP 和 JSON 将应用程序构建为 REST 架构风格已成为构建微服务的标准方法。但是，随着微服务的数量及其网络交互的激增，RESTful 服务已经无法满足现代化的需求了。下面介绍 RESTful 服务的 3 个主要局限性，这些局限性妨碍了其作为消息协议在现代微服务应用程序中的运用。</p>
+<ol>
+<li>基于文本的低效消息协议</li>
+</ol>
+<p>从本质上来讲，RESTful 服务建立在基于文本的传输协议(如 HTTP 1.<em>x</em>)之上，并且会使用人类可读的文本格式，如 JSON。但是，在进行服务与服务之间的通信时，通信双方都不需要这种人类可读的文本化格式，这时使用这种格式非常低效。</p>
+<p>客户端应用程序(源)生成需要发送给服务器的二进制内容，然后需要将二进制结构转换成文本(如果使用 HTTP 1.<em>x</em>，就只能发送文本化消息)，并通过网络以文本的形式(借助 HTTP)发送到另一台机器上，这台机器需要在服务器端(目标)解析文本并将其转换回二进制结构。其实，我们也可以很轻松地发送映射服务和消费者业务逻辑的二进制内容，采用 JSON 格式主要是因为它是“人类可读的”，相对来说易于使用。这涉及工具选择问题，而不是二进制协议问题。</p>
+<ol start="2">
+<li>应用程序之间缺乏强类型接口</li>
+</ol>
+<p>随着越来越多的服务要通过网络进行交互，而且这些服务使用完全不同的语言来构建，缺乏明确定义和强类型的服务接口成了使用 RESTful 服务的主要阻碍。RESTful 中现有的各种服务定义技术 (如 OpenAPI/Swagger 等)都是事后的补救措施，并没有与底层的架构风格或消息协议紧密集成在一起。</p>
+<p>在构建这种分散的应用程序时，会遇到很多的不兼容、运行时错误和互操作等问题。例如，在开发 RESTful 服务时，应用程序之间并不需要共享服务定义和类型定义的信息。但是，在开发 RESTful 应用程序时，我们要么通过网络查看文本格式，要么使用第三方 API 定义技术(如 OpenAPI)。因此，现在非常重要的任务就是拥有现代化的强类型服务定义技术以及框架，从而为多语言技术生成核心的服务器端代码和客户端代码。</p>
+<ol start="3">
+<li>REST架构风格难以强制实施</li>
+</ol>
+<p>REST 架构风格有很多“好的实践”，只有遵循这些实践，才能构建出真正的 RESTful 服务。但是，由于它们并没有作为实现协议(比如 HTTP)的一部分进行强制的要求，因此在实现阶段，这些实践很难实施。事实上，大多数自称 RESTful 的服务并没有遵循基础的 REST 架构风格，也就是说，这些所谓的 RESTful 服务不过是通过网络公开的 HTTP 服务。因此，开发团队必须花费大量时间来维护 RESTful 服务的一致性和纯度。</p>
+<p>鉴于进程间通信技术在构建现代云原生应用程序时所存在的这些限制，人们开始寻求更好的消息协议。</p>
+<h2 id="gRPC"><a href="#gRPC" class="headerlink" title="gRPC"></a>gRPC</h2><h3 id="gRPC的起源"><a href="#gRPC的起源" class="headerlink" title="gRPC的起源"></a>gRPC的起源</h3><p>长期以来，谷歌有一个名为 Stubby 的通用 RPC 框架，用来连接成千上万的微服务，这些微服务跨多个数据中心并且使用完全不同的技术来构建。Stubby 的核心 RPC 层每秒能处理数百亿次的互联网请求。Stubby 有许多很棒的特性，但无法标准化为业界通用的框架，这是因为它与谷歌内部的基础设施耦合得过于紧密。</p>
+<p>2015 年，谷歌发布了开源 RPC 框架 gRPC，这个 RPC 基础设施具有标准化、可通用和跨平台的特点，旨在提供类似 Stubby 的可扩展性、性能和功能，但它主要面向社区。</p>
+<p>在此之后，gRPC 的受欢迎程度陡增，很多大型公司大规模采用了 gRPC，如 Netflix、Square、Lyft、Docker、CoreOS 和思科。接着，gRPC 加入了云原生计算基金会(Cloud Native Computing Foundation， CNCF)，这是最受欢迎的开源软件基金会之一，它致力于让云原生计算具备通用性和可持续性。gRPC 从 CNCF 生态系统项目中获得了巨大的发展动力。</p>
+<p>下面看一下相对于传统进程间通信协议，选择使用 gRPC 的一些关键原因。</p>
+<h3 id="选择gRPC的原因"><a href="#选择gRPC的原因" class="headerlink" title="选择gRPC的原因"></a>选择gRPC的原因</h3><p>gRPC 是一种支持互联网规模的进程间通信技术，可以弥补传统进程间通信技术的大多数缺点。鉴于 gRPC 所带来的收益，越来越多的现代应用程序和服务器将其进程间通信协议替换成了 gRPC。在面对如此众多的可选方案时，为什么选择 gRPC 作为通信协议呢?下面详细介绍 gRPC 的关键优势。</p>
+<h4 id="gRPC-的优势"><a href="#gRPC-的优势" class="headerlink" title="gRPC 的优势"></a>gRPC 的优势</h4><p>gRPC 的优势是它被越来越多的人所采用的关键所在，主要有以下几个方面。</p>
+<ol>
+<li><p>提供高效的进程间通信。</p>
+<p>gRPC 没有使用 JSON 或 XML 这样的文本化格式，而是使用一个基于 protocol buffers 的二进制协议与 gRPC 服务和客户端通信。同时，gRPC 在 HTTP/2 之上实现了 protocol buffers，从而能够更快地处理进程间通信。这样一来，gRPC 就变成了最高效的进程间通信技术之一。</p>
+</li>
+<li><p>具有简单且定义良好的服务接口和模式<br> gRPC 为应用程序开发提供了一种契约优先的方式。也就是说，首先必须定义服务接口，然后才能去处理实现细节。因此，与 RESTful 服务定义中的 OpenAPI/Swagger 和 SOAP Web 服务中的 WSDL 不同，gRPC 提供了简单但一致、可靠且可扩展的应用程序开发体验。</p>
+</li>
+<li><p>属于强类型</p>
+<p>因为使用 protocol buffers 来定义 gRPC 服务，所以 gRPC 服务契约清晰定义了应用程序间进行通信所使用的类型。这样一来，在构建跨多个团队和技术类型的云原生应用程序时，对于其所产生的大多数运行时错误和互操作错误，可以通过静态类型来克服，因此分布式应用程序的开发更加稳定。</p>
+</li>
+<li><p>支持多语言</p>
+<p>gRPC 支持多种编程语言。基于 protocol buffers 的服务定义是语言中立的。因此，我们可以选择任意一种语言，它们都能与现有的 gRPC 服务或客户端进行互操作。</p>
+</li>
+<li><p>支持双工流</p>
+<p>gRPC 在客户端和服务器端都提供了对流的原生支持，这些功能都被整合到了服务定义本身之中。因此，开发流服务或流客户端变得非常容易。与传统的 RESTful 服务消息风格相比，gRPC 的关键优势就是能够同时构建传统的请求–响应风格的消息以及客户端流和服务器端流。</p>
+</li>
+<li><p>具备内置的商业化特性</p>
+<p>gRPC 提供了对商业化特性的内置支持，如认证、加密、弹性 (截止时间和超时)、元数据交换、压缩、负载均衡、服务发现等 。</p>
+</li>
+<li><p>与云原生生态系统进行了集成</p>
+</li>
+</ol>
+<p>gRPC 是 CNCF 的一部分，大多数现代框架和技术对 gRPC 提供了原生支持。例如，CNCF 下的很多项目(如 Envoy)支持使用 gRPC 作为通信协议。另外，对于横切性的特性，比如度量指标和监控，gRPC 也得到了大多数工具的支持，比如使用 Prometheus 来监控 gRPC 应用程序。</p>
+<ol start="8">
+<li>行业已成熟并被广泛采用</li>
+</ol>
+<p>通过在谷歌进行的大量实战测试，gRPC 已发展成熟。许多大型科技公司采用了 gRPC，如 Square、Lyft、Netflix、Docker、CoreOS 和思科等。</p>
+<p>与其他技术一样，gRPC 也存在一定的劣势。在开发应用程序时，了解这些方面非常有用。</p>
+<h4 id="gRPC的劣势"><a href="#gRPC的劣势" class="headerlink" title="gRPC的劣势"></a>gRPC的劣势</h4><p>下面介绍 gRPC 的一些劣势，在选择它来构建应用程序时，需要注意以下 3 点。</p>
+<ol>
+<li><p>gRPC 可能不太适合面向外部的服务</p>
+<p>大多数的外部消费者可能对 gRPC、REST 或 HTTP 等协议很陌生。因此，如果希望将应用程序或服务通过互联网暴露给外部客户端，gRPC 可能不是最适合的协议。gRPC 服务具有契约驱动、强类型的特点，这可能会限制我们向外部暴露的服务的灵活性，同时消费者的控制权会削弱很多。按照设计，gRPC 网关将是克服该问题的解决方案。</p>
+</li>
+<li><p>巨大的服务定义变更是复杂的开发流程</p>
+<p>在现代的服务间通信场景中，模式修改很常见。如果出现巨大的 gRPC 服务定义变更，通常需要重新生成客户端代码和服务器端代码。这需要整合到现有的持续集成过程中，可能会让整个开发生命周期复杂化。但是，大多数 gRPC 服务定义的变更可以在不破坏服务契约的情况下完成，而且只要不引入破坏性的变更，gRPC 就可以与使用不同版本 proto 的客户端和服务器端进行交互。因此，大多数情况并不需要重新生成代码。</p>
+</li>
+<li><p>gRPC 生态系统相对较小</p>
+<p>与传统的 REST 或 HTTP 等协议相比，gRPC 的生态系统依然相对较小。浏览器和移动应用程序对 gRPC 的支持依然处于初级阶段。</p>
+<p>在开发应用程序时，必须注意这些方面的问题。由此可以看到，gRPC 并不是适用于所有进程间通信需求的万能技术。相反，你需要评估业务场景和需求，选择适当的消息协议。</p>
+</li>
+</ol>
+<p>如前所述，目前有很多新兴的进程间通信技术。因此，有一点非常重要，那就是了解如何将 gRPC 与在现代应用程序开发中流行的类似技术进行对比，从而为服务选择最合适的协议。</p>
+<h3 id="gRPC与其他协议的对比-Thrift和GraphQL"><a href="#gRPC与其他协议的对比-Thrift和GraphQL" class="headerlink" title="gRPC与其他协议的对比:Thrift和GraphQL"></a>gRPC与其他协议的对比:Thrift和GraphQL</h3><p>前面详细讨论了 RESTful 服务的局限性，正是这些局限性为 gRPC 的诞生奠定了基础。无独有偶，还有很多新兴的进程间通信技术，它们的问世也是为了满足相同的需求。下面看一下目前较为流行的技术，并将之与 gRPC 进行对比。</p>
+<h4 id="Thrift"><a href="#Thrift" class="headerlink" title="Thrift"></a>Thrift</h4><p>Apache Thrift(以下简称 Thrift)是与 gRPC 类似的 RPC 框架，最初由 Facebook 开发，后来被捐赠给了 Apache。它有自己的接口定义语言并提供了对多种编程语言的支持。Thrift 可以在定义文件中定义数据类型和服务接口。Thrift 编译器以服务定义作为输入，能够生成客户端代码和服务器端代码。Thrift 的传输层为网络 I/O 提供了抽象，并将 Thrift 从系统的其他组成部分中解耦出来，这意味着 Thrift 可以在任意传输实现上运行，如 TCP、HTTP 等。</p>
+<p>如果将 Thrift 和 gRPC 进行对比，可以发现它们遵循相同的设计理念和使用目标。但是，两者之间也有一些重要的区别。</p>
+<ol>
+<li><p>传输方面<br>相对于 Thrift，gRPC 的倾向性更强，它为 HTTP/2 提供了一流的支持。gRPC 基于 HTTP/2 的实现充分利用了该协议的功能，从而实现了高效率并且能够支持像流这样的消息模式。</p>
+</li>
+<li><p>流方面</p>
+</li>
+</ol>
+<p>gRPC 服务定义原生支持双向流(客户端和服务器端)，它本身便是服务定义的一部分。</p>
+<ol start="3">
+<li>采用情况和社区资源方面</li>
+</ol>
+<p>从采用情况来看，gRPC 的势头似乎更好，它已围绕 CNCF 项目成功构建了一个良好的生态系统。同时，gRPC 的社区资源非常丰富，比如良好的文档、外部的演讲以及示例。因此，相对于 Thrift，采用 gRPC 会更顺利一些。</p>
+<ol start="4">
+<li>性能方面</li>
+</ol>
+<p>虽然目前还没有 gRPC 和 Thrift 对比的官方结果，但一些在线资源对比了两者的性能，结果显示 Thrift 的数据表现更好。然而，gRPC 的绝大多数发布版本经过了大量的性能测试。因此，性能问题不太可能是选择 Thrift 而非 gRPC 的决定性因素。同时，一些其他 RPC 框架提供了类似的功能，但不管怎样，gRPC 是目前最标准、最具交互性和采用范围最广的 RPC 技术，处于领先地位。</p>
+<h4 id="GraphQL"><a href="#GraphQL" class="headerlink" title="GraphQL"></a>GraphQL</h4><p>GraphQL 是另一项越来越流行的进程间通信技术，该项目由 Facebook 发起并通过开源进行了标准化。它是一门针对 API 的查询语言，并且是基于既有数据满足这些查询的运行时。GraphQL 为传统的客户端–服务器端通信提供了一种完全不同的方法，该方法允许客户端定义希望获得的数据、获取数据的方式以及数据格式。gRPC 则有针对远程方法的特定契约，借此实现客户端和服务器端之间的通信。</p>
+<p>GraphQL 更适合面向外部的服务或 API，它们被直接暴露给消费者。在这种情况下，消费者需要对来自服务器端的数据有更多的控制权。以在线零售应用程序场景为例，假设 ProductInfo 服务的</p>
+<p>消费者只需要关于商品的特定信息，而不是商品属性的完整集合，而且他们希望能有一种方法来指定想要的信息，那么我们可以借助 GraphQL 来建模一个服务，允许消费者使用 GraphQL 查询语言来查询服务并获取想要的信息。</p>
+<p>在 GraphQL 和 gRPC 的大多数使用场景中，GraphQL 用于面向外部的服务或 API，而支撑 API 的内部服务则使用 gRPC 来实现。</p>
+<p>接下来看一些实际的 gRPC 采用者及其使用场景。</p>
+<h1 id="gRPC的通信模式"><a href="#gRPC的通信模式" class="headerlink" title="gRPC的通信模式"></a>gRPC的通信模式</h1><h2 id="一元RPC模式"><a href="#一元RPC模式" class="headerlink" title="一元RPC模式"></a>一元RPC模式</h2><p>在一元 RPC 模式中，gRPC 服务器端和 gRPC 客户端在通信时始终是请求响应一一对应。</p>
+<h3 id="创建服务定义"><a href="#创建服务定义" class="headerlink" title="创建服务定义"></a>创建服务定义</h3><blockquote>
+<p>具体 protobuf 使用见《RPC Protobuf框架》</p>
+</blockquote>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">syntax = <span class="string">&quot;proto3&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;google/protobuf/wrappers.proto&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">option</span> java_multiple_files = <span class="literal">true</span>;</span><br><span class="line"><span class="keyword">option</span> java_package = <span class="string">&quot;io.github.elijah.communication&quot;</span>;</span><br><span class="line"><span class="keyword">option</span> java_outer_classname = <span class="string">&quot;Message&quot;</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> communication;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">service</span> <span class="title">ComMsg</span> </span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">rpc</span> get(google.protobuf.Int32Value) <span class="keyword">returns</span> (Response) </span>&#123;&#125;</span><br><span class="line">  <span class="function"><span class="keyword">rpc</span> set(Request) <span class="keyword">returns</span> (Response) </span>&#123;&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Request</span> </span>&#123;</span><br><span class="line">  <span class="built_in">int32</span> id = <span class="number">1</span>;</span><br><span class="line">  <span class="built_in">string</span> value = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">message</span> <span class="title">Response</span> </span>&#123;</span><br><span class="line">  <span class="built_in">int32</span> id = <span class="number">1</span>;</span><br><span class="line">  <span class="built_in">string</span> value = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="实现Grpc服务端"><a href="#实现Grpc服务端" class="headerlink" title="实现Grpc服务端"></a>实现Grpc服务端</h3><p>首先先要实现 *ImplBase 抽象类，重载定义的 rpc 接口逻辑。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//继承插件ComMsgImplBase，重载服务端处理逻辑</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComMsgServerImpl</span> <span class="keyword">extends</span> <span class="title">ComMsgGrpc</span>.<span class="title">ComMsgImplBase</span> </span>&#123;</span><br><span class="line">    <span class="comment">//重载方法</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">get</span><span class="params">(Int32Value request, StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//responseObserver用来发送响应给客户端并关闭流</span></span><br><span class="line">        <span class="keyword">int</span> value = request.getValue();</span><br><span class="line">        <span class="keyword">if</span> (value &gt; <span class="number">0</span>) &#123;</span><br><span class="line">            Response response = Response.newBuilder()</span><br><span class="line">                    .setValue(<span class="string">&quot;OK&quot;</span>).build();</span><br><span class="line">            <span class="comment">//发送响应给客户端</span></span><br><span class="line">            responseObserver.onNext(response);</span><br><span class="line">            <span class="comment">//通过关闭流终结客户端调用</span></span><br><span class="line">            responseObserver.onCompleted();</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">//发送错误给客户端</span></span><br><span class="line">            responseObserver.onError(<span class="keyword">new</span> IllegalArgumentException(<span class="string">&quot;无效参数&quot;</span>));</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">set</span><span class="params">(Request request, StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>.set(request, responseObserver);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>启动 Server 并阻塞该线程。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ComMsgServer</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</span><br><span class="line">        <span class="comment">//通过ServerBuilder构建Server服务端</span></span><br><span class="line">        Server server = ServerBuilder</span><br><span class="line">                .forPort(<span class="number">50051</span>)</span><br><span class="line">                .addService(<span class="keyword">new</span> ComMsgServerImpl())</span><br><span class="line">                .build()</span><br><span class="line">                .start();</span><br><span class="line">        System.out.println(<span class="string">&quot;Server start, listening on &quot;</span> + server.getPort());</span><br><span class="line">        <span class="comment">//添加运行时的Hook，使JVM在关闭时关闭gRpc服务器</span></span><br><span class="line">        Runtime.getRuntime().addShutdownHook(<span class="keyword">new</span> Thread(() -&gt; &#123;</span><br><span class="line">            System.err.println(<span class="string">&quot;Shutting down gRpc server&quot;</span>);</span><br><span class="line">            server.shutdown();</span><br><span class="line">        &#125;));</span><br><span class="line">        <span class="comment">//服务器线程会一直保持，直到线程终止</span></span><br><span class="line">        server.awaitTermination();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="实现Grpc客户端"><a href="#实现Grpc客户端" class="headerlink" title="实现Grpc客户端"></a>实现Grpc客户端</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ComMsgClient</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">        <span class="comment">//创建 gRPC 通道并指定希望连接的服务器地址和端口</span></span><br><span class="line">        ManagedChannel channel = ManagedChannelBuilder</span><br><span class="line">                .forAddress(<span class="string">&quot;127.0.0.1&quot;</span>, <span class="number">50059</span>)</span><br><span class="line">                <span class="comment">//启用了明文(plaintext)，这意味着在客户端和服务器端之间建立的连接不安全。</span></span><br><span class="line">                .usePlaintext()</span><br><span class="line">                .build();</span><br><span class="line">        <span class="comment">//创建Stub，Stub类型不同决定着接收响应的行为</span></span><br><span class="line">        ComMsgGrpc.ComMsgBlockingStub stub = ComMsgGrpc.newBlockingStub(channel);</span><br><span class="line">        Response response = stub.get(Int32Value.of(<span class="number">1</span>));</span><br><span class="line">        System.out.println(response);</span><br><span class="line">        <span class="comment">//关闭连接，回收相应资源</span></span><br><span class="line">        channel.shutdown();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="服务端流RPC模式"><a href="#服务端流RPC模式" class="headerlink" title="服务端流RPC模式"></a>服务端流RPC模式</h2><p>在流 RPC 模式中，服务端在接收到客户端请求消息后，会发送一个响应序列。这种多个响应所组成的序列也被称为“流”。在将所有的服务器端响应发送完毕之后，服务器端会以 trailer 元数据的形式将其状态发送给客户端，从而标记流的结束。</p>
+<p><strong>创建服务定义</strong></p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//...</span></span><br><span class="line"><span class="class"><span class="keyword">service</span> <span class="title">ComMsg</span> </span>&#123;</span><br><span class="line">  <span class="comment">//为Response，也就是服务器返回数据类型加上 stream 关键字</span></span><br><span class="line">  <span class="function"><span class="keyword">rpc</span> get(google.protobuf.Int32Value) <span class="keyword">returns</span> (stream Response) </span>&#123;&#125;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC服务端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//继承插件ComMsgImplBase，重载服务端处理逻辑</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComMsgServerImpl</span> <span class="keyword">extends</span> <span class="title">ComMsgGrpc</span>.<span class="title">ComMsgImplBase</span> </span>&#123;</span><br><span class="line">  <span class="meta">@Override</span></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">get</span><span class="params">(Int32Value request, StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">    <span class="comment">//发送响应给客户端</span></span><br><span class="line">    responseObserver.onNext(response);</span><br><span class="line">    responseObserver.onNext(response);</span><br><span class="line">    <span class="comment">//通过关闭流终结客户端调用</span></span><br><span class="line">    responseObserver.onCompleted();</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC客户端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ComMsgClient</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> </span>&#123;</span><br><span class="line">      <span class="comment">//...</span></span><br><span class="line">      <span class="comment">//返回一个流进行读取（阻塞stub中表现形式为一个阻塞队列）</span></span><br><span class="line">      ComMsgGrpc.ComMsgBlockingStub stub = ComMsgGrpc.newBlockingStub(channel);</span><br><span class="line">      Iterator&lt;Response&gt; iterator = stub.get(Int32Value.of(<span class="number">1</span>));</span><br><span class="line">      iterator.forEachRemaining(System.out::println);</span><br><span class="line">      <span class="comment">//...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="客户端流RPC模式"><a href="#客户端流RPC模式" class="headerlink" title="客户端流RPC模式"></a>客户端流RPC模式</h2><p>在客户端流 RPC 模式中，客户端会发送多个请求给服务器端，而不再是单个请求。服务器端则会发送一个响应给客户端。但是，服务器端不一定要等到从客户端接收到所有消息后才发送响应。基于这样的逻辑，我们可以在接收到流中的一条消息或几条消息之后就发送响应，也可以在读取完流中的所有消息之后再发送响应。</p>
+<p><strong>创建服务定义</strong></p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//...</span></span><br><span class="line"><span class="class"><span class="keyword">service</span> <span class="title">ComMsg</span> </span>&#123;</span><br><span class="line">  <span class="comment">//为Request，也就是客户端输入数据类型加上 stream 关键字</span></span><br><span class="line">  <span class="function"><span class="keyword">rpc</span> get(stream google.protobuf.Int32Value) <span class="keyword">returns</span> (Response) </span>&#123;&#125;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC服务端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//继承插件ComMsgImplBase，重载服务端处理逻辑</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComMsgServerImpl</span> <span class="keyword">extends</span> <span class="title">ComMsgGrpc</span>.<span class="title">ComMsgImplBase</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> StreamObserver&lt;Int32Value&gt; <span class="title">get</span><span class="params">(StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> StreamObserver&lt;Int32Value&gt;() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onNext</span><span class="params">(Int32Value value)</span> </span>&#123;</span><br><span class="line">                System.out.println(value.getValue());</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Throwable t)</span> </span>&#123;&#125;</span><br><span class="line">            </span><br><span class="line">            <span class="comment">//由于客户端会发送多个请求，但服务端只能回一个响应，因此onNext函数要放在onCompleted中调用</span></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onCompleted</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                responseObserver.onNext(Response.newBuilder().setValue(<span class="string">&quot;OK&quot;</span>).build());</span><br><span class="line">                responseObserver.onCompleted();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">set</span><span class="params">(Request request, StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>.set(request, responseObserver);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC客户端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ComMsgClient</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException </span>&#123;</span><br><span class="line">      	<span class="comment">//...</span></span><br><span class="line">        <span class="comment">//创建Stub，必须创建异步Stub以保证消息正常传输</span></span><br><span class="line">        ComMsgGrpc.ComMsgStub stub = ComMsgGrpc.newStub(channel);</span><br><span class="line"></span><br><span class="line">      	<span class="comment">//接收服务端响应</span></span><br><span class="line">        StreamObserver&lt;Response&gt; responseStreamObserver = <span class="keyword">new</span> StreamObserver&lt;Response&gt;() &#123;</span><br><span class="line">            <span class="comment">//客户端流RPC，服务器只发送一个响应包，该函数只调用一次</span></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onNext</span><span class="params">(Response value)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Throwable t)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onCompleted</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                System.out.println(<span class="string">&quot;complete&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//发送客户端请求</span></span><br><span class="line">        StreamObserver&lt;Int32Value&gt; requestStreamObserver = stub.get(responseStreamObserver);</span><br><span class="line">        requestStreamObserver.onNext(Int32Value.of(<span class="number">1</span>));</span><br><span class="line">        requestStreamObserver.onNext(Int32Value.of(<span class="number">2</span>));</span><br><span class="line">        requestStreamObserver.onCompleted();</span><br><span class="line"></span><br><span class="line">        Thread.sleep(Integer.MAX_VALUE);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="双向流RPC模式"><a href="#双向流RPC模式" class="headerlink" title="双向流RPC模式"></a>双向流RPC模式</h2><p>在双向流 RPC 模式中，客户端以消息流的形式发送请求到服务器端，服务器端也以消息流的形式进行响应。调用必须由客户端发起，但在此之后，通信完全基于 gRPC 客户端和服务器端的应用程序逻辑。</p>
+<p><strong>创建服务定义</strong></p>
+<figure class="highlight protobuf"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//...</span></span><br><span class="line"><span class="class"><span class="keyword">service</span> <span class="title">ComMsg</span> </span>&#123;</span><br><span class="line">  <span class="comment">//为 Request 和 Response 加上 stream 关键字</span></span><br><span class="line">  <span class="function"><span class="keyword">rpc</span> get(stream google.protobuf.Int32Value) <span class="keyword">returns</span> (stream Response) </span>&#123;&#125;</span><br><span class="line">  <span class="comment">//...</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//...</span></span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC服务端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//继承插件ComMsgImplBase，重载服务端处理逻辑</span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">ComMsgServerImpl</span> <span class="keyword">extends</span> <span class="title">ComMsgGrpc</span>.<span class="title">ComMsgImplBase</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> StreamObserver&lt;Int32Value&gt; <span class="title">get</span><span class="params">(StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> StreamObserver&lt;Int32Value&gt;() &#123;</span><br><span class="line">            <span class="comment">//由于客户端会发送多个请求，服务端顺序响应，resp onNext 放在 req onNext 中</span></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onNext</span><span class="params">(Int32Value value)</span> </span>&#123;</span><br><span class="line">                System.out.println(int32Value.getValue());</span><br><span class="line">                Response response = Response.newBuilder().setValue(int32Value.getValue() + <span class="string">&quot; OK&quot;</span>).build();</span><br><span class="line">                responseObserver.onNext(response);</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Throwable t)</span> </span>&#123;&#125;</span><br><span class="line">            </span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onCompleted</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            	System.out.println(<span class="string">&quot;complete&quot;</span>);</span><br><span class="line">                responseObserver.onCompleted();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">set</span><span class="params">(Request request, StreamObserver&lt;Response&gt; responseObserver)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>.set(request, responseObserver);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>实现gRPC客户端</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ComMsgClient</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> InterruptedException </span>&#123;</span><br><span class="line">      	<span class="comment">//...</span></span><br><span class="line">        <span class="comment">//创建Stub，必须创建异步Stub以保证消息正常传输</span></span><br><span class="line">        ComMsgGrpc.ComMsgStub stub = ComMsgGrpc.newStub(channel);</span><br><span class="line"></span><br><span class="line">      	<span class="comment">//接收服务端响应</span></span><br><span class="line">        StreamObserver&lt;Response&gt; responseStreamObserver = <span class="keyword">new</span> StreamObserver&lt;Response&gt;() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onNext</span><span class="params">(Response value)</span> </span>&#123;</span><br><span class="line">                System.out.println(response);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onError</span><span class="params">(Throwable t)</span> </span>&#123;&#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onCompleted</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                System.out.println(<span class="string">&quot;complete&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//发送客户端请求</span></span><br><span class="line">        StreamObserver&lt;Int32Value&gt; requestStreamObserver = stub.get(responseStreamObserver);</span><br><span class="line">        requestStreamObserver.onNext(Int32Value.of(<span class="number">1</span>));</span><br><span class="line">        requestStreamObserver.onNext(Int32Value.of(<span class="number">2</span>));</span><br><span class="line">        requestStreamObserver.onCompleted();</span><br><span class="line"></span><br><span class="line">        Thread.sleep(Integer.MAX_VALUE);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+
+
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RPC/" rel="tag"># RPC</a>
+              <a href="/tags/gRPC/" rel="tag"># gRPC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/11/RPC-Protobuf%E6%A1%86%E6%9E%B6/" rel="prev" title="RPC ProtoBuf框架">
+      <i class="fa fa-chevron-left"></i> RPC ProtoBuf框架
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/04/12/Go-%E5%B9%B6%E5%8F%91%E4%B8%8E%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6/" rel="next" title="Go 并发与同步机制">
+      Go 并发与同步机制 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E6%8A%80%E6%9C%AF%E7%9A%84%E6%BC%94%E5%8C%96"><span class="nav-number">1.</span> <span class="nav-text">进程间通信技术的演化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%A0%E7%BB%9F%E7%9A%84RPC"><span class="nav-number">1.1.</span> <span class="nav-text">传统的RPC</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SOAP"><span class="nav-number">1.2.</span> <span class="nav-text">SOAP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#REST"><span class="nav-number">1.3.</span> <span class="nav-text">REST</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#gRPC"><span class="nav-number">1.4.</span> <span class="nav-text">gRPC</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#gRPC%E7%9A%84%E8%B5%B7%E6%BA%90"><span class="nav-number">1.4.1.</span> <span class="nav-text">gRPC的起源</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%89%E6%8B%A9gRPC%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.4.2.</span> <span class="nav-text">选择gRPC的原因</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#gRPC-%E7%9A%84%E4%BC%98%E5%8A%BF"><span class="nav-number">1.4.2.1.</span> <span class="nav-text">gRPC 的优势</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#gRPC%E7%9A%84%E5%8A%A3%E5%8A%BF"><span class="nav-number">1.4.2.2.</span> <span class="nav-text">gRPC的劣势</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#gRPC%E4%B8%8E%E5%85%B6%E4%BB%96%E5%8D%8F%E8%AE%AE%E7%9A%84%E5%AF%B9%E6%AF%94-Thrift%E5%92%8CGraphQL"><span class="nav-number">1.4.3.</span> <span class="nav-text">gRPC与其他协议的对比:Thrift和GraphQL</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Thrift"><span class="nav-number">1.4.3.1.</span> <span class="nav-text">Thrift</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#GraphQL"><span class="nav-number">1.4.3.2.</span> <span class="nav-text">GraphQL</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#gRPC%E7%9A%84%E9%80%9A%E4%BF%A1%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">gRPC的通信模式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E5%85%83RPC%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.1.</span> <span class="nav-text">一元RPC模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E6%9C%8D%E5%8A%A1%E5%AE%9A%E4%B9%89"><span class="nav-number">2.1.1.</span> <span class="nav-text">创建服务定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0Grpc%E6%9C%8D%E5%8A%A1%E7%AB%AF"><span class="nav-number">2.1.2.</span> <span class="nav-text">实现Grpc服务端</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0Grpc%E5%AE%A2%E6%88%B7%E7%AB%AF"><span class="nav-number">2.1.3.</span> <span class="nav-text">实现Grpc客户端</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E7%AB%AF%E6%B5%81RPC%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">服务端流RPC模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF%E6%B5%81RPC%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.3.</span> <span class="nav-text">客户端流RPC模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8C%E5%90%91%E6%B5%81RPC%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.4.</span> <span class="nav-text">双向流RPC模式</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Elijah</p>
+  <div class="site-description" itemprop="description">Leave a trace</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">73</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">222</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Elijah</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
