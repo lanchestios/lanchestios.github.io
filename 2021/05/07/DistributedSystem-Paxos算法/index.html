@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"elijahte.gitee.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Google Chubby 的作者 Mike Burrows 说过这个世界上只有一种一致性算法，那就是 Paxos，其它的算法都是残次品。 Paxos 问题指分布式系统中存在故障（Fault），但不存在恶意 corrupt 节点场景（消息可能丢失但不会造假）下的共识达成（Consensus）问题。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分布式系统 paxos算法">
+<meta property="og:url" content="http://elijahte.gitee.io/2021/05/07/DistributedSystem-Paxos%E7%AE%97%E6%B3%95/index.html">
+<meta property="og:site_name" content="Elijah&#39;s Blog">
+<meta property="og:description" content="Google Chubby 的作者 Mike Burrows 说过这个世界上只有一种一致性算法，那就是 Paxos，其它的算法都是残次品。 Paxos 问题指分布式系统中存在故障（Fault），但不存在恶意 corrupt 节点场景（消息可能丢失但不会造假）下的共识达成（Consensus）问题。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos单体架构.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos多Proposer架构.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/PaxosChosenValue.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/PaxosChosenValueDetail.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos多Acceptor架构.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos单LearnerLeader架构.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos多LearnerLeader架构.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/paxos%E6%B4%BB%E9%94%81.png">
+<meta property="og:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84.png">
+<meta property="article:published_time" content="2021-05-07T11:51:14.000Z">
+<meta property="article:modified_time" content="2021-05-07T13:12:47.787Z">
+<meta property="article:author" content="Elijah">
+<meta property="article:tag" content="Distributed System">
+<meta property="article:tag" content="Paxos">
+<meta property="article:tag" content="Originality">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://elijahte.gitee.io/images/DistributedSystem/Paxos单体架构.png">
+
+<link rel="canonical" href="http://elijahte.gitee.io/2021/05/07/DistributedSystem-Paxos%E7%AE%97%E6%B3%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>分布式系统 paxos算法 | Elijah's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Elijah's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://elijahte.gitee.io/2021/05/07/DistributedSystem-Paxos%E7%AE%97%E6%B3%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Elijah">
+      <meta itemprop="description" content="Leave a trace">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Elijah's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          分布式系统 paxos算法
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2021-05-07 19:51:14 / Modified: 21:12:47" itemprop="dateCreated datePublished" datetime="2021-05-07T19:51:14+08:00">2021-05-07</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Distributed-System/" itemprop="url" rel="index"><span itemprop="name">Distributed System</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Google Chubby 的作者 Mike Burrows 说过这个世界上只有一种一致性算法，那就是 Paxos，其它的算法都是残次品。</p>
+<p>Paxos 问题指分布式系统中存在故障（Fault），但不存在恶意 corrupt 节点场景（消息可能丢失但不会造假）下的共识达成（Consensus）问题。</p>
+<a id="more"></a>
+
+<h1 id="背景介绍"><a href="#背景介绍" class="headerlink" title="背景介绍"></a>背景介绍</h1><p>现在，我们来想像一个充满了民主与法制的联邦议会，有三种角色参会：</p>
+<ul>
+<li>Proposer：发起提案的<strong>提议员</strong></li>
+<li>Acceptor：给每个提案投票的<strong>议员</strong>，如果大多数议员同意则通过提案</li>
+<li>Learner：<strong>记录员</strong>记录议员们通过的提案</li>
+</ul>
+<blockquote>
+<p>当然，总有人身兼多职，例如：A 是 Proposer、Acceptor、Learner 三位一体的工具人。 </p>
+</blockquote>
+<p>在议会中，需要由 Proposer 先发起一个提议，Accptors 为该提案投票，通过提案后 Learners 进行相关的记录。而在这个过程中，交流（communication）必然是少不了的。 </p>
+<p>那么，将该议会制度代入二进制世界。首先需要我们解决的问题是议会中人们的交流问题。而对于我们的目标（实现分布式系统）来说，要解决的就是不同主机相互之间的交流问题。当然我们可以通过各式各样的方法传递数据，当然最通用也最适合分布式定义的方式当然是通过网络传输的 HTTP/TCP 协议了。</p>
+<p>因此，我们也需要对网络的传输特性有所了解：</p>
+<ol>
+<li><p>网络传输是异步的。</p>
+<p>当然这不是必须的，但与此同时你也要接受你实现的系统运行速度可以与乌龟比速度的事实以及一旦出现了死锁或其他问题导致的整个系统不可用。造成的结果已经至少违反了 CAP 理论中的 AP 了。</p>
+</li>
+<li><p>网络传输的不确定性。</p>
+<p>通常情况下，网络数据包会以一个比较稳定的速度到达它的目的地。但也会发生一些意外：丢包、断连、重复包。甚至会因为网络拥塞导致同时发的包到达相同目的地的时间差距很大。</p>
+</li>
+</ol>
+<p>当然，不仅仅要考虑网络的原因，我们还要考虑作为议会参与者对应的机器的问题：</p>
+<ol>
+<li>无法与其他参与者通过网络通信</li>
+<li>因各种各样的问题断电或者终止程序的运行</li>
+<li>终止后重启，重新参会的问题</li>
+<li>…..</li>
+</ol>
+<p>好了，万事开头难，二进制世界总是从第一个 0/1 开始，随后将不断出现的问题加以解决，画上一个看不到结尾的句号。</p>
+<h1 id="提出提案"><a href="#提出提案" class="headerlink" title="提出提案"></a>提出提案</h1><p>一个有容错（fault-tolerant）能力的分布式系统需要满足哪些基本条件：</p>
+<ul>
+<li>当没有提案（proposal）出现时，不会改变记录员（learner）记录的内容。</li>
+<li>对于同一个提案编号（proposal number）有多个提案值（proposal value）时，最终只会选择一个唯一的值。</li>
+<li>记录员应该记录被议员（Acceptors）通过的提案值。</li>
+</ul>
+<p>在分布式系统中，我们不能强求其拥有像本地数据库一样的 ACID 能力。</p>
+<blockquote>
+<p>原因是多种多样的，例如：无法避免的网络延迟、网络闪断等。</p>
+</blockquote>
+<p>但我们可以保证其 BASE 能力，计算机的世界总是充满了权衡的味道。</p>
+<blockquote>
+<p>注意，Paxos 只对一个值（accepted value）的提案进行了描述，即所有的提案都是针对同一个值进行改变。例如：A 发起一个提案将 accepted value 值修改为 5，随后 B 发起一个提案将 accepted value 值修改为 2。</p>
+</blockquote>
+<h1 id="选择唯一的提案（Choosing-a-Value）"><a href="#选择唯一的提案（Choosing-a-Value）" class="headerlink" title="选择唯一的提案（Choosing a Value）"></a>选择唯一的提案（Choosing a Value）</h1><h2 id="单议员场景（Single-Acceptor）"><a href="#单议员场景（Single-Acceptor）" class="headerlink" title="单议员场景（Single Acceptor）"></a>单议员场景（Single Acceptor）</h2><p>我们来考虑一个最简单的情况，议会中只有一个 Proposer、Acceptor 和 Learner。每个提案被 Proposer 发起后，Acceptor 直接同意提案并由 Learner 记录结果。</p>
+<img src="/images/DistributedSystem/Paxos单体架构.png" style="zoom:60%;" />
+
+<p>显然，三个角色无论哪一个不能正常运行，都会导致整个系统的不可用。这可不是我们想看到的。</p>
+<h2 id="多议员场景（Mutiple-Acceptors）"><a href="#多议员场景（Mutiple-Acceptors）" class="headerlink" title="多议员场景（Mutiple Acceptors）"></a>多议员场景（Mutiple Acceptors）</h2><p>由于多个 Acceptors 出现在我们的议会中，对于每一个 Proposer 发起的提议，每个 Acceptor 都会对提案发表自己的意见（同意、拒绝、弃权）。</p>
+<blockquote>
+<p>当然，正常情况下 Acceptor 不会弃权，这种情况只出现在网络断连等特殊情况。</p>
+</blockquote>
+<p>议员当然不能毫无目的的发表自己的看法，他们也需要一个共同的核心价值观：喜新厌旧。没错，这是根据数据的特性来确定的。例如，作者今年 22 岁，到了明年涨到了 23 岁，而作者用户信息栏中的 22 岁就会变得毫无意义。而对于未填写的年龄信息来说，22 岁这条信息就比未填写更新更有意义。</p>
+<p>那么，如何在如此多的意见中公平的选出一个最终的唯一的结果呢？</p>
+<p>结论就是选出一个大多数（majority）议员都同意的结果。也就是我们常说的少数服从多数，用数学公式来表示为 $\lfloor acceptors.size / 2 \rfloor + 1$。</p>
+<p>当然，大多数原则也还是太过的虚幻，我们还是举个例子来说明其科学性。假设我们有 5 位记录员记录通过的提案，但在将「accepted proposal number，accepted value」从「OLD，1」 修改为「NEW，2」这个提案时发生了意外，其中两位记录员由于走神没有记录下这个提案的结果，但还是有三个记录员记录成功了该提案，因此提案通过。当我们现在想知道该提案的结果时，只需要随便选三个记录员问一下他们记录的内容，选取其中 proposal number 最新的即可，假设我们的运气太不好了恰好问到了走神的两位记录员，但我们还是会从第三位记录员口中得知「NEW，2」这个最新的结果。与此相反的是，假设三位记录员都没有记录成功最新提案，但提案又被错误地通过了，随便找三位记录员询问记录结果时就会有几率询问到错误的结果（或过期的数据）。因此，我们要保证只有过半的人都成功记录了提案，才可以通过提案。</p>
+<blockquote>
+<p>我们这里引入了 proposal number 这个概念，其作用就是以一个递增序列的形式标记提案，数字最大的就可以认为是最新的提案。</p>
+</blockquote>
+<p>此时，我们应该将现实世界中的多议员的场景考虑的比较全面了。</p>
+<h2 id="多提议员场景（Multiple-Proposers）"><a href="#多提议员场景（Multiple-Proposers）" class="headerlink" title="多提议员场景（Multiple Proposers）"></a>多提议员场景（Multiple Proposers）</h2><p>和现实世界不同的是，二进制世界还有一个颇为常见的场景：并行场景。即在一种极端情况下，两个 Proposers 同一时间提出了自己的提案，由于多个 Proposers 不会共享他们的 proposal number，因此 Acceptor 可能会或快或慢的接收到两个相同 proposal number 的提案。</p>
+<img src="/images/DistributedSystem/Paxos多Proposer架构.png" style="zoom:60%;" />
+
+<p>对于 Acceptor 来说，最先接收到的提案根据喜新厌旧的原则是必然会被同意的，而后面紧随其后的相同提案编号（proposal number）的提案由于不是最新的数据，所以会拒绝该提案。</p>
+<blockquote>
+<p>需要注意的是，对于 Acceptor 来说，是否是新的数据完全取决于 proposal number，与 proposal value 毫无关系。 </p>
+</blockquote>
+<p>因此，到这一步来说可以分为两种情况进行讨论：Acceptors 个数为奇数、Acceptors 个数为偶数。</p>
+<p>如果是奇数，无论如何接收提案，总会有过半的 Acceptors 同意某一提案，而拒绝另一提案。</p>
+<p>但如果是偶数，有一半的 Acceptors 同意了 A 提案，另一半同意了 B 提案。两者都没有过半，因此都会被拒绝。</p>
+<p>此时我们发现，在设备正常运转的情况下，同样的输入但造成的结果却是不确定的，这显然无法满足算法的基本特性：确定性。</p>
+<blockquote>
+<p>当然，保证两个 proposal number 在 Proposals 不相互通信的情况下不同还是比较简单的，例如可以通过 <code>timestamp-serverId-counter</code> 的数据格式来保证。这里不是重点，感兴趣的读者可以参考《分布式系统 分布式ID生成方案》的几种核心思想。</p>
+</blockquote>
+<h2 id="过期数据场景（Expiration-Data）"><a href="#过期数据场景（Expiration-Data）" class="headerlink" title="过期数据场景（Expiration Data）"></a>过期数据场景（Expiration Data）</h2><p>在网络分区或其他场景影响下，也会造成这样一种情况（情况很多），Acceptor 会接收到的 proposal number 比在自身中记录的 accepted proposal number 低的提案。这显然是因为其他 Acceptor 存在旧数据造成的。 </p>
+<p>解决方案当然是将已经记录的相对更新的数据记录传播到其他的 Learner 中并记录。当一个提案被 Proposer 提出，传播到多个 Acceptors 时，Acceptor 会发现接收到的 proposal number 比在自身中记录的 accepted proposal number 低的提案。这显然是因为其他 Acceptors 存在旧数据造成的。因此我们只需要将已经通过的最新提案返回到 Proposer，Proposer 根据返回的记录中最新提案重新修改 proposal 的内容，并再次 issue proposal 即可将全部节点更新为最新提案。</p>
+<p>因此我们将整个提交过程分为两个阶段：prepare 阶段和 accept 阶段。</p>
+<img src="/images/DistributedSystem/PaxosChosenValue.png" style="zoom:67%;" />
+
+<p>并且基于上述思想，我们还可以在不影响数据正确性的前提下做进一步优化：Acceptor 会分别记录 prepare 和 accept 两阶段所接收的最新 proposal number，并直接忽略低于对应阶段 proposal number 的网络包。</p>
+<p>具体的操作流程如下图：</p>
+<p><img src="/images/DistributedSystem/PaxosChosenValueDetail.png"></p>
+<p>以下是上图的详细描述：</p>
+<p><strong>第一阶段</strong></p>
+<p>提议员（Proposer）选择一个提议编号 pn，并向所有议员（Acceptor）广播一个编号 pn 的 <code>Prepare(n)</code> 请求。</p>
+<p>如果议员（Acceptor）收到的准备请求的编号 n 大于其已答复的任何准备 Prepare 请求的编号，则议员（Acceptor）对该请求作出答复，并承诺 <code>Promised(pn)</code> 不接受任何编号小于 pn 且其已接受的编号最高的提案。</p>
+<p><strong>第二阶段</strong></p>
+<p>如果提议员（Proposer）从大多数议员（Acceptor）处收到对其准备请求（编号 pn）的响应，则它向这些接受人中的每一个发送一个接受请求，请求编号 pn 的提案，其值为 pv。如果没有发现有一个议员（Acceptor）接受过一个 pv，那么向所有的议员（Acceptor）发起自己的值和提议编号 pn，否则，从所有接受过的值中选择对应的提议编号最大的，作为提议的值。</p>
+<p>如果议员（Acceptor）收到编号为 pn 的提案的接受请求，则除非议员（Acceptor）已对编号大于 pn 的准备请求作出响应，否则接受该提案。</p>
+<h1 id="记录通过的提案（Learning-a-Chosen-Value）"><a href="#记录通过的提案（Learning-a-Chosen-Value）" class="headerlink" title="记录通过的提案（Learning a Chosen Value）"></a>记录通过的提案（Learning a Chosen Value）</h1><p>在 $N \times Acceptor$  及 $M \times Learner$  的场景下，网络中一次 learn 操作会造成 $N \times M$ 量级的数据包 request &amp; response。 </p>
+<img src="/images/DistributedSystem/Paxos多Acceptor架构.png" style="zoom: 50%;" />
+
+<p>而选取 Learner Leader 可以将网络中数据包量级压缩到 $N + M$。但一旦 Learner Leader 宕机，整个系统也会不可用。</p>
+<img src="/images/DistributedSystem/Paxos单LearnerLeader架构.png" style="zoom:50%;" />
+
+<p>这时我们可以选取多个 Learner Leader 来补充系统的可用性，但会对系统复杂度造成进一步的提升。</p>
+<img src="/images/DistributedSystem/Paxos多LearnerLeader架构.png" style="zoom:50%;" />
+
+<h1 id="FIX"><a href="#FIX" class="headerlink" title="FIX"></a>FIX</h1><h2 id="FIX-Leader机制"><a href="#FIX-Leader机制" class="headerlink" title="FIX Leader机制"></a>FIX Leader机制</h2><p>现在，我们将上面描述中讲的问题总结一下：</p>
+<ol>
+<li><p>在多提议员的场景下，我们要保证每个提议员发出的议案编号全局唯一。</p>
+<blockquote>
+<p>避免数据混乱，维持算法确定性。</p>
+</blockquote>
+</li>
+<li><p>在多议员和多记录员的场景下，我们最好保证记录员有 Leader 负责从 Acceptor 接收通过的提案以及将该提案传播给其他 Learner。</p>
+<blockquote>
+<p>优化网络中网络包的数量。</p>
+</blockquote>
+</li>
+</ol>
+<p>另外，过期数据场景中提到的方案也会造成新的问题——活锁（Live Lock）。</p>
+<p>Paxos 算法可能形成活锁而永远不会结束，如下图实例所示：</p>
+<p><img src="/images/DistributedSystem/paxos%E6%B4%BB%E9%94%81.png"></p>
+<p>回顾两个承诺之一，Acceptor 不再应答 proposal number 小于等于当前请求的 prepare 请求。意味着需要应答 proposal number 大于当前请求的 prepare 请求。两个 Proposers 交替 Prepare 成功，而 Accept 失败，形成活锁。</p>
+<p>当然，选举一个 Proposer Leader 是可以解决活锁的问题的，顺便也能把上述 proposal number 全局号唯一的问题解决了。</p>
+<p>针对上述问题且依据上文描述，Paxos 系统时需要拥有以下特性：</p>
+<ul>
+<li>Proposers 需要 Leader</li>
+<li>Learners 需要 Leader</li>
+<li>引入对上述两种 Leader 实施的可用性方案</li>
+<li>实现两阶段提交的议题选择方案</li>
+</ul>
+<p>引入 Proposal Leader 和 Learner Leader，我们再来看看当前 Paxos 系统的结构吧。</p>
+<p><img src="/images/DistributedSystem/Paxos%E6%95%B4%E4%BD%93%E6%9E%B6%E6%9E%84.png"></p>
+<p>Proposer Leader 的出现实现了 request 的序列化，它让每个接收到的 command 以队列的形式进行 issue proposal 的操作并保证了大多数 command 的正确执行。但也只是大多数，请求仍然会因为网络故障以及“Split Brain“的问题提交失败。</p>
+<h2 id="FIX-Leader选举"><a href="#FIX-Leader选举" class="headerlink" title="FIX Leader选举"></a>FIX Leader选举</h2><h2 id="FIX-状态机机制"><a href="#FIX-状态机机制" class="headerlink" title="FIX 状态机机制"></a>FIX 状态机机制</h2>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Distributed-System/" rel="tag"># Distributed System</a>
+              <a href="/tags/Paxos/" rel="tag"># Paxos</a>
+              <a href="/tags/Originality/" rel="tag"># Originality</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/28/Math-%E5%8A%A0%E5%AF%86%E7%AE%97%E6%B3%95/" rel="prev" title="Math 加密算法">
+      <i class="fa fa-chevron-left"></i> Math 加密算法
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">背景介绍</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8F%90%E5%87%BA%E6%8F%90%E6%A1%88"><span class="nav-number">2.</span> <span class="nav-text">提出提案</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E5%94%AF%E4%B8%80%E7%9A%84%E6%8F%90%E6%A1%88%EF%BC%88Choosing-a-Value%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">选择唯一的提案（Choosing a Value）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%95%E8%AE%AE%E5%91%98%E5%9C%BA%E6%99%AF%EF%BC%88Single-Acceptor%EF%BC%89"><span class="nav-number">3.1.</span> <span class="nav-text">单议员场景（Single Acceptor）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%9A%E8%AE%AE%E5%91%98%E5%9C%BA%E6%99%AF%EF%BC%88Mutiple-Acceptors%EF%BC%89"><span class="nav-number">3.2.</span> <span class="nav-text">多议员场景（Mutiple Acceptors）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A4%9A%E6%8F%90%E8%AE%AE%E5%91%98%E5%9C%BA%E6%99%AF%EF%BC%88Multiple-Proposers%EF%BC%89"><span class="nav-number">3.3.</span> <span class="nav-text">多提议员场景（Multiple Proposers）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%87%E6%9C%9F%E6%95%B0%E6%8D%AE%E5%9C%BA%E6%99%AF%EF%BC%88Expiration-Data%EF%BC%89"><span class="nav-number">3.4.</span> <span class="nav-text">过期数据场景（Expiration Data）</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AE%B0%E5%BD%95%E9%80%9A%E8%BF%87%E7%9A%84%E6%8F%90%E6%A1%88%EF%BC%88Learning-a-Chosen-Value%EF%BC%89"><span class="nav-number">4.</span> <span class="nav-text">记录通过的提案（Learning a Chosen Value）</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#FIX"><span class="nav-number">5.</span> <span class="nav-text">FIX</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#FIX-Leader%E6%9C%BA%E5%88%B6"><span class="nav-number">5.1.</span> <span class="nav-text">FIX Leader机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FIX-Leader%E9%80%89%E4%B8%BE"><span class="nav-number">5.2.</span> <span class="nav-text">FIX Leader选举</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FIX-%E7%8A%B6%E6%80%81%E6%9C%BA%E6%9C%BA%E5%88%B6"><span class="nav-number">5.3.</span> <span class="nav-text">FIX 状态机机制</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Elijah</p>
+  <div class="site-description" itemprop="description">Leave a trace</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">232</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Elijah</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
