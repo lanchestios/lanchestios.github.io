@@ -34,12 +34,11 @@
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/HashMap-Hash1.png">
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/HashMap-Hash2.png">
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/%E5%AE%B9%E9%87%8F%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F.png">
-<meta property="og:image" content="http://elijahte.gitee.io/images/JDK/HashMap-resize.png">
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/CopyOnWriteArrayListSet.jpg">
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/JUCMap.jpg">
 <meta property="og:image" content="http://elijahte.gitee.io/images/JDK/JUCQueue.jpg">
 <meta property="article:published_time" content="2021-01-20T13:34:09.000Z">
-<meta property="article:modified_time" content="2021-03-27T08:52:28.000Z">
+<meta property="article:modified_time" content="2021-06-23T13:16:02.213Z">
 <meta property="article:author" content="Elijah">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="Collections Framework">
@@ -236,7 +235,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2021-03-27 16:52:28" itemprop="dateModified" datetime="2021-03-27T16:52:28+08:00">2021-03-27</time>
+                <time title="Modified: 2021-06-23 21:16:02" itemprop="dateModified" datetime="2021-06-23T21:16:02+08:00">2021-06-23</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -341,7 +340,7 @@
 <td>效果基本同上，并牺牲一定的性能以维护保存插入顺序的双向链表</td>
 </tr>
 </tbody></table>
-<h1 id="Design-Points"><a href="#Design-Points" class="headerlink" title="Design Points"></a>Design Points</h1><h2 id="fail-fast机制"><a href="#fail-fast机制" class="headerlink" title="fail-fast机制"></a>fail-fast机制</h2><p>fail-fast 产生的原因就在于程序在对 Collection 进行迭代时，对该 Collection 在结构/属性上对其做了修改（调用了不属于当前 Iterator 的方法进行修改），这时迭代器就会抛出 ConcurrentModificationException 异常信息，从而产生 fail-fast。但要注意，该机制如果是在单线程的情况下，迭代器的快速失败行为可以保证；但在多线程的情况下，迭代器的快速失败行为不能保证一定会发生，因此 ConcurrentModificationException 应只是用来检测 bug。</p>
+<h1 id="Design-Points"><a href="#Design-Points" class="headerlink" title="Design Points"></a>Design Points</h1><h2 id="Fail-Fast机制"><a href="#Fail-Fast机制" class="headerlink" title="Fail-Fast机制"></a>Fail-Fast机制</h2><p>fail-fast 产生的原因就在于程序在对 Collection 进行迭代时，对该 Collection 在结构/属性上对其做了修改（调用了不属于当前 Iterator 的方法进行修改），这时迭代器就会抛出 ConcurrentModificationException 异常信息，从而产生 fail-fast。但要注意，该机制如果是在单线程的情况下，迭代器的快速失败行为可以保证；但在多线程的情况下，迭代器的快速失败行为不能保证一定会发生，因此 ConcurrentModificationException 应只是用来检测 bug。</p>
 <p>下图为多线程情况下 ArrayList fail-fast 无法保证的情况</p>
 <p><img src="/images/JDK/Collection-FailFast.png"></p>
 <h2 id="Hash计算方式"><a href="#Hash计算方式" class="headerlink" title="Hash计算方式"></a>Hash计算方式</h2><blockquote>
@@ -355,7 +354,7 @@
 <p>由于hash 值的高位都被上述与操作置为 0，因此 index 仅与 hash 值的低 n 位有关。</p>
 <p><img src="/images/JDK/HashMap-Hash2.png"></p>
 <p>由上图可以看到，只有 hash 值的低4位参与了运算。</p>
-<p>这样做很容易产生碰撞。设计者权衡了 speed、utility and quality，将高16位与低16位异或来减少这种影响。设计者考虑到现在的 hashCode 分布的已经很不错了，而且当发生较大碰撞时也用树形存储降低了冲突。仅仅异或一下，既减少了系统的开销，也不会造成的因为高位没有参与下标的计算（table长度比较小时），从而引起的碰撞。</p>
+<p>这样做很容易产生碰撞。设计者权衡了 speed、utility and quality，将高 16 位与低 16 位异或来减少这种影响。设计者考虑到现在的 hashCode 分布的已经很不错了，而且当发生较大碰撞时也用树形存储降低了冲突。仅仅异或一下，既减少了系统的开销，也不会造成的因为高位没有参与下标的计算（table长度比较小时），从而引起的碰撞。</p>
 <h2 id="容量标准化方式"><a href="#容量标准化方式" class="headerlink" title="容量标准化方式"></a>容量标准化方式</h2><blockquote>
 <p>分析实现类：HashMap</p>
 </blockquote>
@@ -367,20 +366,6 @@
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">int</span> n = cap - <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
 <p>让 cap - 1 再赋值给 n 的目的是另找到的目标值大于或等于原值。</p>
 <p>例如二进制 1000 ，十进制数值为 8 。如果不对它减 1 而直接操作，将得到答案 10000 ，即 16 。显然不是结果。减 1 后二进制为 111 ，再进行操作则会得到原来的数值 1000 ，即 8 。</p>
-<h2 id="碰撞扩容"><a href="#碰撞扩容" class="headerlink" title="碰撞扩容"></a>碰撞扩容</h2><blockquote>
-<p>分析实现类：HashMap</p>
-</blockquote>
-<p>HashMap 的实例有两个参数影响其性能：“容量” 和 “加载因子”。当哈希表中现有元素与当前容器容量之比超过了加载因子规定的数值，则要进行 rehash 操作。如果散列表里有很多映射，初始化一个足够大的容量以便减少自动哈希次数。通常，默认加载因子是 0.75，这是在时间和空间成本上寻求一种折衷。加载因子过高虽然减少了空间开销，但同时也增加了查询成本。</p>
-<p>对于 rehash 触发的扩容操作，那么必须 Map 中的所有的数进行再散列，重新装入。在扩充 HashMap 的时候，不需要像 JDK1.7 的实现那样重新计算 hash，只需要进行简单的判断即可。</p>
-<p><img src="/images/JDK/HashMap-resize.png"></p>
-<p>可以看出，对应容量倍增后扩张的对应 bit 位：如果是 0，索引不变（对应 key1 情况）；如果是 1，索引变为 <code>原索引 + 原容量</code>。</p>
-<h2 id="红黑树树化"><a href="#红黑树树化" class="headerlink" title="红黑树树化"></a>红黑树树化</h2><blockquote>
-<p>分析实现类：HashMap</p>
-</blockquote>
-<p>通过阈值来控制将哈希碰撞后形成的链表转化为红黑树的过程。</p>
-<blockquote>
-<p>红黑树的原理详见 《数据结构 红黑树》</p>
-</blockquote>
 <h1 id="Concurrent-Collections"><a href="#Concurrent-Collections" class="headerlink" title="Concurrent Collections"></a>Concurrent Collections</h1><p>Concurrent Collections 本质上是对 JUC 锁的应用，因此在此简单介绍即可。</p>
 <h2 id="List和Set"><a href="#List和Set" class="headerlink" title="List和Set"></a>List和Set</h2><p><img src="/images/JDK/CopyOnWriteArrayListSet.jpg"></p>
 <table>
@@ -556,7 +541,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Collection-Layout"><span class="nav-number">1.</span> <span class="nav-text">Collection Layout</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Compare-Collections"><span class="nav-number">2.</span> <span class="nav-text">Compare Collections</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Design-Points"><span class="nav-number">3.</span> <span class="nav-text">Design Points</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#fail-fast%E6%9C%BA%E5%88%B6"><span class="nav-number">3.1.</span> <span class="nav-text">fail-fast机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hash%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">Hash计算方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%B9%E9%87%8F%E6%A0%87%E5%87%86%E5%8C%96%E6%96%B9%E5%BC%8F"><span class="nav-number">3.3.</span> <span class="nav-text">容量标准化方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A2%B0%E6%92%9E%E6%89%A9%E5%AE%B9"><span class="nav-number">3.4.</span> <span class="nav-text">碰撞扩容</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E6%A0%91%E5%8C%96"><span class="nav-number">3.5.</span> <span class="nav-text">红黑树树化</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Concurrent-Collections"><span class="nav-number">4.</span> <span class="nav-text">Concurrent Collections</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#List%E5%92%8CSet"><span class="nav-number">4.1.</span> <span class="nav-text">List和Set</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Map"><span class="nav-number">4.2.</span> <span class="nav-text">Map</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Queue"><span class="nav-number">4.3.</span> <span class="nav-text">Queue</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Collection-Layout"><span class="nav-number">1.</span> <span class="nav-text">Collection Layout</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Compare-Collections"><span class="nav-number">2.</span> <span class="nav-text">Compare Collections</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Design-Points"><span class="nav-number">3.</span> <span class="nav-text">Design Points</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Fail-Fast%E6%9C%BA%E5%88%B6"><span class="nav-number">3.1.</span> <span class="nav-text">Fail-Fast机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hash%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">Hash计算方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%B9%E9%87%8F%E6%A0%87%E5%87%86%E5%8C%96%E6%96%B9%E5%BC%8F"><span class="nav-number">3.3.</span> <span class="nav-text">容量标准化方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Concurrent-Collections"><span class="nav-number">4.</span> <span class="nav-text">Concurrent Collections</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#List%E5%92%8CSet"><span class="nav-number">4.1.</span> <span class="nav-text">List和Set</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Map"><span class="nav-number">4.2.</span> <span class="nav-text">Map</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Queue"><span class="nav-number">4.3.</span> <span class="nav-text">Queue</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -577,13 +562,13 @@
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-count">21</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">229</span>
+        <span class="site-state-item-count">228</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
