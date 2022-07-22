@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文介绍了 Netty 构建的应用面临的相关风险以及 SSL 安全特性及 Netty 相关的源码解析等。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Netty 高安全之道">
+<meta property="og:url" content="http://example.com/2021/03/29/Netty-%E9%AB%98%E5%AE%89%E5%85%A8%E4%B9%8B%E9%81%93/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文介绍了 Netty 构建的应用面临的相关风险以及 SSL 安全特性及 Netty 相关的源码解析等。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Netty/Netty%E6%9E%84%E5%BB%BA%E5%8D%8F%E8%AE%AE.png">
+<meta property="og:image" content="http://example.com/images/Netty/SSL单向认证原理.gif">
+<meta property="article:published_time" content="2021-03-29T04:59:58.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.569Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="SSL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Netty/Netty%E6%9E%84%E5%BB%BA%E5%8D%8F%E8%AE%AE.png">
+
+<link rel="canonical" href="http://example.com/2021/03/29/Netty-%E9%AB%98%E5%AE%89%E5%85%A8%E4%B9%8B%E9%81%93/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Netty 高安全之道 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/03/29/Netty-%E9%AB%98%E5%AE%89%E5%85%A8%E4%B9%8B%E9%81%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Netty 高安全之道
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-03-29 12:59:58" itemprop="dateCreated datePublished" datetime="2021-03-29T12:59:58+08:00">2021-03-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文介绍了 Netty 构建的应用面临的相关风险以及 SSL 安全特性及 Netty 相关的源码解析等。</p>
+<span id="more"></span>
+
+<h1 id="Netty面临的安全风险"><a href="#Netty面临的安全风险" class="headerlink" title="Netty面临的安全风险"></a>Netty面临的安全风险</h1><p>下面介绍 Netty 典型应用场景下面临的安全挑战。</p>
+<h2 id="应用场景：内部使用"><a href="#应用场景：内部使用" class="headerlink" title="应用场景：内部使用"></a>应用场景：内部使用</h2><p>仅限内部使用的 RPC 通信框架。随着业务的发展，网站规模的扩大，传统基于 MVC 的垂直架构已经无法应对业务的快速发展。需要对数据和业务进行水平拆分，基于 RPC 的分布式服务框架成为最佳选择。</p>
+<p>业务水平拆分之后，内部的各个模块需要进行高性能的通信，传统基于 RMI 和 Hession 的同步阻塞式通信已经无法满足性能和可靠性要求。因此，高性能的 NIO 框架成为构建分布式服务框架的基石高性能的 RPC 框架，各模块之间往往采用长连接通信，通过心跳检测保证链路的可靠性。由于 RPC 框架通常是在内部各模块之间使用，运行在授信的内部安全域中，不直接对外开放接口。因此，不需要做握手、黑白名单、SSL&#x2F;TLS 等，正所谓是“防君子不防人在这种应用场景下，Netty 的安全性是依托企业的防火墙、安全加固操作系统等系统级安全来保障的，它自身并不需要再做额外的安全性保护工作。</p>
+<h2 id="应用场景：第三方使用"><a href="#应用场景：第三方使用" class="headerlink" title="应用场景：第三方使用"></a>应用场景：第三方使用</h2><p>对第三方开放的通信框架。如果使用 Netty 做 RPC 框架或者私有协议栈，RPC 框架面向非授信的第三方开放，例如将内部的一些能力通过服务对外开放出去，此时就需要进行安全认证，如果开放的是公网 IP，对于安全性要求非常高的一些服务，例如在线支付、订购等，需要通过 SSL&#x2F;TLS 进行通信。</p>
+<p>对第三方开放的通信框架的接口调用存在三种场景：</p>
+<ol>
+<li>在企业内网，开放给内部其他模块调用的服务，通常不需要进行安全认证和 SSL&#x2F;TLS 传输</li>
+<li>在企业内网，被外部其他模块调用的服务，往往需要利用 IP 黑白名单、握手登陆等方式进行安全认证，认证通过之后双方使用普通的 Socket 进行通信，如果认证失败，则拒绝客户端连接；</li>
+<li>开放给企业外部第三方应用访问的服务，往往需要监听公网 IP（通常是防火墙的 IP 地址），由于对第三方服务调用者的监管存在诸多困难，或者无法有效监管，这些第三方应用实际是非授信的。为了有效应对安全风险，对于敏感的服务往往需要通过 SSL&#x2F;TLS 进行安全传输。</li>
+</ol>
+<h2 id="应用场景：应用层协议的安全性"><a href="#应用场景：应用层协议的安全性" class="headerlink" title="应用场景：应用层协议的安全性"></a>应用场景：应用层协议的安全性</h2><p>作为高性能、异步事件驱动的 NIO 框架，Netty 非常适合构建上层的应用层协议，相关原理，如下图所示。</p>
+<p><img src="/images/Netty/Netty%E6%9E%84%E5%BB%BA%E5%8D%8F%E8%AE%AE.png"></p>
+<p>由于绝大多数应用层协议都是公有的，这意味着底层的 Netty 需要向上层提供通信层的安全传输，也就是需要支持 SSL&#x2F;TLS JDK 的安全类库提供了<code>javax.net.ssl.SSLSocket</code>和<code>javax.net.ssl.SSLServerSocket</code>类库用于支持 SSL&#x2F;TLS 安全传输，对于 NIO 非阻塞 Socket 通信，JDK并没有提供现成可用的类库简化用户开发。</p>
+<p>Netty 通过 JDK 的 SSLEngine，以 SslHandler 的方式提供对 SSL&#x2F;TLS 安全传输的支持，极大的简化了用户的开发工作量，降低开发难度。对于 Netty 默认提供的 HTTP 协议，Netty 利用 SsIHandler，同样支持 Https 协议。</p>
+<h1 id="Netty-SSL安全特性"><a href="#Netty-SSL安全特性" class="headerlink" title="Netty SSL安全特性"></a>Netty SSL安全特性</h1><p>Netty 通过 SslHandler 提供了对 SSL 的支持，它支持的 SSL 协议类型包括：SSL V2、SSL V3 和 TLS。</p>
+<h2 id="SSL单向认证"><a href="#SSL单向认证" class="headerlink" title="SSL单向认证"></a>SSL单向认证</h2><p>单向认证，即客户端只验证服务端的合法性，服务端不验证客户端。</p>
+<p><strong>单向认证原理</strong></p>
+<img src="/images/Netty/SSL单向认证原理.gif" alt="SSL工作原理" style="zoom:150%;" />
+
+<h2 id="SSL双向认证"><a href="#SSL双向认证" class="headerlink" title="SSL双向认证"></a>SSL双向认证</h2><p>与单向认证不同的是，服务端也需要对客户端进行安全认证。这就意味着客户端的自签名证书也需要导入到服务端的数字证书仓库中。</p>
+<p><strong>双向认证原理</strong></p>
+<p>SSL 双向认证相比单向认证，多了一步服务端发送认证请求消息给客户端，客户端发送自签名证书给服务端进行安全认证的过程。</p>
+<h2 id="第三方CA认证"><a href="#第三方CA认证" class="headerlink" title="第三方CA认证"></a>第三方CA认证</h2><p>使用 jdk keytool 生成的数字证书是自签名的。自签名就是指证书只能保证自己是完整且没有经过非法修改，但是无法保证这个证书是属于谁的。为了对自签名证书进行认证，需要每个客户端和服务端都交换自己自签名的私有证书，对于一个大型网站或者应用服务器，这种工作量是非常大的。</p>
+<p>基于自签名的 SSL 双向认证，只要客户端或者服务端修改了密钥和证书，就需要重新进行签名和证书交换，这种调试和维护工作量是非常大的。因此，在实际的商用系统中往往会使用第三方 CA 证书颁发机构进行签名和验证。我们的浏览器就保存了几个常用的 CA_ROOT。每次连接到网站时只要这个网站的证书是经过这些 CA_ROOT 签名过的。就可以通过验证了。</p>
+<p>CA 数字证书认证服务往往是收费的，国内有很多数字认证中心都提供相关的服务，有需要的可以通过这些商业机构获取认证。CA 可以通过 OpenSSL 生成。</p>
+<h1 id="Netty-SSL源码分析"><a href="#Netty-SSL源码分析" class="headerlink" title="Netty SSL源码分析"></a>Netty SSL源码分析</h1><h2 id="客户端"><a href="#客户端" class="headerlink" title="客户端"></a>客户端</h2><p>当客户端和服务端的 TCP 链路建立成功之后，SslHandler 的 channelActive 被触发 SSL 客户端通过 SSL 引擎发起握手请求消息，代码如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">handshake</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// Begin handshake.</span>
+    <span class="token keyword">final</span> <span class="token class-name">ChannelHandlerContext</span> ctx <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>ctx<span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        engine<span class="token punctuation">.</span><span class="token function">beginHandshake</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">wrapNonAppData</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">setHandshakeFailure</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">forceFlush</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>发起握手请求之后，需要将 SSLEngine 创建的握手请求消息进行 SSL 编码，发送给服务端，因此，握手之后立即调用 wrapNonAppData 方法，下面具体对该方法进行分析：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">boolean</span> <span class="token function">wrapNonAppData</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">ChannelHandlerContext</span> ctx<span class="token punctuation">,</span> <span class="token keyword">boolean</span> inUnwrap<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SSLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">ByteBuf</span> out <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token class-name">ByteBufAllocator</span> alloc <span class="token operator">=</span> ctx<span class="token punctuation">.</span><span class="token function">alloc</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Only continue to loop if the handler was not removed in the meantime.</span>
+        <span class="token comment">// See https://github.com/netty/netty/issues/5860</span>
+        outer<span class="token operator">:</span> <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token operator">!</span>ctx<span class="token punctuation">.</span><span class="token function">isRemoved</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>out <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// As this is called for the handshake we have no real idea how big the buffer needs to be.</span>
+                <span class="token comment">// That said 2048 should give us enough room to include everything like ALPN / NPN data.</span>
+                <span class="token comment">// If this is not enough we will increase the buffer in wrap(...).</span>
+                out <span class="token operator">=</span> <span class="token function">allocateOutNetBuf</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> <span class="token number">2048</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token class-name">SSLEngineResult</span> result <span class="token operator">=</span> <span class="token function">wrap</span><span class="token punctuation">(</span>alloc<span class="token punctuation">,</span> engine<span class="token punctuation">,</span> <span class="token class-name">Unpooled</span><span class="token punctuation">.</span>EMPTY_BUFFER<span class="token punctuation">,</span> out<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">bytesProduced</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                ctx<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>out<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addListener</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ChannelFutureListener</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token annotation punctuation">@Override</span>
+                    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">operationComplete</span><span class="token punctuation">(</span><span class="token class-name">ChannelFuture</span> future<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token class-name">Throwable</span> cause <span class="token operator">=</span> future<span class="token punctuation">.</span><span class="token function">cause</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        <span class="token keyword">if</span> <span class="token punctuation">(</span>cause <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                            <span class="token function">setHandshakeFailureTransportFailure</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> cause<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        <span class="token punctuation">&#125;</span>
+                    <span class="token punctuation">&#125;</span>
+                <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>inUnwrap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    needsFlush <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+                out <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token class-name">HandshakeStatus</span> status <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">getHandshakeStatus</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">switch</span> <span class="token punctuation">(</span>status<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">case</span> FINISHED<span class="token operator">:</span>
+                    <span class="token function">setHandshakeSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+                <span class="token keyword">case</span> NEED_TASK<span class="token operator">:</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">runDelegatedTasks</span><span class="token punctuation">(</span>inUnwrap<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token comment">// We scheduled a task on the delegatingTaskExecutor, so stop processing as we will</span>
+                        <span class="token comment">// resume once the task completes.</span>
+                        <span class="token keyword">break</span> outer<span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                    <span class="token keyword">break</span><span class="token punctuation">;</span>
+                <span class="token keyword">case</span> NEED_UNWRAP<span class="token operator">:</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>inUnwrap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token comment">// If we asked for a wrap, the engine requested an unwrap, and we are in unwrap there is</span>
+                        <span class="token comment">// no use in trying to call wrap again because we have already attempted (or will after we</span>
+                        <span class="token comment">// return) to feed more data to the engine.</span>
+                        <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+
+                    <span class="token function">unwrapNonAppData</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">break</span><span class="token punctuation">;</span>
+                <span class="token keyword">case</span> NEED_WRAP<span class="token operator">:</span>
+                    <span class="token keyword">break</span><span class="token punctuation">;</span>
+                <span class="token keyword">case</span> NOT_HANDSHAKING<span class="token operator">:</span>
+                    <span class="token function">setHandshakeSuccessIfStillHandshaking</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token comment">// Workaround for TLS False Start problem reported at:</span>
+                    <span class="token comment">// https://github.com/netty/netty/issues/1108#issuecomment-14266970</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>inUnwrap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        <span class="token function">unwrapNonAppData</span><span class="token punctuation">(</span>ctx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                    <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+                <span class="token keyword">default</span><span class="token operator">:</span>
+                    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalStateException</span><span class="token punctuation">(</span><span class="token string">"Unknown handshake status: "</span> <span class="token operator">+</span> result<span class="token punctuation">.</span><span class="token function">getHandshakeStatus</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// Check if did not produce any bytes and if so break out of the loop, but only if we did not process</span>
+            <span class="token comment">// a task as last action. It's fine to not produce any data as part of executing a task.</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">bytesProduced</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> status <span class="token operator">!=</span> <span class="token class-name">HandshakeStatus</span><span class="token punctuation">.</span>NEED_TASK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token comment">// It should not consume empty buffers when it is not handshaking</span>
+            <span class="token comment">// Fix for Android, where it was encrypting empty buffers even when not handshaking</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">bytesConsumed</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> result<span class="token punctuation">.</span><span class="token function">getHandshakeStatus</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token class-name">HandshakeStatus</span><span class="token punctuation">.</span>NOT_HANDSHAKING<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>  <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>out <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            out<span class="token punctuation">.</span><span class="token function">release</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>对编码结果进行判断，如果编码字节数大于 0，则将编码后的结果发送给服务端，然后释放临时变量 outer 判断 SSL 引擎的操作结果，SSL 引擎的操作结果定义如下：</p>
+<ol>
+<li>FINISHED：SSLEngine 已经完成握手</li>
+<li>NEED_TASK：SSLEngine 在继续进行握手前需要一个（或多个）代理任务的结果</li>
+<li>NEED_UNWRAP：在继续进行握手前，SSLEngine 需要从远端接收数据，所以应带调用 <code>SSLEngine.unwrap()</code></li>
+<li>NEED_WRAP：在继续进行握手前，SSLEngine 必须向远端发送数据，所以应该调用<code>SSLEngine.wrap()</code></li>
+<li>NOT_HANDSHAKING：SSLEngine 当前没有进行握手</li>
+</ol>
+<p>如果握手成功，则设置 handshakePromise 的操作结果为成功，同时发送 SsIHandshakeCompletionEvent.SUCCESS 给 SSL 监听器，代码如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">setHandshakeSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    handshakePromise<span class="token punctuation">.</span><span class="token function">trySuccess</span><span class="token punctuation">(</span>ctx<span class="token punctuation">.</span><span class="token function">channel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    ctx<span class="token punctuation">.</span><span class="token function">fireUserEventTriggered</span><span class="token punctuation">(</span><span class="token class-name">SslHandshakeCompletionEvent</span><span class="token punctuation">.</span>SUCCESS<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>readDuringHandshake <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>ctx<span class="token punctuation">.</span><span class="token function">channel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">config</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isAutoRead</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        readDuringHandshake <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        ctx<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>如果是 NEED_TASK，说明异步执行 SSL_Task，完成后续可能耗时的操作或者任务，Netty 封装了一个任务立即执行线程池专门处理 SSL 的代理任务，代码如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">boolean</span> <span class="token function">runDelegatedTasks</span><span class="token punctuation">(</span><span class="token keyword">boolean</span> inUnwrap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>delegatedTaskExecutor <span class="token operator">==</span> <span class="token class-name">ImmediateExecutor</span><span class="token punctuation">.</span>INSTANCE <span class="token operator">||</span> <span class="token function">inEventLoop</span><span class="token punctuation">(</span>delegatedTaskExecutor<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// We should run the task directly in the EventExecutor thread and not offload at all.</span>
+        <span class="token function">runAllDelegatedTasks</span><span class="token punctuation">(</span>engine<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">executeDelegatedTasks</span><span class="token punctuation">(</span>inUnwrap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>如果是 NEED_UNWRAP，则判断是否由 UNWRAP 发起，如果不是则执行 UNWRAP 操作如果是 NOT_HANDSHAKING，则调用 unwrap，继续接收服务端的消息。</p>
+<h2 id="服务端"><a href="#服务端" class="headerlink" title="服务端"></a>服务端</h2><p>SSL 服务端接收客户端握手请求消息的入口方法是 decode 方法，下面对它进行详细分析。首先获取接收缓冲区的读写索引，并对读取的偏移量指针进行备份：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">decode</span><span class="token punctuation">(</span><span class="token class-name">ChannelHandlerContext</span> ctx<span class="token punctuation">,</span> <span class="token class-name">ByteBuf</span> in<span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> out<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">SSLException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>processTask<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>jdkCompatibilityMode<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">decodeJdkCompatible</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> in<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">decodeNonJdkCompatible</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> in<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">decodeJdkCompatible</span><span class="token punctuation">(</span><span class="token class-name">ChannelHandlerContext</span> ctx<span class="token punctuation">,</span> <span class="token class-name">ByteBuf</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">NotSslRecordException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> packetLength <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>packetLength<span class="token punctuation">;</span>
+    <span class="token comment">// If we calculated the length of the current SSL record before, use that information.</span>
+    <span class="token comment">//对半包标识进行判断，如果上一个消息是半包消息，则判断当前可读的字节数是否小于整包消息的长度，</span>
+    <span class="token comment">//如果小于整包长度，则说明本次读取操作仍然没有把SSL整包消息读取完整，需要返回IO线程继续读取.</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>packetLength <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>in<span class="token punctuation">.</span><span class="token function">readableBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> packetLength<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Get the packet length and wait until we get a packets worth of data to unwrap.</span>
+        <span class="token keyword">final</span> <span class="token keyword">int</span> readableBytes <span class="token operator">=</span> in<span class="token punctuation">.</span><span class="token function">readableBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>readableBytes <span class="token operator">&lt;</span> <span class="token class-name">SslUtils</span><span class="token punctuation">.</span>SSL_RECORD_HEADER_LENGTH<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        packetLength <span class="token operator">=</span> <span class="token function">getEncryptedPacketLength</span><span class="token punctuation">(</span>in<span class="token punctuation">,</span> in<span class="token punctuation">.</span><span class="token function">readerIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>packetLength <span class="token operator">==</span> <span class="token class-name">SslUtils</span><span class="token punctuation">.</span>NOT_ENCRYPTED<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Not an SSL/TLS packet</span>
+            <span class="token class-name">NotSslRecordException</span> e <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NotSslRecordException</span><span class="token punctuation">(</span>
+                    <span class="token string">"not an SSL/TLS record: "</span> <span class="token operator">+</span> <span class="token class-name">ByteBufUtil</span><span class="token punctuation">.</span><span class="token function">hexDump</span><span class="token punctuation">(</span>in<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            in<span class="token punctuation">.</span><span class="token function">skipBytes</span><span class="token punctuation">(</span>in<span class="token punctuation">.</span><span class="token function">readableBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// First fail the handshake promise as we may need to have access to the SSLEngine which may</span>
+            <span class="token comment">// be released because the user will remove the SslHandler in an exceptionCaught(...) implementation.</span>
+            <span class="token function">setHandshakeFailure</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">throw</span> e<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">//对长度进行判断，如果SSL报文长度大于可读的字节数，说明是个半包消息，</span>
+        <span class="token comment">//返回IO线程继续读取后续的数据报</span>
+        <span class="token keyword">assert</span> packetLength <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>packetLength <span class="token operator">></span> readableBytes<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// wait until the whole packet can be read</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>packetLength <span class="token operator">=</span> packetLength<span class="token punctuation">;</span>
+            <span class="token keyword">return</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// Reset the state of this class so we can get the length of the next packet. We assume the entire packet will</span>
+    <span class="token comment">// be consumed by the SSLEngine.</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>packetLength <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//将SSL加密的消息解码为加密前的原始数据</span>
+        <span class="token keyword">int</span> bytesConsumed <span class="token operator">=</span> <span class="token function">unwrap</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> in<span class="token punctuation">,</span> in<span class="token punctuation">.</span><span class="token function">readerIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> packetLength<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">assert</span> bytesConsumed <span class="token operator">==</span> packetLength <span class="token operator">||</span> engine<span class="token punctuation">.</span><span class="token function">isInboundDone</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">:</span>
+                <span class="token string">"we feed the SSLEngine a packets worth of data: "</span> <span class="token operator">+</span> packetLength <span class="token operator">+</span> <span class="token string">" but it only consumed: "</span> <span class="token operator">+</span>
+                        bytesConsumed<span class="token punctuation">;</span>
+        in<span class="token punctuation">.</span><span class="token function">skipBytes</span><span class="token punctuation">(</span>bytesConsumed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> cause<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">handleUnwrapThrowable</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> cause<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>调用 SSLEngine 的 unwrap 方法对 SSL 原始消息进行解码，对解码结果进行判断，如果越界，说明 out 缓冲区不够，需要进行动态扩展。如果是首次越界，为了尽量节约内存，使用 SSL 最大缓冲区长度和 SSL 原始缓冲区可读的字节数中较小的。如果再次发生缓冲区越界，说明扩张后的缓冲区仍然不够用，直接使用 SSL 缓冲区的最大长度，保证下次解码成功。</p>
+<p>解码成功之后，对 SSL 引擎的操作结果进行判断：如果需要继续接收数据，则继续执行解码操作；如果需要发送握手消息，则调用 wrapNonAppData 发送握手消息；如果需要异步执行 SSL 代理任务，则调用立即执行线程池执行代理任务；如果是握手成功，则设置 SSL 操作结果，发送 SSL 握手成功事件；如果是应用层的业务数据，则继续执行解码操作，其他操作结果，抛出操作类型异常。</p>
+<p>需要指出的是，SSL 客户端和服务端接收对方 SSL 握手消息的代码是相同的，那为什么 SSL 服务端和客户端发送的握手消息不同呢？这些是 SSL 引擎负责区分和处理的，我们在创建 SSL 引擎的时候设置了客户端模式，SSL 引擎就是根据这个来进行区分的，代码如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">engine<span class="token punctuation">.</span><span class="token function">setUseClientMode</span><span class="token punctuation">(</span><span class="token function">isClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h1 id="Netty扩展的安全特性"><a href="#Netty扩展的安全特性" class="headerlink" title="Netty扩展的安全特性"></a>Netty扩展的安全特性</h1><p>利用 Netty 的 ChannelHandler 接口提供的网络切面，用户可以非常容易的扩展 Netty 的安全策略，如：IP 地址黑名单机制或者是用户接入认证。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/SSL/" rel="tag"># SSL</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/28/ZooKeeper-%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%90%AF%E5%8A%A8%E5%8F%8ALeader%E9%80%89%E4%B8%BE/" rel="prev" title="ZooKeeper 服务器启动及Leader选举">
+      <i class="fa fa-chevron-left"></i> ZooKeeper 服务器启动及Leader选举
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/29/JDK-%E7%BD%91%E7%BB%9CIO%E6%96%B9%E5%BC%8F%E5%AF%B9%E6%AF%94/" rel="next" title="JDK 网络IO方式对比">
+      JDK 网络IO方式对比 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Netty%E9%9D%A2%E4%B8%B4%E7%9A%84%E5%AE%89%E5%85%A8%E9%A3%8E%E9%99%A9"><span class="nav-number">1.</span> <span class="nav-text">Netty面临的安全风险</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF%EF%BC%9A%E5%86%85%E9%83%A8%E4%BD%BF%E7%94%A8"><span class="nav-number">1.1.</span> <span class="nav-text">应用场景：内部使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF%EF%BC%9A%E7%AC%AC%E4%B8%89%E6%96%B9%E4%BD%BF%E7%94%A8"><span class="nav-number">1.2.</span> <span class="nav-text">应用场景：第三方使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF%EF%BC%9A%E5%BA%94%E7%94%A8%E5%B1%82%E5%8D%8F%E8%AE%AE%E7%9A%84%E5%AE%89%E5%85%A8%E6%80%A7"><span class="nav-number">1.3.</span> <span class="nav-text">应用场景：应用层协议的安全性</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Netty-SSL%E5%AE%89%E5%85%A8%E7%89%B9%E6%80%A7"><span class="nav-number">2.</span> <span class="nav-text">Netty SSL安全特性</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#SSL%E5%8D%95%E5%90%91%E8%AE%A4%E8%AF%81"><span class="nav-number">2.1.</span> <span class="nav-text">SSL单向认证</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SSL%E5%8F%8C%E5%90%91%E8%AE%A4%E8%AF%81"><span class="nav-number">2.2.</span> <span class="nav-text">SSL双向认证</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%96%B9CA%E8%AE%A4%E8%AF%81"><span class="nav-number">2.3.</span> <span class="nav-text">第三方CA认证</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Netty-SSL%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">3.</span> <span class="nav-text">Netty SSL源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF"><span class="nav-number">3.1.</span> <span class="nav-text">客户端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E7%AB%AF"><span class="nav-number">3.2.</span> <span class="nav-text">服务端</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Netty%E6%89%A9%E5%B1%95%E7%9A%84%E5%AE%89%E5%85%A8%E7%89%B9%E6%80%A7"><span class="nav-number">4.</span> <span class="nav-text">Netty扩展的安全特性</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

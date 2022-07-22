@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="RocketMQ 可以分为 NameServer、Consumer、Broker、Producer 四大组件，它们相互调用构成了完整的 Produce-Consume 模式。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RocketMQ 源码解析">
+<meta property="og:url" content="http://example.com/2021/07/12/RocketMQ-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="RocketMQ 可以分为 NameServer、Consumer、Broker、Producer 四大组件，它们相互调用构成了完整的 Produce-Consume 模式。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MQ/RocketMQRemote%E6%A8%A1%E5%9D%97.png">
+<meta property="article:published_time" content="2021-07-12T08:59:28.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.623Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="RocketMQ">
+<meta property="article:tag" content="NameServer">
+<meta property="article:tag" content="Broker">
+<meta property="article:tag" content="Consumer">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MQ/RocketMQRemote%E6%A8%A1%E5%9D%97.png">
+
+<link rel="canonical" href="http://example.com/2021/07/12/RocketMQ-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>RocketMQ 源码解析 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/07/12/RocketMQ-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RocketMQ 源码解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-07-12 16:59:28" itemprop="dateCreated datePublished" datetime="2021-07-12T16:59:28+08:00">2021-07-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MessageQueue/" itemprop="url" rel="index"><span itemprop="name">MessageQueue</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>RocketMQ 可以分为 NameServer、Consumer、Broker、Producer 四大组件，它们相互调用构成了完整的 Produce-Consume 模式。</p>
+<span id="more"></span>
+
+<h1 id="NameServer"><a href="#NameServer" class="headerlink" title="NameServer"></a>NameServer</h1><p>NameServer 在 RocketMQ 的使用过程中主要是做分布式协调、通知的作用，通过接收其他角色定期上报的状态信息，协调各个角色之间的调用关系（包括在角色下线后从自身的可用列表中移除）。</p>
+<blockquote>
+<p><strong>协调各角色之间的关系</strong></p>
+<p>以创建 Topic 为例，创建 Topic 的命令先发往对应的 Broker，在 Broker 接收到创建请求后，执行具体的创建逻辑。结束后向 NameServer 发送注册消息。只有在 NameServer 完成创建 Topic 后，其他客户端才能够发现新增的 Topic。</p>
+</blockquote>
+<p>在 NameServer Module 中 <code>org.apache.rocketmq.namesrv.NamesrvStartup</code> 是模块启动入口，其作用主要是创建和运行 <code>org.apache.rocketmq.namesrv.NamesrvController</code> 帮助协调各功能模块之间的关系。</p>
+<h2 id="初始化逻辑处理"><a href="#初始化逻辑处理" class="headerlink" title="初始化逻辑处理"></a>初始化逻辑处理</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//工作线程 默认ServerWorkerThreads=8</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>remotingExecutor <span class="token operator">=</span>
+    <span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">newFixedThreadPool</span><span class="token punctuation">(</span>nettyServerConfig<span class="token punctuation">.</span><span class="token function">getServerWorkerThreads</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">ThreadFactoryImpl</span><span class="token punctuation">(</span><span class="token string">"RemotingExecutorThread_"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//将封装Netty的通信服务与工作线程池绑定</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">registerProcessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//扫描失效Broker 10s一次,超时两分钟则认为Broker失效</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>scheduledExecutorService<span class="token punctuation">.</span><span class="token function">scheduleAtFixedRate</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">NamesrvController</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>routeInfoManager<span class="token punctuation">.</span><span class="token function">scanNotActiveBroker</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>SECONDS<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//打印配置信息 10s一次</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>scheduledExecutorService<span class="token punctuation">.</span><span class="token function">scheduleAtFixedRate</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">NamesrvController</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>kvConfigManager<span class="token punctuation">.</span><span class="token function">printAllPeriodically</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MINUTES<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="核心业务逻辑处理"><a href="#核心业务逻辑处理" class="headerlink" title="核心业务逻辑处理"></a>核心业务逻辑处理</h2><p>网络通信模块收到请求调用 <code>org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor</code> 处理。通过 RequestCode 可看出 NameServer 的主要功能。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">RemotingCommand</span> <span class="token function">processRequest</span><span class="token punctuation">(</span><span class="token class-name">ChannelHandlerContext</span> ctx<span class="token punctuation">,</span>
+    <span class="token class-name">RemotingCommand</span> request<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">RemotingCommandException</span> <span class="token punctuation">&#123;</span>
+  
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getCode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>PUT_KV_CONFIG<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">putKVConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_KV_CONFIG<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getKVConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>DELETE_KV_CONFIG<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">deleteKVConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>QUERY_DATA_VERSION<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token function">queryBrokerTopicConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>REGISTER_BROKER<span class="token operator">:</span>
+            <span class="token class-name">Version</span> brokerVersion <span class="token operator">=</span> <span class="token class-name">MQVersion</span><span class="token punctuation">.</span><span class="token function">value2Version</span><span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getVersion</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>brokerVersion<span class="token punctuation">.</span><span class="token function">ordinal</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">>=</span> <span class="token class-name">MQVersion<span class="token punctuation">.</span>Version</span><span class="token punctuation">.</span>V3_0_11<span class="token punctuation">.</span><span class="token function">ordinal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">registerBrokerWithFilterServer</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">registerBroker</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>UNREGISTER_BROKER<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">unregisterBroker</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_ROUTEINFO_BY_TOPIC<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getRouteInfoByTopic</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_BROKER_CLUSTER_INFO<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getBrokerClusterInfo</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>WIPE_WRITE_PERM_OF_BROKER<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">wipeWritePermOfBroker</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_ALL_TOPIC_LIST_FROM_NAMESERVER<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token function">getAllTopicListFromNameserver</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>DELETE_TOPIC_IN_NAMESRV<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token function">deleteTopicInNamesrv</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_KVLIST_BY_NAMESPACE<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getKVListByNamespace</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_TOPICS_BY_CLUSTER<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getTopicsByCluster</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_SYSTEM_TOPIC_LIST_FROM_NS<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getSystemTopicListFromNs</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_UNIT_TOPIC_LIST<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getUnitTopicList</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_HAS_UNIT_SUB_TOPIC_LIST<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getHasUnitSubTopicList</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_HAS_UNIT_SUB_UNUNIT_TOPIC_LIST<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getHasUnitSubUnUnitTopicList</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>UPDATE_NAMESRV_CONFIG<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> <span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_NAMESRV_CONFIG<span class="token operator">:</span>
+            <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConfig</span><span class="token punctuation">(</span>ctx<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="集群状态存储"><a href="#集群状态存储" class="headerlink" title="集群状态存储"></a>集群状态存储</h2><p>NameServer 作为集群的协调者，需要保存和维护集群的各种元数据 ， 这是通过 <code>org.apache.rocketmq.namesrv.routeinfo.RouteInfoManager</code> 类来实现的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//TOPIC QUEUE 存储了所有 TOPIC 的属性信息</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* topic */</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">QueueData</span><span class="token punctuation">></span></span><span class="token operator">></span> topicQueueTable<span class="token punctuation">;</span>
+<span class="token comment">//BROKER 存储了Broker和Cluster的名称以及一主多从的地址信息</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* brokerName */</span><span class="token punctuation">,</span> <span class="token class-name">BrokerData</span><span class="token operator">></span> brokerAddrTable<span class="token punctuation">;</span>
+<span class="token comment">//CLUSTER 储存了Cluster映射Broker的反索引</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* clusterName */</span><span class="token punctuation">,</span> <span class="token class-name">Set</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* brokerName */</span><span class="token operator">>></span> clusterAddrTable<span class="token punctuation">;</span>
+<span class="token comment">//BROKER LIVE 与brokerAddrTable不同的是，它储存的是Brokers的实时状态</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* brokerAddr */</span><span class="token punctuation">,</span> <span class="token class-name">BrokerLiveInfo</span><span class="token operator">></span> brokerLiveTable<span class="token punctuation">;</span>
+<span class="token comment">//FILTER 一个Broker可以有多个FilterServer</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">String</span><span class="token comment">/* brokerAddr */</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span><span class="token comment">/* Filter Server */</span><span class="token operator">></span> filterServerTable<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="状态维护原理"><a href="#状态维护原理" class="headerlink" title="状态维护原理"></a>状态维护原理</h2><p>因为各个角色都会主动向 NameServer 上报状态，所以 NameServer 只需要根据上报消息里的请求码做出响应（具体逻辑在 <code>org.apache.rocketmq.namesrv.processor.DefaultRequestProcessor</code>）。</p>
+<p>此外，连接断开的事件也会触发状态更新（具体逻辑在 <code>org.apache.rocketmq.namesrv.routeinfo.BrokerHousekeepingService</code>）。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onChannelClose</span><span class="token punctuation">(</span><span class="token class-name">String</span> remoteAddr<span class="token punctuation">,</span> <span class="token class-name">Channel</span> channel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>namesrvController<span class="token punctuation">.</span><span class="token function">getRouteInfoManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">onChannelDestroy</span><span class="token punctuation">(</span>remoteAddr<span class="token punctuation">,</span> channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onChannelException</span><span class="token punctuation">(</span><span class="token class-name">String</span> remoteAddr<span class="token punctuation">,</span> <span class="token class-name">Channel</span> channel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>namesrvController<span class="token punctuation">.</span><span class="token function">getRouteInfoManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">onChannelDestroy</span><span class="token punctuation">(</span>remoteAddr<span class="token punctuation">,</span> channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onChannelIdle</span><span class="token punctuation">(</span><span class="token class-name">String</span> remoteAddr<span class="token punctuation">,</span> <span class="token class-name">Channel</span> channel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>namesrvController<span class="token punctuation">.</span><span class="token function">getRouteInfoManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">onChannelDestroy</span><span class="token punctuation">(</span>remoteAddr<span class="token punctuation">,</span> channel<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="Remoting模块"><a href="#Remoting模块" class="headerlink" title="Remoting模块"></a>Remoting模块</h2><p>RocketMQ 的通信相关代码在 Remote 模块，并在<code>org.apache.rocketmq.remoting.netty.NettyRemotingClient</code> 和 <code>org.apache.rocketmq.remoting.netty.NettyRemotingServer</code> 中封装了 Netty 的网络库。</p>
+<p><img src="/images/MQ/RocketMQRemote%E6%A8%A1%E5%9D%97.png"></p>
+<h1 id="Consumer"><a href="#Consumer" class="headerlink" title="Consumer"></a>Consumer</h1><h2 id="初始化逻辑处理-1"><a href="#初始化逻辑处理-1" class="headerlink" title="初始化逻辑处理"></a>初始化逻辑处理</h2><p>首先是初始化 MQClientInstance，并且设置好 rebalance 策略和 pullApi­Wraper，有这些结构后才能发送 pull 请求获取消息。然后是确定 OffsetStore。OffsetStore 里存储的是当前消费者所消费的消息在队列中的偏移量。</p>
+<p>根据消费消息方式的不同，OffsetStore 的类型也不同。 如果是 BROADCASTING 模式，使用的是 LocalFileOffsetStore，Offset 存到本地；如果是 CLUSTERING 模式，使用的是 RemoteBrokerOffsetStore，Offset 存到 Broker 机器上。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getOffsetStore</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getOffsetStore</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getMessageModel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> BROADCASTING<span class="token operator">:</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">LocalFileOffsetStore</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>mQClientFactory<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getConsumerGroup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> CLUSTERING<span class="token operator">:</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RemoteBrokerOffsetStore</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>mQClientFactory<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getConsumerGroup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">setOffsetStore</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>然后是初始化 consumeMessageService，根据对消息顺序需求的不同，使用不同的 Service 类型。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMessageListenerInner</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">instanceof</span> <span class="token class-name">MessageListenerOrderly</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>consumeOrderly <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>consumeMessageService <span class="token operator">=</span>
+        <span class="token keyword">new</span> <span class="token class-name">ConsumeMessageOrderlyService</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token class-name">MessageListenerOrderly</span><span class="token punctuation">)</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMessageListenerInner</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMessageListenerInner</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">instanceof</span> <span class="token class-name">MessageListenerConcurrently</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>consumeOrderly <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>consumeMessageService <span class="token operator">=</span>
+        <span class="token keyword">new</span> <span class="token class-name">ConsumeMessageConcurrentlyService</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token class-name">MessageListenerConcurrently</span><span class="token punctuation">)</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getMessageListenerInner</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">this</span><span class="token punctuation">.</span>consumeMessageService<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="获取消息逻辑"><a href="#获取消息逻辑" class="headerlink" title="获取消息逻辑"></a>获取消息逻辑</h2><p>获取消息的逻辑实现在 <code>org.apache.rocketmq.client.impl.consumer.DefaultMQPushConsumerImpl#pullMessage</code> 函数中。</p>
+<p><strong>流量控制部分</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">long cachedMessageCount &#x3D; processQueue.getMsgCount().get();
+long cachedMessageSizeInMiB &#x3D; processQueue.getMsgSize().get() &#x2F; (1024 * 1024);
+
+if (cachedMessageCount &gt; this.defaultMQPushConsumer.getPullThresholdForQueue()) &#123;
+  this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_FLOW_CONTROL);
+  if ((queueFlowControlTimes++ % 1000) &#x3D;&#x3D; 0) &#123;
+    log.warn(
+      &quot;the cached message count exceeds the threshold &#123;&#125;, so do flow control, minOffset&#x3D;&#123;&#125;, maxOffset&#x3D;&#123;&#125;, count&#x3D;&#123;&#125;, size&#x3D;&#123;&#125; MiB, pullRequest&#x3D;&#123;&#125;, flowControlTimes&#x3D;&#123;&#125;&quot;,
+      this.defaultMQPushConsumer.getPullThresholdForQueue(), processQueue.getMsgTreeMap().firstKey(), processQueue.getMsgTreeMap().lastKey(), cachedMessageCount, cachedMessageSizeInMiB, pullRequest, queueFlowControlTimes);
+  &#125;
+  return;
+&#125;
+
+if (cachedMessageSizeInMiB &gt; this.defaultMQPushConsumer.getPullThresholdSizeForQueue()) &#123;
+  this.executePullRequestLater(pullRequest, PULL_TIME_DELAY_MILLS_WHEN_FLOW_CONTROL);
+  if ((queueFlowControlTimes++ % 1000) &#x3D;&#x3D; 0) &#123;
+    log.warn(
+      &quot;the cached message size exceeds the threshold &#123;&#125; MiB, so do flow control, minOffset&#x3D;&#123;&#125;, maxOffset&#x3D;&#123;&#125;, count&#x3D;&#123;&#125;, size&#x3D;&#123;&#125; MiB, pullRequest&#x3D;&#123;&#125;, flowControlTimes&#x3D;&#123;&#125;&quot;,
+      this.defaultMQPushConsumer.getPullThresholdSizeForQueue(), processQueue.getMsgTreeMap().firstKey(), processQueue.getMsgTreeMap().lastKey(), cachedMessageCount, cachedMessageSizeInMiB, pullRequest, queueFlowControlTimes);
+  &#125;
+  return;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>处理返回结果部分</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">PullCallback</span> pullCallback <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">PullCallback</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token annotation punctuation">@Override</span>
+  <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token class-name">PullResult</span> pullResult<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>pullResult <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      pullResult <span class="token operator">=</span> <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>pullAPIWrapper<span class="token punctuation">.</span><span class="token function">processPullResult</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pullResult<span class="token punctuation">,</span>
+                                                                                   subscriptionData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+      <span class="token keyword">switch</span> <span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getPullStatus</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> FOUND<span class="token operator">:</span>
+          <span class="token keyword">long</span> prevRequestOffset <span class="token operator">=</span> pullRequest<span class="token punctuation">.</span><span class="token function">getNextOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          pullRequest<span class="token punctuation">.</span><span class="token function">setNextOffset</span><span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getNextBeginOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token keyword">long</span> pullRT <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> beginTimestamp<span class="token punctuation">;</span>
+          <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConsumerStatsManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">incPullRT</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getConsumerGroup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                                                             pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pullRT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+          <span class="token keyword">long</span> firstMsgOffset <span class="token operator">=</span> <span class="token class-name">Long</span><span class="token punctuation">.</span>MAX_VALUE<span class="token punctuation">;</span>
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestImmediately</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            firstMsgOffset <span class="token operator">=</span> pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getQueueOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConsumerStatsManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">incPullTPS</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getConsumerGroup</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                                                                pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">boolean</span> dispatchToConsume <span class="token operator">=</span> processQueue<span class="token punctuation">.</span><span class="token function">putMessage</span><span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>consumeMessageService<span class="token punctuation">.</span><span class="token function">submitConsumeRequest</span><span class="token punctuation">(</span>
+              pullResult<span class="token punctuation">.</span><span class="token function">getMsgFoundList</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+              processQueue<span class="token punctuation">,</span>
+              pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+              dispatchToConsume<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getPullInterval</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+              <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestLater</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">,</span>
+                                                                     <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getPullInterval</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+              <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestImmediately</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+          <span class="token punctuation">&#125;</span>
+
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getNextBeginOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> prevRequestOffset
+              <span class="token operator">||</span> firstMsgOffset <span class="token operator">&lt;</span> prevRequestOffset<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span>
+              <span class="token string">"[BUG] pull message result maybe data wrong, nextBeginOffset: &#123;&#125; firstMsgOffset: &#123;&#125; prevRequestOffset: &#123;&#125;"</span><span class="token punctuation">,</span>
+              pullResult<span class="token punctuation">.</span><span class="token function">getNextBeginOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+              firstMsgOffset<span class="token punctuation">,</span>
+              prevRequestOffset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">&#125;</span>
+
+          <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> NO_NEW_MSG<span class="token operator">:</span>
+        <span class="token keyword">case</span> NO_MATCHED_MSG<span class="token operator">:</span>
+          pullRequest<span class="token punctuation">.</span><span class="token function">setNextOffset</span><span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getNextBeginOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+          <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">correctTagsOffset</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+          <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestImmediately</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> OFFSET_ILLEGAL<span class="token operator">:</span>
+          log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"the pull request offset illegal, &#123;&#125; &#123;&#125;"</span><span class="token punctuation">,</span>
+                   pullRequest<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pullResult<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          pullRequest<span class="token punctuation">.</span><span class="token function">setNextOffset</span><span class="token punctuation">(</span>pullResult<span class="token punctuation">.</span><span class="token function">getNextBeginOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+          pullRequest<span class="token punctuation">.</span><span class="token function">getProcessQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setDropped</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executeTaskLater</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+            <span class="token annotation punctuation">@Override</span>
+            <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+              <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore<span class="token punctuation">.</span><span class="token function">updateOffset</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                                                        pullRequest<span class="token punctuation">.</span><span class="token function">getNextOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>offsetStore<span class="token punctuation">.</span><span class="token function">persist</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>rebalanceImpl<span class="token punctuation">.</span><span class="token function">removeProcessQueue</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"fix the pull request offset, &#123;&#125;"</span><span class="token punctuation">,</span> pullRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+              <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"executeTaskLater Exception"</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+              <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+          <span class="token punctuation">&#125;</span><span class="token punctuation">,</span> <span class="token number">10000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+          <span class="token keyword">break</span><span class="token punctuation">;</span>
+      <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token annotation punctuation">@Override</span>
+  <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onException</span><span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">startsWith</span><span class="token punctuation">(</span><span class="token class-name">MixAll</span><span class="token punctuation">.</span>RETRY_GROUP_TOPIC_PREFIX<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"execute the pull request exception"</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token class-name">DefaultMQPushConsumerImpl</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestLater</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">,</span> pullTimeDelayMillsWhenException<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>发送获取消息请求</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>pullAPIWrapper<span class="token punctuation">.</span><span class="token function">pullKernelImpl</span><span class="token punctuation">(</span>
+        pullRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        subExpression<span class="token punctuation">,</span>
+        subscriptionData<span class="token punctuation">.</span><span class="token function">getExpressionType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        subscriptionData<span class="token punctuation">.</span><span class="token function">getSubVersion</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        pullRequest<span class="token punctuation">.</span><span class="token function">getNextOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getPullBatchSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        sysFlag<span class="token punctuation">,</span>
+        commitOffsetValue<span class="token punctuation">,</span>
+        BROKER_SUSPEND_MAX_TIME_MILLIS<span class="token punctuation">,</span>
+        CONSUMER_TIMEOUT_MILLIS_WHEN_SUSPEND<span class="token punctuation">,</span>
+        <span class="token class-name">CommunicationMode</span><span class="token punctuation">.</span>ASYNC<span class="token punctuation">,</span>
+        pullCallback
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"pullKernelImpl exception"</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executePullRequestLater</span><span class="token punctuation">(</span>pullRequest<span class="token punctuation">,</span> pullTimeDelayMillsWhenException<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="并发处理逻辑"><a href="#并发处理逻辑" class="headerlink" title="并发处理逻辑"></a>并发处理逻辑</h2><p>以 <code>org.apache.rocketmq.client.impl.consumer.ConsumeMessageConcurrentlyService</code> 为例。</p>
+<p><strong>定义线程池</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">this</span><span class="token punctuation">.</span>consumeExecutor <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ThreadPoolExecutor</span><span class="token punctuation">(</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getConsumeThreadMin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getConsumeThreadMax</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token number">1000</span> <span class="token operator">*</span> <span class="token number">60</span><span class="token punctuation">,</span>
+    <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MILLISECONDS<span class="token punctuation">,</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>consumeRequestQueue<span class="token punctuation">,</span>
+    <span class="token keyword">new</span> <span class="token class-name">ThreadFactoryImpl</span><span class="token punctuation">(</span><span class="token string">"ConsumeMessageThread_"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">this</span><span class="token punctuation">.</span>scheduledExecutorService <span class="token operator">=</span> <span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">newSingleThreadScheduledExecutor</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ThreadFactoryImpl</span><span class="token punctuation">(</span><span class="token string">"ConsumeMessageScheduledThread_"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>cleanExpireMsgExecutors <span class="token operator">=</span> <span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">newSingleThreadScheduledExecutor</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ThreadFactoryImpl</span><span class="token punctuation">(</span><span class="token string">"CleanExpireMsgScheduledThread_"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>将收到的Message打包消费</strong></p>
+<p>从 Broker 获取到一批消息以后，根据 BatchSize 的设置，把一批消息封装到一个 ConsumeRequest 中，然后把这个 ConsumeRequest 提交到 consumeExecutor 线程池中执行。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">submitConsumeRequest</span><span class="token punctuation">(</span>
+    <span class="token keyword">final</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MessageExt</span><span class="token punctuation">></span></span> msgs<span class="token punctuation">,</span>
+    <span class="token keyword">final</span> <span class="token class-name">ProcessQueue</span> processQueue<span class="token punctuation">,</span>
+    <span class="token keyword">final</span> <span class="token class-name">MessageQueue</span> messageQueue<span class="token punctuation">,</span>
+    <span class="token keyword">final</span> <span class="token keyword">boolean</span> dispatchToConsume<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> consumeBatchSize <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getConsumeMessageBatchMaxSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>msgs<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> consumeBatchSize<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ConsumeRequest</span> consumeRequest <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ConsumeRequest</span><span class="token punctuation">(</span>msgs<span class="token punctuation">,</span> processQueue<span class="token punctuation">,</span> messageQueue<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>consumeExecutor<span class="token punctuation">.</span><span class="token function">submit</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">RejectedExecutionException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">submitConsumeRequestLater</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> total <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> total <span class="token operator">&lt;</span> msgs<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MessageExt</span><span class="token punctuation">></span></span> msgThis <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MessageExt</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>consumeBatchSize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> consumeBatchSize<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">,</span> total<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>total <span class="token operator">&lt;</span> msgs<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    msgThis<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>msgs<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>total<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">break</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token class-name">ConsumeRequest</span> consumeRequest <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ConsumeRequest</span><span class="token punctuation">(</span>msgThis<span class="token punctuation">,</span> processQueue<span class="token punctuation">,</span> messageQueue<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>consumeExecutor<span class="token punctuation">.</span><span class="token function">submit</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">RejectedExecutionException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span> total <span class="token operator">&lt;</span> msgs<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> total<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    msgThis<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>msgs<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>total<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+
+                <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">submitConsumeRequestLater</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>消息消费的状态处理</strong></p>
+<p>消息的处理结果可能有不同的值，主要的两个是 CONSUME_SUCCESS 和 RECONSUME_LATER。如果消费不成功，要把消息提交到上面说的 scheduledExecutorService 线程池中，5 秒后再执行；如果消费模式是 CLUSTERING 模式，未消费成功的消息会先被发送回 Broker，供这个 ConsumerGroup 里的其他 Consumer 消费，如果发送回 Broker 失败，再调用 CONSUME_LATER，消息消费的 Status 处理逻辑如下。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">processConsumeResult</span><span class="token punctuation">(</span>
+    <span class="token keyword">final</span> <span class="token class-name">ConsumeConcurrentlyStatus</span> status<span class="token punctuation">,</span>
+    <span class="token keyword">final</span> <span class="token class-name">ConsumeConcurrentlyContext</span> context<span class="token punctuation">,</span>
+    <span class="token keyword">final</span> <span class="token class-name">ConsumeRequest</span> consumeRequest
+<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> ackIndex <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getAckIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>status<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> CONSUME_SUCCESS<span class="token operator">:</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>ackIndex <span class="token operator">>=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                ackIndex <span class="token operator">=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">int</span> ok <span class="token operator">=</span> ackIndex <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span>
+            <span class="token keyword">int</span> failed <span class="token operator">=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> ok<span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConsumerStatsManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">incConsumeOKTPS</span><span class="token punctuation">(</span>consumerGroup<span class="token punctuation">,</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> ok<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConsumerStatsManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">incConsumeFailedTPS</span><span class="token punctuation">(</span>consumerGroup<span class="token punctuation">,</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> failed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> RECONSUME_LATER<span class="token operator">:</span>
+            ackIndex <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getConsumerStatsManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">incConsumeFailedTPS</span><span class="token punctuation">(</span>consumerGroup<span class="token punctuation">,</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">.</span><span class="token function">getMessageModel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> BROADCASTING<span class="token operator">:</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> ackIndex <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">MessageExt</span> msg <span class="token operator">=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"BROADCASTING, the message consume failed, drop it, &#123;&#125;"</span><span class="token punctuation">,</span> msg<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">case</span> CLUSTERING<span class="token operator">:</span>
+            <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MessageExt</span><span class="token punctuation">></span></span> msgBackFailed <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">MessageExt</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> ackIndex <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">MessageExt</span> msg <span class="token operator">=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">boolean</span> result <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sendMessageBack</span><span class="token punctuation">(</span>msg<span class="token punctuation">,</span> context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>result<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    msg<span class="token punctuation">.</span><span class="token function">setReconsumeTimes</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span><span class="token function">getReconsumeTimes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    msgBackFailed<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>msg<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>msgBackFailed<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">removeAll</span><span class="token punctuation">(</span>msgBackFailed<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">submitConsumeRequestLater</span><span class="token punctuation">(</span>msgBackFailed<span class="token punctuation">,</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getProcessQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">long</span> offset <span class="token operator">=</span> consumeRequest<span class="token punctuation">.</span><span class="token function">getProcessQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">removeMessage</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">.</span><span class="token function">getMsgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>offset <span class="token operator">>=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>consumeRequest<span class="token punctuation">.</span><span class="token function">getProcessQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">isDropped</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumerImpl<span class="token punctuation">.</span><span class="token function">getOffsetStore</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">updateOffset</span><span class="token punctuation">(</span>consumeRequest<span class="token punctuation">.</span><span class="token function">getMessageQueue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> offset<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>处理逻辑是用户自定义的，当消息量大的时候，处理逻辑执行效率的高低影响系统的吞吐量。可以把多条消息组合起来处理，或者提高线程数，以提高系统的吞吐量。</p>
+<h2 id="MQClientlnstance"><a href="#MQClientlnstance" class="headerlink" title="MQClientlnstance"></a>MQClientlnstance</h2><p>MQClientInstance 是客户端各种类型的 Consumer 和 Producer 的底层类。这个类首先从 NameServer 获取并保存各种配置信息，比如 Topic 的 Route 信息。同时 MQClientlnstance 还会通过 MQClientAPIImpl 类实现消息的收发，也就是从 Broker 获取消息或者发送消息到 Broker。</p>
+<p>既然 MQClientInstance 实现的是底层通信功能和获取并保存元数据的功能，就没必要每个 Consumer 或 Producer 都创建一个对象，一个 MQC!ientlnstance 对象可以被多个 Consumer 或 Producer 公用。</p>
+<p>RocketMQ 通过一个工厂类达到共用 MQClientlnstance 的目的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">MQClientManager</span><span class="token punctuation">.</span><span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOrCreateMQClientInstance</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMQPushConsumer<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>rpcHook<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>MQClientlnstance 是通过工厂类被创建的，并不是一个单例模式，有些情况下需要创建多个实例。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">MQClientInstance</span> <span class="token function">getOrCreateMQClientInstance</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">ClientConfig</span> clientConfig<span class="token punctuation">,</span> <span class="token class-name">RPCHook</span> rpcHook<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">String</span> clientId <span class="token operator">=</span> clientConfig<span class="token punctuation">.</span><span class="token function">buildMQClientId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">MQClientInstance</span> instance <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>factoryTable<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>clientId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">null</span> <span class="token operator">==</span> instance<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        instance <span class="token operator">=</span>
+            <span class="token keyword">new</span> <span class="token class-name">MQClientInstance</span><span class="token punctuation">(</span>clientConfig<span class="token punctuation">.</span><span class="token function">cloneClientConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>factoryIndexGenerator<span class="token punctuation">.</span><span class="token function">getAndIncrement</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> clientId<span class="token punctuation">,</span> rpcHook<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">MQClientInstance</span> prev <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>factoryTable<span class="token punctuation">.</span><span class="token function">putIfAbsent</span><span class="token punctuation">(</span>clientId<span class="token punctuation">,</span> instance<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>prev <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            instance <span class="token operator">=</span> prev<span class="token punctuation">;</span>
+            log<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token string">"Returned Previous MQClientInstance for clientId:[&#123;&#125;]"</span><span class="token punctuation">,</span> clientId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"Created new MQClientInstance for clientId:[&#123;&#125;]"</span><span class="token punctuation">,</span> clientId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> instance<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>系统中维护了 <code>ConcurrentMap&lt;String/* clientld */, MQClientlnstance&gt; factoryTable</code> 这个 Map 对象，每创建一个新的 MQClientlnstance，都会以 clientld 作为 Key 放入 Map 结构中。clientld 的格式是“clientlp” + @ + “InstanceName”，其中 clientlp 是客户端机器的 IP 地址，一般不会变，instancename 有默认值，也可以被手动设置。</p>
+<p>普通情况下，一个用到 RocketMQ 客户端的 Java 程序，或者说一个 JVM 进程只要有一个 MQClientlnstance 实例就够了。这时候创建一个或多个 Consumer 或者 Producer，底层使用的是同一个 MQClientlnstance 实例。但有些情况下只有一个 MQClientlnstance 对象是不够的，比如一个 Java 程序需要连接两个 RoceketMQ 集群，从一个集群读取消息，发送到另一个集群，一个 MQClientlnstance 对象无法支持这种场景。这种情况下一定要手动指定不同的 InstanceName，底层会创建两个 MQClientlnstance 对象。</p>
+<p>MQClientlnstance 通过定时任务会执行如下几个操作：获取 NameServer 地址、更新 TopicRoute 信息、清理离线的 Broker 和保存消费者的 Offset。</p>
+<h1 id="Broker"><a href="#Broker" class="headerlink" title="Broker"></a>Broker</h1><h2 id="主从同步机制"><a href="#主从同步机制" class="headerlink" title="主从同步机制"></a>主从同步机制</h2><p>RocketMQ 的 Broker 分为 Master 和 Slave 两个角色，为了保证高可用性，Master 角色的机器接收到消息后，要把内容同步到 Slave 机器上，这样一旦 Master 宕机，Slave 机器依然可以提供服务。Master 和 Slave 角色的 Broker 之间同步信息功能的实现。需要同步的信息分为两种类型，实现方式各不相同：一种是元数据信息，采用基于 Netty 的 command 方式来同步消息；另一种是 CommitLog 信息，同步方式是直接基于 Java NIO 来实现。</p>
+<h3 id="同步属性信息"><a href="#同步属性信息" class="headerlink" title="同步属性信息"></a>同步属性信息</h3><p>Slave 需要和 Master 同步的不只是消息本身，一些元数据信息也需要同步，比如 TopicConfig 信息、ConsumerOffset 信息、DelayOffset 和 SubscriptionGroupConfig 信息。Broker 在启动的时候，判断自己的角色是否是 Slave，是的话就启动定时同步任务。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">handleSlaveSynchronize</span><span class="token punctuation">(</span><span class="token class-name">BrokerRole</span> role<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>role <span class="token operator">==</span> <span class="token class-name">BrokerRole</span><span class="token punctuation">.</span>SLAVE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">null</span> <span class="token operator">!=</span> slaveSyncFuture<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            slaveSyncFuture<span class="token punctuation">.</span><span class="token function">cancel</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>slaveSynchronize<span class="token punctuation">.</span><span class="token function">setMasterAddr</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        slaveSyncFuture <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>scheduledExecutorService<span class="token punctuation">.</span><span class="token function">scheduleAtFixedRate</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token annotation punctuation">@Override</span>
+            <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    <span class="token class-name">BrokerController</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>slaveSynchronize<span class="token punctuation">.</span><span class="token function">syncAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+                <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"ScheduledTask SlaveSynchronize syncAll error."</span><span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span><span class="token punctuation">,</span> <span class="token number">1000</span> <span class="token operator">*</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">1000</span> <span class="token operator">*</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MILLISECONDS<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//handle the slave synchronise</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">null</span> <span class="token operator">!=</span> slaveSyncFuture<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            slaveSyncFuture<span class="token punctuation">.</span><span class="token function">cancel</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>slaveSynchronize<span class="token punctuation">.</span><span class="token function">setMasterAddr</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在 syncAll 函数里，调用 <code>syncTopicConfig()</code>、<code>syncConsumerOffset()</code>、<code>syncDelayOffset()</code>、<code>syncSubscriptionGroupConfig()</code> 进行元数据同步。我们以 <code>syncConsumerOffset()</code> 为例，看看底层的具体实现。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">syncConsumerOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">String</span> masterAddrBak <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>masterAddr<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>masterAddrBak <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span>masterAddrBak<span class="token punctuation">.</span><span class="token function">equals</span><span class="token punctuation">(</span>brokerController<span class="token punctuation">.</span><span class="token function">getBrokerAddr</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">ConsumerOffsetSerializeWrapper</span> offsetWrapper <span class="token operator">=</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>brokerController<span class="token punctuation">.</span><span class="token function">getBrokerOuterAPI</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getAllConsumerOffset</span><span class="token punctuation">(</span>masterAddrBak<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>brokerController<span class="token punctuation">.</span><span class="token function">getConsumerOffsetManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getOffsetTable</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">putAll</span><span class="token punctuation">(</span>offsetWrapper<span class="token punctuation">.</span><span class="token function">getOffsetTable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>brokerController<span class="token punctuation">.</span><span class="token function">getConsumerOffsetManager</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">persist</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            log<span class="token punctuation">.</span><span class="token function">info</span><span class="token punctuation">(</span><span class="token string">"Update slave consumer offset from master, &#123;&#125;"</span><span class="token punctuation">,</span> masterAddrBak<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"SyncConsumerOffset Exception, &#123;&#125;"</span><span class="token punctuation">,</span> masterAddrBak<span class="token punctuation">,</span> e<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">ConsumerOffsetSerializeWrapper</span> <span class="token function">getAllConsumerOffset</span><span class="token punctuation">(</span>
+    <span class="token keyword">final</span> <span class="token class-name">String</span> addr<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">,</span> <span class="token class-name">RemotingTimeoutException</span><span class="token punctuation">,</span>
+    <span class="token class-name">RemotingSendRequestException</span><span class="token punctuation">,</span> <span class="token class-name">RemotingConnectException</span><span class="token punctuation">,</span> <span class="token class-name">MQBrokerException</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">RemotingCommand</span> request <span class="token operator">=</span> <span class="token class-name">RemotingCommand</span><span class="token punctuation">.</span><span class="token function">createRequestCommand</span><span class="token punctuation">(</span><span class="token class-name">RequestCode</span><span class="token punctuation">.</span>GET_ALL_CONSUMER_OFFSET<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">RemotingCommand</span> response <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>remotingClient<span class="token punctuation">.</span><span class="token function">invokeSync</span><span class="token punctuation">(</span>addr<span class="token punctuation">,</span> request<span class="token punctuation">,</span> <span class="token number">3000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">assert</span> response <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token keyword">switch</span> <span class="token punctuation">(</span>response<span class="token punctuation">.</span><span class="token function">getCode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">case</span> <span class="token class-name">ResponseCode</span><span class="token punctuation">.</span>SUCCESS<span class="token operator">:</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token class-name">ConsumerOffsetSerializeWrapper</span><span class="token punctuation">.</span><span class="token function">decode</span><span class="token punctuation">(</span>response<span class="token punctuation">.</span><span class="token function">getBody</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">ConsumerOffsetSerializeWrapper</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">default</span><span class="token operator">:</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">MQBrokerException</span><span class="token punctuation">(</span>response<span class="token punctuation">.</span><span class="token function">getCode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> response<span class="token punctuation">.</span><span class="token function">getRemark</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> addr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>sysConsumerOffset()</code> 的基本逻辑是组装一个 RemotingCommand，底层通过 Netty 将消息发送到 Master 角色的 Broker，然后获取 Offset 信息。</p>
+<h3 id="同步消息体"><a href="#同步消息体" class="headerlink" title="同步消息体"></a>同步消息体</h3><p>Master 和 Slave 之间同步消息体内容的方法，也就是同步 CommitLog 内容的方法。CommitLog 和元数据信息不同：首先，CommitLog 的数据量比元数据要大；其次，对实时性和可靠性要求也不一样。元数据信息是定时同步的，在两次同步的时间差里，如果出现异常可能会造成 Master 上的元数据内容和 Slave 上的元数据内容不一致，不过这种情况还可以补救（手动调整 Offset，重启 Consumer 等）。CommitLog 在高可靠性场景下如果没有及时同步，一旦 Master 机器出故障，消息就彻底丢失了。所以有专门的代码来实现<br>Master 和 Slave 之间消息体内容的同步。</p>
+<p>主要的实现代码在 Broker 模块的 <code>org.apache.rocketmq.store.ha</code> 包中，里面<br>包括 HAService、HAConnection 和 WaitNotifyObject 这三个类。</p>
+<p>HAService 是实现 commitLog 同步的主体，它在 Master 机器和 Slave 机器上执行的逻辑不同，默认是在 Master 机器上执行。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//BrokerController#initialize()</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">BrokerRole</span><span class="token punctuation">.</span>SLAVE <span class="token operator">==</span> <span class="token keyword">this</span><span class="token punctuation">.</span>messageStoreConfig<span class="token punctuation">.</span><span class="token function">getBrokerRole</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>messageStoreConfig<span class="token punctuation">.</span><span class="token function">getHaMasterAddress</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>messageStoreConfig<span class="token punctuation">.</span><span class="token function">getHaMasterAddress</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">>=</span> <span class="token number">6</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>messageStore<span class="token punctuation">.</span><span class="token function">updateHaMasterAddress</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>messageStoreConfig<span class="token punctuation">.</span><span class="token function">getHaMasterAddress</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>updateMasterHAServerAddrPeriodically <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>updateMasterHAServerAddrPeriodically <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>当 Broker 角色是 Slave 的时候，MasterAddr 的值会被正确设置，这样<br>HAService 在启动的时候，在 HAClient 这个内部类中，connectMaster 会被正<br>确执行，如代码清单所示。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">boolean</span> <span class="token function">connectMaster</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ClosedChannelException</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">null</span> <span class="token operator">==</span> socketChannel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">String</span> addr <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>masterAddress<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>addr <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+            <span class="token class-name">SocketAddress</span> socketAddress <span class="token operator">=</span> <span class="token class-name">RemotingUtil</span><span class="token punctuation">.</span><span class="token function">string2SocketAddress</span><span class="token punctuation">(</span>addr<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>socketAddress <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">this</span><span class="token punctuation">.</span>socketChannel <span class="token operator">=</span> <span class="token class-name">RemotingUtil</span><span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>socketAddress<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>socketChannel <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    <span class="token keyword">this</span><span class="token punctuation">.</span>socketChannel<span class="token punctuation">.</span><span class="token function">register</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>selector<span class="token punctuation">,</span> <span class="token class-name">SelectionKey</span><span class="token punctuation">.</span>OP_READ<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">this</span><span class="token punctuation">.</span>currentReportedOffset <span class="token operator">=</span> <span class="token class-name">HAService</span><span class="token punctuation">.</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMessageStore<span class="token punctuation">.</span><span class="token function">getMaxPhyOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">this</span><span class="token punctuation">.</span>lastWriteTimestamp <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>socketChannel <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>HAClient 试图通过 Java NIO 函数去连接 Master 角色的 Broker。Master 角色有相应的监听代码，如下所示。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">beginAccept</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serverSocketChannel <span class="token operator">=</span> <span class="token class-name">ServerSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>selector <span class="token operator">=</span> <span class="token class-name">RemotingUtil</span><span class="token punctuation">.</span><span class="token function">openSelector</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serverSocketChannel<span class="token punctuation">.</span><span class="token function">socket</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setReuseAddress</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serverSocketChannel<span class="token punctuation">.</span><span class="token function">socket</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">bind</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>socketAddressListen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serverSocketChannel<span class="token punctuation">.</span><span class="token function">configureBlocking</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serverSocketChannel<span class="token punctuation">.</span><span class="token function">register</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>selector<span class="token punctuation">,</span> <span class="token class-name">SelectionKey</span><span class="token punctuation">.</span>OP_ACCEPT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>CommitLog 的同步，不是经过 netty command 的方式，而是直接进行 TCP 连接，这样效率更高。连接成功以后，通过对比 Master 和 Slave 的 Offset，不断进行同步。</p>
+<h3 id="主从同步方式"><a href="#主从同步方式" class="headerlink" title="主从同步方式"></a>主从同步方式</h3><p>sync_master 和 async_master 是写在 Broker 配置文件里的配置参数，这个参数影响的是主从同步的方式。sync_master 是同步方式，也就是 Master 角色 Broker 中的消息要立刻同步过去；async_master 是异步方式，也就是 Master 角色 Broker 中的消息是通过异步处理的方式同步到 Slave 角色的机器上的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">handleHA</span><span class="token punctuation">(</span><span class="token class-name">AppendMessageResult</span> result<span class="token punctuation">,</span> <span class="token class-name">PutMessageResult</span> putMessageResult<span class="token punctuation">,</span> <span class="token class-name">MessageExt</span> messageExt<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">BrokerRole</span><span class="token punctuation">.</span>SYNC_MASTER <span class="token operator">==</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMessageStore<span class="token punctuation">.</span><span class="token function">getMessageStoreConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getBrokerRole</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">HAService</span> service <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultMessageStore<span class="token punctuation">.</span><span class="token function">getHaService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>messageExt<span class="token punctuation">.</span><span class="token function">isWaitStoreMsgOK</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">// Determine whether to wait</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>service<span class="token punctuation">.</span><span class="token function">isSlaveOK</span><span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">getWroteOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> result<span class="token punctuation">.</span><span class="token function">getWroteBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">GroupCommitRequest</span> request <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">GroupCommitRequest</span><span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">getWroteOffset</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> result<span class="token punctuation">.</span><span class="token function">getWroteBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                service<span class="token punctuation">.</span><span class="token function">putRequest</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                service<span class="token punctuation">.</span><span class="token function">getWaitNotifyObject</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">wakeupAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">PutMessageStatus</span> replicaStatus <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    replicaStatus <span class="token operator">=</span> request<span class="token punctuation">.</span><span class="token function">future</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultMessageStore<span class="token punctuation">.</span><span class="token function">getMessageStoreConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getSyncFlushTimeout</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                            <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MILLISECONDS<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">InterruptedException</span> <span class="token operator">|</span> <span class="token class-name">ExecutionException</span> <span class="token operator">|</span> <span class="token class-name">TimeoutException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token punctuation">&#125;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>replicaStatus <span class="token operator">!=</span> <span class="token class-name">PutMessageStatus</span><span class="token punctuation">.</span>PUT_OK<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    log<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">"do sync transfer other node, wait return, but failed, topic: "</span> <span class="token operator">+</span> messageExt<span class="token punctuation">.</span><span class="token function">getTopic</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">" tags: "</span>
+                        <span class="token operator">+</span> messageExt<span class="token punctuation">.</span><span class="token function">getTags</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">" client address: "</span> <span class="token operator">+</span> messageExt<span class="token punctuation">.</span><span class="token function">getBornHostNameString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    putMessageResult<span class="token punctuation">.</span><span class="token function">setPutMessageStatus</span><span class="token punctuation">(</span><span class="token class-name">PutMessageStatus</span><span class="token punctuation">.</span>FLUSH_SLAVE_TIMEOUT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">// Slave problem</span>
+            <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">// Tell the producer, slave not available</span>
+                putMessageResult<span class="token punctuation">.</span><span class="token function">setPutMessageStatus</span><span class="token punctuation">(</span><span class="token class-name">PutMessageStatus</span><span class="token punctuation">.</span>SLAVE_NOT_AVAILABLE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在 CommitLog 类的 putMessage 函数末尾，调用 handleHA 函数。代码中的<br>关键词是 wakeupAll 和 waitForFlush，在同步方式下，Master 每次写消息的时<br>候，都会等待向 Slave 同步消息的过程，同步完成后再返回，如代码清单所示。（putMessage函数比较长，仅列出关键的代码）。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public PutMessageResult putMessage(final MessageExtBrokerInner msg) &#123;
+ 
+    &#x2F;&#x2F;...
+
+    handleDiskFlush(result, putMessageResult, msg);
+    handleHA(result, putMessageResult, msg);
+
+    return putMessageResult;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RocketMQ/" rel="tag"># RocketMQ</a>
+              <a href="/tags/NameServer/" rel="tag"># NameServer</a>
+              <a href="/tags/Broker/" rel="tag"># Broker</a>
+              <a href="/tags/Consumer/" rel="tag"># Consumer</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/07/12/Middleware-Hibernate/" rel="prev" title="Middleware Hibernate">
+      <i class="fa fa-chevron-left"></i> Middleware Hibernate
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/07/15/SE-%E7%BA%BF%E7%A8%8B%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/" rel="next" title="架构设计 线程设计模式">
+      架构设计 线程设计模式 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#NameServer"><span class="nav-number">1.</span> <span class="nav-text">NameServer</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E9%80%BB%E8%BE%91%E5%A4%84%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">初始化逻辑处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E4%B8%9A%E5%8A%A1%E9%80%BB%E8%BE%91%E5%A4%84%E7%90%86"><span class="nav-number">1.2.</span> <span class="nav-text">核心业务逻辑处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E7%8A%B6%E6%80%81%E5%AD%98%E5%82%A8"><span class="nav-number">1.3.</span> <span class="nav-text">集群状态存储</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%8A%B6%E6%80%81%E7%BB%B4%E6%8A%A4%E5%8E%9F%E7%90%86"><span class="nav-number">1.4.</span> <span class="nav-text">状态维护原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Remoting%E6%A8%A1%E5%9D%97"><span class="nav-number">1.5.</span> <span class="nav-text">Remoting模块</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Consumer"><span class="nav-number">2.</span> <span class="nav-text">Consumer</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E9%80%BB%E8%BE%91%E5%A4%84%E7%90%86-1"><span class="nav-number">2.1.</span> <span class="nav-text">初始化逻辑处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E6%B6%88%E6%81%AF%E9%80%BB%E8%BE%91"><span class="nav-number">2.2.</span> <span class="nav-text">获取消息逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E5%A4%84%E7%90%86%E9%80%BB%E8%BE%91"><span class="nav-number">2.3.</span> <span class="nav-text">并发处理逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MQClientlnstance"><span class="nav-number">2.4.</span> <span class="nav-text">MQClientlnstance</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Broker"><span class="nav-number">3.</span> <span class="nav-text">Broker</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E6%9C%BA%E5%88%B6"><span class="nav-number">3.1.</span> <span class="nav-text">主从同步机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8C%E6%AD%A5%E5%B1%9E%E6%80%A7%E4%BF%A1%E6%81%AF"><span class="nav-number">3.1.1.</span> <span class="nav-text">同步属性信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8C%E6%AD%A5%E6%B6%88%E6%81%AF%E4%BD%93"><span class="nav-number">3.1.2.</span> <span class="nav-text">同步消息体</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E6%96%B9%E5%BC%8F"><span class="nav-number">3.1.3.</span> <span class="nav-text">主从同步方式</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

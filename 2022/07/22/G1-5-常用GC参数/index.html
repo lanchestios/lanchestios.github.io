@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本章主要讲解 JVM 的参数，重点讲解形如 -XX:[+,-]* 的非标准化参数。这些参数相对来说不稳定，随着 JVM 版本的变化可能会发生变化，主要用于 JVM 调优和 DEBUG。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="G1 常用GC参数">
+<meta property="og:url" content="http://example.com/2022/07/22/G1-5-%E5%B8%B8%E7%94%A8GC%E5%8F%82%E6%95%B0/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本章主要讲解 JVM 的参数，重点讲解形如 -XX:[+,-]* 的非标准化参数。这些参数相对来说不稳定，随着 JVM 版本的变化可能会发生变化，主要用于 JVM 调优和 DEBUG。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-07-22T08:14:21.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:15:32.851Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="GC">
+<meta property="article:tag" content="G1">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2022/07/22/G1-5-%E5%B8%B8%E7%94%A8GC%E5%8F%82%E6%95%B0/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>G1 常用GC参数 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/07/22/G1-5-%E5%B8%B8%E7%94%A8GC%E5%8F%82%E6%95%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          G1 常用GC参数
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-07-22 16:14:21 / Modified: 16:15:32" itemprop="dateCreated datePublished" datetime="2022-07-22T16:14:21+08:00">2022-07-22</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本章主要讲解 JVM 的参数，重点讲解形如 <code>-XX:[+,-]*</code> 的非标准化参数。这些参数相对来说不稳定，随着 JVM 版本的变化可能会发生变化，主要用于 JVM 调优和 DEBUG。</p>
+<span id="more"></span>
+
+
+
+<h1 id="GC-打印控制"><a href="#GC-打印控制" class="headerlink" title="GC 打印控制"></a>GC 打印控制</h1><h2 id="按日志等级打印详情"><a href="#按日志等级打印详情" class="headerlink" title="按日志等级打印详情"></a>按日志等级打印详情</h2><h3 id="Level-fine"><a href="#Level-fine" class="headerlink" title="Level: fine"></a>Level: fine</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGC
+或
+-XX:+UnlockExperimentalVMOptions
+-XX:G1LogLevel&#x3D;fine<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">0.149: [GC pause (G1 Humongous Allocation) (young) (initial-mark) 102M-&gt;100M(256M), 0.0025488 secs]
+0.152: [GC concurrent-root-region-scan-start]
+0.152: [GC concurrent-root-region-scan-end, 0.0004812 secs]
+0.152: [GC concurrent-mark-start]
+0.152: [GC concurrent-mark-end, 0.0002496 secs]
+0.156: [GC remark, 0.0016928 secs]
+0.158: [GC cleanup 111M-&gt;111M(256M), 0.0005160 secs]
+0.205: [Full GC (System.gc())  211M-&gt;388K(8192K), 0.0207117 secs]
+
+# JVM启动至今所经过的时间：GC类型 [回收前使用内存-&gt;回收后使用内存(总占用的内存)] [回收耗费的时间]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="Level-finer"><a href="#Level-finer" class="headerlink" title="Level: finer"></a>Level: finer</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCDetails
+或
+-XX:+UnlockExperimentalVMOptions
+-XX:G1LogLevel&#x3D;finer<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">0.141: [GC pause (G1 Humongous Allocation) (young) (initial-mark), 0.0017330 secs]
+   [Parallel Time: 1.3 ms, GC Workers: 8]
+      [GC Worker Start (ms): Min: 140.9, Avg: 141.0, Max: 141.1, Diff: 0.1]
+      [Ext Root Scanning (ms): Min: 0.3, Avg: 0.3, Max: 0.5, Diff: 0.2, Sum: 2.6]
+      [Update RS (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [Processed Buffers: Min: 0, Avg: 0.0, Max: 0, Diff: 0, Sum: 0]
+      [Scan RS (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [Code Root Scanning (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [Object Copy (ms): Min: 0.2, Avg: 0.3, Max: 0.6, Diff: 0.4, Sum: 2.2]
+      [Termination (ms): Min: 0.0, Avg: 0.5, Max: 0.6, Diff: 0.6, Sum: 3.7]
+         [Termination Attempts: Min: 1, Avg: 3.4, Max: 7, Diff: 6, Sum: 27]
+      [GC Worker Other (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.1]
+      [GC Worker Total (ms): Min: 0.9, Avg: 1.1, Max: 1.2, Diff: 0.3, Sum: 8.6]
+      [GC Worker End (ms): Min: 141.9, Avg: 142.1, Max: 142.1, Diff: 0.2]
+   [Code Root Fixup: 0.0 ms]
+   [Code Root Purge: 0.0 ms]
+   [Clear CT: 0.1 ms]
+   [Other: 0.4 ms]
+      [Choose CSet: 0.0 ms]
+      [Ref Proc: 0.2 ms]
+      [Ref Enq: 0.0 ms]
+      [Redirty Cards: 0.1 ms]
+      [Humongous Register: 0.0 ms]
+      [Humongous Reclaim: 0.0 ms]
+      [Free CSet: 0.0 ms]
+   [Eden: 2048.0K(24.0M)-&gt;0.0B(24.0M) Survivors: 0.0B-&gt;1024.0K Heap: 102.0M(256.0M)-&gt;100.5M(256.0M)]
+ [Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.00 secs] 
+0.143: [GC concurrent-root-region-scan-start]
+0.143: [GC concurrent-root-region-scan-end, 0.0003985 secs]
+0.143: [GC concurrent-mark-start]
+0.143: [GC concurrent-mark-end, 0.0002379 secs]
+0.147: [GC remark 0.147: [Finalize Marking, 0.0002819 secs] 0.147: [GC ref-proc, 0.0000358 secs] 0.147: [Unloading, 0.0003903 secs], 0.0010815 secs]
+ [Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.00 secs] 
+0.148: [GC cleanup 111M-&gt;111M(256M), 0.0003577 secs]
+ [Times: user&#x3D;0.00 sys&#x3D;0.00, real&#x3D;0.00 secs] 
+0.193: [Full GC (System.gc())  211M-&gt;388K(8192K), 0.0145046 secs]
+   [Eden: 1024.0K(24.0M)-&gt;0.0B(3072.0K) Survivors: 1024.0K-&gt;0.0B Heap: 211.0M(256.0M)-&gt;388.9K(8192.0K)], [Metaspace: 3086K-&gt;3086K(1056768K)]
+ [Times: user&#x3D;0.00 sys&#x3D;0.01, real&#x3D;0.01 secs] 
+ Heap
+ garbage-first heap   total 8192K, used 388K [0x00000006c0000000, 0x00000006c0100040, 0x00000007c0000000)
+  region size 1024K, 1 young (1024K), 0 survivors (0K)
+ Metaspace       used 3093K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 339K, capacity 388K, committed 512K, reserved 1048576K<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>打印的 G1 的回收流程，以及各步骤回收的内存及执行的时间。</p>
+<pre class="line-numbers language-none"><code class="language-none">[Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.01 secs] 
+
+# user CPU工作在用户态花费的时间（所有线程总和）
+# sys  CPU工作在内核态花费的时间（所有线程总和）
+# real 此次GC事件花费的时间（真实时间）<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="Level-finest"><a href="#Level-finest" class="headerlink" title="Level: finest"></a>Level: finest</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+UnlockExperimentalVMOptions
+-XX:G1LogLevel&#x3D;finest<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">0.233: [GC pause (G1 Humongous Allocation) (young) (initial-mark), 0.0019984 secs]
+   [Parallel Time: 0.8 ms, GC Workers: 8]
+      [GC Worker Start (ms):  233.5  233.5  233.5  233.5  233.6  233.6  233.6  233.7
+       Min: 233.5, Avg: 233.6, Max: 233.7, Diff: 0.2]
+      [Ext Root Scanning (ms):  0.2  0.2  0.2  0.1  0.2  0.7  0.1  0.0
+       Min: 0.0, Avg: 0.2, Max: 0.7, Diff: 0.7, Sum: 1.6]
+         [Thread Roots (ms):  0.0  0.0  0.1  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.1, Diff: 0.1, Sum: 0.1]
+         [StringTable Roots (ms):  0.1  0.1  0.1  0.1  0.1  0.0  0.1  0.0
+          Min: 0.0, Avg: 0.1, Max: 0.1, Diff: 0.1, Sum: 0.5]
+         [Universe Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [JNI Handles Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.1  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.1, Diff: 0.1, Sum: 0.1]
+         [ObjectSynchronizer Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [FlatProfiler Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [Management Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [SystemDictionary Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [CLDG Roots (ms):  0.1  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.1, Diff: 0.1, Sum: 0.1]
+         [JVMTI Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [CodeCache Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [CM RefProcessor Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [Wait For Strong CLD (ms):  0.0  0.0  0.0  0.0  0.0  0.5  0.0  0.0
+          Min: 0.0, Avg: 0.1, Max: 0.5, Diff: 0.5, Sum: 0.8]
+         [Weak CLD Roots (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [SATB Filtering (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [Update RS (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+       Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [Processed Buffers:  0  0  0  0  0  0  0  0
+          Min: 0, Avg: 0.0, Max: 0, Diff: 0, Sum: 0]
+      [Scan RS (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+       Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [Code Root Scanning (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+       Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [Object Copy (ms):  0.0  0.0  0.0  0.0  0.5  0.0  0.0  0.0
+       Min: 0.0, Avg: 0.1, Max: 0.5, Diff: 0.5, Sum: 0.5]
+      [Termination (ms):  0.5  0.5  0.5  0.6  0.0  0.0  0.5  0.6
+       Min: 0.0, Avg: 0.4, Max: 0.6, Diff: 0.6, Sum: 3.2]
+         [Termination Attempts:  1  1  1  1  1  1  1  1
+          Min: 1, Avg: 1.0, Max: 1, Diff: 0, Sum: 8]
+      [GC Worker Other (ms):  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+       Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      [GC Worker Total (ms):  0.7  0.7  0.7  0.7  0.7  0.7  0.7  0.6
+       Min: 0.6, Avg: 0.7, Max: 0.7, Diff: 0.1, Sum: 5.4]
+      [GC Worker End (ms):  234.2  234.2  234.2  234.2  234.2  234.2  234.2  234.2
+       Min: 234.2, Avg: 234.2, Max: 234.2, Diff: 0.0]
+   [Code Root Fixup: 0.0 ms]
+   [Code Root Purge: 0.0 ms]
+   [Clear CT: 0.2 ms]
+   [Other: 1.0 ms]
+      [Choose CSet: 0.0 ms]
+      [Ref Proc: 0.8 ms]
+      [Ref Enq: 0.0 ms]
+      [Redirty Cards: 0.2 ms]
+         [Parallel Redirty:  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0
+          Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+         [Redirtied Cards:  0  0  0  0  0  0  0  0
+          Min: 0, Avg: 0.0, Max: 0, Diff: 0, Sum: 0]
+      [Humongous Register: 0.0 ms]
+         [Humongous Total: 0]
+         [Humongous Candidate: 0]
+      [Humongous Reclaim: 0.0 ms]
+         [Humongous Reclaimed: 0]
+      [Free CSet: 0.0 ms]
+         [Young Free CSet: 0.0 ms]
+         [Non-Young Free CSet: 0.0 ms]
+   [Eden: 1024.0K(3072.0K)-&gt;0.0B(3072.0K) Survivors: 0.0B-&gt;1024.0K Heap: 450.4K(8192.0K)-&gt;435.0K(8192.0K)]
+ [Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.00 secs] <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="堆相关信息"><a href="#堆相关信息" class="headerlink" title="堆相关信息"></a>堆相关信息</h2><h3 id="堆使用信息"><a href="#堆使用信息" class="headerlink" title="堆使用信息"></a>堆使用信息</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+UnlockDiagnosticVMOptions
+-XX:+G1PrintRegionLivenessInfo<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">### PHASE Post-Marking @ 0.215
+# 并发标记后，所有分区的情况，包括Eden、Old、Survivor和Free
+### HEAP  reserved: 0x00000006c0000000-0x00000007c0000000  region-size: 1048576
+# -- 列表头介绍 --
+# type 区域类型
+# address-range 区域寻址范围
+# used 区域已用空间 
+# prev-live 相对于之前标记周期的区域的活跃数据
+# next-live 标记后活跃数据空间
+# gc-eff 区域GC效率
+# remset RSet大小
+# code-roots CodeRoot大小
+###   type                         address-range       used  prev-live  next-live          gc-eff     remset  code-roots
+###                                                 (bytes)    (bytes)    (bytes)      (bytes&#x2F;ms)    (bytes)    (bytes)
+###   OLD  0x00000006c0000000-0x00000006c0100000     398256     398256     398256             0.0       3880        496
+###   FREE 0x00000006c0100000-0x00000006c0200000          0          0          0             0.0       3400         16
+###   FREE 0x00000006c0200000-0x00000006c0300000          0          0          0             0.0       3400         16
+###   FREE 0x00000006c0300000-0x00000006c0400000          0          0          0             0.0       3400         16
+###   FREE 0x00000006c0400000-0x00000006c0500000          0          0          0             0.0       3400         16
+###   FREE 0x00000006c0500000-0x00000006c0600000          0          0          0             0.0       3400         16
+###   SURV 0x00000006c0600000-0x00000006c0700000      47208      47208      47208             0.0       3400         16
+###   HUMS 0x00000006c0700000-0x00000006c0800000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0800000-0x00000006c0900000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0900000-0x00000006c0a00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0a00000-0x00000006c0b00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0b00000-0x00000006c0c00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0c00000-0x00000006c0d00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0d00000-0x00000006c0e00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0e00000-0x00000006c0f00000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c0f00000-0x00000006c1000000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c1000000-0x00000006c1100000    1048576    1048576    1048576             0.0       3400         16
+###   HUMC 0x00000006c1100000-0x00000006c1200000         16         16         16             0.0       3400         16
+###   EDEN 0x00000006c1200000-0x00000006c1300000     125904     125904     125904             0.0       3400         16
+###
+### SUMMARY  capacity: 19.00 MB  used: 10.54 MB &#x2F; 55.50 %  prev-live: 10.54 MB &#x2F; 55.50 %  next-live: 10.54 MB &#x2F; 55.50 %  remset: 0.31 MB  code-roots: 0.00 MB
+
+
+### PHASE Post-Sorting @ 0.215
+# CSet选择时需要对老生代分区进行排序，排序的依据是gc-eff，
+# 这个值越大说明回收该分区的效率越高，所以会优先选择效率高的老生代分区
+### HEAP  reserved: 0x00000006c0000000-0x00000007c0000000  region-size: 1048576
+###
+###   type                         address-range       used  prev-live  next-live          gc-eff     remset  code-roots
+###                                                 (bytes)    (bytes)    (bytes)      (bytes&#x2F;ms)    (bytes)    (bytes)
+###   OLD  0x00000006c0000000-0x00000006c0100000     398256     398256          0        196560.1       3880        496
+###
+### SUMMARY  capacity: 1.00 MB  used: 0.38 MB &#x2F; 37.98 %  prev-live: 0.38 MB &#x2F; 37.98 %  next-live: 0.00 MB &#x2F; 0.00 %  remset: 0.25 MB  code-roots: 0.00 MB<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="堆的分配和使用情况"><a href="#堆的分配和使用情况" class="headerlink" title="堆的分配和使用情况"></a>堆的分配和使用情况</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+G1PrintHeapRegions<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">G1HR #StartFullGC 9
+G1HR UNCOMMIT [0x00000006c0800000,0x00000006c0900000]
+G1HR POST-COMPACTION(Old) 0x00000006c0000000 0x00000006c00612e0
+G1HR #EndFullGC 9
+210M-&gt;388K(8192K), 0.0204781 secs]
+G1HR ALLOC(Eden) 0x00000006c0700000
+G1HR #StartGC 10
+G1HR CSET 0x00000006c0700000
+G1HR ALLOC(Survivor) 0x00000006c0600000
+G1HR RETIRE 0x00000006c0600000 0x00000006c0600b20
+G1HR COMMIT [0x00000006c0800000,0x00000006c0900000]
+G1HR #EndGC 10
+470K-&gt;391K(16M), 0.0012499 secs]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="输出-GC-前后的堆概要信息"><a href="#输出-GC-前后的堆概要信息" class="headerlink" title="输出 GC 前后的堆概要信息"></a>输出 GC 前后的堆概要信息</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintHeapAtGC<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">&#123;Heap before GC invocations&#x3D;12 (full 4):
+ garbage-first heap   total 8192K, used 388K [0x00000006c0000000, 0x00000006c0100040, 0x00000007c0000000)
+  region size 1024K, 1 young (1024K), 0 survivors (0K)
+ Metaspace       used 3086K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 338K, capacity 388K, committed 512K, reserved 1048576K
+0.557: [GC pause (G1 Humongous Allocation) (young) (initial-mark) 470K-&gt;390K(16M), 0.0006541 secs]
+Heap after GC invocations&#x3D;13 (full 4):
+ garbage-first heap   total 16384K, used 390K [0x00000006c0000000, 0x00000006c0100080, 0x00000007c0000000)
+  region size 1024K, 1 young (1024K), 1 survivors (1024K)
+ Metaspace       used 3086K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 338K, capacity 388K, committed 512K, reserved 1048576K
+&#125;
+0.558: [GC concurrent-root-region-scan-start]
+0.558: [GC concurrent-root-region-scan-end, 0.0000694 secs]
+0.558: [GC concurrent-mark-start]
+0.558: [GC concurrent-mark-end, 0.0004754 secs]
+0.562: [GC remark, 0.0008506 secs]
+0.567: [GC cleanup 20M-&gt;20M(38M), 0.0003862 secs]
+&#123;Heap before GC invocations&#x3D;14 (full 4):
+ garbage-first heap   total 252928K, used 215431K [0x00000006c0000000, 0x00000006c01007b8, 0x00000007c0000000)
+  region size 1024K, 2 young (2048K), 1 survivors (1024K)
+ Metaspace       used 3086K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 338K, capacity 388K, committed 512K, reserved 1048576K
+0.651: [Full GC (System.gc())  210M-&gt;388K(8192K), 0.0195430 secs]
+Heap after GC invocations&#x3D;15 (full 5):
+ garbage-first heap   total 8192K, used 388K [0x00000006c0000000, 0x00000006c0100040, 0x00000007c0000000)
+  region size 1024K, 0 young (0K), 0 survivors (0K)
+ Metaspace       used 3086K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 338K, capacity 388K, committed 512K, reserved 1048576K
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>Heap before GC</code> 和 <code>Heap after GC</code> 分别表示 GC 前后堆的信息的开始，invocations 表示调用堆信息输出的次数（<code>Heap after GC</code> 对应的 invocations 除 2，即为 GC 的次数），而 full 表示第几次 Full GC。</p>
+<h2 id="输出具体时间"><a href="#输出具体时间" class="headerlink" title="输出具体时间"></a>输出具体时间</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCTimeStamps # 将时间加到GC日志(G1默认开启)
+-XX:+PrintGCDateStamps # 将日期加到GC日志<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">2022-07-21T15:50:40.086-0800: 0.555: [GC concurrent-root-region-scan-start]<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h2 id="输出新生代到老年代晋升的情况"><a href="#输出新生代到老年代晋升的情况" class="headerlink" title="输出新生代到老年代晋升的情况"></a>输出新生代到老年代晋升的情况</h2><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
+-XX:+PrintTenuringDistribution<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">332.036: [GC pause (G1 Humongous Allocation) (young) (initial-mark)
+Desired survivor size 223674368 bytes, new threshold 15 (max 15)
+- age   1:   63634632 bytes,   63634632 total
+- age   2:    1064928 bytes,   64699560 total
+- age   3:   24489776 bytes,   89189336 total
+: 1795001K-&gt;92332K(2184576K), 0.1389036 secs] 1960821K-&gt;258153K(4806016K), 0.1390975 secs] [Times: user&#x3D;0.37 sys&#x3D;0.16, real&#x3D;0.14 secs]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们需要知道，我们是可以通过 MaxTenuringThreshold 参数控制对象从新生代晋升到老年代经过 GC 次数的最大值，这个默认值是 15，而最大值也是 15，因为对象头里给了 4个 bit 存放，只能表示 15 以内的整数。这个参数并非能达到绝对控制，比如晋升失败会导致对象原地不动，如果 survival 区不够大，可能直接放到老年代。</p>
+<p>这时候 Survivor 的大小是 223674368 字节，<code>new threshold 15</code> 表示 age 为 15 的对象都将送入到老生代分区，最大的年代数是 15。当前 age1 有 63634632 字节，age2 有 1064928 字节，age3 有 24489776 字节，total 是当前加起来的总和。</p>
+<h2 id="输出大对象日志分析"><a href="#输出大对象日志分析" class="headerlink" title="输出大对象日志分析"></a>输出大对象日志分析</h2><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
+-XX:+UnlockExperimentalVMOptions
+-XX:+G1TraceEagerReclaimHumongousObjects<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>输出日志如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">Live humongous region 0 size 4194320 start 0x00000000f0000000 length 5 with remset 8194 code roots 0 is marked 0 reclaim candidate 0 type array 0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>以上日志表示 0 号分区活跃大对象分区为 4M；起始地址为 0x00000000f0000000，占用 5 个分区；RSet 更新过 8194 次，代码块长度为 0，并有被标记；<code>reclaim candidate 0</code> 表示不能被回收；<code>type array 0</code> 表示不是数组类型。</p>
+<h2 id="输出GC时应用时间"><a href="#输出GC时应用时间" class="headerlink" title="输出GC时应用时间"></a>输出GC时应用时间</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCApplicationConcurrentTime # GC时打印应用执行时间
+-XX:+PrintGCApplicationStoppedTime    # GC时打印应用停顿时间<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none"># -XX:+PrintGCApplicationConcurrentTime GC前打印
+Application time: 0.2222222 seconds
+# -XX:+PrintGCApplicationStoppedTime GC后打印
+Total time for which application thread were stopped: 0.222222 seconds<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="输出G1自适应调整详细信息"><a href="#输出G1自适应调整详细信息" class="headerlink" title="输出G1自适应调整详细信息"></a>输出G1自适应调整详细信息</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintAdaptiveSizePolicy<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none"> 0.018: [G1Ergonomics (Heap Sizing) expand the heap, requested expansion amount: 268435456 bytes, attempted expansion amount: 268435456 bytes]
+ 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: occupancy higher than threshold, occupancy: 115343360 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+ 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: requested by GC cause, GC cause: G1 Humongous Allocation]
+ 0.187: [G1Ergonomics (Concurrent Cycles) initiate concurrent cycle, reason: concurrent cycle initiation requested]
+0.187: [GC pause (G1 Humongous Allocation) (young) (initial-mark) 0.187: [G1Ergonomics (CSet Construction) start choosing CSet, _pending_cards: 0, predicted base time: 10.00 ms, remaining time: 190.00 ms, target pause time: 200.00 ms]
+ 0.187: [G1Ergonomics (CSet Construction) add young regions to CSet, eden: 2 regions, survivors: 0 regions, predicted young region time: 30.60 ms]
+ 0.187: [G1Ergonomics (CSet Construction) finish choosing CSet, eden: 2 regions, survivors: 0 regions, old: 0 regions, predicted pause time: 40.60 ms, target pause time: 200.00 ms]
+ 102M-&gt;100M(256M), 0.0057796 secs]
+0.193: [GC concurrent-root-region-scan-start]
+0.194: [GC concurrent-root-region-scan-end, 0.0007363 secs]
+0.194: [GC concurrent-mark-start]
+0.194: [GC concurrent-mark-end, 0.0001506 secs]
+0.201: [GC remark, 0.0044089 secs]
+0.211: [GC cleanup 120M-&gt;120M(256M), 0.0009541 secs]
+ 0.218: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 149946368 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+ 0.262: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 230686720 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+0.268: [Full GC (System.gc())  0.272: [G1Ergonomics (Heap Sizing) attempt heap shrinking, reason: capacity higher than max desired capacity after Full GC, capacity: 268435456 bytes, occupancy: 398256 bytes, max desired capacity: 8388608 bytes (70.00 %)]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="输出并发标记概要信息"><a href="#输出并发标记概要信息" class="headerlink" title="输出并发标记概要信息"></a>输出并发标记概要信息</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+UnlockDiagnosticVMOptions
+-XX:+G1SummarizeConcMark<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">Concurrent marking:
+     0   init marks: total time &#x3D;     0.00 s (avg &#x3D;     0.00 ms).
+     5      remarks: total time &#x3D;     0.01 s (avg &#x3D;     1.45 ms).
+          [std. dev &#x3D;     0.49 ms, max &#x3D;     1.81 ms]
+     # remark有5个历史数据，给出了均值、最大值
+        5  final marks: total time &#x3D;     0.00 s (avg &#x3D;     0.79 ms).
+             [std. dev &#x3D;     0.43 ms, max &#x3D;     1.18 ms]
+        5    weak refs: total time &#x3D;     0.00 s (avg &#x3D;     0.66 ms).
+             [std. dev &#x3D;     0.13 ms, max &#x3D;     0.86 ms]
+     5     cleanups: total time &#x3D;     0.00 s (avg &#x3D;     0.40 ms).
+          [std. dev &#x3D;     0.06 ms, max &#x3D;     0.48 ms]
+   Final counting total time &#x3D;     0.00 s (avg &#x3D;     0.10 ms).
+   # 并发标记的最后，对分区对象进行计数的时间花费
+   RS scrub total time &#x3D;     0.00 s (avg &#x3D;     0.10 ms).
+   # 处理RSet的花费
+   Total stop_world time &#x3D;     0.01 s.
+   # 初始化、再标记、清理的时间
+ 	Total concurrent time &#x3D;     0.76 s (    0.01 s marking).
+ 	# 并发线程总花费和标记时间花费<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="GC-文件输出"><a href="#GC-文件输出" class="headerlink" title="GC 文件输出"></a>GC 文件输出</h1><h2 id="Log文件输出"><a href="#Log文件输出" class="headerlink" title="Log文件输出"></a>Log文件输出</h2><pre class="line-numbers language-none"><code class="language-none"># 根据时间戳生成日志名
+-Xloggc:gc-%t.log<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h2 id="Dump文件输出"><a href="#Dump文件输出" class="headerlink" title="Dump文件输出"></a>Dump文件输出</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+HeapDumpOnOutOfMemoryError<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+
+
+<h1 id="GC-功能性参数"><a href="#GC-功能性参数" class="headerlink" title="GC 功能性参数"></a>GC 功能性参数</h1><h2 id="分配物理内存"><a href="#分配物理内存" class="headerlink" title="分配物理内存"></a>分配物理内存</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+AlwaysPreTouch<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>服务启动的时候真实的分配物理内存给 JVM。如果没有此参数，则 JVM 启动的时候，分配的只是虚拟内存，当真正使用的时候才会分配物理内存，导致代码运行速度变慢；如果有此参数，则 JVM 启动的时候速度会下降很多。</p>
+<h1 id="TODO-参数"><a href="#TODO-参数" class="headerlink" title="TODO 参数"></a>TODO 参数</h1><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintSafepointStatistics
+-XX:PrintSafepointStatisticsCount&#x3D;1
+-XX:+PrintReferenceGC
+-XX:+G1SummarizeRSetStats 
+-XX:+DisableExplicitGC 
+-XX:+DebugNonSafepoints 
+-XX:+FlightRecorder 
+-XX:FlightRecorderOptions&#x3D;stackdepth&#x3D;500 
+-XX:-OmitStackTraceInFastThrow 
+-XX:+TrustFinalNonStaticFields 
+-XX:+UnlockCommercialFeatures 
+-XX:+UseCompressedClassPointers 
+-XX:+UseCompressedOops <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/GC/" rel="tag"># GC</a>
+              <a href="/tags/G1/" rel="tag"># G1</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/22/G1-4-FullGC%E8%BF%87%E7%A8%8B/" rel="prev" title="G1 FullGC过程">
+      <i class="fa fa-chevron-left"></i> G1 FullGC过程
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%89%93%E5%8D%B0%E6%8E%A7%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">GC 打印控制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%97%A5%E5%BF%97%E7%AD%89%E7%BA%A7%E6%89%93%E5%8D%B0%E8%AF%A6%E6%83%85"><span class="nav-number">1.1.</span> <span class="nav-text">按日志等级打印详情</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-fine"><span class="nav-number">1.1.1.</span> <span class="nav-text">Level: fine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finer"><span class="nav-number">1.1.2.</span> <span class="nav-text">Level: finer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finest"><span class="nav-number">1.1.3.</span> <span class="nav-text">Level: finest</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%9B%B8%E5%85%B3%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.</span> <span class="nav-text">堆相关信息</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E4%BD%BF%E7%94%A8%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.1.</span> <span class="nav-text">堆使用信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%88%86%E9%85%8D%E5%92%8C%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-number">1.2.2.</span> <span class="nav-text">堆的分配和使用情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA-GC-%E5%89%8D%E5%90%8E%E7%9A%84%E5%A0%86%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.3.</span> <span class="nav-text">输出 GC 前后的堆概要信息</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%85%B7%E4%BD%93%E6%97%B6%E9%97%B4"><span class="nav-number">1.3.</span> <span class="nav-text">输出具体时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E6%96%B0%E7%94%9F%E4%BB%A3%E5%88%B0%E8%80%81%E5%B9%B4%E4%BB%A3%E6%99%8B%E5%8D%87%E7%9A%84%E6%83%85%E5%86%B5"><span class="nav-number">1.4.</span> <span class="nav-text">输出新生代到老年代晋升的情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%A4%A7%E5%AF%B9%E8%B1%A1%E6%97%A5%E5%BF%97%E5%88%86%E6%9E%90"><span class="nav-number">1.5.</span> <span class="nav-text">输出大对象日志分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BAGC%E6%97%B6%E5%BA%94%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">1.6.</span> <span class="nav-text">输出GC时应用时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BAG1%E8%87%AA%E9%80%82%E5%BA%94%E8%B0%83%E6%95%B4%E8%AF%A6%E7%BB%86%E4%BF%A1%E6%81%AF"><span class="nav-number">1.7.</span> <span class="nav-text">输出G1自适应调整详细信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%B9%B6%E5%8F%91%E6%A0%87%E8%AE%B0%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.8.</span> <span class="nav-text">输出并发标记概要信息</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.</span> <span class="nav-text">GC 文件输出</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Log%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.1.</span> <span class="nav-text">Log文件输出</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dump%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.2.</span> <span class="nav-text">Dump文件输出</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%8A%9F%E8%83%BD%E6%80%A7%E5%8F%82%E6%95%B0"><span class="nav-number">3.</span> <span class="nav-text">GC 功能性参数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E9%85%8D%E7%89%A9%E7%90%86%E5%86%85%E5%AD%98"><span class="nav-number">3.1.</span> <span class="nav-text">分配物理内存</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#TODO-%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">TODO 参数</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

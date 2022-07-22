@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Servlet 3.0 规范新增了对异步请求的支持，Spring MVC 也在此基础上对异步请求提供了方便。异步请求是在处理比较耗时的业务时先将 request 返回，然后另起线程处理耗时的业务，处理完后再返回给用户。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SpringMVC 异步请求">
+<meta property="og:url" content="http://example.com/2021/09/23/Spring-SpringMVC%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Servlet 3.0 规范新增了对异步请求的支持，Spring MVC 也在此基础上对异步请求提供了方便。异步请求是在处理比较耗时的业务时先将 request 返回，然后另起线程处理耗时的业务，处理完后再返回给用户。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-09-23T09:37:10.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.540Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SpringMVC">
+<meta property="article:tag" content="Servlet 3.0">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2021/09/23/Spring-SpringMVC%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>SpringMVC 异步请求 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/23/Spring-SpringMVC%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          SpringMVC 异步请求
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-09-23 17:37:10" itemprop="dateCreated datePublished" datetime="2021-09-23T17:37:10+08:00">2021-09-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Servlet 3.0 规范新增了对异步请求的支持，Spring MVC 也在此基础上对异步请求提供了方便。异步请求是在处理比较耗时的业务时先将 request 返回，然后另起线程处理耗时的业务，处理完后再返回给用户。</p>
+<span id="more"></span>
+
+<p>HTTP 协议是单向的，只能客户端自己拉不能服务器主动推，Servlet 对异步请求的支持并没有修改 HTTP 协议，而是对 HTTP 的巧妙利用。异步请求的核心原理主要分为两大类，一类是轮询，另一类是长连接。轮询就是定时自动发起请求检查有没有需要返回的数据，这种方式对资源的浪费是比较大的；长连接的原理是在客户端发起请求，服务端处理并返回后并不结束连接，这样就可以在后面再次返回给客户端数据。Servlet 对异步请求的支持其实采用的是长连接的方式，也就是说，异步请求中在原始的请求返回的时候并没有关闭连接，关闭的，只是处理请求的那个线程（一般是回收的线程池里了），只有在异步请求全部处理完之后才会关闭连接。</p>
+<h1 id="Servlet-3-0-对异步请求的支持"><a href="#Servlet-3-0-对异步请求的支持" class="headerlink" title="Servlet 3.0 对异步请求的支持"></a>Servlet 3.0 对异步请求的支持</h1><p>在 Servlet 3.0 规范中使用异步处理请求非常简单，只需要在请求处理过程中调用 request 的 startAsync 方法即可，其返回值是 AsyncContext。</p>
+<p>AsyncContext 是保存与异步请求相关的所有信息，类似于 Servlet 中的 ServletContext。异步请求主要是使用 AsyncContext 进行操作，它是在请求处理的过程中调用 Request 的 startAsync 方法返回的，需要注意的是多次调用 startAsync 方法返回的是同一个 AsyncContext。AsyncContext 接口定义如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">AsyncContext</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">String</span> ASYNC_REQUEST_URI <span class="token operator">=</span> <span class="token string">"javax.servlet.async.request_uri"</span><span class="token punctuation">;</span>
+    <span class="token class-name">String</span> ASYNC_CONTEXT_PATH <span class="token operator">=</span> <span class="token string">"javax.servlet.async.context_path"</span><span class="token punctuation">;</span>
+    <span class="token class-name">String</span> ASYNC_MAPPING <span class="token operator">=</span> <span class="token string">"javax.servlet.async.mapping"</span><span class="token punctuation">;</span>
+    <span class="token class-name">String</span> ASYNC_PATH_INFO <span class="token operator">=</span> <span class="token string">"javax.servlet.async.path_info"</span><span class="token punctuation">;</span>
+    <span class="token class-name">String</span> ASYNC_SERVLET_PATH <span class="token operator">=</span> <span class="token string">"javax.servlet.async.servlet_path"</span><span class="token punctuation">;</span>
+    <span class="token class-name">String</span> ASYNC_QUERY_STRING <span class="token operator">=</span> <span class="token string">"javax.servlet.async.query_string"</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">ServletRequest</span> <span class="token function">getRequest</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">ServletResponse</span> <span class="token function">getResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">boolean</span> <span class="token function">hasOriginalRequestAndResponse</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">dispatch</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">dispatch</span><span class="token punctuation">(</span><span class="token class-name">String</span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">dispatch</span><span class="token punctuation">(</span><span class="token class-name">ServletContext</span> var1<span class="token punctuation">,</span> <span class="token class-name">String</span> var2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">complete</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addListener</span><span class="token punctuation">(</span><span class="token class-name">AsyncListener</span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addListener</span><span class="token punctuation">(</span><span class="token class-name">AsyncListener</span> var1<span class="token punctuation">,</span> <span class="token class-name">ServletRequest</span> var2<span class="token punctuation">,</span> <span class="token class-name">ServletResponse</span> var3<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span> <span class="token keyword">extends</span> <span class="token class-name">AsyncListener</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">createListener</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> var1<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ServletException</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token keyword">long</span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">long</span> <span class="token function">getTimeout</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="SpringMVC-中的异步请求"><a href="#SpringMVC-中的异步请求" class="headerlink" title="SpringMVC 中的异步请求"></a>SpringMVC 中的异步请求</h1><p>Spring MVC 为了方便使用异步请求专门提供了 AsyncWebRequest 类型的 request，并且提供了处理异步请求的管理器 WebAsyncManager 和工具 WebAsyncUtils。</p>
+<p>Spring MVC 将异步请求细分为了 Callable、WebAsyncTask、DeferredResult 和 ListenableFuture 四种类型。Spring MVC 专门提供了 AsyncRestTemplate 方法调用别的资源，并返回 ListenableFuture 类型。</p>
+<h2 id="异步请求示例"><a href="#异步请求示例" class="headerlink" title="异步请求示例"></a>异步请求示例</h2><h3 id="Callable"><a href="#Callable" class="headerlink" title="Callable"></a>Callable</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@RequestMapping</span><span class="token punctuation">(</span><span class="token string">"/hello"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> <span class="token function">hello</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">call</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">sleep5s</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> <span class="token string">"Complete"</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+  <span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Callable 的处理其实是在 WebAsyncManager 内部封装成 WebAsyncTask 后再处理的。核心逻辑在返回值处理器 CallableMethodReturnValueHandler。</p>
+<h3 id="WebAsyncTask"><a href="#WebAsyncTask" class="headerlink" title="WebAsyncTask"></a>WebAsyncTask</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@RequestMapping</span><span class="token punctuation">(</span><span class="token string">"/hello"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> <span class="token function">hello</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> task <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">5000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token string">"Complete"</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> task<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>WebAsyncTask 比 Callable 更好的是支持设置 timeout 和 Executor，以及支持 Timeout、Complete、Error 事件回调。</p>
+<h3 id="DeferredResult"><a href="#DeferredResult" class="headerlink" title="DeferredResult"></a>DeferredResult</h3><p>DeferredResult 是 Spring 提供的一种用于封装延迟处理结果的类，当一个处理器返回<br>DeferredResult 类型的返回值时将启动异步处理。其含义是当结果好了 set 就可以了。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@RequestMapping(&quot;&#x2F;hello&quot;)
+public DeferredResult&lt;String&gt; hello() &#123;
+  final DeferredResult&lt;String&gt; result &#x3D; new DeferredResult&lt;String&gt;(5 * 1000L, &quot;Timeout&quot;);
+  &#x2F;&#x2F; 一般使用线程池
+  new Thread(()-&gt;&#123;
+    sleep5s();
+    result.setResult(&quot;Complete&quot;);
+  &#125;).start();
+  return result;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>其支持设置 timeout 和 结果处理器，以及支持 Timeout、Complete、Error 事件回调。</p>
+<h3 id="ListenableFuture"><a href="#ListenableFuture" class="headerlink" title="ListenableFuture"></a>ListenableFuture</h3><p>ListenableFuture 继承自 Future，ListenableFuture 在 Future 阻塞获取结果的基础上，增加了可以添加处理成功和处理失败回调方法的方法，代码如下:</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ListenableFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">Future</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">/**
+    * Register the given &#123;@code ListenableFutureCallback&#125;.
+    * @param callback the callback to register
+    */</span>
+   <span class="token keyword">void</span> <span class="token function">addCallback</span><span class="token punctuation">(</span><span class="token class-name">ListenableFutureCallback</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> callback<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token comment">/**
+    * Java 8 lambda-friendly alternative with success and failure callbacks.
+    * @param successCallback the success callback
+    * @param failureCallback the failure callback
+    * @since 4.1
+    */</span>
+   <span class="token keyword">void</span> <span class="token function">addCallback</span><span class="token punctuation">(</span><span class="token class-name">SuccessCallback</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> successCallback<span class="token punctuation">,</span> <span class="token class-name">FailureCallback</span> failureCallback<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+
+   <span class="token comment">/**
+    * Expose this &#123;@link ListenableFuture&#125; as a JDK &#123;@link CompletableFuture&#125;.
+    * @since 5.0
+    */</span>
+   <span class="token keyword">default</span> <span class="token class-name">CompletableFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">completable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token class-name">CompletableFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> completable <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DelegatingCompletableFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token function">addCallback</span><span class="token punctuation">(</span>completable<span class="token operator">::</span><span class="token function">complete</span><span class="token punctuation">,</span> completable<span class="token operator">::</span><span class="token function">completeExceptionally</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> completable<span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>ListenableFutureCallback 继承自 SuccessCallback 和 FailureCallback 接口，后两个接口分别有一个 onSuccess 方法和 onFailure 方法，用于处理异步处理成功的返回值和异步处理失败的返回值。</p>
+<h2 id="异步请求组件"><a href="#异步请求组件" class="headerlink" title="异步请求组件"></a>异步请求组件</h2><h3 id="AsyncWebRequest"><a href="#AsyncWebRequest" class="headerlink" title="AsyncWebRequest"></a>AsyncWebRequest</h3><p>AsyncWebRequest 是专门处理异步请求的 request。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">AsyncWebRequest</span> <span class="token keyword">extends</span> <span class="token class-name">NativeWebRequest</span> <span class="token punctuation">&#123;</span>
+ 
+   <span class="token keyword">void</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token class-name">Long</span> timeout<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+   <span class="token keyword">void</span> <span class="token function">dispatch</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">void</span> <span class="token function">startAsync</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+   <span class="token keyword">boolean</span> <span class="token function">isAsyncStarted</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">boolean</span> <span class="token function">isAsyncComplete</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token keyword">void</span> <span class="token function">addTimeoutHandler</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> runnable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">void</span> <span class="token function">addCompletionHandler</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> runnable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>其实现类有两个，一个是 NoSupportAsyncWebRequest，另一个是 StandardServletAsyncWebRequest，前者不支持异步请求，所以在 Spring MVC 中实际用作异步请求的 request 是 StandardServletAsyncWebRequest。</p>
+<p>StandardServletAsyncWebRequest 还实现了 AsyncListener 接口，其本质就是一个监听器。并且在 startAsync 方法中创建出 AsyncContext 后会将自己当作监听器注册进去。</p>
+<h3 id="WebAsyncManager"><a href="#WebAsyncManager" class="headerlink" title="WebAsyncManager"></a>WebAsyncManager</h3><p>WebAsyncManager 是 Spring MVC 处理异步请求过程中最核心的类，它管理着整个异步<br>处理的过程。</p>
+<p>WebAsyncManager 中最重要的两个方法是 startCallableProcessing 和 startDeferredResultProcessing，这两个方法是启动异步处理的入口方法，它们一共做了三件事：① 启动异步处理; ② 给 Request 设置相应属性（主要包括 timeout、timeoutHandler 和 completionHandler）; ③ 在相应位置调用相应的拦截器。这里的拦截器是 Spring MVC 自己定义的。</p>
+<p>startCallableProcessing 方法用于处理 Callable 和 WebAsyncTask 类型的异步请求，使用的拦截器类型是 CallableProcessingInterceptor，拦截器封装在 CallableInterceptorChain 类型的拦截器链中统一调用。</p>
+<p>startDeferredResultProcessing 方法用于处理 DeferredResult 和 ListenableFuture 类型的异步请求，使用的拦截器是 DeferredResultProcessingInterceptor 拦截器，拦截器封装在 DeferredResultInterceptorChain 类型的拦截器链中统一调用。</p>
+<p>下面是 Callable 类型的拦截器</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 用作拦截 Callable 类型的异步请求</span>
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">CallableProcessingInterceptor</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">Object</span> RESULT_NONE <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">Object</span> RESPONSE_HANDLED <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token comment">// 并发处理前事件</span>
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span>  <span class="token function">beforeConcurrentHandling</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">preProcess</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">postProcess</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">,</span> <span class="token class-name">Object</span> concurrentResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+ 
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">Object</span> <span class="token function">handleTimeout</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token comment">// Complete 事件：包含超时、网络异常、正常完成等的 Complete 事件</span>
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">afterCompletion</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下面是 DeferredResult 类型的拦截器</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 用作拦截 DeferredResult 类型的异步请求</span>
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">DeferredResultProcessingInterceptor</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">beforeConcurrentHandling</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">preProcess</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">postProcess</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">,</span> <span class="token class-name">Object</span> concurrentResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">boolean</span> <span class="token function">handleTimeout</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+   <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">afterCompletion</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>CallableInterceptorChain 和 DeferredResultInterceptorChain 分别用于封装两个 Interceptor，它们都是将多个相应的拦截器封装到一个 List 类型的属性，然后在相应的方法中调用所封装的 Interceptor 相应方法进行处理。</p>
+<p>下面分析 WebAsyncManager 的核心代码： </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">startCallableProcessing</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> webAsyncTask<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> processingContext<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">// 设置超时时间</span>
+   <span class="token class-name">Long</span> timeout <span class="token operator">=</span> webAsyncTask<span class="token punctuation">.</span><span class="token function">getTimeout</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>timeout <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>asyncWebRequest<span class="token punctuation">.</span><span class="token function">setTimeout</span><span class="token punctuation">(</span>timeout<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+
+   <span class="token comment">// 设置线程池</span>
+   <span class="token class-name">AsyncTaskExecutor</span> executor <span class="token operator">=</span> webAsyncTask<span class="token punctuation">.</span><span class="token function">getExecutor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>executor <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>taskExecutor <span class="token operator">=</span> executor<span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+
+   <span class="token comment">// 设置拦截器</span>
+   <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CallableProcessingInterceptor</span><span class="token punctuation">></span></span> interceptors <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">CallableProcessingInterceptor</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   interceptors<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>webAsyncTask<span class="token punctuation">.</span><span class="token function">getInterceptor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   interceptors<span class="token punctuation">.</span><span class="token function">addAll</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>callableInterceptors<span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   interceptors<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>timeoutCallableInterceptor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token keyword">final</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> callable <span class="token operator">=</span> webAsyncTask<span class="token punctuation">.</span><span class="token function">getCallable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">final</span> <span class="token class-name">CallableInterceptorChain</span> interceptorChain <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CallableInterceptorChain</span><span class="token punctuation">(</span>interceptors<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token comment">// 添加超时请求处理器</span>
+   <span class="token keyword">this</span><span class="token punctuation">.</span>asyncWebRequest<span class="token punctuation">.</span><span class="token function">addTimeoutHandler</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token annotation punctuation">@Override</span>
+      <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+         <span class="token class-name">Object</span> result <span class="token operator">=</span> interceptorChain<span class="token punctuation">.</span><span class="token function">triggerAfterTimeout</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+         <span class="token keyword">if</span> <span class="token punctuation">(</span>result <span class="token operator">!=</span> <span class="token class-name">CallableProcessingInterceptor</span><span class="token punctuation">.</span>RESULT_NONE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">setConcurrentResultAndDispatch</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+         <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+   <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token comment">// 添加请求完成处理器</span>
+   <span class="token keyword">this</span><span class="token punctuation">.</span>asyncWebRequest<span class="token punctuation">.</span><span class="token function">addCompletionHandler</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token annotation punctuation">@Override</span>
+      <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+         interceptorChain<span class="token punctuation">.</span><span class="token function">triggerAfterCompletion</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">&#125;</span>
+   <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">// 执行 applu 方法</span>
+  interceptorChain<span class="token punctuation">.</span><span class="token function">applyBeforeConcurrentHandling</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   
+   <span class="token comment">// 启动异步处理</span>
+   <span class="token function">startAsyncProcessing</span><span class="token punctuation">(</span>processingContext<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>taskExecutor<span class="token punctuation">.</span><span class="token function">submit</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Runnable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+         <span class="token annotation punctuation">@Override</span>
+         <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">Object</span> result <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+               interceptorChain<span class="token punctuation">.</span><span class="token function">applyPreProcess</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+               result <span class="token operator">=</span> callable<span class="token punctuation">.</span><span class="token function">call</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+               result <span class="token operator">=</span> ex<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+               result <span class="token operator">=</span> interceptorChain<span class="token punctuation">.</span><span class="token function">applyPostProcess</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">,</span> result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">// 设置处理结果并发送请求</span>
+            <span class="token function">setConcurrentResultAndDispatch</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+         <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">RejectedExecutionException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token class-name">Object</span> result <span class="token operator">=</span> interceptorChain<span class="token punctuation">.</span><span class="token function">applyPostProcess</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>asyncWebRequest<span class="token punctuation">,</span> callable<span class="token punctuation">,</span> ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token function">setConcurrentResultAndDispatch</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> ex<span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>concurrentResult 是 WebAsyncManager 中用来保存异步处理结果的属性，hasConcurrentResult 方法用来判断 concurrentResult 是否已经存在返回值。整个方法过程是：如果 concurrentResult 已经有返回值则直接返回，否则将传入的参数设置到 concurrentResult，然后调用 <code>asyncWebRequest.isAsyneComplete()</code> 检查 Request 是否已设置为异步处理完成状态（网络中断会造成 Request 设置为异步处理完成状态），如果是则保存错误日志并返回，否则调用。</p>
+<p><code>asyncWebRequest.dispatch()</code> 发送请求。Spring MVC 中异步请求处理完成后会再次发起一个相同的请求，然后在 HandlerAdapter 中使用一个特殊的 HandlerMethod 来处理它，具体过程后面再讲解，不过通过 Request 的 dispatch 方法发起的请求使用的还是原来的 Request，也就是说原来保存在 Request 中的属性不会丢失。</p>
+<p>startDeferredResultProcessing 方法和 startCallableProcessing 方法执行过程类似，只是并没有使用 taskExecutor 来提交执行，这是因为 DeferredResult 并不需要执行处理，在后面讲了 DeferredResult 的用法后大家就明白了。</p>
+<h3 id="WebAsyncUtils"><a href="#WebAsyncUtils" class="headerlink" title="WebAsyncUtils"></a>WebAsyncUtils</h3><p>提供了对于 Async Manager、Request 等的操作支持。</p>
+<h2 id="对异步请求的支持"><a href="#对异步请求的支持" class="headerlink" title="对异步请求的支持"></a>对异步请求的支持</h2><p>SpringMVC 对异步的支持可以拆分为两个部分：异步请求包装、返回结果处理。</p>
+<p>主要处理流程可总结为：首先在处理器中返回需要启动异步处理的类型时（四种类型）相应返回值处理器会调用 WebAsyncManager 的相关方法启动异步处理，然后在 DispatcherServlet 中将原来请求直接返回，当异步处理完成后会重新发出一个相同的请求，这时在 RequestMappingHandlerAdapter 中会使用特殊的 ServletInvocableHandlerMethod 来处理请求，处理方法是：如果异步处理返回的结果是异常类型则抛出异常，否则直接返回异步处理结果，然后使用返回值处理器处理，接着返回 DispatcherServlet 中按正常流程往下处理。</p>
+<p>异步处理完成后会重新发起一个请求，这时会重新查找 HandlerMethod 并初始化 PathVariable、MatrixVariable 等参数，重新初始化 Model 中的数据并再次执行 HandlerInterceptor 中相应的方法。这么做主要是可以复用原来的那套组件进行处理而不需要重新定义。</p>
+<h3 id="异步请求包装"><a href="#异步请求包装" class="headerlink" title="异步请求包装"></a>异步请求包装</h3><p>异步请求包装的核心逻辑主要由 RequestMappingHandlerAdapter#invokeHandleMethod 方法提供：</p>
+<p>创建 AsyncWebRequest 并初始化当前请求的 WebAsyncManager</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">AsyncWebRequest</span> asyncWebRequest <span class="token operator">=</span> <span class="token class-name">WebAsyncUtils</span><span class="token punctuation">.</span><span class="token function">createAsyncWebRequest</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span>
+asyncWebRequest<span class="token punctuation">.</span><span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>asyncRequestTimeout<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token class-name">WebAsyncManager</span> asyncManager <span class="token operator">=</span> <span class="token class-name">WebAsyncUtils</span><span class="token punctuation">.</span><span class="token function">getAsyncManager</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+asyncManager<span class="token punctuation">.</span><span class="token function">setTaskExecutor</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>taskExecutor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+asyncManager<span class="token punctuation">.</span><span class="token function">setAsyncWebRequest</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+asyncManager<span class="token punctuation">.</span><span class="token function">registerCallableInterceptors</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>callableInterceptors<span class="token punctuation">)</span><span class="token punctuation">;</span>
+asyncManager<span class="token punctuation">.</span><span class="token function">registerDeferredResultInterceptors</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>deferredResultInterceptors<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="返回结果处理"><a href="#返回结果处理" class="headerlink" title="返回结果处理"></a>返回结果处理</h3><p>如果是该请求第一次进入 DispatcherServlet，会直接通过 ServletInvocableHandlerMethod 桥接到 Controller 层获取到需要异步执行的任务（如 Callable 等），再通过 ReturnValueHandler 做异步处理后返回 null。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">invocableMethod.invokeAndHandle(webRequest, mavContainer);
+if (asyncManager.isConcurrentHandlingStarted()) &#123;
+   return null;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下面主要解释一下 ReturnValueHandler 的行为（以 Callable 为例）：</p>
+<p>先通过 HandlerMethodReturnValueHandlerComposite 匹配出 Callable 对应的处理器 CallableMethodReturnValueHandler，并调用 handleReturnValue 做异步处理。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// WebAsyncManager</span>
+<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">startCallableProcessing</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> webAsyncTask<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> processingContext<span class="token punctuation">)</span>
+      <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">// ...设置基本属性</span>
+   
+   <span class="token comment">// ... before concurrent handling</span>
+   
+   <span class="token function">startAsyncProcessing</span><span class="token punctuation">(</span>processingContext<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   
+   <span class="token comment">// ... pre process</span>
+   
+   <span class="token comment">// ... process</span>
+   
+   <span class="token comment">// ... post process</span>
+  
+   <span class="token comment">// 异步结果计算完成后，再次发送一个请求返回数据，处理通过下述解决</span>
+   <span class="token function">setConcurrentResultAndDispatch</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+  
+   <span class="token comment">// ... exception process</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>如果当前请求是异步请求而且已经处理出了结果，则将异步处理结果与之前保存到 WebAsyncManager 里的 ModelAndViewContainer 取出来，并将 WebAsyncManager 里的结果清空，然后调用 ServletInvocableHandlerMethod 的 wrapConcurrentResult 方法创建 ConcurrentResultHandlerMethod 类型的 ServletInvocableHandlerMethod 来替换自己，创建出来的 ConcurrentResultHandlerMethod 并不执行请求，它的主要功能是判断异步处理的结果是不是异常类型，如果是则抛出，如果不是则使用 ReturmValueHandler 对其进行解析并返回。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span>asyncManager<span class="token punctuation">.</span><span class="token function">hasConcurrentResult</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token class-name">Object</span> result <span class="token operator">=</span> asyncManager<span class="token punctuation">.</span><span class="token function">getConcurrentResult</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   mavContainer <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">ModelAndViewContainer</span><span class="token punctuation">)</span> asyncManager<span class="token punctuation">.</span><span class="token function">getConcurrentResultContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+   asyncManager<span class="token punctuation">.</span><span class="token function">clearConcurrentResult</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token class-name">LogFormatUtils</span><span class="token punctuation">.</span><span class="token function">traceDebug</span><span class="token punctuation">(</span>logger<span class="token punctuation">,</span> traceOn <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+      <span class="token class-name">String</span> formatted <span class="token operator">=</span> <span class="token class-name">LogFormatUtils</span><span class="token punctuation">.</span><span class="token function">formatValue</span><span class="token punctuation">(</span>result<span class="token punctuation">,</span> <span class="token operator">!</span>traceOn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> <span class="token string">"Resume with async result ["</span> <span class="token operator">+</span> formatted <span class="token operator">+</span> <span class="token string">"]"</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   invocableMethod <span class="token operator">=</span> invocableMethod<span class="token punctuation">.</span><span class="token function">wrapConcurrentResult</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p>  超时、线程池等属性都可以在 RequestMappingHandlerAdapter 中设置</p>
+</blockquote>
+<h2 id="异步请求的问题"><a href="#异步请求的问题" class="headerlink" title="异步请求的问题"></a>异步请求的问题</h2><p>第一是异步请求相应的拦截器里的方法会被调用两次。这是不合适的，而且有的时候还会出问题，比如，如果用了拦截器来检查 Token，那么第一次检查通过后就会将相应内容删除，第二次再检查的时候就检查失败了。</p>
+<p>第二个是通过 FlashMap 传递 Redirect 参数的情况。FlashMapManager 获取 FlashMap 的时候说过，每次获取后就会将相应的 FlashMap 删除，但异步请求会获取两次，如果异步处理器是 Redirect 到的结果处理器，并且使用 FlashMap 传递了参数，这种情况下如果在第二次获取 FlashMap 的时候（异步请求处理完了）正好用户又发了一个相同的请求，而且 RedirectView 已经将 FlashMap 设置到了 Session，在获取之前可能被前面的请求获取删除，导致自己获取不到，示例如下：</p>
+<table>
+<thead>
+<tr>
+<th>请求1</th>
+<th>请求2</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>saveOutputFlashMap 设置到 FM1</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>saveOutputFlashMap 设置到 FM2</td>
+</tr>
+<tr>
+<td>retrieveAndUpdate 获取到 FM1</td>
+<td></td>
+</tr>
+<tr>
+<td>retrieveAndUpdate 获取到 FM2</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>retrieveAndUpdate 获取到 null</td>
+</tr>
+<tr>
+<td></td>
+<td>retrieveAndUpdate 获取到 null</td>
+</tr>
+</tbody></table>
+<p>这样请求 2 设置的 FlashMap 就会被请求 1 的第二次 retrieveAndUpdate 获取到并从 Session 中删除，请求 2 就获取不到了，这样造成了两个请求的值都出了问题。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SpringMVC/" rel="tag"># SpringMVC</a>
+              <a href="/tags/Servlet-3-0/" rel="tag"># Servlet 3.0</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/" rel="prev" title="SpringMVC 参数绑定工具 DataBinder">
+      <i class="fa fa-chevron-left"></i> SpringMVC 参数绑定工具 DataBinder
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/09/26/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-1-%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F%E5%9F%BA%E7%A1%80-%E5%8F%AF%E9%9D%A0%E6%80%A7%E5%8F%AF%E4%BC%B8%E7%BC%A9%E6%80%A7%E5%8F%AF%E7%BB%B4%E6%8A%A4%E6%80%A7/" rel="next" title="数据密集型应用 可靠性、可伸缩性、可维护性">
+      数据密集型应用 可靠性、可伸缩性、可维护性 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Servlet-3-0-%E5%AF%B9%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E7%9A%84%E6%94%AF%E6%8C%81"><span class="nav-number">1.</span> <span class="nav-text">Servlet 3.0 对异步请求的支持</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringMVC-%E4%B8%AD%E7%9A%84%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82"><span class="nav-number">2.</span> <span class="nav-text">SpringMVC 中的异步请求</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E7%A4%BA%E4%BE%8B"><span class="nav-number">2.1.</span> <span class="nav-text">异步请求示例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Callable"><span class="nav-number">2.1.1.</span> <span class="nav-text">Callable</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WebAsyncTask"><span class="nav-number">2.1.2.</span> <span class="nav-text">WebAsyncTask</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DeferredResult"><span class="nav-number">2.1.3.</span> <span class="nav-text">DeferredResult</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ListenableFuture"><span class="nav-number">2.1.4.</span> <span class="nav-text">ListenableFuture</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E7%BB%84%E4%BB%B6"><span class="nav-number">2.2.</span> <span class="nav-text">异步请求组件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AsyncWebRequest"><span class="nav-number">2.2.1.</span> <span class="nav-text">AsyncWebRequest</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WebAsyncManager"><span class="nav-number">2.2.2.</span> <span class="nav-text">WebAsyncManager</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WebAsyncUtils"><span class="nav-number">2.2.3.</span> <span class="nav-text">WebAsyncUtils</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E7%9A%84%E6%94%AF%E6%8C%81"><span class="nav-number">2.3.</span> <span class="nav-text">对异步请求的支持</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E5%8C%85%E8%A3%85"><span class="nav-number">2.3.1.</span> <span class="nav-text">异步请求包装</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%94%E5%9B%9E%E7%BB%93%E6%9E%9C%E5%A4%84%E7%90%86"><span class="nav-number">2.3.2.</span> <span class="nav-text">返回结果处理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">2.4.</span> <span class="nav-text">异步请求的问题</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

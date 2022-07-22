@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="主要介绍了 ThreadLocal、InheritableThreadLocal、FastThreadLocal、TransmittableThreadLocal 四种 ThreadLocal 的原理和应用方式。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JDK ThreadLocal">
+<meta property="og:url" content="http://example.com/2021/03/11/JDK-ThreadLocal/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="主要介绍了 ThreadLocal、InheritableThreadLocal、FastThreadLocal、TransmittableThreadLocal 四种 ThreadLocal 的原理和应用方式。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/JDK/ThreadLocal.png">
+<meta property="og:image" content="http://example.com/images/Netty/FastThreadLocalMap%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="article:published_time" content="2021-03-11T03:30:04.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.564Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="ThreadLocal">
+<meta property="article:tag" content="InheritableThreadLocal">
+<meta property="article:tag" content="FastThreadLocal">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="TransmittableThreadLocal">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/JDK/ThreadLocal.png">
+
+<link rel="canonical" href="http://example.com/2021/03/11/JDK-ThreadLocal/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>JDK ThreadLocal | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/03/11/JDK-ThreadLocal/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JDK ThreadLocal
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-03-11 11:30:04" itemprop="dateCreated datePublished" datetime="2021-03-11T11:30:04+08:00">2021-03-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>主要介绍了 ThreadLocal、InheritableThreadLocal、FastThreadLocal、TransmittableThreadLocal 四种 ThreadLocal 的原理和应用方式。</p>
+<span id="more"></span>
+
+<h1 id="ThreadLocal"><a href="#ThreadLocal" class="headerlink" title="ThreadLocal"></a>ThreadLocal</h1><h2 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h2><p>简单来说，ThreadLocal 使用的以 WeakReference 引用为键的 HASH 表进行存储。</p>
+<blockquote>
+<p>关于引用的详解《JDK ReferenceObject》</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ * ThreadLocalMap is a customized hash map suitable only for
+ * maintaining thread local values. No operations are exported
+ * outside of the ThreadLocal class. The class is package private to
+ * allow declaration of fields in class Thread.  To help deal with
+ * very large and long-lived usages, the hash table entries use
+ * WeakReferences for keys. However, since reference queues are not
+ * used, stale entries are guaranteed to be removed only when
+ * the table starts running out of space.
+ */</span>
+<span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">ThreadLocalMap</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token comment">/**
+     * The entries in this hash map extend WeakReference, using
+     * its main ref field as the key (which is always a
+     * ThreadLocal object).  Note that null keys (i.e. entry.get()
+     * == null) mean that the key is no longer referenced, so the
+     * entry can be expunged from table.  Such entries are referred to
+     * as "stale entries" in the code that follows.
+     */</span>
+    <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Entry</span> <span class="token keyword">extends</span> <span class="token class-name">WeakReference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ThreadLocal</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/** The value associated with this ThreadLocal. */</span>
+        <span class="token class-name">Object</span> value<span class="token punctuation">;</span>
+
+        <span class="token class-name">Entry</span><span class="token punctuation">(</span><span class="token class-name">ThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> k<span class="token punctuation">,</span> <span class="token class-name">Object</span> v<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">super</span><span class="token punctuation">(</span>k<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            value <span class="token operator">=</span> v<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>当发生 HASH 碰撞时，则 +1 向后寻址，直到找到空位置或垃圾回收位置进行存储。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span>key <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Entry</span> c <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Entry</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> h <span class="token operator">=</span> key<span class="token punctuation">.</span>threadLocalHashCode <span class="token operator">&amp;</span> <span class="token punctuation">(</span>len <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>table<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        h <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>h<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    table<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">=</span> c<span class="token punctuation">;</span>
+    size<span class="token operator">++</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>当按 HASH 值寻找键时，也采用 MISS 后向后查找的思路。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">private Entry getEntryAfterMiss(ThreadLocal&lt;?&gt; key, int i, Entry e) &#123;
+    Entry[] tab &#x3D; table;
+    int len &#x3D; tab.length;
+
+    while (e !&#x3D; null) &#123;
+        ThreadLocal&lt;?&gt; k &#x3D; e.get();
+        if (k &#x3D;&#x3D; key)
+            return e;
+        if (k &#x3D;&#x3D; null)
+            expungeStaleEntry(i);
+        else
+            i &#x3D; nextIndex(i, len);
+        e &#x3D; tab[i];
+    &#125;
+    return null;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="散列算法"><a href="#散列算法" class="headerlink" title="散列算法"></a>散列算法</h2><p>因为使用的是 HASH 表进行储存，则一定会通过散列算法减少 HASH 碰撞。ThreadLocal 使用的是<code>斐波那契（Fibonacci）散列法</code>，本质上是一个乘数散列法。</p>
+<h3 id="斐波那契数列"><a href="#斐波那契数列" class="headerlink" title="斐波那契数列"></a>斐波那契数列</h3><p>意大利数学家斐波那契，提出了一个著名的“兔子数列”，该数列从第 3 个数起，后面的每个数都是它前面那两个数的和。如果把斐波那契数列的任何一项除以前一项，将会得到一个比值极限约为0.618，俗称黄金分割点，因此斐波纳契数列又称黄金分割数列，用数列<code>&#123;Fn&#125;</code>表示，则有：<br>$$<br>F_0 &#x3D; F_1 &#x3D; 1<br>$$</p>
+<p>$$<br>F_n &#x3D; F_{n-1} + F_{n-2}(n&#x3D;2,3,4,…)<br>$$</p>
+<p>对闭区间<code>[a, b]</code>上的单峰函数<code>f(t)</code>，按相邻两斐波那契数之比，使用对称规则进行搜索的方法。其特点是：逐步缩短所考察的区间，以尽量少的函数求值次数，达到预定的某一缩短率。</p>
+<blockquote>
+<p>计算黄金分割最简单的方法，是计算斐波契数列1，1，2，3，5，8，13，21，…后二数之比 2&#x2F;3，3&#x2F;5，5&#x2F;8，8&#x2F;13，13&#x2F;21，…近似值的。</p>
+</blockquote>
+<h3 id="神秘的数字-0x61c88647"><a href="#神秘的数字-0x61c88647" class="headerlink" title="神秘的数字 0x61c88647"></a>神秘的数字 0x61c88647</h3><p><code>ThreadLocal</code> 执行设置元素时，通过以下算式计算哈希值的代码；</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> HASH_INCREMENT <span class="token operator">=</span> <span class="token number">0x61c88647</span><span class="token punctuation">;</span>
+
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">nextHashCode</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> nextHashCode<span class="token punctuation">.</span><span class="token function">getAndAdd</span><span class="token punctuation">(</span>HASH_INCREMENT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>其实这是一个哈希值的黄金分割点，也就是 <code>0.618</code><br>$$<br>黄金分割点: (√5 - 1) &#x2F; 2 &#x3D; 0.6180339887<br>$$<br>由于 int 类型占 32 位，，因此用<code>2 ^ 32 * 0.6180339887</code>，得到的结果是：<code>-1640531527</code>，也就是 16 进制的<code>0x61c88647</code>。</p>
+<h3 id="散列计算方式"><a href="#散列计算方式" class="headerlink" title="散列计算方式"></a>散列计算方式</h3><p>通过 Key 对 threadLocalHashCode 值的保存，当需要获取 Table 的下标时直接取出计算即可。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">int</span> i <span class="token operator">=</span> key<span class="token punctuation">.</span>threadLocalHashCode <span class="token operator">&amp;</span> <span class="token punctuation">(</span>table<span class="token punctuation">.</span>length <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h2 id="扩容机制"><a href="#扩容机制" class="headerlink" title="扩容机制"></a>扩容机制</h2><h3 id="扩容条件"><a href="#扩容条件" class="headerlink" title="扩容条件"></a>扩容条件</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//只要使用到数组结构，就一定会有扩容</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">cleanSomeSlots</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> sz<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> sz <span class="token operator">>=</span> threshold<span class="token punctuation">)</span>
+    <span class="token function">rehash</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<ul>
+<li>首先，进行<code>启发式清理 cleanSomeSlots</code>，把过期元素清理掉，看空间是否</li>
+<li>之后，判断<code>sz &gt;= threshold</code>，其中 <code>threshold = len * 2 / 3</code>，也就是说数组中天填充的元素，大于 <code>len * 2 / 3</code>，就需要扩容了。</li>
+<li>最后，就是我们要分析的重点，<code>rehash();</code>，扩容重新计算元素位置。</li>
+</ul>
+<h3 id="探测式清理和校验"><a href="#探测式清理和校验" class="headerlink" title="探测式清理和校验"></a>探测式清理和校验</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">rehash</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">expungeStaleEntries</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// Use lower threshold for doubling to avoid hysteresis</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>size <span class="token operator">>=</span> threshold <span class="token operator">-</span> threshold <span class="token operator">/</span> <span class="token number">4</span><span class="token punctuation">)</span>
+        <span class="token function">resize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">expungeStaleEntries</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> tab <span class="token operator">=</span> table<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> len <span class="token operator">=</span> tab<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> len<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Entry</span> e <span class="token operator">=</span> tab<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>e <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> e<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+            <span class="token function">expungeStaleEntry</span><span class="token punctuation">(</span>j<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<ul>
+<li>这部分是主要是探测式清理过期元素，以及判断清理后是否满足扩容条件，size &gt;&#x3D; threshold * 3&#x2F;4</li>
+<li>满足后执行扩容操作，其实扩容完的核心操作就是重新计算哈希值，把元素填充到新的数组中。</li>
+</ul>
+<h3 id="rehash扩容"><a href="#rehash扩容" class="headerlink" title="rehash扩容"></a>rehash扩容</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">resize</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> oldTab <span class="token operator">=</span> table<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> oldLen <span class="token operator">=</span> oldTab<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> newLen <span class="token operator">=</span> oldLen <span class="token operator">*</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> newTab <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Entry</span><span class="token punctuation">[</span>newLen<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> count <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> oldLen<span class="token punctuation">;</span> <span class="token operator">++</span>j<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Entry</span> e <span class="token operator">=</span> oldTab<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>e <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">ThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> k <span class="token operator">=</span> e<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>k <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                e<span class="token punctuation">.</span>value <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span> <span class="token comment">// Help the GC</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">int</span> h <span class="token operator">=</span> k<span class="token punctuation">.</span>threadLocalHashCode <span class="token operator">&amp;</span> <span class="token punctuation">(</span>newLen <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span>newTab<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                    h <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>h<span class="token punctuation">,</span> newLen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                newTab<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">=</span> e<span class="token punctuation">;</span>
+                count<span class="token operator">++</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">setThreshold</span><span class="token punctuation">(</span>newLen<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    size <span class="token operator">=</span> count<span class="token punctuation">;</span>
+    table <span class="token operator">=</span> newTab<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>扩容的整体操作，具体包括如下步骤；</p>
+<ol>
+<li>首先把数组长度扩容到原来的2倍，<code>oldLen * 2</code>，实例化新数组。</li>
+<li>遍历for，所有的旧数组中的元素，重新放到新数组中。</li>
+<li>在放置数组的过程中，如果发生哈希碰撞，则链式法顺延。</li>
+<li>同时这还有检测key值的操作 <code>if (k == null)</code>，方便GC。</li>
+</ol>
+<h2 id="清理机制"><a href="#清理机制" class="headerlink" title="清理机制"></a>清理机制</h2><h3 id="探测式清理（expungeStaleEntry）"><a href="#探测式清理（expungeStaleEntry）" class="headerlink" title="探测式清理（expungeStaleEntry）"></a>探测式清理（expungeStaleEntry）</h3><p>探测式清理，是以当前遇到的 GC 元素开始，向后不断的清理。直到遇到 null 为止，才停止 rehash 计算。</p>
+<p><strong>expungeStaleEntry</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">expungeStaleEntry</span><span class="token punctuation">(</span><span class="token keyword">int</span> staleSlot<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> tab <span class="token operator">=</span> table<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> len <span class="token operator">=</span> tab<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token comment">// expunge entry at staleSlot</span>
+    tab<span class="token punctuation">[</span>staleSlot<span class="token punctuation">]</span><span class="token punctuation">.</span>value <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    tab<span class="token punctuation">[</span>staleSlot<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    size<span class="token operator">--</span><span class="token punctuation">;</span>
+    <span class="token comment">// Rehash until we encounter null</span>
+    <span class="token class-name">Entry</span> e<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> i<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>i <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>staleSlot<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+         <span class="token punctuation">(</span>e <span class="token operator">=</span> tab<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+         i <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> k <span class="token operator">=</span> e<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>k <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            e<span class="token punctuation">.</span>value <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+            tab<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+            size<span class="token operator">--</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">int</span> h <span class="token operator">=</span> k<span class="token punctuation">.</span>threadLocalHashCode <span class="token operator">&amp;</span> <span class="token punctuation">(</span>len <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>h <span class="token operator">!=</span> i<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                tab<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+                <span class="token comment">// Unlike Knuth 6.4 Algorithm R, we must scan until</span>
+                <span class="token comment">// null because multiple entries could have been stale.</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span>tab<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                    h <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>h<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                tab<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">=</span> e<span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> i<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>探测式清理在获取、设置元素中使用到； <code>new ThreadLocal&lt;&gt;().get() -&gt; map.getEntry(this) -&gt; getEntryAfterMiss(key, i, e) -&gt; expungeStaleEntry(i)</code></p>
+<h3 id="启发式清理（cleanSomeSlots）"><a href="#启发式清理（cleanSomeSlots）" class="headerlink" title="启发式清理（cleanSomeSlots）"></a>启发式清理（cleanSomeSlots）</h3><p>启发式清理大概意思是；试探的扫描一些单元格，寻找过期元素，也就是被垃圾回收的元素。<em>当添加新元素或删除另一个过时元素时，将调用此函数。它执行对数扫描次数，作为不扫描（快速但保留垃圾）和与元素数量成比例的扫描次数之间的平衡，这将找到所有垃圾，但会导致一些插入花费O（n）时间。</em></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+    * Heuristically scan some cells looking for stale entries.
+    * This is invoked when either a new element is added, or
+    * another stale one has been expunged. It performs a
+    * logarithmic number of scans, as a balance between no
+    * scanning (fast but retains garbage) and a number of scans
+    * proportional to number of elements, that would find all
+    * garbage but would cause some insertions to take O(n) time.
+    *
+    * @param i a position known NOT to hold a stale entry. The
+    * scan starts at the element after i.
+    *
+    * @param n scan control: &#123;@code log2(n)&#125; cells are scanned,
+    * unless a stale entry is found, in which case
+    * &#123;@code log2(table.length)-1&#125; additional cells are scanned.
+    * When called from insertions, this parameter is the number
+    * of elements, but when from replaceStaleEntry, it is the
+    * table length. (Note: all this could be changed to be either
+    * more or less aggressive by weighting n instead of just
+    * using straight log n. But this version is simple, fast, and
+    * seems to work well.)
+    *
+    * @return true if any stale entries have been removed.
+    */</span>
+<span class="token keyword">private</span> <span class="token keyword">boolean</span> <span class="token function">cleanSomeSlots</span><span class="token punctuation">(</span><span class="token keyword">int</span> i<span class="token punctuation">,</span> <span class="token keyword">int</span> n<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">boolean</span> removed <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> tab <span class="token operator">=</span> table<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> len <span class="token operator">=</span> tab<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">do</span> <span class="token punctuation">&#123;</span>
+        i <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Entry</span> e <span class="token operator">=</span> tab<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>e <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> e<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            n <span class="token operator">=</span> len<span class="token punctuation">;</span>
+            removed <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+            i <span class="token operator">=</span> <span class="token function">expungeStaleEntry</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">while</span> <span class="token punctuation">(</span> <span class="token punctuation">(</span>n <span class="token operator">>>>=</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> removed<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="内存泄露和避免"><a href="#内存泄露和避免" class="headerlink" title="内存泄露和避免"></a>内存泄露和避免</h2><h3 id="内存泄漏的原因"><a href="#内存泄漏的原因" class="headerlink" title="内存泄漏的原因"></a>内存泄漏的原因</h3><p><img src="/images/JDK/ThreadLocal.png"></p>
+<blockquote>
+<p>实线箭头表示强引用，虚线箭头表示弱引用</p>
+</blockquote>
+<p>从上图中可以看出，ThreadLocalMap 使用 ThreadLocal 的弱引用作为 Key，如果一个 ThreadLocal 不存在外部强引用时，Key（ThreadLocal）势必会被 GC 回收，这样就会导致 ThreadLocalMap 中 Key 为 null，而 Value 还存在着强引用，只有 Thread 线程退出以后，Value 的强引用链条才会断掉。</p>
+<p>但如果当前线程再迟迟不结束的话，这些 Key 为 null 的 Entry 的 Value 就会一直存在一条强引用链：</p>
+<blockquote>
+<p>Thread Ref -&gt; Thread -&gt; ThreaLocalMap -&gt; Entry -&gt; value</p>
+</blockquote>
+<p>永远无法回收，造成内存泄漏。</p>
+<p>由于 Thread 中包含变量 ThreadLocalMap，因此 ThreadLocalMap 与 Thread 的生命周期是一样长的，如果一直没有删除对应 Key，就会导致内存泄漏。</p>
+<h3 id="Key使用弱引用的原因"><a href="#Key使用弱引用的原因" class="headerlink" title="Key使用弱引用的原因"></a>Key使用弱引用的原因</h3><p><strong>Key使用强引用的后果</strong></p>
+<p>当 ThreadLocalMap 的 Key 为强引用。回收 ThreadLocal 时，因为 ThreadLocalMap 还持有 ThreadLocal 的强引用，如果没有手动删除，ThreadLocal 不会被回收，导致 Entry 内存泄漏。</p>
+<p><strong>Key使用弱引用的好处</strong></p>
+<p>当 ThreadLocalMap 的 Key 为弱引用回收 ThreadLocal 时，由于 ThreadLocalMap 持有 ThreadLocal 的弱引用，即使没有手动删除，ThreadLocal 也会被回收。当 Key 为 null，在下一次 ThreadLocalMap 调用<code>set()</code>、<code>get()</code>、<code>remove()</code>方法的时候会被清除 Value 值。</p>
+<h3 id="正确的使用方法"><a href="#正确的使用方法" class="headerlink" title="正确的使用方法"></a>正确的使用方法</h3><ul>
+<li>每次使用完 ThreadLocal 都调用它的<code>remove()</code>方法清除数据</li>
+<li>将 ThreadLocal 变量定义成<code>private static</code>，这样就一直存在 ThreadLocal 的强引用，也就能保证任何时候都能通过 ThreadLocal 的弱引用访问到 Entry 的 Value 值，进而清除掉 。</li>
+</ul>
+<h1 id="InheritableThreadLocal"><a href="#InheritableThreadLocal" class="headerlink" title="InheritableThreadLocal"></a>InheritableThreadLocal</h1><p>解决了 ThreadLocal 不能获取父线程的 ThreadLocal 内容的问题，也就是解决了父子间传递。</p>
+<p>线程在创建时，将父类的 inheritableThreadLocals 深拷贝了一份。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//----成员变量</span>
+<span class="token comment">/*
+ * InheritableThreadLocal values pertaining to this thread. This map is
+ * maintained by the InheritableThreadLocal class.
+ */</span>
+<span class="token class-name">ThreadLocal<span class="token punctuation">.</span>ThreadLocalMap</span> inheritableThreadLocals <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+<span class="token comment">//----函数</span>
+<span class="token comment">/**
+ * Initializes a Thread.
+ */</span>
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token class-name">ThreadGroup</span> g<span class="token punctuation">,</span> <span class="token class-name">Runnable</span> target<span class="token punctuation">,</span> <span class="token class-name">String</span> name<span class="token punctuation">,</span>
+                  <span class="token keyword">long</span> stackSize<span class="token punctuation">,</span> <span class="token class-name">AccessControlContext</span> acc<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   
+    <span class="token class-name">Thread</span> parent <span class="token operator">=</span> <span class="token function">currentThread</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//....省略部分代码</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>parent<span class="token punctuation">.</span>inheritableThreadLocals <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+        <span class="token comment">//创建线程时，如果拥有可继承的 ThreadLocals 的话，自动创建</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>inheritableThreadLocals <span class="token operator">=</span>
+            <span class="token class-name">ThreadLocal</span><span class="token punctuation">.</span><span class="token function">createInheritedMap</span><span class="token punctuation">(</span>parent<span class="token punctuation">.</span>inheritableThreadLocals<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//....省略部分代码</span>
+<span class="token punctuation">&#125;</span>
+<span class="token comment">/**
+ * Factory method to create map of inherited thread locals.
+ * Designed to be called only from Thread constructor.
+ *
+ * @param  parentMap the map associated with parent thread
+ * @return a map containing the parent's inheritable bindings
+ */</span>
+<span class="token keyword">static</span> <span class="token class-name">ThreadLocalMap</span> <span class="token function">createInheritedMap</span><span class="token punctuation">(</span><span class="token class-name">ThreadLocalMap</span> parentMap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ThreadLocalMap</span><span class="token punctuation">(</span>parentMap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token comment">/**
+ * Construct a new map including all Inheritable ThreadLocals
+ * from given parent map. Called only by createInheritedMap.
+ *
+ * @param parentMap the map associated with parent thread.
+ */</span>
+<span class="token keyword">private</span> <span class="token class-name">ThreadLocalMap</span><span class="token punctuation">(</span><span class="token class-name">ThreadLocalMap</span> parentMap<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">Entry</span><span class="token punctuation">[</span><span class="token punctuation">]</span> parentTable <span class="token operator">=</span> parentMap<span class="token punctuation">.</span>table<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> len <span class="token operator">=</span> parentTable<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token function">setThreshold</span><span class="token punctuation">(</span>len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    table <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Entry</span><span class="token punctuation">[</span>len<span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> len<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Entry</span> e <span class="token operator">=</span> parentTable<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>e <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+            <span class="token class-name">ThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> key <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">ThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span><span class="token punctuation">)</span> e<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>key <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">Object</span> value <span class="token operator">=</span> key<span class="token punctuation">.</span><span class="token function">childValue</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">Entry</span> c <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Entry</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">int</span> h <span class="token operator">=</span> key<span class="token punctuation">.</span>threadLocalHashCode <span class="token operator">&amp;</span> <span class="token punctuation">(</span>len <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span>table<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span>
+                    h <span class="token operator">=</span> <span class="token function">nextIndex</span><span class="token punctuation">(</span>h<span class="token punctuation">,</span> len<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                table<span class="token punctuation">[</span>h<span class="token punctuation">]</span> <span class="token operator">=</span> c<span class="token punctuation">;</span>
+                size<span class="token operator">++</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>当使用<code>get()</code>去获取时，根据对应的<code>ThreadLocal&lt;T&gt;</code>寻找期望值。 </p>
+<h1 id="Netty-FastThreadLocal"><a href="#Netty-FastThreadLocal" class="headerlink" title="Netty FastThreadLocal"></a>Netty FastThreadLocal</h1><p>ThreadLocal 使用了线性探测的方式解决 Hash 冲突，由于经常存在 Hash 冲突，影响效率。FastThreadLocal 直接使用数组避免了 Hash 冲突的发生，具体做法是：每一个 FastThreadLocal 实例创建时，分配一个下标 index；每个 FastThreadLocal 都能获取到一个不重复的下标。当调用<code>FastThreadLocal.get()</code>方法获取值时，直接从数组获取返回，如<code>return array[index]</code>。</p>
+<h2 id="NioEventLoopGroup的线程封装"><a href="#NioEventLoopGroup的线程封装" class="headerlink" title="NioEventLoopGroup的线程封装"></a>NioEventLoopGroup的线程封装</h2><p>NioEventLoopGroup 的父类 MultithreadEventExecutorGroup 的构造函数中对 Executor 的赋值语句如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token class-name">MultithreadEventExecutorGroup</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">,</span> <span class="token class-name">ThreadFactory</span> threadFactory<span class="token punctuation">,</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">,</span>hreadFactory <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">?</span> <span class="token keyword">null</span> <span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">ThreadPerTaskExecutor</span><span class="token punctuation">(</span>threadFactory<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>封装了所调用的线程，将普通 Runnable 装为 FastThreadLocalRunnable。并且通过单独封装的 FastThreadLocalThread 来调用执行。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">ThreadPerTaskExecutor</span> <span class="token keyword">implements</span> <span class="token class-name">Executor</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ThreadFactory</span> threadFactory<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">ThreadPerTaskExecutor</span><span class="token punctuation">(</span><span class="token class-name">ThreadFactory</span> threadFactory<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>threadFactory <span class="token operator">=</span> <span class="token class-name">ObjectUtil</span><span class="token punctuation">.</span><span class="token function">checkNotNull</span><span class="token punctuation">(</span>threadFactory<span class="token punctuation">,</span> <span class="token string">"threadFactory"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">execute</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> command<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        threadFactory<span class="token punctuation">.</span><span class="token function">newThread</span><span class="token punctuation">(</span>command<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DefaultThreadFactory</span> <span class="token keyword">implements</span> <span class="token class-name">ThreadFactory</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token class-name">Thread</span> <span class="token function">newThread</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> r<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Thread</span> t <span class="token operator">=</span> <span class="token function">newThread</span><span class="token punctuation">(</span><span class="token class-name">FastThreadLocalRunnable</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span><span class="token punctuation">,</span> prefix <span class="token operator">+</span> nextId<span class="token punctuation">.</span><span class="token function">incrementAndGet</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//...</span>
+        <span class="token keyword">return</span> t<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">protected</span> <span class="token class-name">Thread</span> <span class="token function">newThread</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> r<span class="token punctuation">,</span> <span class="token class-name">String</span> name<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">FastThreadLocalThread</span><span class="token punctuation">(</span>threadGroup<span class="token punctuation">,</span> r<span class="token punctuation">,</span> name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>到现在，我们知道 EventLoop 中的线程都是 FastThreadLocalThread 类型的。并且在此类型的线程中有一个属性叫做 InternalThreadLocalMap，该属性是为了实现 FastThreadLocal。</p>
+<h2 id="FTL的使用及资源释放"><a href="#FTL的使用及资源释放" class="headerlink" title="FTL的使用及资源释放"></a>FTL的使用及资源释放</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">FastThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> local <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">FastThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">protected</span> <span class="token class-name">String</span> <span class="token function">initialValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token string">"Init"</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">//移除回调方法</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">onRemoval</span><span class="token punctuation">(</span><span class="token class-name">String</span> value<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"Value has be removed"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">new</span> <span class="token class-name">DefaultThreadFactory</span><span class="token punctuation">(</span><span class="token string">"FastThread Pool"</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">newThread</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>local<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">new</span> <span class="token class-name">FastThreadLocalThread</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+        local<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token string">"Modify"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>local<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>这里 onRemoval 的回调是在 FastThreadLocalRunnable 体现的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">FastThreadLocalRunnable</span> <span class="token keyword">implements</span> <span class="token class-name">Runnable</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Runnable</span> runnable<span class="token punctuation">;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+            runnable<span class="token punctuation">.</span><span class="token function">run</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">FastThreadLocal</span><span class="token punctuation">.</span><span class="token function">removeAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">static</span> <span class="token class-name">Runnable</span> <span class="token function">wrap</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> runnable<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> runnable <span class="token keyword">instanceof</span> <span class="token class-name">FastThreadLocalRunnable</span> <span class="token operator">?</span> runnable <span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">FastThreadLocalRunnable</span><span class="token punctuation">(</span>runnable<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">//删除该线程下的所有FastThreadLocal</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">removeAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">InternalThreadLocalMap</span> threadLocalMap <span class="token operator">=</span> <span class="token class-name">InternalThreadLocalMap</span><span class="token punctuation">.</span><span class="token function">getIfSet</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>threadLocalMap <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Object</span> v <span class="token operator">=</span> threadLocalMap<span class="token punctuation">.</span><span class="token function">indexedVariable</span><span class="token punctuation">(</span>variablesToRemoveIndex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>v <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> v <span class="token operator">!=</span> <span class="token class-name">InternalThreadLocalMap</span><span class="token punctuation">.</span>UNSET<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+            <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">FastThreadLocal</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">></span></span> variablesToRemove <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">FastThreadLocal</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">></span></span><span class="token punctuation">)</span> v<span class="token punctuation">;</span>
+            <span class="token class-name">FastThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> variablesToRemoveArray <span class="token operator">=</span>
+                variablesToRemove<span class="token punctuation">.</span><span class="token function">toArray</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">FastThreadLocal</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">FastThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> tlv<span class="token operator">:</span> variablesToRemoveArray<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                tlv<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>threadLocalMap<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">InternalThreadLocalMap</span><span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于线程池中的线程由于会被复用，所以线程池中的每一条线程在执行 Runnable 结束后，要清理掉其 InternalThreadLocalMap 和其内的 FastThreadLocal 信息，否则 InternalThreadLocalMap 信息还存储着上一次被使用时的信息；另外，假设这条线程不再被使用，但是这个线程有可能不会被销毁（与线程池的类型和配置相关），那么线程上的 FastThreadLocal 将发生资源泄露。</p>
+<h2 id="ThreadLocalMap封装实现"><a href="#ThreadLocalMap封装实现" class="headerlink" title="ThreadLocalMap封装实现"></a>ThreadLocalMap封装实现</h2><p>InternalThreadLocalMap 的父类是 UnpaddedInternalThreadLocalMap，该类中指定了保存数据的结构。</p>
+<p><img src="/images/Netty/FastThreadLocalMap%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<h3 id="UnpaddedInternalThreadLocalMap主要属性"><a href="#UnpaddedInternalThreadLocalMap主要属性" class="headerlink" title="UnpaddedInternalThreadLocalMap主要属性"></a>UnpaddedInternalThreadLocalMap主要属性</h3><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;SlowMap
+static final ThreadLocal&lt;InternalThreadLocalMap&gt; slowThreadLocalMap &#x3D; new ThreadLocal&lt;InternalThreadLocalMap&gt;();
+&#x2F;&#x2F;FastMap
+static final AtomicInteger nextIndex &#x3D; new AtomicInteger();
+Object[] indexedVariables;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>数组 indexedVariables 就是用来存储 ftl 的 value 的，使用下标的方式直接访问。nextIndex 在 ftl 实例创建时用来给每个 ftl 实例分配一个下标，slowThreadLocalMap 在线程不是 ftl 时使用到。由于是自增插入，因此不会有冲突产生。</p>
+<h3 id="InternalThreadLocalMap的主要属性"><a href="#InternalThreadLocalMap的主要属性" class="headerlink" title="InternalThreadLocalMap的主要属性"></a>InternalThreadLocalMap的主要属性</h3><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 用于标识数组的槽位还未使用 
+public static final Object UNSET &#x3D; new Object();
+&#x2F;**
+ * 用于标识ftl变量是否注册了cleaner
+ * BitSet简要原理：
+ * BitSet默认底层数据结构是一个long[]数组，开始时长度为1，即只有long[0],而一个long有64bit。
+ * 当BitSet.set(1)的时候，表示将long[0]的第二位设置为true，即0000 0000 ... 0010（64bit）,则long[0]&#x3D;&#x3D;2
+ * 当BitSet.get(1)的时候，第二位为1，则表示true；如果是0，则表示false
+ * 当BitSet.set(64)的时候，表示设置第65位，此时long[0]已经不够用了，扩容成long[]来，进行存储
+ *
+ * 存储类似 &#123;index:boolean&#125; 键值对，用于防止一个FastThreadLocal多次启动清理线程
+ * 将index位置的bit设为true，表示该InternalThreadLocalMap中对该FastThreadLocal已经启动了清理线程
+ *&#x2F;
+private BitSet cleanerFlags;	
+
+private InternalThreadLocalMap() &#123;
+    super(newIndexedVariableTable());
+&#125;
+
+private static Object[] newIndexedVariableTable() &#123;
+        Object[] array &#x3D; new Object[32];
+        Arrays.fill(array, UNSET);
+        return array;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>比较简单，<code>newIndexedVariableTable()</code>方法创建长度为 32 的数组，然后初始化为 UNSET，然后传给父类。之后 ftl 的值就保存到这个数组里面。注意，这里保存的直接是变量值，不是 entry，这是和 jdk ThreadLocal 不同的。。</p>
+<h2 id="Get方法实现分析"><a href="#Get方法实现分析" class="headerlink" title="Get方法实现分析"></a>Get方法实现分析</h2><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public final V get() &#123;
+    InternalThreadLocalMap threadLocalMap &#x3D; InternalThreadLocalMap.get();
+    Object v &#x3D; threadLocalMap.indexedVariable(index);
+    if (v !&#x3D; InternalThreadLocalMap.UNSET) &#123;
+        return (V) v;
+    &#125;
+
+    return initialize(threadLocalMap);
+&#125;
+
+public static InternalThreadLocalMap get() &#123;
+    Thread thread &#x3D; Thread.currentThread();
+    if (thread instanceof FastThreadLocalThread) &#123;
+        return fastGet((FastThreadLocalThread) thread);
+    &#125; else &#123;
+        return slowGet();
+    &#125;
+&#125;
+
+&#x2F;&#x2F; 直接从ftlt线程获取threadLocalMap
+private static InternalThreadLocalMap fastGet(FastThreadLocalThread thread) &#123;
+    InternalThreadLocalMap threadLocalMap &#x3D; thread.threadLocalMap();
+    if (threadLocalMap &#x3D;&#x3D; null) &#123;
+        thread.setThreadLocalMap(threadLocalMap &#x3D; new InternalThreadLocalMap());
+    &#125;
+    return threadLocalMap;
+&#125;   
+&#x2F;&#x2F; 父类的类型为 JDK ThreadLocal 的静态属性，从该 threadLocal 获取 InternalThreadLocalMap
+private static InternalThreadLocalMap slowGet() &#123;
+    ThreadLocal&lt;InternalThreadLocalMap&gt; slowThreadLocalMap &#x3D; UnpaddedInternalThreadLocalMap.slowThreadLocalMap;
+    InternalThreadLocalMap ret &#x3D; slowThreadLocalMap.get();
+    if (ret &#x3D;&#x3D; null) &#123;
+        ret &#x3D; new InternalThreadLocalMap();
+        slowThreadLocalMap.set(ret);
+    &#125;
+    return ret;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="FTL的资源回收机制"><a href="#FTL的资源回收机制" class="headerlink" title="FTL的资源回收机制"></a>FTL的资源回收机制</h2><p>对于 FTL 提供了三种回收机制：</p>
+<ul>
+<li>自动：使用 FTLT 执行一个被 FastThreadLocalRunnable wrap 的 Runnable 任务，在任务执行完毕后会自动进行 FTL 的清理。</li>
+<li>手动：FTL 和 InternalThreadLocalMap 都提供了 remove 方法，在合适的时候用户可以（有的时候也是必须，例如普通线程的线程池使用 FTL）手动进行调用，进行显式删除。</li>
+</ul>
+<h2 id="FTL在Netty中的使用"><a href="#FTL在Netty中的使用" class="headerlink" title="FTL在Netty中的使用"></a>FTL在Netty中的使用</h2><p>FTL 在 Netty 中最重要的使用，就是分配 ByteBuf。基本做法是：每个线程都分配一块内存（PoolArena），当需要分配 ByteBuf 时，线程先从自己持有的 PoolArena 分配，如果自己无法分配，再采用全局分配。但是由于内存资源有限，所以还是会有多个线程持有同一块 PoolArena 的情况。不过这种方式已经最大限度地减轻了多线程的资源竞争，提高程序效率。</p>
+<p>具体的代码在 PoolByteBufAllocator 的内部类 PoolThreadLocalCache 中：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">PoolThreadLocalCache</span> <span class="token keyword">extends</span> <span class="token class-name">FastThreadLocal</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">PoolThreadCache</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">protected</span> <span class="token keyword">synchronized</span> <span class="token class-name">PoolThreadCache</span> <span class="token function">initialValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">final</span> <span class="token class-name">PoolArena</span><span class="token operator">&lt;</span><span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token operator">></span> heapArena <span class="token operator">=</span> <span class="token function">leastUsedArena</span><span class="token punctuation">(</span>heapArenas<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">final</span> <span class="token class-name">PoolArena</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">></span></span> directArena <span class="token operator">=</span> <span class="token function">leastUsedArena</span><span class="token punctuation">(</span>directArenas<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Thread</span> current <span class="token operator">=</span> <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">currentThread</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>useCacheForAllThreads <span class="token operator">||</span> current <span class="token keyword">instanceof</span> <span class="token class-name">FastThreadLocalThread</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+          <span class="token comment">// PoolThreadCache即为各个线程持有的内存块的封装  </span>
+          <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">PoolThreadCache</span><span class="token punctuation">(</span>
+                    heapArena<span class="token punctuation">,</span> directArena<span class="token punctuation">,</span> tinyCacheSize<span class="token punctuation">,</span> smallCacheSize<span class="token punctuation">,</span> normalCacheSize<span class="token punctuation">,</span>
+                    DEFAULT_MAX_CACHED_BUFFER_CAPACITY<span class="token punctuation">,</span> DEFAULT_CACHE_TRIM_INTERVAL<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">// No caching so just use 0 as sizes.</span>
+        <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">PoolThreadCache</span><span class="token punctuation">(</span>heapArena<span class="token punctuation">,</span> directArena<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>   <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="TransmittableThreadLocal"><a href="#TransmittableThreadLocal" class="headerlink" title="TransmittableThreadLocal"></a>TransmittableThreadLocal</h1><blockquote>
+<p>无法正确理解 TransmittableThreadLocal 的应用场景和作用，实现逻辑直接看代码也不是很能理清，在此占位。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/ThreadLocal/" rel="tag"># ThreadLocal</a>
+              <a href="/tags/InheritableThreadLocal/" rel="tag"># InheritableThreadLocal</a>
+              <a href="/tags/FastThreadLocal/" rel="tag"># FastThreadLocal</a>
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/TransmittableThreadLocal/" rel="tag"># TransmittableThreadLocal</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/06/ZooKeeper-%E5%85%B8%E5%9E%8B%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/" rel="prev" title="ZooKeeper 典型应用场景">
+      <i class="fa fa-chevron-left"></i> ZooKeeper 典型应用场景
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/12/Unix-ZeroCopy/" rel="next" title="Unix Zero Copy">
+      Unix Zero Copy <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#ThreadLocal"><span class="nav-number">1.</span> <span class="nav-text">ThreadLocal</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%A3%E5%88%97%E7%AE%97%E6%B3%95"><span class="nav-number">1.2.</span> <span class="nav-text">散列算法</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%90%E6%B3%A2%E9%82%A3%E5%A5%91%E6%95%B0%E5%88%97"><span class="nav-number">1.2.1.</span> <span class="nav-text">斐波那契数列</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A5%9E%E7%A7%98%E7%9A%84%E6%95%B0%E5%AD%97-0x61c88647"><span class="nav-number">1.2.2.</span> <span class="nav-text">神秘的数字 0x61c88647</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%A3%E5%88%97%E8%AE%A1%E7%AE%97%E6%96%B9%E5%BC%8F"><span class="nav-number">1.2.3.</span> <span class="nav-text">散列计算方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A9%E5%AE%B9%E6%9C%BA%E5%88%B6"><span class="nav-number">1.3.</span> <span class="nav-text">扩容机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A9%E5%AE%B9%E6%9D%A1%E4%BB%B6"><span class="nav-number">1.3.1.</span> <span class="nav-text">扩容条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A2%E6%B5%8B%E5%BC%8F%E6%B8%85%E7%90%86%E5%92%8C%E6%A0%A1%E9%AA%8C"><span class="nav-number">1.3.2.</span> <span class="nav-text">探测式清理和校验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#rehash%E6%89%A9%E5%AE%B9"><span class="nav-number">1.3.3.</span> <span class="nav-text">rehash扩容</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B8%85%E7%90%86%E6%9C%BA%E5%88%B6"><span class="nav-number">1.4.</span> <span class="nav-text">清理机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A2%E6%B5%8B%E5%BC%8F%E6%B8%85%E7%90%86%EF%BC%88expungeStaleEntry%EF%BC%89"><span class="nav-number">1.4.1.</span> <span class="nav-text">探测式清理（expungeStaleEntry）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8F%91%E5%BC%8F%E6%B8%85%E7%90%86%EF%BC%88cleanSomeSlots%EF%BC%89"><span class="nav-number">1.4.2.</span> <span class="nav-text">启发式清理（cleanSomeSlots）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E5%92%8C%E9%81%BF%E5%85%8D"><span class="nav-number">1.5.</span> <span class="nav-text">内存泄露和避免</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E6%B3%84%E6%BC%8F%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.5.1.</span> <span class="nav-text">内存泄漏的原因</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Key%E4%BD%BF%E7%94%A8%E5%BC%B1%E5%BC%95%E7%94%A8%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.5.2.</span> <span class="nav-text">Key使用弱引用的原因</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A3%E7%A1%AE%E7%9A%84%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.</span> <span class="nav-text">正确的使用方法</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InheritableThreadLocal"><span class="nav-number">2.</span> <span class="nav-text">InheritableThreadLocal</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Netty-FastThreadLocal"><span class="nav-number">3.</span> <span class="nav-text">Netty FastThreadLocal</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#NioEventLoopGroup%E7%9A%84%E7%BA%BF%E7%A8%8B%E5%B0%81%E8%A3%85"><span class="nav-number">3.1.</span> <span class="nav-text">NioEventLoopGroup的线程封装</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FTL%E7%9A%84%E4%BD%BF%E7%94%A8%E5%8F%8A%E8%B5%84%E6%BA%90%E9%87%8A%E6%94%BE"><span class="nav-number">3.2.</span> <span class="nav-text">FTL的使用及资源释放</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ThreadLocalMap%E5%B0%81%E8%A3%85%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.3.</span> <span class="nav-text">ThreadLocalMap封装实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#UnpaddedInternalThreadLocalMap%E4%B8%BB%E8%A6%81%E5%B1%9E%E6%80%A7"><span class="nav-number">3.3.1.</span> <span class="nav-text">UnpaddedInternalThreadLocalMap主要属性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#InternalThreadLocalMap%E7%9A%84%E4%B8%BB%E8%A6%81%E5%B1%9E%E6%80%A7"><span class="nav-number">3.3.2.</span> <span class="nav-text">InternalThreadLocalMap的主要属性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Get%E6%96%B9%E6%B3%95%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90"><span class="nav-number">3.4.</span> <span class="nav-text">Get方法实现分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FTL%E7%9A%84%E8%B5%84%E6%BA%90%E5%9B%9E%E6%94%B6%E6%9C%BA%E5%88%B6"><span class="nav-number">3.5.</span> <span class="nav-text">FTL的资源回收机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FTL%E5%9C%A8Netty%E4%B8%AD%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="nav-number">3.6.</span> <span class="nav-text">FTL在Netty中的使用</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#TransmittableThreadLocal"><span class="nav-number">4.</span> <span class="nav-text">TransmittableThreadLocal</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

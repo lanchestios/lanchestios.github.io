@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="并发是所有问题的基础，也是操作系统设计的基础。并发包括很多设计问题，其中有进程间通信、资源共享与竞争（如内存、文件、IO 访问）、多个进程活动的同步以及给进程分配处理器时间等。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OS 并发性-互斥和同步">
+<meta property="og:url" content="http://example.com/2021/02/10/OS-%E5%B9%B6%E5%8F%91%E6%80%A7-%E4%BA%92%E6%96%A5%E5%92%8C%E5%90%8C%E6%AD%A5/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="并发是所有问题的基础，也是操作系统设计的基础。并发包括很多设计问题，其中有进程间通信、资源共享与竞争（如内存、文件、IO 访问）、多个进程活动的同步以及给进程分配处理器时间等。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/OS/%E4%B8%8E%E5%B9%B6%E5%8F%91%E7%9B%B8%E5%85%B3%E7%9A%84%E5%85%B3%E9%94%AE%E6%9C%AF%E8%AF%AD.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E7%9A%84%E4%BA%A4%E4%BA%92.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%B8%B8%E7%94%A8%E7%9A%84%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6.png">
+<meta property="og:image" content="http://example.com/images/OS/%E4%BF%A1%E5%8F%B7%E9%87%8F%E6%9C%BA%E5%88%B6%E7%A4%BA%E4%BE%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E8%AE%BF%E9%97%AE%E5%8F%97%E4%BF%A1%E5%8F%B7%E9%87%8F%E4%BF%9D%E6%8A%A4%E7%9A%84%E5%85%B1%E4%BA%AB%E6%95%B0%E6%8D%AE.png">
+<meta property="og:image" content="http://example.com/images/OS/管程的结构.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E5%92%8C%E5%90%8C%E6%AD%A5%E7%9A%84%E6%B6%88%E6%81%AF%E4%BC%A0%E9%80%92%E7%B3%BB%E7%BB%9F%E7%9A%84%E8%AE%BE%E8%AE%A1%E7%89%B9%E7%82%B9.png">
+<meta property="og:image" content="http://example.com/images/OS/%E9%97%B4%E6%8E%A5%E7%9A%84%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1.png">
+<meta property="og:image" content="http://example.com/images/OS/般消息格式.png">
+<meta property="og:image" content="http://example.com/images/OS/%E7%AC%AC%E4%BA%94%E7%AB%A0%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9.png">
+<meta property="article:published_time" content="2021-02-10T11:10:06.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.602Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Operation System">
+<meta property="article:tag" content="并发">
+<meta property="article:tag" content="进程通信">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/OS/%E4%B8%8E%E5%B9%B6%E5%8F%91%E7%9B%B8%E5%85%B3%E7%9A%84%E5%85%B3%E9%94%AE%E6%9C%AF%E8%AF%AD.png">
+
+<link rel="canonical" href="http://example.com/2021/02/10/OS-%E5%B9%B6%E5%8F%91%E6%80%A7-%E4%BA%92%E6%96%A5%E5%92%8C%E5%90%8C%E6%AD%A5/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>OS 并发性-互斥和同步 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/02/10/OS-%E5%B9%B6%E5%8F%91%E6%80%A7-%E4%BA%92%E6%96%A5%E5%92%8C%E5%90%8C%E6%AD%A5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OS 并发性-互斥和同步
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-02-10 19:10:06" itemprop="dateCreated datePublished" datetime="2021-02-10T19:10:06+08:00">2021-02-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Operation-System/" itemprop="url" rel="index"><span itemprop="name">Operation System</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>并发是所有问题的基础，也是操作系统设计的基础。并发包括很多设计问题，其中有进程间通信、资源共享与竞争（如内存、文件、IO 访问）、多个进程活动的同步以及给进程分配处理器时间等。</p>
+<span id="more"></span>
+
+<p>操作系统设计中的核心问题是进程和线程的管理：</p>
+<ul>
+<li>多道程序设计技术：管理单处理器系统中的多个进程。</li>
+<li>多处理器技术：管理多处理器系统中的多个进程。</li>
+<li>分布式处理器技术：管理多台分布式计算机系统中多个进程的执行。最近迅猛发展的集群就是这类系统的典型例子</li>
+</ul>
+<p>并发会在以下三种不同的上下文中出现：</p>
+<ul>
+<li>多应用程序：多道程序设计技术允许在多个活动的应用程序间动态共享处理器时间。</li>
+<li>结构化应用程序：作为模块化设计和结构化程序设计的扩展，一些应用程序可被有效地设计成一组并发进程。</li>
+<li>操作系统结构：同样的结构化程序设计优点适用于系统程序，且我们已知操作系统自身常常作为一组进程或线程实现</li>
+</ul>
+<p>下表是与并发相关的关键术语</p>
+<p><img src="/images/OS/%E4%B8%8E%E5%B9%B6%E5%8F%91%E7%9B%B8%E5%85%B3%E7%9A%84%E5%85%B3%E9%94%AE%E6%9C%AF%E8%AF%AD.png"></p>
+<h1 id="并发的原理"><a href="#并发的原理" class="headerlink" title="并发的原理"></a>并发的原理</h1><p>在单处理器多道程序设计系统中，进程会被交替地执行，因而表现出一种并发执行的外部特征。即使不能实现真正的并行处理，并且在进程间来回切换也需要一定的开销，交替执行在处理效率和程序结构上还是会带来很多好处。在多处理器系统中，不仅可以交替执行进程，而且可以重叠执行进程。</p>
+<p>从表面上看，交替和重叠代表了完全不同的执行模式和不同的问题。实际上，这两种技术都可视为并发处理的一个实例，并且都代表了同样的问题。在单处理器情况下，问题源于多道程序设计系统的一个基本特性：进程的相对执行速度不可预测，它取决于其他进程的活动、操作系统处理中断的方式以及操作系统的调度策略。这就带来了下列困难：</p>
+<ul>
+<li>全局资源的共享充满了危险。例如，如果两个进程都使用同一个全局变量，并且都对该变量执行读写操作，那么不同的读写执行顺序是非常关键的。</li>
+<li>操作系统很难对资源进行最优化分配。例如，进程 A 可能请求使用一个特定的 IO 通道，并获得控制权，但它在使用这个通道前已被阻塞，而操作系统仍然锁定这个通道，以防止其他进程使用，这是难以令人满意的。事实上，这种情况有可能导致死锁。</li>
+<li>定位程序设计错误非常困难。这是因为结果通常是不确定的和不可再现的。</li>
+</ul>
+<p>对于共享变量的访问的问题，在单处理器系统的情况下，出现问题的原因是中断可能会在进程中的任何地方停止指令的执行；在多处理器系统的情况下，不仅同样的条件可以引发问题，而且当两个进程同时执行且都试图访问同一个全局变量时，也会引发问题。这两类问题的解决方案是相同的：控制对共享资源的访问。</p>
+<h2 id="竞争条件"><a href="#竞争条件" class="headerlink" title="竞争条件"></a>竞争条件</h2><p>竞争条件发生在多个进程或线程读写数据时，其最终结果取决于多个进程的指令执行顺序。</p>
+<h2 id="操作系统关注的问题"><a href="#操作系统关注的问题" class="headerlink" title="操作系统关注的问题"></a>操作系统关注的问题</h2><ol>
+<li>操作系统必须能够跟踪不同的进程，这可使用进程控制块来实现。</li>
+<li>操作系统必须为每个活动进程分配和释放各种资源。有时，多个进程想访问相同的资源。<br>这些资源包括：<ul>
+<li>处理器时间：调度功能</li>
+<li>存储器：大多数操作系统使用虚存方案</li>
+<li>文件：IO设备</li>
+</ul>
+</li>
+<li>操作系统必须保护每个进程的数据和物理资源，避免其他进程的无意干扰，这涉及与存储器、文件和 IO 设备相关的技术。关于保护的通用处理，详见第七部分。</li>
+<li>一个进程的功能和输出结果必须与执行速度无关（相对于其他并发进程的执行速度）。</li>
+</ol>
+<h2 id="进程的交互"><a href="#进程的交互" class="headerlink" title="进程的交互"></a>进程的交互</h2><p>可根据进程相互之间知道对方是否存在的程度，对进程间的交互方式进行分类。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E7%9A%84%E4%BA%A4%E4%BA%92.png"></p>
+<p><strong>进程间的资源竞争</strong></p>
+<p>当并发进程竞争使用同一资源时，它们之间会发生冲突。我们可以把这种情况简单描述如下：两个或更多的进程在它们的执行过程中需要访问一个资源，每个进程并不知道其他进程的存在，且每个进程也不受其他进程的影响。每个进程都不影响它所用资源的状态，这类资源包括 IO 设备、存储器、处理器时间和时钟。<br>竞争进程间没有任何信息交换，但一个进程的执行可能会影响到竞争进程的行为。特别是当两个进程都期望访问同一个资源时，如果操作系统把这个资源分配给一个进程，那么另一个进程就必须等待。因此，被拒绝访问的进程的执行速度就会变慢。一种极端情况是，被阻塞的进程永远不能访问这个资源，因此该进程永远不能成功结束运行。</p>
+<p>竞争进程面临三个控制问题。首先是需要互斥（ mutual exclusion ）。在执行过程中，每个进程都给该 IO 设备发命令，接收状态信息，发送数据和接收数据。我们把这类资源称为临界资源（ critical resource ），使用临界资源的那部分程序称为程序的临界区（ critical section ）。一次只允许有一个程序在临界区中。</p>
+<p>实施互斥产生了两个额外的控制问题。一个是死锁（ deadlock ）。例如，考虑两个进程 P1 和 P2，以及两个资源 R1 和 R2，假设每个进程为执行部分功能都需要访问这两个资源，那么就有可能出现下列情况：操作系统把 R1 分配给 P2，把 R2 分配给 P1，每个进程都在等待另一个资源，且在获得其他资源并完成功能前，谁都不会释放自己已拥有的资源，此时这两个进程就会发生死锁。</p>
+<p>另一个控制问题是饥饿（ starvation ）。假设有三个进程（ P1、P2 和 P3 ），每个进程都周期性地访问资源 R。考虑这种情况，即 P1 拥有资源，P2 和 P3 都被延迟，等待这个资源。当 P1 退出其临界区时，P2 和 P3 都允许访问 R，假设操作系统把访间权授予 P3，并在 P3 退出临界区之前 P1 又要访问该临界区，若在 P3 结束后操作系统又把访问权授予 P1，且接下来把访问权轮流授予 P1 和 P3，那么即使没有死锁，P2 也可能被无限地拒绝访问资源。</p>
+<p>由于操作系统负责分配资源，竞争的控制不可避免地涉及操作系统。此外，进程自身需要能够以某种方式表达互斥的需求，如在使用前对资源加锁，但任何一种解决方案都涉及操作系统的某些支持，如提供锁机制。</p>
+<p><strong>进程间通过共享合作</strong></p>
+<p>通过共享进行合作的情况，包括进程间在互相并不确切知道对方的情况下进行交互。例如，多个进程可能访问一个共享变量、共享文件或数据库，进程可能使用并修改共亨变量而不涉及其他进程，但却知道其他进程也可能访问同一个数据。因此，这些进程必须合作，以确保它们共享的数据得到正确管理。控制机制必须确保共享数据的完整性。</p>
+<p>由于数据保存在资源（设备或存储器）中，因此再次涉及有关互斥、死锁和饥饿等控制问题。唯一的区别是可以按两种不同的模式（读和写）访问数据项，并且只有写操作必须保证互斥。</p>
+<p>但是，除这些问题之外还有一个新要求：数据一致性。因此，在通过共享进行合作的情况下，临界区的概念非常重要。此外，若使用临界区来保护数据的完整性，则没有确定的资源或变量可作为参数。此时，可以把参数视为一个在并发进程间共享的标识符，用于标识必须互斥的临界区。</p>
+<p><strong>进程间通过通信合作</strong></p>
+<p>进程间通过通信合作在前面两种情况下，每个进程都有自己独立的环境，不包括其他进程，进程间的交互是间接的，并且都存在共享。在竞争情况下，它们在不知道其他进程存在的情况下共享资源；在第二种情况下，它们共享变量，每个进程并未明确地知道其他进程的存在，它只知道需要维护数据的完整性。当进程通过通信进行合作时，各个进程都与其他进程进行连接。通信提供同步和协调各种活动的方法。</p>
+<p>典型情况下，通信可由各种类型的消息组成，发送消息和接收消息的原语由程序设计语言提供，或由操作系统的内核提供。由于在传递消息的过程中进程间未共享任何对象，因而这类合作不需要互斥，但仍然存在死锁和饥饿问题。例如，有两个进程可能都被阻塞，每个都在等待来自对方的通信，这时发生死锁。作为饥饿的例子，考虑三个进程 P1、P2 和 P3，它们都有如下特性：P1 不断地试图与 P2 或 P3 通信，P2 和 P3 都试图与 P1 通信，如果 P1 和 P2 不断地交换信息，而 P3 一直被阻塞，等待与 P1 通信，由于 P1 一直是活动的，因此虽不存在死锁，但 P3 处于饥饿状态。</p>
+<h2 id="互斥的要求"><a href="#互斥的要求" class="headerlink" title="互斥的要求"></a>互斥的要求</h2><p>一要提供对互斥的支持，必须满足以下要求：</p>
+<ol>
+<li><p>必须强制实施互斥：在与相同资源或共享对象的临界区有关的所有进程中，一次只允许一个进程进入临界区</p>
+</li>
+<li><p>一个在非临界区停止的进程不能干涉其他进程。</p>
+</li>
+<li><p>绝不允许出现需要访问临界区的进程被无限延迟的情况，即不会死锁或饥饿。</p>
+</li>
+<li><p>没有进程在临界区中时，任何需要进入临界区的进程必须能够立即进入。</p>
+</li>
+<li><p>对相关进程的执行速度和处理器的数量没有任何要求和限制。</p>
+</li>
+<li><p>一个进程驻留在临界区中的时间必须是有限的。</p>
+</li>
+</ol>
+<p>满足这些互斥条件的方法有多种。第一种方法是让并发执行的进程承担这一责任，这类进程（不论是系统程序还是应用程序）需要与另一个进程合作，而不需要程序设计语言或操作系统提供任何支持来实施互斥。我们把这类方法称为软件方法。尽管这种方法已被证明会增加开销并存在缺陷，但通过分析这类方法，可以更好地理解并发处理的复杂性。第二种方法涉及专用机器指令，这种方法的优点是可以减少开销，但却很难成为一种通用的解决方案。第三种方法是在操作系统或程序设计语言中提供某种级别的支持。</p>
+<h1 id="互斥：硬件支持"><a href="#互斥：硬件支持" class="headerlink" title="互斥：硬件支持"></a>互斥：硬件支持</h1><p>介绍几种实现互斥的硬件方法。</p>
+<h2 id="中断禁用"><a href="#中断禁用" class="headerlink" title="中断禁用"></a>中断禁用</h2><p>在单处理器机器中，并发进程不能重叠，只能交替。此外，一个进程在调用一个系统服务或被中断前，将一直运行。因此，为保证互斥，只需保证一个进程不被中断即可，这种能力可通过系统内核为启用和禁用中断定义的原语来提供。进程可通过如下方法实施互斥。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">while(true)&#123;
+    &#x2F;&#x2F;禁用中断
+    &#x2F;&#x2F;临界区
+    &#x2F;&#x2F;启用中断
+    &#x2F;&#x2F;其余逻辑
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于临界区不能被中断，故可以保证互斥。但是，这种方法的代价非常高。由于处理器被限制得只能交替执行程序，因此执行的效率会明显降低。另一个问题是，这种方法不能用于多处理器体系结构中。当一个计算机系统包括多个处理器时，通常就可能有一个以上的进程同时执行，在这种情况下，禁用中断并不能保证互斥。</p>
+<h2 id="专用机器指令"><a href="#专用机器指令" class="headerlink" title="专用机器指令"></a>专用机器指令</h2><p>在多处理器配置中，几个处理器共享对内存的访问。在这种情况下，不存在主&#x2F;从关系，处理器间的行为是无关的，表现出一种对等关系，处理器之间没有支持互斥的中断机制。</p>
+<p>在硬件级别上，对存储单元的访问排斥对相同单元的其他访问。因此，处理器的设计者人员提出了一些机器指令，用于保证两个动作的原子性，如在一个取指周期中对一个存储器单元的读和写或读和测试。在这个指令执行的过程中，任何其他指令访问内存都将被阻止，而且这些动作在一个指令周期中完成。</p>
+<h3 id="比较和交换指令"><a href="#比较和交换指令" class="headerlink" title="比较和交换指令"></a>比较和交换指令</h3><p>比较和交换指令（Compare And Swap）的核心思想是用一个测试值（ testval ）检查一个内存单元（ *word ）。如果这个内存单元的当前值等于给定参数（ testval ），就用新值（ newval）取代该值；否则保持不变。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">int</span> <span class="token function">compare_and_swap</span> <span class="token punctuation">(</span><span class="token keyword">int</span> <span class="token operator">*</span>word<span class="token punctuation">,</span> <span class="token keyword">int</span> testval<span class="token punctuation">,</span> <span class="token keyword">int</span> newval<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> oldvalue <span class="token operator">=</span> <span class="token operator">*</span>word<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>oldvalue <span class="token operator">==</span> testval<span class="token punctuation">)</span> <span class="token operator">*</span>word <span class="token operator">=</span> newval<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> oldval<span class="token punctuation">;</span> <span class="token comment">//有的版本会返回一个布尔值</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="exchange指令"><a href="#exchange指令" class="headerlink" title="exchange指令"></a>exchange指令</h3><p>该指令交换一个寄存器的内容和一个存储单元的内容。Intel IA-32（Pentium）和 IA-64（Itanium）体系结构都含有 XCHG 指令。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">exchange</span> <span class="token punctuation">(</span><span class="token keyword">int</span> <span class="token operator">*</span><span class="token keyword">register</span><span class="token punctuation">,</span> <span class="token keyword">int</span> <span class="token operator">*</span>memory<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> temp <span class="token operator">=</span> <span class="token operator">*</span>memory<span class="token punctuation">;</span>
+    <span class="token operator">*</span>memory <span class="token operator">=</span> <span class="token operator">*</span><span class="token keyword">register</span><span class="token punctuation">;</span>
+    <span class="token operator">*</span><span class="token keyword">register</span> <span class="token operator">=</span> temp<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="机器指令方法的特点"><a href="#机器指令方法的特点" class="headerlink" title="机器指令方法的特点"></a>机器指令方法的特点</h3><p>使用专用机器指令实施互斥有以下优点：</p>
+<ul>
+<li>适用于单处理器或共享内存的多处理器上的任意数量的进程。</li>
+<li>简单且易于证明。</li>
+<li>可用于支持多个临界区，每个临界区可以用它自己的变量定义</li>
+</ul>
+<p>但也有一些严重的缺点：</p>
+<ul>
+<li>使用了自旋等待：因此，当一个进程正在等待进入临界区时，它会继续消耗处理器时间。</li>
+<li>可能饥饿：当一个进程离开一个临界区且有多个进程正在等待时，选择哪个等待进程是任意的，因此某些进程可能会被无限地拒绝进入。</li>
+<li>可能死锁：考虑单处理器上的下列情况。进程 P1 执行专用指令（例如 compare&amp;swap、 exchange）并进入临界区，然后 P1 被中断并把处理器让给具有更高优先级的 P2。若 P2 试图使用同一资源，由于互斥机制，它将被拒绝访问。因此，它会进入忙等待循环。但是，由于 P1 比 P2 的优先级低，因此它将永远不会被调度执行。</li>
+</ul>
+<p>由于软件方法和硬件方法都存在缺陷，因此需要寻找其他合适的机制。</p>
+<h1 id="常用的并发机制"><a href="#常用的并发机制" class="headerlink" title="常用的并发机制"></a>常用的并发机制</h1><p><img src="/images/OS/%E5%B8%B8%E7%94%A8%E7%9A%84%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6.png"></p>
+<h2 id="信号量"><a href="#信号量" class="headerlink" title="信号量"></a>信号量</h2><h3 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h3><p>两个或多个进程可以通过简单的信号进行合作，可以强迫一个进程在某个位置停止，直到它接收到一个特定的信号。任何复杂的合作需求都可通过适当的信号结构得到满足。</p>
+<p>为了发信号，需要使用一个称为信号量的特殊变量。要通过信号量 s 传送信号，进程须执行原语<code>semsigna(s)</code>；要通过信号量 s 接收信号，进程须执行原语<code>semwait(s)</code>；若相应的信号仍未发送，则阻塞进程，直到发送完为止。</p>
+<h3 id="信号量的三个基本操作"><a href="#信号量的三个基本操作" class="headerlink" title="信号量的三个基本操作"></a>信号量的三个基本操作</h3><p>为达到预期效果，可把信号量视为一个值为整数的变量，整数值上定义了三个操作：</p>
+<ol>
+<li>初始化：一个信号量可以初始化成非负数。</li>
+<li>semWait：该操作使信号量减 1。若值变成负数，则阻塞执行 semWait 的进程，否则进程继续执行</li>
+<li>semSignal：该操作使信号量加 1。若值小于等于零，则被 semWait 操作阻塞的进程解除阻塞。</li>
+</ol>
+<p>除了这三个操作外，没有任何其他方法可以检查或操作信号量。对这三个操作的解释如下：</p>
+<p>开始时，信号量的值为零或正数。若值为正数，则它等于发出 semWait 操作后可立即继续执行的进程的数量。若值为零（要么由于初始化，要么由于有等于信号量初值的进程已在等待），则发出 semWait 操作的下一个进程会被阻塞，此时该信号量的值变为负值。之后，每个后续的 semWait 操作都会使信号量的负值更大。该负值等于正在等待解除阻塞的进程的数量。在信号量为负值的情形下，每个 semSignal 操作都会将等待进程中的一个进程解除阻塞。</p>
+<h3 id="信号量的三个重要结论"><a href="#信号量的三个重要结论" class="headerlink" title="信号量的三个重要结论"></a>信号量的三个重要结论</h3><ol>
+<li>通常，在进程对信号量减 1 之前，无法提前知道该信号量是否会被阻塞。</li>
+<li>当进程对一个信号量加 1 之后，会唤醒另一个进程，两个进程继续并发运行。而在一个单处理器系统中，同样无法知道哪个进程会立即继续运行。</li>
+<li>向信号量发出信号后，不需要知道是否有另一个进程正在等待，被解除阻塞的进程数要么没有，要么是为 1。</li>
+</ol>
+<h3 id="信号量的分类"><a href="#信号量的分类" class="headerlink" title="信号量的分类"></a>信号量的分类</h3><p>二元信号量（binary semaphore）指信号量的值只能是0或1。理论上，二元信号量更易于实现，且可以证明它和普通信号具有同样的表达能力。为了区分这两种信号，非二元信号量也常称为计数信号量（counting semaphore）或一般信号量（general semaphore）。</p>
+<h3 id="阻塞队列策略"><a href="#阻塞队列策略" class="headerlink" title="阻塞队列策略"></a>阻塞队列策略</h3><p>不论是计数信号量还是二元信号量，都需要使用队列来保存于信号量上等待的进程。那么进程要按照什么顺序从队列中移出呢？</p>
+<p>最公平的策略是先进先出（FIFO）：被阻塞时间最久的进程最先从队列释放。采用这一策略定义的信号量称为强信号量（strong semaphore），而没有规定进程从队列中移出顺序的信号量称为弱信号量（weak semaphore）。下图一个关于强信号量操作的示例。</p>
+<p><img src="/images/OS/%E4%BF%A1%E5%8F%B7%E9%87%8F%E6%9C%BA%E5%88%B6%E7%A4%BA%E4%BE%8B.png"></p>
+<p>强信号量保证不会饥饿，而弱信号量则无法保证。这里将采用强信号量，因为它们更方便，且是操作系统提供的典型信号量形式。</p>
+<h3 id="解决互斥问题"><a href="#解决互斥问题" class="headerlink" title="解决互斥问题"></a>解决互斥问题</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">const</span> <span class="token keyword">int</span> n <span class="token operator">=</span> <span class="token comment">/* 进程数 */</span><span class="token punctuation">;</span>
+semaphore s <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+
+<span class="token keyword">void</span> <span class="token function">P</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>true<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+       <span class="token function">semWait</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">;</span>
+       <span class="token comment">/* 临界区 */</span>
+       <span class="token function">semSignal</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">void</span> <span class="token function">main</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">parbegin</span> <span class="token punctuation">(</span><span class="token function">P</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">P</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">,</span> <span class="token function">P</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下图显示了三个进程使用上图定义的互斥协议后的一种执行顺序。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E8%AE%BF%E9%97%AE%E5%8F%97%E4%BF%A1%E5%8F%B7%E9%87%8F%E4%BF%9D%E6%8A%A4%E7%9A%84%E5%85%B1%E4%BA%AB%E6%95%B0%E6%8D%AE.png"></p>
+<p>上图的程序可公平地处理一次允许多个进程进入临界区的需求。这个需求可通过把信号量初始化成某个特定值来实现。因此，在任何时候，<code>s.count</code>的值都可解释如下：</p>
+<ol>
+<li><code>s.count ≥ 0</code>：<code>s.count</code>是可执行<code>semwait(s)</code>而不被阻塞的进程数。</li>
+<li><code>s.count &lt; 0</code>：<code>s.count</code>的大小是阻塞在<code>s.queue</code>队列中的进程数。</li>
+</ol>
+<h3 id="信号量的实现"><a href="#信号量的实现" class="headerlink" title="信号量的实现"></a>信号量的实现</h3><p>如前所述，semWait 和 semSignal 操作必须作为原子原语实现。可以从软件和硬件角度去实现它们。</p>
+<p>问题的本质是互斥：任何时候只有一个进程可用 semWait 或 semSignal 操作控制一个信号量。因此，可以使用如 Dekker 算法或 Peterson 算法在内的算法实现，这必然伴随着处理开销。</p>
+<p>另一种选择是使用一种硬件支持实现互斥的方案。下面使用 compare&amp;swap 指令的实现。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token function">semWait</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token function">compare_and_swap</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>flag<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token comment">/* 不做任何事 */</span>
+    s<span class="token punctuation">.</span>count<span class="token operator">--</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>count <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* 该进程进入阻塞队列 */</span>
+        <span class="token comment">/* 阻塞该进程 */</span>
+    <span class="token punctuation">&#125;</span>
+    s<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token function">semSignal</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token function">compare_and_swap</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>flag<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token comment">/* 不做任何事 */</span>
+    s<span class="token punctuation">.</span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>count <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* 该进程移出阻塞队列 */</span>
+        <span class="token comment">/* 进程进入就绪队列 */</span>
+    <span class="token punctuation">&#125;</span>
+    s<span class="token punctuation">.</span>flag <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>其中，信号量是上面章节介绍的结构。诚然，这涉及某种形式的忙等待，但 semWait 和 semSignal 操作都相对较短，因此所涉及的忙等待时间量非常小。</p>
+<p>对于单处理器系统，在 semWait 或 semSignal 操作期间是可以禁用中断的，这些操作的执行时间相对较短，因此这种方式是合理的。</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token function">semwait</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token comment">//禁用中断;</span>
+    s<span class="token punctuation">.</span>count<span class="token operator">--</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span> count <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* 该进程进入阻塞队列 */</span>
+        <span class="token comment">/* 阻塞该进程，并允许中断 */</span> 
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//允许中断;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token function">semSignal</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//禁用中断;</span>
+    s<span class="token punctuation">.</span>count<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>count <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">/* 从阻塞队列中移出进程 */</span>
+        <span class="token comment">/* 进程进入就绪队列 */</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">//允许中断;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="管程"><a href="#管程" class="headerlink" title="管程"></a>管程</h2><p>信号量为实施互斥和进程间的合作，提供了一种原始但功能强大且灵活的工具。但是，使用信号量设计一个正确的程序是很困难的，难点在于 semWait 和 semSignal 操作可能分布在整个程序中，而很难看出信号量上的这些操作所产生的整体效果。</p>
+<p>管程是一种程序设计语言结构，它提供的功能与信号量相同，但更易于控制。管程结构在很多程序设计语言中都得以实现，包括并发 Pascal、Pascal-Plus、Modula-2、Modula-3 和 Java，它还被作为一个程序库实现。这就允许我们用管程锁定任何对象，对类似于链表之类的对象，可以用一个锁锁住整个链表，也可每个表用一个锁，还可为表中的每个元素用一个锁。</p>
+<h3 id="使用信号的管程"><a href="#使用信号的管程" class="headerlink" title="使用信号的管程"></a>使用信号的管程</h3><p>一个进程可以通过调用管程的任何一个过程进入管程，但我们仍可视管程有一个入口点，保证一次只有一个进程可以进入。其他试图进入管程的进程被阻塞并加入等待管程可用的进程队列中。当一个进程在管程中时，它可能会通过发送 cwait(x) 把自己暂时阻塞在条件 x 上，随后它被放入等待条件改变以重新进入管程的进程队列中，在 cwait(x) 调用的下一条指令开始恢复执行。若在管程中执行的一个进程发现条件变量 x 发生了变化，则它发送 csignal(x)，通知相应的条件队列条件已改变。</p>
+<p>通过给进程强加规定，管程可以提供一种互斥机制：管程中的数据变量每次只能被一个进程访问。因此，可以把一个共享数据结构放在管程中，从而对它进行保护。如果管程中的数据代表某些资源，那么管程为访问这些资源提供了互斥机制。</p>
+<p>要进行并发处理，管程必须包含同步工具。例如，假设一个进程调用了管程，且当它在管程中时必须被阻塞，直到满足某些条件。这就需要一种机制，使得该进程不仅被阻塞，而且能释放这个管程，以便某些其他的进程可以进入。以后，当条件满足且管程再次可用时，需要恢复该进程并允许它在阻塞点重新进入管程。</p>
+<img src="/images/OS/管程的结构.png" style="zoom:67%;" />
+
+<p>管程通过使用条件变量（ condition variable ）来支持同步，这些条件变量包含在管程中，并且只有在管程中才能被访问。有两个函数可以操作条件变量：</p>
+<ul>
+<li>cwait(c)：调用进程的执行在条件 c 上阻塞，管程现在可能被另一个进程使用。</li>
+<li>csignal(c)：恢复执行在 cwait 之后因某些条件而被阻塞的进程。若有多个这样的进程，选择其中一个；若没有这样的进程，什么也不做。</li>
+</ul>
+<p>注意，管程的 wait 和 signal 操作与信号量不同。如果管程中的一个进程发信号，但没有在这个条件变量上等待的任务，则丢弃这个信号。</p>
+<h3 id="Hoare-Monitor"><a href="#Hoare-Monitor" class="headerlink" title="Hoare Monitor"></a>Hoare Monitor</h3><p>在 Hoare 管程中，因为管程是互斥进入的，所以当一个进程试图进入一个已被占用的管程时，应该在管程的入口处等待。为此，在管程的入口处设置了一个入口等待队列，如果出现了 P 进程唤醒了 Q，那么 P 等待 Q 执行，如果进程 Q 执行，又唤醒了进程 R，那么 Q 等待 R 执行，这就是 HOARE 语义。因此我们会看到管程中可能会出现多个进程。为了管理这些管程内的等待队列，在管程内就专门设置了一个紧急队列，这个队列里的进程会比入口等待队列的进程的优先级高。</p>
+<p><strong>HM 缺陷</strong></p>
+<ol>
+<li>若产生 csignal 的进程在管程内还未结束，则需要两次额外的进程切换：阻塞这个进程需要一次切换；管程可用时，恢复这个进程又需要一次切换。</li>
+<li>与信号相关的进程调度必须非常可靠。产生一个 csignal 时，必须立即激活来自相应条件队列中的一个进程，调度程序必须确保在激活前没有其他进程进入管程，否则进程被激活的条件又会改变。例如，生产者进程可能向一个空缓冲区中添加一个字符，并在发送 csignal 信号前失败，因此在进程等待队列中的任何进程都将被永久阻塞。</li>
+</ol>
+<h3 id="Mesa-Monitor"><a href="#Mesa-Monitor" class="headerlink" title="Mesa Monitor"></a>Mesa Monitor</h3><p>Lampson 和 Redell 为 Mesa 语言开发了一种不同的管程，这种方法克服了上面的缺陷，并支持许多有用的扩展。Mesa 管程结构还可用于 Modula-3 系统程序设计语言。在 Mesa 中， csignal 原语被 cnotify 取代，cnotify 可解释如下：当一个正在管程中的进程执行 cnotify(x) 时，会使得ⅹ条件队列得到通知，但发信号的进程继续执行。通知的结果是在将来合适且处理器可用时恢复执行位于条件队列头的进程。但是，由于不能保证在它之前没有其他进程进入管程，因而这个等待进程必须重新检查条件。</p>
+<p>判断检查条件的 if 语句会被自旋取代，因此这个方案导致了对条件变量至少多一次额外的检测。作为回报，它不再有额外的进程切换，且对等待进程在 cnotify 之后什么时候运行没有任何限制。</p>
+<p>与 cnotify 原语相关的一个有用的改进是，给每个条件原语关联一个监视计时器，不论条件是否被通知，等待时间超时的一个进程将被设置为就绪态。激活该进程后，它检查相关条件，如果条件满足则继续执行。超时可以防止如下情况的发生：当某些其他进程在产生相关条件的信号之前失败时，等待该条件的进程被无限制地推迟执行而处于饥饿状态。</p>
+<p>由于进程是接到通知而非强制激活的，因此可给指令表增加一条 broadcast 原语。广播可以使所有在该条件上等待的进程都置于就绪态，当一个进程不知道有多少进程将被激活时，这种方式非常方便。例如，在生产者消费者问题中，假设 append 和 take 函数都适用于变长字符块，此时，如果一个生产者向缓冲区中添加了一批字符，那么它不需要知道每个正在等待的消费者准备消耗多少字符，而只需产生一个 broadcast，所有正在等待的进程都得到通知并再次尝试运行。</p>
+<p>此外，当一个进程难以准确地判定将激活哪个进程时，也可使用广播。存储管理程序就是一个很好的例子。管理程序有 j 个空闲字节，一个进程释放了额外的 k 个字节，但它不知道哪个等待进程共需要 k+j 个字节，因此它使用广播，所有进程都检测是否有足够的存储空间。</p>
+<p>Lampson&#x2F;Redell 管程优于 Hoare 管程的原因是， Lampson&#x2F;Redell 方法错误较少。在 Lampson&#x2F;Redell 方法中，由于每个过程在收到信号后都检查管程变量，且由于使用了自旋结构，一个进程不正确地广播或发信号，不会导致收到信号的程序出错。收到信号的程序将检查相关的变量，如果期望的条件得不到满足，它会继续等待。</p>
+<p>Lampson&#x2F;Redell 管程的另一个优点是，它有助于在程序结构中采用更加模块化的方法。例如，考虑一个缓冲区分配程序的实现，为了在顺序的进程间合作，必须满足两级条件：</p>
+<ol>
+<li>保持一致的数据结构。管程强制实施互斥，并在允许对缓冲区的另一个操作之前完成一个输入或输出操作。</li>
+<li>在 1 级条件的基础上，为该进程加上足够的内存，完成其分配请求。</li>
+</ol>
+<p>在 Hoare 管程中，每个信号会传达 1 级条件，同时携带一个隐含消息“我现在有足够的空闲字节，能够满足特定的分配请求”，因此，该信号隐式携带 2 级条件。如果后来程序员改变了 2 级条件的定义，则需要重新编写所有发信号的进程；如果程序员改变了对任何特定等待进程的假设（即等待一个稍微不同的 2 级不变量），则可能需要重新编写所有发信号的进程。这样就不是模块化的结构，且当代码被修改后可能会引发同步错误（如被错误条件唤醒）。每当对 2 级条件做很小的改动时，程序员就必须记得去修改所有进程。而对于 Lampson&#x2F;Redell 管程，一次广播可以确保 1 级条件并携带 2 级条件的线索，每个进程将自己检查 2 级条件。不论是等待者还是发信号者对 2 级条件进行了改动，由于每个过程都会检查自己的 2 级条件，故不会产生错误的唤醒。因此，2 级条件可以隐藏在每个过程中。而对 Hoare 管程而言，2 级条件必须由等待者带到每个发信号的进程的代码中，这违反了数据抽象和进程间的模块化原理。</p>
+<h1 id="消息传递"><a href="#消息传递" class="headerlink" title="消息传递"></a>消息传递</h1><p>进程交互时，必须满足两个基本要求：同步和通信。为实施互斥，进程间需要同步；为实现合作，进程间需要交换信息。提供这些功能的一种方法是消息传递。消息传递还有一个优点，即它可在分布式系统、共享内存的多处理器系统和单处理器系统中实现。</p>
+<p>消息传递系统有多种形式，本节简述这类系统的典型特征。消息传递的实际功能以一对原语的形式提供：</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token function">send</span><span class="token punctuation">(</span>destination<span class="token punctuation">,</span> message<span class="token punctuation">)</span>
+<span class="token function">receive</span><span class="token punctuation">(</span>source<span class="token punctuation">,</span> message<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>这是进程间进行消息传递所需的最小操作集。一个进程以消息（message）的形式给另一个指定的目标（destination）进程发送信息；进程通过执行 receive 原语接收信息，receive 原语中指明发送消息的源进程（source）和消息（message）。</p>
+<p>下表中列出了与消息传递系统相关的一些设计问题</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E5%92%8C%E5%90%8C%E6%AD%A5%E7%9A%84%E6%B6%88%E6%81%AF%E4%BC%A0%E9%80%92%E7%B3%BB%E7%BB%9F%E7%9A%84%E8%AE%BE%E8%AE%A1%E7%89%B9%E7%82%B9.png"></p>
+<h2 id="同步"><a href="#同步" class="headerlink" title="同步"></a>同步</h2><p>两个进程间的消息通信隐含着某种同步的信息：只有当一个进程发送消息后，接收者才能接收消息。</p>
+<p>考虑 send 原语。首先，一个进程执行 send 原语时有两种可能：要么发送进程被阻塞直到这个消息被目标进程接收到，要么不阻塞。类似地，一个进程发出 receive 原语后，也有两种可能：</p>
+<ol>
+<li>若一个消息在此之前已被发送，则该消息被接收并继续执行。</li>
+<li>若没有正等待的消息，则（a）该进程被阻塞直到所等待的消息到达，或（b）该进程继续执行，放弃接收的努力。</li>
+</ol>
+<p>因此，发送者和接收者都可阻塞或不阻塞。通常有三种组合，但任何一个特定系统通常只实现种或两种组合：</p>
+<ul>
+<li><strong>阻塞 send，阻塞 receive</strong>：发送者和接收者都被阻塞，直到完成信息的投递。这种情况有时也称为会合（rendezvous），它考虑到了进程间的紧密同步</li>
+<li><strong>无阻塞 send，阻塞 receive</strong>：尽管发送者可以继续，但接收者会被阻塞直到请求的消息到达。这可能是最有用的一种组合，它允许一个进程给各个目标进程尽快地发送一条或多条消息。在继续工作前必须接收到消息的进程将被阻塞，直到该消息到达。例如，一个服务器进程给其他进程提供服务或资源。</li>
+<li><strong>无阻塞 send，无阻塞 receive</strong>：不要求任何一方等待。</li>
+</ul>
+<p>对大多数并发程序设计任务来说，无阻塞 send 是最自然的。但无阻塞 send 有一个潜在的危险：错误会导致进程重复产生消息。由于对进程没有阻塞的要求，这些消息可能会消耗系统资源，包括处理器时间和缓冲区空间，进而损害其他进程和操作系统。同时，无阻塞 send 增加了程序员的负担，由于必须确定消息是否收到，因而进程必须使用应答消息，以证实收到了消息。</p>
+<p>对大多数并发程序设计任务来说，阻塞 receive 原语是最自然的。通常，请求一个消息的进程都需要这个期望的信息才能继续执行下去，但若消息丢失（在分布式系统中很可能发生这种情况），或者个进程在发送预期的消息之前失败，则接收进程会无限期地阻塞。这个问题可以使用无阻塞 receive 来解决。但该方法的危险是，若消息在一个进程已执行与之匹配的 receive 之后发送，则该消息将被丢失。其他可能的方法是允许一个进程在发出 receive 之前检测是否有消息正在等待，或允许进程在 receive 原语中确定多个源进程。若一个进程正在等待从多个源进程发来的消息，且只要有一个消息到达就可以继续下去时，则后一种方法非常有用。</p>
+<h2 id="寻址"><a href="#寻址" class="headerlink" title="寻址"></a>寻址</h2><p>显然，在 send 原语中确定哪个进程接收消息很有必要。类似地，大多数实现允许接收进程指明消息的来源。<br>在 send 和 receive 原语中确定目标或源进程的方案分为两类：直接寻址和间接寻址。对于直接寻址（direct addressing），send 原语包含目标进程的标识号，而 receive 原语有两种处理方式。一种是要求进程显式地指定源进程，因此该进程必须事先知道希望得到来自哪个进程的消息，这种方式对于处理并发进程间的合作非常有效。另一种是不可能指定所期望的源进程，例如打印机服务器进程将接受来自各个进程的打印请求，对这类应用使用隐式寻址更为有效。此时，receive 原语的 source 参数保存接收操作执行后的返回值。</p>
+<p>另一种常用的方法是间接寻址（indirect addressing）。此时，消息不直接从发送者发送到接收者，而是发送到一个共享数据结构，该结构由临时保存消息的队列组成，这些队列通常称为信箱（mailbox）。因此，两个通信进程中，一个进程给合适的信箱发送消息，另一个进程从信箱中获取这些消息。间接寻址通过解除发送者和接收者之间的耦合关系，可更灵活地使用消息。发送者和接收者之间的关系可以是一对一、多对一、一对多或多对多。</p>
+<ol>
+<li>一对一（one-to-one）关系允许在两个进程间建立专用的通信链接，隔离它们间的交互，避免其他进程的错误干扰。</li>
+<li>多对一（many-to-one）关系对客户服务器间的交互非常有用，一个进程给许多其他进程提供服务，这时信箱常称为一个端口（point）。</li>
+<li>一对多（one-to-many）关系适用于一个发送者和多个接收者，它对于在一组进程间广播一条消息或某些信息的应用程序非常有用。</li>
+<li>多对多（many-to-many）关系可让多个服务进程对多个客户进程提供服务。</li>
+</ol>
+<p><img src="/images/OS/%E9%97%B4%E6%8E%A5%E7%9A%84%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1.png"></p>
+<p>进程和信箱的关联既可以是静态的，也可以是动态的。端口常常静态地关联到一个特定的进程上，也就是说，端口被永久地创建并指定到该进程。一对一关系就是典型的静态和永久性关系。当有很多发送者时，发送者和信箱间的关联可以是动态的，基于这一目的可使用诸如 connect 和 disconnect 之类的原语。</p>
+<p>一个相关的问题是信箱的所有权问题。对于端口来说，信箱的所有都通常是接收进程，并由接收进程创建。因此，撤销一个进程时，其端口也会随之销毁。对于通用的信箱，操作系统可提供一个创建信箱的服务，这样信箱就可视为由创建它的进程所有，这时它们也同该进程一起终止；或视为由操作系统所有，这时销毁信箱需要一个显式命令。</p>
+<h2 id="消息格式"><a href="#消息格式" class="headerlink" title="消息格式"></a>消息格式</h2><p>消息的格式取决于消息机制的目标，以及该机制是运行在一台计算机上还是运行在分布式系统中。对某些操作系统而言，设计者会优先选用定长的短消息来减小处理和存储的开销。需要传递大量数据时，可将数据放到一个文件中，然后让消息引用该文件。更为灵活的一种方法是使用变长消息。</p>
+<img src="/images/OS/般消息格式.png" style="zoom:67%;" />
+
+<p>上图给出了操作系统支持的变长消息的典型格式。该消息分为两部分：包含相关信息的消息头和包含实际内容的消息体。消息头包含消息源和目标的标识符、长度域及判定各种消息类型的类型域，还可能含有一些额外的控制信息，例如创建消息链表的指针域、记录源和目标之间所传递消息的数量、顺序和序号，以及一个优先级域。</p>
+<h2 id="排队原则"><a href="#排队原则" class="headerlink" title="排队原则"></a>排队原则</h2><p>最简单的排队原则是先进先出，但当某些消息比其他消息更紧急时，仅有这一原则是不够的。一个替代原则是允许指定消息的优先级，即根据消息的类型来指定或由发送者指定；另一个替代原则是允许接收者检查消息队列并选择下一次接收哪个消息。</p>
+<h1 id="推荐读物"><a href="#推荐读物" class="headerlink" title="推荐读物"></a>推荐读物</h1><p><img src="/images/OS/%E7%AC%AC%E4%BA%94%E7%AB%A0%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Operation-System/" rel="tag"># Operation System</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1/" rel="tag"># 进程通信</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/02/08/OS-%E7%BA%BF%E7%A8%8B/" rel="prev" title="OS 线程">
+      <i class="fa fa-chevron-left"></i> OS 线程
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/02/12/JUC-SYNC%E5%85%B3%E9%94%AE%E5%AD%97/" rel="next" title="JUC SYNC关键字">
+      JUC SYNC关键字 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">并发的原理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AB%9E%E4%BA%89%E6%9D%A1%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">竞争条件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%85%B3%E6%B3%A8%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.2.</span> <span class="nav-text">操作系统关注的问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E4%BA%A4%E4%BA%92"><span class="nav-number">1.3.</span> <span class="nav-text">进程的交互</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%92%E6%96%A5%E7%9A%84%E8%A6%81%E6%B1%82"><span class="nav-number">1.4.</span> <span class="nav-text">互斥的要求</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BA%92%E6%96%A5%EF%BC%9A%E7%A1%AC%E4%BB%B6%E6%94%AF%E6%8C%81"><span class="nav-number">2.</span> <span class="nav-text">互斥：硬件支持</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E7%A6%81%E7%94%A8"><span class="nav-number">2.1.</span> <span class="nav-text">中断禁用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%93%E7%94%A8%E6%9C%BA%E5%99%A8%E6%8C%87%E4%BB%A4"><span class="nav-number">2.2.</span> <span class="nav-text">专用机器指令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AF%94%E8%BE%83%E5%92%8C%E4%BA%A4%E6%8D%A2%E6%8C%87%E4%BB%A4"><span class="nav-number">2.2.1.</span> <span class="nav-text">比较和交换指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#exchange%E6%8C%87%E4%BB%A4"><span class="nav-number">2.2.2.</span> <span class="nav-text">exchange指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%BA%E5%99%A8%E6%8C%87%E4%BB%A4%E6%96%B9%E6%B3%95%E7%9A%84%E7%89%B9%E7%82%B9"><span class="nav-number">2.2.3.</span> <span class="nav-text">机器指令方法的特点</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B8%B8%E7%94%A8%E7%9A%84%E5%B9%B6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="nav-number">3.</span> <span class="nav-text">常用的并发机制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E9%87%8F"><span class="nav-number">3.1.</span> <span class="nav-text">信号量</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86"><span class="nav-number">3.1.1.</span> <span class="nav-text">基本原理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E9%87%8F%E7%9A%84%E4%B8%89%E4%B8%AA%E5%9F%BA%E6%9C%AC%E6%93%8D%E4%BD%9C"><span class="nav-number">3.1.2.</span> <span class="nav-text">信号量的三个基本操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E9%87%8F%E7%9A%84%E4%B8%89%E4%B8%AA%E9%87%8D%E8%A6%81%E7%BB%93%E8%AE%BA"><span class="nav-number">3.1.3.</span> <span class="nav-text">信号量的三个重要结论</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E9%87%8F%E7%9A%84%E5%88%86%E7%B1%BB"><span class="nav-number">3.1.4.</span> <span class="nav-text">信号量的分类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97%E7%AD%96%E7%95%A5"><span class="nav-number">3.1.5.</span> <span class="nav-text">阻塞队列策略</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E4%BA%92%E6%96%A5%E9%97%AE%E9%A2%98"><span class="nav-number">3.1.6.</span> <span class="nav-text">解决互斥问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E9%87%8F%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.1.7.</span> <span class="nav-text">信号量的实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%A1%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">管程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E4%BF%A1%E5%8F%B7%E7%9A%84%E7%AE%A1%E7%A8%8B"><span class="nav-number">3.2.1.</span> <span class="nav-text">使用信号的管程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Hoare-Monitor"><span class="nav-number">3.2.2.</span> <span class="nav-text">Hoare Monitor</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Mesa-Monitor"><span class="nav-number">3.2.3.</span> <span class="nav-text">Mesa Monitor</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E4%BC%A0%E9%80%92"><span class="nav-number">4.</span> <span class="nav-text">消息传递</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8C%E6%AD%A5"><span class="nav-number">4.1.</span> <span class="nav-text">同步</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%BB%E5%9D%80"><span class="nav-number">4.2.</span> <span class="nav-text">寻址</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E6%A0%BC%E5%BC%8F"><span class="nav-number">4.3.</span> <span class="nav-text">消息格式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%92%E9%98%9F%E5%8E%9F%E5%88%99"><span class="nav-number">4.4.</span> <span class="nav-text">排队原则</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9"><span class="nav-number">5.</span> <span class="nav-text">推荐读物</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

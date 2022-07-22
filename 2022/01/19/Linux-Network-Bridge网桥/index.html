@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Bridge 是一个虚拟网络设备，所以具有网络设备的特征，可以配置 IP、MAC 地址等；其次，Bridge 是一个虚拟交换机，和物理交换机有类似的功能。对于普通的网络设备来说，只有两端，从一端进来的数据会从另一端出去，如物理网卡从外面网络中收到的数据会转发给内核协议栈，而从协议栈过来的数据会转发到外面的物理网络中。而 Bridge 不同，Bridge 有多个端口，数据可以从任何端口进来，进来之后">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux Network Bridge">
+<meta property="og:url" content="http://example.com/2022/01/19/Linux-Network-Bridge%E7%BD%91%E6%A1%A5/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Bridge 是一个虚拟网络设备，所以具有网络设备的特征，可以配置 IP、MAC 地址等；其次，Bridge 是一个虚拟交换机，和物理交换机有类似的功能。对于普通的网络设备来说，只有两端，从一端进来的数据会从另一端出去，如物理网卡从外面网络中收到的数据会转发给内核协议栈，而从协议栈过来的数据会转发到外面的物理网络中。而 Bridge 不同，Bridge 有多个端口，数据可以从任何端口进来，进来之后">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Linux/LinuxNetworkBridge1.png">
+<meta property="og:image" content="http://example.com/images/Linux/LinuxNetworkBridge2.png">
+<meta property="og:image" content="http://example.com/images/Linux/LinuxNetworkBridge3.png">
+<meta property="og:image" content="http://example.com/images/Linux/VMBridge.png">
+<meta property="og:image" content="http://example.com/images/Linux/DockerBridge.png">
+<meta property="article:published_time" content="2022-01-19T04:17:10.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.586Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Linux">
+<meta property="article:tag" content="Linux Network">
+<meta property="article:tag" content="Bridge">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Linux/LinuxNetworkBridge1.png">
+
+<link rel="canonical" href="http://example.com/2022/01/19/Linux-Network-Bridge%E7%BD%91%E6%A1%A5/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Linux Network Bridge | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/01/19/Linux-Network-Bridge%E7%BD%91%E6%A1%A5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux Network Bridge
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2022-01-19 12:17:10" itemprop="dateCreated datePublished" datetime="2022-01-19T12:17:10+08:00">2022-01-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Bridge 是一个虚拟网络设备，所以具有网络设备的特征，可以配置 IP、MAC 地址等；其次，Bridge 是一个虚拟交换机，和物理交换机有类似的功能。对于普通的网络设备来说，只有两端，从一端进来的数据会从另一端出去，如物理网卡从外面网络中收到的数据会转发给内核协议栈，而从协议栈过来的数据会转发到外面的物理网络中。而 Bridge 不同，Bridge 有多个端口，数据可以从任何端口进来，进来之后从哪个口出去和物理交换机的原理差不多，要看 MAC 地址。</p>
+<span id="more"></span>
+
+<h1 id="深入理解-Bridge"><a href="#深入理解-Bridge" class="headerlink" title="深入理解 Bridge"></a>深入理解 Bridge</h1><blockquote>
+<p>基本信息简介</p>
+<p>本机 IP：172.30.234.97&#x2F;20（物理网卡 eth0）<br>网关 IP：172.30.224.1&#x2F;20</p>
+<p>Bridge IP：172.30.224.13&#x2F;20<br>Veth0 IP：172.30.224.11&#x2F;20<br>Veth1 IP：172.30.224.12&#x2F;20</p>
+<p>注意 Bridge 要和网关保持在同一子网</p>
+</blockquote>
+<h2 id="创建-Bridge"><a href="#创建-Bridge" class="headerlink" title="创建 Bridge"></a>创建 Bridge</h2><p>当刚创建一个 bridge 时，它是一个独立的网络设备，只有一个端口连着协议栈，其它的端口啥都没连，这样的 bridge 没有任何实际功能。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> name br0 <span class="token builtin class-name">type</span> bridge
+$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> br0 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<img src="/images/Linux/LinuxNetworkBridge1.png"  />
+
+<h2 id="创建-Veth-Peer"><a href="#创建-Veth-Peer" class="headerlink" title="创建 Veth Peer"></a>创建 Veth Peer</h2><p>创建一对 veth 设备，并配置 IP</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> veth0 <span class="token builtin class-name">type</span> veth peer name veth1
+$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.11/20 dev veth0
+$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.12/20 dev veth1
+$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth0 up
+$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth1 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在 Ubuntu 中，处于同一 Network Namespace 的 Veth Peer 无法被 Ping 通，可以通过以下方式解决（或将两个 Veth 置于不同 NS 下）</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/accept_local
+<span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/accept_local
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/all/rp_filter
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/rp_filter
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/rp_filter<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="将-Bridge-和-Veth-设备相连"><a href="#将-Bridge-和-Veth-设备相连" class="headerlink" title="将 Bridge 和 Veth 设备相连"></a>将 Bridge 和 Veth 设备相连</h2><p>将 veth0 连上 br0</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> dev veth0 master br0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>查看 bridge 连接情况</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ bridge <span class="token function">link</span>
+<span class="token number">7</span>: veth0@veth1: <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span>
+<span class="token comment"># 可以看到 veth0 连接着 br0，且 veth1 是 veth0 的对端</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>这时候，网络就变成了这个样子:</p>
+<p><img src="/images/Linux/LinuxNetworkBridge2.png"></p>
+<p>br0 和 veth0 相连之后，发生了几个变化：</p>
+<ul>
+<li>br0 和 veth0 之间连接起来了，并且是双向的通道</li>
+<li>协议栈和 veth0 之间变成了单通道，协议栈能发数据给 veth0，但 veth0 从外面收到的数据不会转发给协议栈</li>
+<li>br0 的 mac 地址变成了 veth0 的 mac 地址</li>
+</ul>
+<p>相当于 bridge 将 veth0 本来要转发给协议栈的数据给拦截，然后从 bridge 转发。</p>
+<h2 id="验证-Bridge-作用"><a href="#验证-Bridge-作用" class="headerlink" title="验证 Bridge 作用"></a>验证 Bridge 作用</h2><h3 id="veth0-ping-veth1"><a href="#veth0-ping-veth1" class="headerlink" title="veth0 ping veth1"></a>veth0 ping veth1</h3><p>通过 veth0 ping veth1 失败：</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I veth0 <span class="token number">192.168</span>.3.102
+ping: Warning: <span class="token builtin class-name">source</span> address might be selected on device other than: veth0
+PING <span class="token number">192.168</span>.3.102 <span class="token punctuation">(</span><span class="token number">192.168</span>.3.102<span class="token punctuation">)</span> from <span class="token number">172.30</span>.50.129 veth0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+
+--- <span class="token number">192.168</span>.3.102 <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>为什么 veth0 加入了 bridge 之后，就 ping 不通 veth2 了呢？ 先抓包看看：</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 由于veth0的arp缓存里面没有veth1的mac地址，所以ping之前先发arp请求</span>
+
+<span class="token comment"># 从veth1上抓包来看，veth1收到了arp请求(request)，并且返回了应答(reply)</span>
+$ tcpdump -eni veth1
+listening on veth1, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">16</span>:09:02.306393 be:f4:3d:23:38:ee <span class="token operator">></span> ff:ff:ff:ff:ff:ff, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Request who-has <span class="token number">192.168</span>.3.102 tell <span class="token number">172.30</span>.50.129, length <span class="token number">28</span>
+<span class="token number">16</span>:09:02.306434 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span>
+
+<span class="token comment"># 从veth0上抓包来看，数据包也发出去了，并且也收到了返回</span>
+$ tcpdump -eni veth0
+listening on veth0, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">16</span>:20:30.926201 be:f4:3d:23:38:ee <span class="token operator">></span> ff:ff:ff:ff:ff:ff, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Request who-has <span class="token number">192.168</span>.3.102 tell <span class="token number">172.30</span>.50.129, length <span class="token number">28</span>
+<span class="token number">16</span>:20:30.926222 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span>
+
+<span class="token comment">#再看br0上的数据包，发现只有应答</span>
+$ tcpdump -eni br0
+listening on br0, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">16</span>:25:00.590601 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span>
+<span class="token number">16</span>:25:01.595581 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>从上面的抓包可以看出，去和回来的流程都没有问题，问题就出在 veth0 收到应答包后没有给协议栈，而是给了 br0，于是协议栈得不到 veth1 的 mac 地址，从而通信失败。通过分析可以看出，给 veth0 配置IP没有意义，因为就算协议栈传数据包给 veth0，应答包也回不来。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 可以删除veth0的IP，其结果可造成eth0与网络协议栈的链接断裂</span>
+$ <span class="token function">ip</span> addr del <span class="token number">192.168</span>.3.101/24 dev veth0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p>其实 veth0 和协议栈之间还是有联系的，但由于 veth0 没有配置IP，所以协议栈在路由的时候不会将数据包发给 veth0，就算强制要求数据包通过 veth0 发送出去，但由于 veth0 从另一端收到的数据包只会给 br0，所以协议栈还是没法收到相应的 arp 应答包，导致通信失败。此时 veth0 其实就相当于一根网线。</p>
+</blockquote>
+<h3 id="br0-ping-veth1"><a href="#br0-ping-veth1" class="headerlink" title="br0 ping veth1"></a>br0 ping veth1</h3><p>由于 br0 需要发送和接收数据，因此为其配置 IP</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.13/20 dev br0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>于是网络变成了这样子：</p>
+<p><img src="/images/Linux/LinuxNetworkBridge3.png"></p>
+<p>通过 br0 ping 一下 veth1，结果成功</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 <span class="token number">192.168</span>.3.102
+PING <span class="token number">192.168</span>.3.102 <span class="token punctuation">(</span><span class="token number">192.168</span>.3.102<span class="token punctuation">)</span> from <span class="token number">192.168</span>.3.100 br0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+<span class="token number">64</span> bytes from <span class="token number">192.168</span>.3.102: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">64</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">0.037</span> ms
+
+--- <span class="token number">192.168</span>.3.102 <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
+rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">0.037</span>/0.037/0.037/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="将物理网卡连接至-Bridge"><a href="#将物理网卡连接至-Bridge" class="headerlink" title="将物理网卡连接至 Bridge"></a>将物理网卡连接至 Bridge</h2><p>虽然连接 veth1 没有问题，但此时连接外网仍旧是不通的，因为 Bridge 上只有 veth0 这一个设备，与外网根本不连通。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ bridge <span class="token function">link</span>
+<span class="token number">7</span>: veth0@veth1: <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>即通过 eth0（也就是连接外网的物理网卡）可访问到 <code>www.baidu.com</code>，但通过 br0 是不可以的。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 通过br0访问外网，不能连通</span>
+$ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 www.baidu.com
+PING www.a.shifen.com <span class="token punctuation">(</span><span class="token number">39.156</span>.66.18<span class="token punctuation">)</span> from <span class="token number">192.168</span>.3.100 br0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+
+--- www.a.shifen.com <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms
+
+<span class="token comment"># 通过eth0访问外网，可以连通</span>
+$ <span class="token function">ping</span> -c <span class="token number">1</span> -I eth0 www.baidu.com
+PING www.a.shifen.com <span class="token punctuation">(</span><span class="token number">39.156</span>.66.18<span class="token punctuation">)</span> from <span class="token number">172.30</span>.50.129 eth0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+<span class="token number">64</span> bytes from <span class="token number">39.156</span>.66.18 <span class="token punctuation">(</span><span class="token number">39.156</span>.66.18<span class="token punctuation">)</span>: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">54</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">17.8</span> ms
+
+--- www.a.shifen.com <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
+rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">17.784</span>/17.784/17.784/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>因此，我们需要将物理网卡 eth0 添加到 br0 上</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> dev eth0 master br0
+$ bridge <span class="token function">link</span>
+<span class="token number">2</span>: eth0 state UP <span class="token builtin class-name">:</span> <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">4</span>
+<span class="token number">6</span>: veth0 state UP <span class="token builtin class-name">:</span> <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>这时通过 eth0 来 ping 外网失败，但虽然 br0 通过 eth0 这根网线连上了外网的物理交换机，但依然 ping 不通外网。</p>
+<p>这是此时的路由表</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">netstat</span> -rn
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+<span class="token number">0.0</span>.0.0         <span class="token number">172.30</span>.224.1    <span class="token number">0.0</span>.0.0         UG        <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> eth0
+<span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> eth0
+<span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> veth0
+<span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> veth1
+<span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> br0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于与上面讲的通过 veth peer 接入，veth0 无法 ping 通 veth1，原因是 br0 截留了网络包。这个也是同样的道理。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 删除eth0的ip（其实删除其对应的默认路由也可，且eth0的ip无用）</span>
+$ <span class="token function">ip</span> addr del <span class="token number">172.30</span>.234.97/20 dev eth0
+<span class="token comment"># 添加默认网关，并将br0设置为出口设备</span>
+$ route <span class="token function">add</span> default gw <span class="token number">172.30</span>.224.1 dev br0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>如果出现 <code>ping: www.baidu.com: Temporary failure in name resolution</code>，可以查看一下 DNS 配置。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 直接替换（该文件有其他配置慎用）</span>
+$ <span class="token builtin class-name">echo</span> <span class="token string">'nameserver 8.8.8.8'</span> <span class="token operator">></span> /etc/resolv.conf<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>下面测试下网络连通性</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># br0可连接外网</span>
+$ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 www.baidu.com
+PING www.wshifen.com <span class="token punctuation">(</span><span class="token number">103.235</span>.46.39<span class="token punctuation">)</span> from <span class="token number">172.30</span>.224.13 br0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+<span class="token number">64</span> bytes from <span class="token number">103.235</span>.46.39 <span class="token punctuation">(</span><span class="token number">103.235</span>.46.39<span class="token punctuation">)</span>: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">44</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">66.5</span> ms
+
+--- www.wshifen.com <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
+rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">66.504</span>/66.504/66.504/0.000 ms
+
+<span class="token comment"># eth0不可连接外网</span>
+$ <span class="token function">ping</span> -c <span class="token number">1</span> -I eth0 www.baidu.com
+ping: Warning: <span class="token builtin class-name">source</span> address might be selected on device other than: eth0
+PING www.wshifen.com <span class="token punctuation">(</span><span class="token number">103.235</span>.46.39<span class="token punctuation">)</span> from <span class="token number">172.30</span>.224.13 eth0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+^C
+--- www.wshifen.com <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms
+
+<span class="token comment"># 默认走br0的网关</span>
+$ <span class="token function">ping</span> -c <span class="token number">1</span> www.baidu.com
+PING www.wshifen.com <span class="token punctuation">(</span><span class="token number">103.235</span>.46.39<span class="token punctuation">)</span> <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+<span class="token number">64</span> bytes from <span class="token number">103.235</span>.46.39 <span class="token punctuation">(</span><span class="token number">103.235</span>.46.39<span class="token punctuation">)</span>: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">44</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">49.6</span> ms
+
+--- www.wshifen.com <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
+rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">49.574</span>/49.574/49.574/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="Bridge-常用场景"><a href="#Bridge-常用场景" class="headerlink" title="Bridge 常用场景"></a>Bridge 常用场景</h1><h2 id="虚拟机"><a href="#虚拟机" class="headerlink" title="虚拟机"></a>虚拟机</h2><p>虚拟机通过 tun&#x2F;tap 或者其它类似的虚拟网络设备，将虚拟机内的网卡同 br0 连接起来，这样就达到和真实交换机一样的效果，虚拟机发出去的数据包先到达 br0，然后由 br0 交给 eth0 发送出去，数据包都不需要经过 Host 机器的协议栈，效率高。</p>
+<p><img src="/images/Linux/VMBridge.png"></p>
+<h2 id="docker"><a href="#docker" class="headerlink" title="docker"></a>docker</h2><p>由于容器运行在自己单独的 network namespace 里面，所以都有自己单独的协议栈，情况和上面的虚拟机差不多，但它采用了另一种方式来和外界通信：</p>
+<p><img src="/images/Linux/DockerBridge.png"></p>
+<p>容器发送的数据包先到达 br0，然后交给 Host 机器的协议栈，由于目的 IP 是外网 IP，需要 Host 机器开启 IP forward功能，且配置好 NAT 转换。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux/" rel="tag"># Linux</a>
+              <a href="/tags/Linux-Network/" rel="tag"># Linux Network</a>
+              <a href="/tags/Bridge/" rel="tag"># Bridge</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/01/18/Linux-Network-Veth%E8%AE%BE%E5%A4%87%E5%AF%B9/" rel="prev" title="Linux Network Veth Peer">
+      <i class="fa fa-chevron-left"></i> Linux Network Veth Peer
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/02/07/Kubernetes-%E6%9E%B6%E6%9E%84%E7%90%86%E5%BF%B5/" rel="next" title="Kubernetes 架构理念">
+      Kubernetes 架构理念 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Bridge"><span class="nav-number">1.</span> <span class="nav-text">深入理解 Bridge</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA-Bridge"><span class="nav-number">1.1.</span> <span class="nav-text">创建 Bridge</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA-Veth-Peer"><span class="nav-number">1.2.</span> <span class="nav-text">创建 Veth Peer</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86-Bridge-%E5%92%8C-Veth-%E8%AE%BE%E5%A4%87%E7%9B%B8%E8%BF%9E"><span class="nav-number">1.3.</span> <span class="nav-text">将 Bridge 和 Veth 设备相连</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%AA%8C%E8%AF%81-Bridge-%E4%BD%9C%E7%94%A8"><span class="nav-number">1.4.</span> <span class="nav-text">验证 Bridge 作用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#veth0-ping-veth1"><span class="nav-number">1.4.1.</span> <span class="nav-text">veth0 ping veth1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#br0-ping-veth1"><span class="nav-number">1.4.2.</span> <span class="nav-text">br0 ping veth1</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86%E7%89%A9%E7%90%86%E7%BD%91%E5%8D%A1%E8%BF%9E%E6%8E%A5%E8%87%B3-Bridge"><span class="nav-number">1.5.</span> <span class="nav-text">将物理网卡连接至 Bridge</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Bridge-%E5%B8%B8%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="nav-number">2.</span> <span class="nav-text">Bridge 常用场景</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%99%9A%E6%8B%9F%E6%9C%BA"><span class="nav-number">2.1.</span> <span class="nav-text">虚拟机</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#docker"><span class="nav-number">2.2.</span> <span class="nav-text">docker</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

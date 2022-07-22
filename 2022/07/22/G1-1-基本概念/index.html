@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="通常我们所说的 GC 是指垃圾回收，但是在 JVM 的实现中 GC 更为准确的意思是指内存管理器，它有两个职能，第一是内存的分配管理，第二是垃圾回收。这两者是一个事物的两个方面，每一种垃圾回收策略都和内存的分配策略息息相关，脱离内存的分配去谈垃圾回收是没有任何意义的。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="G1 基本概念">
+<meta property="og:url" content="http://example.com/2022/07/22/G1-1-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="通常我们所说的 GC 是指垃圾回收，但是在 JVM 的实现中 GC 更为准确的意思是指内存管理器，它有两个职能，第一是内存的分配管理，第二是垃圾回收。这两者是一个事物的两个方面，每一种垃圾回收策略都和内存的分配策略息息相关，脱离内存的分配去谈垃圾回收是没有任何意义的。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/JDK/G1卡表.png">
+<meta property="og:image" content="http://example.com/images/JDK/G1%E6%94%B6%E9%9B%86%E9%9B%86.png">
+<meta property="article:published_time" content="2022-07-22T02:00:40.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.638Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="GC">
+<meta property="article:tag" content="G1">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/JDK/G1卡表.png">
+
+<link rel="canonical" href="http://example.com/2022/07/22/G1-1-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>G1 基本概念 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/07/22/G1-1-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          G1 基本概念
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-07-22 10:00:40 / Modified: 16:13:23" itemprop="dateCreated datePublished" datetime="2022-07-22T10:00:40+08:00">2022-07-22</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>通常我们所说的 GC 是指垃圾回收，但是在 JVM 的实现中 GC 更为准确的意思是指内存管理器，它有两个职能，第一是内存的分配管理，第二是垃圾回收。这两者是一个事物的两个方面，每一种垃圾回收策略都和内存的分配策略息息相关，脱离内存的分配去谈垃圾回收是没有任何意义的。</p>
+<span id="more"></span>
+
+<h1 id="分区-Region"><a href="#分区-Region" class="headerlink" title="分区 Region"></a>分区 Region</h1><p>分区（Heap Region，HR）或称堆分区，是 G1 堆和操作系统交互的最小管理单位。G1 的分区类型（HeapRegionType）大致可以分为四类：</p>
+<ol>
+<li>自由分区（Free Heap Region，FHR）</li>
+<li>新生代分区（Young Heap Region，YHR）</li>
+<li>大对象分区（Humongous Heap Region，HHR）</li>
+<li>老生代分区（Old Heap Region，OHR）</li>
+</ol>
+<p>其中新生代分区又可以分为 Eden 和 Survivor；大对象分区又可以分为：大对象头分区和大对象连续分区。</p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; hotspot&#x2F;share&#x2F;gc&#x2F;g1&#x2F;heapRegionType.hpp
+
+&#x2F;&#x2F; We encode the value of the heap region type so the generation can be
+  &#x2F;&#x2F; determined quickly. The tag is split into two parts:
+  &#x2F;&#x2F;
+  &#x2F;&#x2F;   major type (young, old, humongous, archive)           : top N-1 bits
+  &#x2F;&#x2F;   minor type (eden &#x2F; survivor, starts &#x2F; cont hum, etc.) : bottom 1 bit
+  &#x2F;&#x2F;
+  &#x2F;&#x2F; If there&#39;s need to increase the number of minor types in the
+  &#x2F;&#x2F; future, we&#39;ll have to increase the size of the latter and hence
+  &#x2F;&#x2F; decrease the size of the former.
+  &#x2F;&#x2F;
+  &#x2F;&#x2F; 00000 0 [ 0] Free
+  &#x2F;&#x2F;
+  &#x2F;&#x2F; 00001 0 [ 2] Young Mask
+  &#x2F;&#x2F; 00001 0 [ 2] Eden
+  &#x2F;&#x2F; 00001 1 [ 3] Survivor
+  &#x2F;&#x2F;
+  &#x2F;&#x2F; 00010 0 [ 4] Humongous Mask
+  &#x2F;&#x2F; 00100 0 [ 8] Pinned Mask
+  &#x2F;&#x2F; 00110 0 [12] Starts Humongous
+  &#x2F;&#x2F; 00110 1 [13] Continues Humongous
+  &#x2F;&#x2F;
+  &#x2F;&#x2F; 01000 0 [16] Old Mask
+  &#x2F;&#x2F;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="卡表-CardTable"><a href="#卡表-CardTable" class="headerlink" title="卡表 CardTable"></a>卡表 CardTable</h1><p>在 G1 堆中，存在 CardTable 的概念，CardTable 是由元素为 1B 的数组来实现的，数组里的元素称之为卡片&#x2F;卡页（Page）。这个 CardTable 会映射到整个堆的空间，每个卡片会对应堆中的 512B 空间。</p>
+<blockquote>
+<p><strong>为什么卡表可以对应堆中 512B 的空间？</strong></p>
+<p>不知道——</p>
+</blockquote>
+<p>如下图所示，在一个大小为 1 GB 的堆下，那么 CardTable 的长度为 2097151 (1GB &#x2F; 512B)；每个 Region 大小为 1 MB，每个 Region 都会对应 2048 个 Card Page。</p>
+<img src="/images/JDK/G1卡表.png" style="zoom:67%;" />
+
+<h1 id="收集集-CSet"><a href="#收集集-CSet" class="headerlink" title="收集集 CSet"></a>收集集 CSet</h1><p><img src="/images/JDK/G1%E6%94%B6%E9%9B%86%E9%9B%86.png"></p>
+<p>收集集合（CSet）代表每次 GC 暂停时回收的一系列目标分区。在任意一次收集暂停中，CSet 所有分区都会被释放，内部存活的对象都会被转移到分配的空闲分区中。因此无论是年轻代收集，还是混合收集，工作的机制都是一致的。年轻代收集 CSet 只容纳年轻代分区，而混合收集会通过启发式算法，在老年代候选回收分区中，筛选出回收收益最高的分区添加到 CSet 中。</p>
+<p>候选老年代分区的 CSet 准入条件，可以通过活跃度阈值 <code>-XX:G1MixedGCLiveThresholdPercent</code> (默认85%)进行设置，从而拦截那些回收开销巨大的对象；同时，每次混合收集可以包含候选老年代分区，可根据 CSet 对堆的总大小占比 <code>-XX:G1OldCSetRegionThresholdPercent</code> (默认10%) 设置数量上限。</p>
+<p>由上述可知，G1 的收集都是根据 CSet 进行操作的，年轻代收集与混合收集没有明显的不同，最大的区别在于两种收集的触发条件。</p>
+<h1 id="记忆集-RSet"><a href="#记忆集-RSet" class="headerlink" title="记忆集 RSet"></a>记忆集 RSet</h1><p>记忆集 RSet 是一种抽象概念，记录对象在不同代际之间的引用关系，目的是为了加速垃圾回收的速度。JVM 使用根对象引用的收集算法，即从根集合出发，标记所有存活的对象，然后遍历对象的每一个字段继续标记，直到所有的对象标记完毕。在分代GC中，我们知道新生代和老生代处于不同的收集阶段，如果还是按照这样的标记方法，既不合理也没必要。假设我们只收集新生代，我们把老生代全部标记，但是并没有收集老生代，浪费了时间。同理，在收集老生代时有同样的问题。当且仅当，我们要进行Full GC才需要做全部标记。所以算法设计者做了这样的设计，用一个 RSet 记录从非收集部分指向收集部分的指针的集合，而这个集合描述对象的引用关系。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/GC/" rel="tag"># GC</a>
+              <a href="/tags/G1/" rel="tag"># G1</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/13/Flowable-4-%E5%AE%9E%E8%B7%B5%E5%9C%BA%E6%99%AF/" rel="prev" title="Flowable 实践场景">
+      <i class="fa fa-chevron-left"></i> Flowable 实践场景
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/07/22/G1-2-YoungGC%E8%BF%87%E7%A8%8B/" rel="next" title="G1 YoungGC过程">
+      G1 YoungGC过程 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%86%E5%8C%BA-Region"><span class="nav-number">1.</span> <span class="nav-text">分区 Region</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%A1%E8%A1%A8-CardTable"><span class="nav-number">2.</span> <span class="nav-text">卡表 CardTable</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%94%B6%E9%9B%86%E9%9B%86-CSet"><span class="nav-number">3.</span> <span class="nav-text">收集集 CSet</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%AE%B0%E5%BF%86%E9%9B%86-RSet"><span class="nav-number">4.</span> <span class="nav-text">记忆集 RSet</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

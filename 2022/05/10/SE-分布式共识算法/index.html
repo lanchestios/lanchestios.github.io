@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="共识指的是让参与的节点对某些决定达成共识。共识算法满足以下条件：  统一协议。所有节点都得出相同的结论。 整体性。没有节点会做两次决定。 有效性。如果决定是 X，那么 X 必定是某个节点建议的。 终止性。任何没有宕机的节点最终都会达成一致。  如果你不关心容错，可以很容易满足以上三个指标，比如指定一个 master 做所有的决定。但是，一旦 master 挂掉，那么系统将不能再做任何决定。这就是我">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 分布式共识算法">
+<meta property="og:url" content="http://example.com/2022/05/10/SE-%E5%88%86%E5%B8%83%E5%BC%8F%E5%85%B1%E8%AF%86%E7%AE%97%E6%B3%95/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="共识指的是让参与的节点对某些决定达成共识。共识算法满足以下条件：  统一协议。所有节点都得出相同的结论。 整体性。没有节点会做两次决定。 有效性。如果决定是 X，那么 X 必定是某个节点建议的。 终止性。任何没有宕机的节点最终都会达成一致。  如果你不关心容错，可以很容易满足以上三个指标，比如指定一个 master 做所有的决定。但是，一旦 master 挂掉，那么系统将不能再做任何决定。这就是我">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/Paxos%E7%AE%97%E6%B3%95%E6%95%B4%E4%BD%93%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/%E6%95%B4%E4%B8%AA%E7%B3%BB%E7%BB%9F%E5%AF%B9%E5%8F%96%E5%80%BC%E4%B8%BAX%E8%BE%BE%E6%88%90%E4%B8%80%E8%87%B4.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/%E8%A2%AB%E9%80%89%E5%AE%9A%E5%8F%AA%E5%8F%96%E5%86%B3%E4%BA%8EPromise%E5%BA%94%E7%AD%94%E4%B8%AD%E6%98%AF%E5%90%A6%E5%B7%B2%E6%89%B9%E5%87%86.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/%E6%95%B4%E4%B8%AA%E7%B3%BB%E7%BB%9F%E6%9C%80%E7%BB%88%E4%BC%9A%E5%AF%B9%E5%8F%96%E5%80%BC%E4%B8%BAY%E8%BE%BE%E6%88%90%E4%B8%80%E8%87%B4.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/%E6%89%B9%E5%87%86%E9%98%B6%E6%AE%B5%E5%A4%B1%E8%B4%A5%E5%BD%A2%E6%88%90%E6%B4%BB%E9%94%81.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/MultiPaxos%E7%AE%97%E6%B3%95%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/DataIntensiveApplications/%E6%9C%89%E9%80%89%E4%B8%BB%E6%9C%BA%E5%88%B6%E7%9A%84%E5%8D%8F%E5%95%86%E5%85%B1%E8%AF%86%E7%9A%84%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/StateTransition.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope1.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope2.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope3.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope4.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope5.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope6.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope7.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope8.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope9.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope10.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope11.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope12.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope13.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope14.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope15.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope16.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope17.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ReplicatedStateMachine.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/raft%E6%97%A5%E5%BF%97%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope18.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope19.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope20.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope21.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope22.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope23.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope24.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope25.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope26.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope27.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope28.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope29.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope30.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope31.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope32.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope33.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope34.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope35.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope36.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope37.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope38.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope39.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope40.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope41.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope43.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope44.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope45.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope46.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope47.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope48.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope49.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope50.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope51.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/RaftScope52.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E5%AF%B9%E6%8F%90%E4%BA%A4%E9%99%90%E5%88%B6%E7%9A%84%E5%8E%9F%E5%9B%A0.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E6%96%B0%E8%8A%82%E7%82%B9%E6%89%A9%E5%B1%95%E7%9A%84%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E4%BA%8C%E9%98%B6%E6%AE%B5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%902.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%903.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%904.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope1.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope2.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope3.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope4.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope5.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope6.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope7.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope8.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope9.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/ZabScope10.png">
+<meta property="og:image" content="https://icyfenix.cn/assets/img/gossip.0eb19e80.gif">
+<meta property="article:published_time" content="2022-05-10T02:48:21.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.639Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Raft">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="Zab">
+<meta property="article:tag" content="Paxos">
+<meta property="article:tag" content="Gossip">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/DataIntensiveApplications/Paxos%E7%AE%97%E6%B3%95%E6%95%B4%E4%BD%93%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+
+<link rel="canonical" href="http://example.com/2022/05/10/SE-%E5%88%86%E5%B8%83%E5%BC%8F%E5%85%B1%E8%AF%86%E7%AE%97%E6%B3%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 分布式共识算法 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/05/10/SE-%E5%88%86%E5%B8%83%E5%BC%8F%E5%85%B1%E8%AF%86%E7%AE%97%E6%B3%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 分布式共识算法
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2022-05-10 10:48:21" itemprop="dateCreated datePublished" datetime="2022-05-10T10:48:21+08:00">2022-05-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>共识指的是让参与的节点对某些决定达成共识。共识算法满足以下条件：</p>
+<ul>
+<li>统一协议。所有节点都得出相同的结论。</li>
+<li>整体性。没有节点会做两次决定。</li>
+<li>有效性。如果决定是 X，那么 X 必定是某个节点建议的。</li>
+<li>终止性。任何没有宕机的节点最终都会达成一致。</li>
+</ul>
+<p>如果你不关心容错，可以很容易满足以上三个指标，比如指定一个 master 做所有的决定。但是，一旦 master 挂掉，那么系统将不能再做任何决定。这就是我们在2PC中看到的情况：如果协调者失败，那么参与者会一直等待。</p>
+<p>终止性主要出现在容错的情况下。在节点故障的环境里，共识算法不能停滞不前，应该也能做出决定。模型认为一个失联的节点再也不会回来，能够基于此继续作出决定。显然，2PC 是不满足这个条件的。当然，所有节点都宕机了，是不可能做出决定的，算法会对宕机节点有一个限制，经过证明任何共识算法只要在一半以上节点正常时就可以正常工作。另外，大部分共识算法默认系统没有出现拜占庭故障（节点异常，比如发送不同的提议道不同的节点）。</p>
+<p>实际生产中，常见的共识算法实现包括 VSR、Paxos、Raft 和 Zab。这些算法细节实现不尽相同，但是都遵循着相同的设计原理。这些算法一般不会直接使用我们描述的单一值决策流程，而是对一系列值作出决定，并满足全局有序的条件，就好像做了多轮的单一值共识算法。</p>
+<span id="more"></span>
+
+<h1 id="Paxos"><a href="#Paxos" class="headerlink" title="Paxos"></a>Paxos</h1><blockquote>
+<p>  Distributed Consensus Algorithm</p>
+<p>  There is only one consensus protocol, and that’s “Paxos” — all other approaches are just broken versions of Paxos</p>
+<p>  世界上只有一种共识协议，就是 Paxos，其他所有共识算法都是 Paxos 的退化版本。</p>
+<p>  —— <a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Michael_Burrows">Mike Burrows</a>，Inventor of Google Chubby</p>
+</blockquote>
+<p>Paxos 是由 <a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Leslie_Lamport">Leslie Lamport</a>（就是大名鼎鼎的<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/LaTeX">LaTeX</a>中的“La”）提出的一种基于消息传递的协商共识算法，现已是当今分布式系统最重要的理论基础，几乎就是“共识”二字的代名词。这个极高的评价出自于提出 Raft 算法的<a target="_blank" rel="noopener" href="https://web.stanford.edu/~ouster/cgi-bin/papers/raft-atc14">论文</a>，更是显得分量十足。Paxos 问题指分布式系统中存在故障（Fault），但不存在恶意 corrupt 节点场景（消息可能丢失但不会造假）下的共识达成（Consensus）问题。</p>
+<h2 id="Paxos-的诞生"><a href="#Paxos-的诞生" class="headerlink" title="Paxos 的诞生"></a>Paxos 的诞生</h2><p>Lamport 虚构了一个名为“Paxos”的希腊城邦，这个城邦按照民主制度制定法律，却又不存在一个中心化的专职立法机构，立法靠着“兼职议会”（Part-Time Parliament）来完成，无法保证所有城邦居民都能够及时地了解新的法律提案、也无法保证居民会及时为提案投票。Paxos 算法的目标就是让城邦能够在每一位居民都不承诺一定会及时参与的情况下，依然可以按照少数服从多数的原则，最终达成一致意见。但是 Paxos 算法并不考虑<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Byzantine_fault">拜占庭将军</a>问题，即假设信息可能丢失也可能延迟，但不会被错误传递。</p>
+<blockquote>
+<p>  <strong>Paxos 的三次叙述</strong></p>
+<p>  Lamport 最初在 1990 年首次发表了 Paxos 算法，选的论文题目就是“<a target="_blank" rel="noopener" href="https://lamport.azurewebsites.net/pubs/lamport-paxos.pdf">The Part-Time Parliament</a>”。由于算法本身极为复杂，用希腊城邦作为比喻反而使得描述更为晦涩，论文的三个审稿人一致要求他把希腊城邦的故事删除掉，这令 Lamport 感觉颇为不爽，然后干脆就撤稿不发了，所以 Paxos 刚刚被提出的时候并没有引起什么反响。八年之后（1998 年），Lamport 再次将此文章重新整理后投到《<a target="_blank" rel="noopener" href="https://dl.acm.org/journal/tocs">ACM Transactions on Computer Systems</a>》，这次论文成功发表，Lamport 的名气确实吸引了一些人去研究，结果是并没有多少人能弄懂他在说什么。时间又过去了三年（2001 年），Lamport 认为前两次是同行们无法理解他以“希腊城邦”来讲故事的幽默感，第三次以“<a target="_blank" rel="noopener" href="https://lamport.azurewebsites.net/pubs/paxos-simple.pdf">Paxos Made Simple</a>”为题，在《<a target="_blank" rel="noopener" href="https://www.sigact.org/SIGACT_News/">SIGACT News</a>》杂志上发表文章，终于放弃了“希腊城邦”的比喻，尽可能用（他认为）简单直接、（他认为）可读性较强的方式去介绍 Paxos 算法，情况虽然比前两次要好上一些，但以 Paxos 本应获得的重视程度来说，这次依然只能算是应者寥寥。</p>
+</blockquote>
+<p>Paxos 算法将分布式系统中的节点分为三类：</p>
+<ul>
+<li><strong>提案节点</strong>：称为 Proposer，提出对某个值进行设置操作的节点，设置值这个行为就被称之为<strong>提案</strong>（Proposal），值一旦设置成功，就是不会丢失也不可变的。请注意，Paxos 是典型的基于操作转移模型而非状态转移模型来设计的算法，这里的“设置值”不要类比成程序中变量赋值操作，应该类比成日志记录操作，在后面介绍的 Raft 算法中就直接把“提案”叫作“日志”了。</li>
+<li><strong>决策节点</strong>：称为 Acceptor，是应答提案的节点，决定该提案是否可被投票、是否可被接受。提案一旦得到过半数决策节点的接受，即称该提案被<strong>批准</strong>（Accept），提案被批准即意味着该值不能再被更改，也不会丢失，且最终所有节点都会接受该它。</li>
+<li><strong>记录节点</strong>：被称为 Learner，不参与提案，也不参与决策，只是单纯地从提案、决策节点中学习已经达成共识的提案，譬如少数派节点从网络分区中恢复时，将会进入这种状态。</li>
+</ul>
+<p>使用 Paxos 算法的分布式系统里的，所有的节点都是平等的，它们都可以承担以上某一种或者多种的角色，不过为了便于确保有明确的多数派，决策节点的数量应该被设定为奇数个，且在系统初始化时，网络中每个节点都知道整个网络所有决策节点的数量、地址等信息。</p>
+<p>在分布式环境下，如果我们说各个节点“就某个值（提案）达成一致”，指的是“不存在某个时刻有一个值为 A，另一个时刻又为 B 的情景”。解决这个问题的复杂度主要来源于以下两个方面因素的共同影响：</p>
+<ul>
+<li>系统内部各个节点通信是不可靠的，不论对于系统中企图设置数据的提案节点抑或决定是否批准设置操作的决策节点，其发出、收到的信息可能延迟送达、也可能会丢失，但不去考虑消息有传递错误的情况。</li>
+<li>系统外部各个用户访问是可并发的，如果系统只会有一个用户，或者每次只对系统进行串行访问，那单纯地应用 Quorum 机制，少数节点服从多数节点，就已经足以保证值被正确地读写。</li>
+</ul>
+<p>第一点是网络通信中客观存在的现象，也是所有共识算法都要重点解决的问题。对于第二点，笔者详细解释一下便于你理解：现在我们讨论的是“分布式环境下并发操作的共享数据”的问题，即使先不考虑是不是在分布式的环境下，只考虑并发操作，假设有一个变量 i 当前在系统中存储的数值为 2，同时有外部请求 A、B 分别对系统发送操作指令：“把 i 的值加 1”和“把 i 的值乘 3”，如果不加任何并发控制的话，将可能得到“(2+1)×3&#x3D;9”与“2×3+1&#x3D;7”两种可能的结果。因此，对同一个变量的并发修改必须先加锁后操作，不能让 A、B 的请求被交替处理，这些可以说是程序设计的基本常识了。而在分布式的环境下，由于还要同时考虑到分布式系统内可能在任何时刻出现的通信故障，如果一个节点在取得锁之后，在释放锁之前发生崩溃失联，这将导致整个操作被无限期的等待所阻塞，因此算法中的加锁就不完全等同于并发控制中以互斥量来实现的加锁，还必须提供一个其他节点能抢占锁的机制，以避免因通信问题而出现死锁。</p>
+<p>为了这个问题，分布式环境中的锁必须是可抢占的。Paxos 算法包括两个阶段，其中，第一阶段“准备”（Prepare）就相当于上面抢占锁的过程。如果某个提案节点准备发起提案，必须先向所有的决策节点广播一个许可申请（称为 Prepare 请求）。提案节点的 Prepare 请求中会附带一个全局唯一的数字 n 作为提案 ID，决策节点收到后，将会给予提案节点两个承诺与一个应答。</p>
+<p>两个承诺是指：</p>
+<ul>
+<li>承诺不会再接受提案 ID 小于或等于 n 的 Prepare 请求。</li>
+<li>承诺不会再接受提案 ID 小于 n 的 Accept 请求。</li>
+</ul>
+<p>一个应答是指：</p>
+<ul>
+<li>不违背以前作出的承诺的前提下，回复已经批准过的提案中 ID 最大的那个提案所设定的值和提案 ID，如果该值从来没有被任何提案设定过，则返回空值。如果违反此前做出的承诺，即收到的提案 ID 并不是决策节点收到过的最大的，那允许直接对此 Prepare 请求不予理会。</li>
+</ul>
+<p>当提案节点收到了多数派决策节点的应答（称为 Promise 应答）后，可以开始第二阶段“批准”（Accept）过程，这时有如下两种可能的结果：</p>
+<ul>
+<li>如果提案节点发现所有响应的决策节点此前都没有批准过该值（即为空），那说明它是第一个设置值的节点，可以随意地决定要设定的值，将自己选定的值与提案 ID，构成一个二元组“(id, value)”，再次广播给全部的决策节点（称为 Accept 请求）。</li>
+<li>如果提案节点发现响应的决策节点中，已经有至少一个节点的应答中包含有值了，那它就不能够随意取值了，必须无条件地从应答中找出提案 ID 最大的那个值并接受，构成一个二元组“(id, maxAcceptValue)”，再次广播给全部的决策节点（称为 Accept 请求）。</li>
+</ul>
+<p>当每一个决策节点收到 Accept 请求时，都会在不违背以前作出的承诺的前提下，接收并持久化对当前提案 ID 和提案附带的值。如果违反此前做出的承诺，即收到的提案 ID 并不是决策节点收到过的最大的，那允许直接对此 Accept 请求不予理会。</p>
+<p>当提案节点收到了多数派决策节点的应答（称为 Accepted 应答）后，协商结束，共识决议形成，将形成的决议发送给所有记录节点进行学习。</p>
+<p>整个过程的时序图如下图所示。</p>
+<p><img src="/images/DataIntensiveApplications/Paxos%E7%AE%97%E6%B3%95%E6%95%B4%E4%BD%93%E6%97%B6%E5%BA%8F%E5%9B%BE.png"></p>
+<blockquote>
+<p>  需要注意的是：准备提案不需要指定提议值，只需要携带提议编号。</p>
+</blockquote>
+<h2 id="工作实例"><a href="#工作实例" class="headerlink" title="工作实例"></a>工作实例</h2><p>假设一个分布式系统有五个节点，分别命名为 S1、S2、S3、S4、S5，这个例子中只讨论正常通信的场景，不涉及网络分区。全部节点都同时扮演着提案节点和决策节点的身份。此时，有两个并发的请求分别希望将同一个值分别设定为 X（由 S1作为提案节点提出）和 Y（由 S5作为提案节点提出），以 P 代表准备阶段，以 A 代表批准阶段，这时候可能发生以下情况：</p>
+<ul>
+<li><p>情况一：譬如，S1 选定的提案 ID 是 3.1（全局唯一 ID 加上节点编号），先取得了多数派决策节点的 Promise 和 Accepted 应答，此时 S5 选定提案 ID 是 4.5，发起 Prepare 请求，收到的多数派应答中至少会包含 1 个此前应答过 S1 的决策节点，假设是 S3，那么 S3 提供的 Promise 中必将包含 S1 已设定好的值 X，S5 就必须无条件地用 X 代替 Y 作为自己提案的值，由此整个系统对“取值为 X”这个事实达成一致，如下图所示。</p>
+<p><img src="/images/DataIntensiveApplications/%E6%95%B4%E4%B8%AA%E7%B3%BB%E7%BB%9F%E5%AF%B9%E5%8F%96%E5%80%BC%E4%B8%BAX%E8%BE%BE%E6%88%90%E4%B8%80%E8%87%B4.png"></p>
+<blockquote>
+<p>  S5 收到了某个应答包含被写入的 acceptedProposalID 和 acceptedValue，这时，必须假设有其他客户端（Proposer）正在运行，虽然 X 不知道对方是否已经成功结束，但任何已经写入的值都不能被修改！所以 X 必须保持原有的值。于是 S5 将看到的最大 acceptedProposalID 对应的 acceptedValue 作为将要写入的值。</p>
+<p>  请注意，Paxos 是典型的基于操作转移模型而非状态转移模型来设计的算法，这里的“设置值”不要类比成程序中变量赋值操作，应该类比成日志记录操作，在后面介绍的 Raft 算法中就直接把“提案”叫作“日志”了。</p>
+</blockquote>
+</li>
+<li><p>情况二：事实上，对于情况一，X 被选定为最终值是必然结果，但从图 2 中可以看出，X 被选定为最终值并不是必定需要多数派的共同批准，只取决于 S5 提案时 Promise 应答中是否已包含了批准过 X 的决策节点，譬如下图所示，S5 发起提案的 Prepare 请求时，X 并未获得多数派批准，但由于 S3 已经批准的关系，最终共识的结果仍然是 X。</p>
+<p><img src="/images/DataIntensiveApplications/%E8%A2%AB%E9%80%89%E5%AE%9A%E5%8F%AA%E5%8F%96%E5%86%B3%E4%BA%8EPromise%E5%BA%94%E7%AD%94%E4%B8%AD%E6%98%AF%E5%90%A6%E5%B7%B2%E6%89%B9%E5%87%86.png"></p>
+</li>
+<li><p>情况三：当然，另外一种可能的结果是 S5 提案时 Promise 应答中并未包含批准过 X 的决策节点，譬如应答 S5 提案时，节点 S1 已经批准了 X，节点 S2、S3 未批准但返回了 Promise 应答，此时 S5 以更大的提案 ID 获得了 S3、S4、S5 的 Promise，这三个节点均未批准过任何值，那么 S3 将不会再接收来自 S1的 Accept 请求，因为它的提案 ID 已经不是最大的了，这三个节点将批准 Y 的取值，整个系统最终会对“取值为 Y”达成一致，如下图所示。</p>
+<p><img src="/images/DataIntensiveApplications/%E6%95%B4%E4%B8%AA%E7%B3%BB%E7%BB%9F%E6%9C%80%E7%BB%88%E4%BC%9A%E5%AF%B9%E5%8F%96%E5%80%BC%E4%B8%BAY%E8%BE%BE%E6%88%90%E4%B8%80%E8%87%B4.png"></p>
+</li>
+<li><p>情况四：从情况三可以推导出另一种极端的情况，如果两个提案节点交替使用更大的提案 ID 使得准备阶段成功，但是批准阶段失败的话，这个过程理论上可以无限持续下去，形成活锁（Live Lock），如下图所示。在算法实现中会引入随机超时时间来避免活锁的产生。</p>
+<p><img src="/images/DataIntensiveApplications/%E6%89%B9%E5%87%86%E9%98%B6%E6%AE%B5%E5%A4%B1%E8%B4%A5%E5%BD%A2%E6%88%90%E6%B4%BB%E9%94%81.png"></p>
+</li>
+</ul>
+<p>虽然 Paxos 是以复杂著称的算法，但以上介绍都是基于 Basic Paxos、以正常流程（未出现网络分区等异常）、通俗方式讲解的 Paxos 算法，并未涉及严谨的逻辑和数学原理，也未讨论 Paxos 的推导证明过程，对于普通的不从事算法研究的技术人员来说，理解起来应该也不算太困难。</p>
+<p>Basic Paxos 的价值在于开拓了分布式共识算法的发展思路，但它因有如下缺陷，一般不会直接用于实践：Basic Paxos 只能对单个值形成决议，并且决议的形成至少需要两次网络请求和应答（准备和批准阶段各一次），高并发情况下将产生较大的网络开销，极端情况下甚至可能形成活锁。总之，Basic Paxos 是一种很学术化但对工业化并不友好的算法，现在几乎只用来做理论研究。实际的应用都是基于 Multi Paxos 和 Fast Paxos 算法的，接下来我们将会了解 Multi Paxos 与一些它的理论等价的算法（如 Raft、Zab 等算法）。</p>
+<h1 id="Multi-Paxos"><a href="#Multi-Paxos" class="headerlink" title="Multi Paxos"></a>Multi Paxos</h1><p>上节 Basic Paxos 的活锁问题，两个提案节点互不相让地争相提出自己的提案，抢占同一个值的修改权限，导致整个系统在持续性地“反复横跳”，外部看起来就像被锁住了一样。此外，笔者还讲述过一个观点，分布式共识的复杂性，主要来源于网络的不可靠与请求的可并发两大因素，活锁问题与许多 Basic Paxos 异常场景中所遭遇的麻烦，都可以看作是源于任何一个提案节点都能够完全平等地、与其他节点并发地提出提案而带来的复杂问题。为此，Lamport 专门设计（“专门设计”的意思是在 Paxos 的论文中 Lamport 随意提了几句可以这么做）了一种 Paxos 的改进版本“Multi Paxos”算法，希望能够找到一种两全其美的办法，既不破坏 Paxos 中“众节点平等”的原则，又能在提案节点中实现主次之分，限制每个节点都有不受控的提案权利，这两个目标听起来似乎是矛盾的，但现实世界中的选举就很符合这种在平等节点中挑选意见领袖的情景。</p>
+<p>Multi Paxos 对 Basic Paxos 的核心改进是增加了“选主”的过程，提案节点会通过定时轮询（心跳），确定当前网络中的所有节点里是否存在有一个主提案节点，一旦没有发现主节点存在，节点就会在心跳超时后使用 Basic Paxos 中定义的准备、批准的两轮网络交互过程，向所有其他节点广播自己希望竞选主节点的请求，希望整个分布式系统对“由我作为主节点”这件事情协商达成一致共识，如果得到了决策节点中多数派的批准，便宣告竞选成功。当选主完成之后，除非主节点失联之后发起重新竞选，否则从此往后，就只有主节点本身才能够提出提案。此时，无论哪个提案节点接收到客户端的操作请求，都会将请求转发给主节点来完成提案，而主节点提案的时候，也就无需再次经过准备过程，因为可以视作是经过选举时的那一次准备之后，后续的提案都是对相同提案 ID 的一连串的批准过程。也可以通俗理解为选主过后，就不会再有其他节点与它竞争，相当于是处于无并发的环境当中进行的有序操作，所以此时系统中要对某个值达成一致，只需要进行一次批准的交互即可，如下图所示。</p>
+<p><img src="/images/DataIntensiveApplications/MultiPaxos%E7%AE%97%E6%B3%95%E6%97%B6%E5%BA%8F%E5%9B%BE.png"></p>
+<p>可能有人注意到这时候的二元组(id, value)已经变成了三元组(id, i, value)，这是因为需要给主节点增加一个“任期编号”，这个编号必须是严格单调递增的，以应付主节点陷入网络分区后重新恢复，但另外一部分节点仍然有多数派，且已经完成了重新选主的情况，此时必须以任期编号大的主节点为准。当节点有了选主机制的支持，在整体来看，就可以进一步简化节点角色，不去区分提案、决策和记录节点了，统统以“节点”来代替，节点只有主（Leader）和从（Follower）的区别，此时协商共识的时序图如下图所示。</p>
+<p><img src="/images/DataIntensiveApplications/%E6%9C%89%E9%80%89%E4%B8%BB%E6%9C%BA%E5%88%B6%E7%9A%84%E5%8D%8F%E5%95%86%E5%85%B1%E8%AF%86%E7%9A%84%E6%97%B6%E5%BA%8F%E5%9B%BE.png"></p>
+<p>在这个理解的基础上，我们换一个角度来重新思考“分布式系统中如何对某个值达成一致”这个问题，可以把该问题划分做三个子问题来考虑，可以证明（具体证明就不列在这里了，感兴趣的读者可参考结尾给出的论文）当以下三个问题同时被解决时，即等价于达成共识：</p>
+<ul>
+<li>如何选主（Leader Election）。</li>
+<li>如何把数据复制到各个节点上（Entity Replication）。</li>
+<li>如何保证过程是安全的（Safety）。</li>
+</ul>
+<p>选主问题尽管还涉及许多工程上的细节，譬如心跳、随机超时、并行竞选，等等，但要只论原理的话，如果你已经理解了 Paxos 算法的操作步骤，相信对选主并不会有什么疑惑，因为这本质上仅仅是分布式系统对“谁来当主节点”这件事情的达成的共识而已，我们在前一节已经花了数千字来讲述分布式系统该如何对一件事情达成共识，这里就不重复赘述了，下面直接来解决数据（Paxos 中的提案、Raft 中的日志）在网络各节点间的复制问题。</p>
+<p>在正常情况下，当客户端向主节点发起一个操作请求，譬如提出“将某个值设置为 X”，此时主节点将 X 写入自己的变更日志，但先不提交，接着把变更 X 的信息在下一次心跳包中广播给所有的从节点，并要求从节点回复确认收到的消息，从节点收到信息后，将操作写入自己的变更日志，然后给主节点发送确认签收的消息，主节点收到过半数的签收消息后，提交自己的变更、应答客户端并且给从节点广播可以提交的消息，从节点收到提交消息后提交自己的变更，数据在节点间的复制宣告完成。</p>
+<p>在异常情况下，网络出现了分区，部分节点失联，但只要仍能正常工作的节点的数量能够满足多数派（过半数）的要求，分布式系统就仍然可以正常工作，这时候数据复制过程如下：</p>
+<ul>
+<li>假设有 S1、S2、S3、S4、S5 五个节点，S1 是主节点，由于网络故障，导致 S1、S2和 S3、S4、S5之间彼此无法通信，形成网络分区。</li>
+<li>一段时间后，S3、S4、S5三个节点中的某一个（譬如是 S3）最先达到心跳超时的阈值，获知当前分区中已经不存在主节点了，它向所有节点发出自己要竞选的广播，并收到了 S4、S5节点的批准响应，加上自己一共三票，即得到了多数派的批准，竞选成功，此时系统中同时存在 S1和 S3两个主节点，但由于网络分区，它们不会知道对方的存在。</li>
+<li>这种情况下，客户端发起操作请求：<ul>
+<li>如果客户端连接到了 S1、S2之一，都将由 S1处理，但由于操作只能获得最多两个节点的响应，不构成多数派的批准，所以任何变更都无法成功提交。</li>
+<li>如果客户端连接到了 S3、S4、S5之一，都将由 S3处理，此时操作可以获得最多三个节点的响应，构成多数派的批准，是有效的，变更可以被提交，即系统可以继续提供服务。</li>
+<li>事实上，以上两种“如果”情景很少机会能够并存。网络分区是由于软、硬件或者网络故障而导致的，内部网络出现了分区，但两个分区仍然能分别与外部网络的客户端正常通信的情况甚为少见。更多的场景是算法能容忍网络里下线了一部分节点，按照这个例子来说，如果下线了两个节点，系统正常工作，下线了三个节点，那剩余的两个节点也不可能继续提供服务了。</li>
+</ul>
+</li>
+<li>假设现在故障恢复，分区解除，五个节点可以重新通信了：<ul>
+<li>S1和 S3都向所有节点发送心跳包，从各自的心跳中可以得知两个主节点里 S3的任期编号更大，它是最新的，此时五个节点均只承认 S3是唯一的主节点。</li>
+<li>S1、S2回滚它们所有未被提交的变更。</li>
+<li>S1、S2从主节点发送的心跳包中获得它们失联期间发生的所有变更，将变更提交写入本地磁盘。</li>
+<li>此时分布式系统各节点的状态达成最终一致。</li>
+</ul>
+</li>
+</ul>
+<p>下面我们来看第三个问题：“如何保证过程是安全的”，不知你是否感觉到这个问题与前两个存在一点差异？选主、数据复制都是很具体的行为，但是“安全”就很模糊，什么算是安全或者不安全？</p>
+<p>在分布式理论中，<code>Safety</code>和<code>Liveness</code>两种属性是有预定义的术语，在专业的资料中一般翻译成“协定性”和“终止性”，这两个概念也是由 Lamport 最先提出，当时给出的定义是：</p>
+<ul>
+<li>协定性（Safety）：所有的坏事都不会发生（something “bad” will never happen）。</li>
+<li>终止性（Liveness）：所有的好事都终将发生，但不知道是啥时候（something “good” will must happen, but we don’t know when）。</li>
+</ul>
+<p>这种就算解释了你也看不明白的定义，是不是很符合 Lamport 老爷子一贯的写作风格？（笔者无奈地摊手苦笑）。我们不去纠结严谨的定义，仍通过举例来说明它们的具体含义。譬如以选主问题为例，Safety 保证了选主的结果一定是有且只有唯一的一个主节点，不可能同时出现两个主节点；而 Liveness 则要保证选主过程是一定可以在某个时刻能够结束的。由前面对活锁的介绍可以得知，在 Liveness 这个属性上选主问题是存在理论上的瑕疵的，可能会由于活锁而导致一直无法选出明确的主节点，所以 Raft 论文中只写了对 Safety 的保证，但由于工程实现上的处理，现实中是几乎不可能会出现终止性的问题。</p>
+<h1 id="Raft"><a href="#Raft" class="headerlink" title="Raft"></a>Raft</h1><p>Raft 算法可以理解为基于复制状态机（Replicated State Machine）的 Paxos 算法工业级实现。它将 consensus &amp; fault-tolerance 分解为三个子问题：Leader 选举（Leader Election）、日志同步（Log Replication）、安全性（Safety）。并提供了三个工程实践中实际问题的解决方案：日志压缩（Log Compaction）、成员变更（Membership Change）、线性一致性等（Linear Consistency）。</p>
+<blockquote>
+<p>Raft动画讲解 <a target="_blank" rel="noopener" href="http://thesecretlivesofdata.com/raft/">Raft Live</a></p>
+<p>Raft演示操作 <a target="_blank" rel="noopener" href="https://raft.github.io/raftscope/index.html">Raft Scope</a></p>
+<p>Raft Blog  <a target="_blank" rel="noopener" href="https://raft.github.io/">https://raft.github.io</a></p>
+</blockquote>
+<h2 id="Leader选举"><a href="#Leader选举" class="headerlink" title="Leader选举"></a>Leader选举</h2><p>原因和单体架构相同，如果 Leader 宕机，会导致整个服务不可用。因此需要有 Leader 选举的机制来保证集群的可用性。</p>
+<p><strong>那么，Leader 如何选举呢？</strong></p>
+<p>好，现在我们依旧拿民主议会来比喻 Leader 的选举过程。我们需要留意以下三个角色：参选者（Candidate）、议长（Leader）、Follower（议员）。当在议会成立之初，只有议员（Follower）参会。但大家很闲散，经常不按要求发言，议会很难进行下去。于是议员们想通过民主的方式选举一个议长（Leader）来负责召集议员并主持会议，保证会议可以顺利进行。议员们可以自由的参与竞选，当参选者（Candidate）得到超过半数的议员支持就可以当选议长。当然，议员们也需要遵守投票规则：先到先得（first-come-first-served），即一轮选举只给“先到”的参选者投票。等到议长离职后，民主议会也会重新竞选新的议长。</p>
+<p><strong>Raft 随机节点参选</strong></p>
+<p>我们知道集群每个节点的状态都只能是 leader、follower 或 candidate。</p>
+<ul>
+<li><p>参选者（Candidate）：如果 follower 在一定时间内没有收到 leader 的心跳（也被称作 election timeout），则认为 leader 可能已经故障，此时启动 leader election 过程，任期（term）自增一，本节点切换为 candidate。如果一轮选举没有产生 Leader，会继续等待超时完成新一轮的选举。</p>
+<blockquote>
+<p>选举的轮数被称作任期</p>
+</blockquote>
+</li>
+<li><p>议长（Leader）：当系统中选举出 leader 后，会向其他节点发送选举成功的消息。其他节点会自动切换为 follower。</p>
+</li>
+<li><p>议员（Follower）：从 leader 或者 candidate 接收到请求就会重置自身超时计时器。</p>
+</li>
+</ul>
+<p>那么节点什么时候会处于哪种状态呢？下图展示了一个节点可能发生的状态转换：</p>
+<p><img src="/images/DistributedSystem/StateTransition.png"></p>
+<h3 id="Follower-状态转换过程"><a href="#Follower-状态转换过程" class="headerlink" title="Follower 状态转换过程"></a>Follower 状态转换过程</h3><p>Raft 的选主基于一种心跳机制，集群中每个节点刚启动时都是 follower 身份（<strong>Step: starts up</strong>），leader 会周期性的向所有节点发送心跳包来维持自己的权威，那么首个 leader 是如何被选举出来的呢？方法是如果一个 follower 在一段时间内没有收到任何心跳，也就是选举超时，那么它就会主观认为系统中没有可用的 leader，并发起新的选举（<strong>Step: times out, starts election</strong>）。</p>
+<p>这里有一个问题，即这个“选举超时时间”该如何制定？如果所有节点在同一时刻启动，经过同样的超时时间后同时发起选举，整个集群会变得低效不堪，极端情况下甚至会一直选不出一个主节点。Raft 巧妙的使用了一个随机化的定时器，让每个节点的“超时时间”在一定范围内随机生成，这样就大大的降低了多个节点同时发起选举的可能性。</p>
+<blockquote>
+<p>但是，过多的节点处在过短的超时时间区间内，会大大增加多个节点同时发起选举的可能性。而过长的超时时间会造成每次选举的时间过长，同样也会增加碰撞后再次选举时的时间。</p>
+</blockquote>
+<img src="/images/DistributedSystem/RaftScope1.png" style="zoom:50%;" />
+
+<p><em>图：一个五节点 Raft 集群的初始状态，所有节点都是 follower 身份，term 为 1，且每个节点的选举超时定时器不同</em></p>
+<p>若 follower 想发起一次选举，follower 需要在定时器超时后，增加自己的当前 term，并将身份切换为 candidate。然后它会向集群其它节点发送“投票请求”（RequestVote RPC）。</p>
+<img src="/images/DistributedSystem/RaftScope2.png" style="zoom:50%;" />
+
+<p><em>图：S1 率先超时，变为 candidate，term + 1，并向其它节点发出拉票请求</em></p>
+<h3 id="Candidate-状态转换过程"><a href="#Candidate-状态转换过程" class="headerlink" title="Candidate 状态转换过程"></a>Candidate 状态转换过程</h3><p>follower 切换为 candidate 并向集群其他节点发送“请给自己投票”的消息后，接下来会有三种可能的结果，也即上面节点状态图中 candidate 状态向外伸出的三条线。</p>
+<p><strong>1. 选举成功（Step: receives votes from majority of servers）</strong></p>
+<p>当 candidate 从整个集群的大多数（N&#x2F;2+1）节点获得了针对同一 term 的选票时，它就赢得了这次选举，立刻将自己的身份转变为 leader 并开始向其它节点发送心跳来维持自己的权威。</p>
+<img src="/images/DistributedSystem/RaftScope3.png" style="zoom:50%;" />
+
+<p><em>图：“大部分”节点都给了 S1 选票</em></p>
+<img src="/images/DistributedSystem/RaftScope4.png" style="zoom:50%;" />
+
+<p><em>图：S1 变为 leader，开始发送心跳维持权威</em></p>
+<p>每个节点针对每个 term 只能投出一张票，并且按照先到先得的原则。这个规则确保只有一个 candidate 会成为 leader。</p>
+<p><strong>2. 选举失败（Step: discovers current leader or new term）</strong></p>
+<p>Candidate 在等待投票回复的时候，可能会突然收到其它自称是 leader 的节点发送的心跳包，如果这个心跳包里携带的 term 不小于 candidate 当前的 term，那么 candidate 会承认这个 leader，并将身份切回 follower。这说明其它节点已经成功赢得了选举，我们只需立刻跟随即可。但如果心跳包中的 term 比自己小，candidate 会拒绝这次请求并保持选举状态。</p>
+<img src="/images/DistributedSystem/RaftScope5.png" style="zoom:50%;" />
+
+<p><em>图：S4、S2 依次开始选举</em></p>
+<img src="/images/DistributedSystem/RaftScope6.png" style="zoom:50%;" />
+
+<p><em>图：S4 成为 leader，S2 在收到 S4 的心跳包后，由于 term 不小于自己当前的 term，因此会立刻切为 follower 跟随 S4</em></p>
+<p><strong>3. 选举超时（Step: times out, new election）</strong></p>
+<p>第三种可能的结果是 candidate 既没有赢也没有输。如果有多个 follower 同时成为 candidate，选票是可能被瓜分的，如果没有任何一个 candidate 能得到大多数节点的支持，那么每一个 candidate 都会超时。此时 candidate 需要增加自己的 term，然后发起新一轮选举。如果这里不做一些特殊处理，选票可能会一直被瓜分，导致选不出 leader 来。这里的“特殊处理”指的就是前文所述的<strong>随机化选举超时时间</strong>。</p>
+<img src="/images/DistributedSystem/RaftScope7.png" style="zoom:50%;" />
+
+
+
+<p><em>图：S1 ~ S5 都在参与选举，没有任何节点愿意给他人投票</em></p>
+<img src="/images/DistributedSystem/RaftScope8.png" style="zoom:50%;" />
+
+<p><em>图：如果没有随机化超时时间，所有节点将会继续同时发起选举……</em></p>
+<h3 id="Leader状态转换过程"><a href="#Leader状态转换过程" class="headerlink" title="Leader状态转换过程"></a>Leader状态转换过程</h3><p>节点状态图中的最后一条线是：<strong>discovers server with higher term</strong>。</p>
+<p><strong>1. 下线节点再次上线，且 term 等于当前 Leader 节点</strong></p>
+<img src="/images/DistributedSystem/RaftScope9.png" style="zoom:50%;" />
+
+<p><em>图：直接 follow 当前 leader 即可</em></p>
+<p><strong>2. 下线节点再次上线，且 term 小于当前 Leader 节点</strong></p>
+<img src="/images/DistributedSystem/RaftScope10.png" style="zoom:50%;" />
+
+<p><em>图：下线节点 S2 恢复后自动切换为 follower</em></p>
+<img src="/images/DistributedSystem/RaftScope11.png" style="zoom:50%;" />
+
+<p><em>图：在接收到当前 leader 的心跳后，将自己的 term 修改为心跳信息中包含的 leader term（简称为接受心跳信息中的 leader term）并 follow 该 leader。</em></p>
+<p><strong>3. 下线节点再次上线，且 term 大于当前 Leader 节点</strong></p>
+<img src="/images/DistributedSystem/RaftScope12.png" style="zoom:50%;" />
+
+<p><em>图：下线节点 S5 恢复后自动切换为 follower</em></p>
+<img src="/images/DistributedSystem/RaftScope13.png" alt="image-20210512125040563" style="zoom:50%;" />
+
+<p><em>图：S4 向 S5 发送心跳包并将 S5 的 term 值当作响应，S4 接受 S5 响应中更高的 term，并且状态由 leader 转为 follower</em></p>
+<img src="/images/DistributedSystem/RaftScope14.png" alt="image-20210512125110559" style="zoom:50%;" />
+
+<p><em>图：S1 刚好 election timeout，状态由 follower 转为 candidate，并向其他节点发起投票请求</em></p>
+<img src="/images/DistributedSystem/RaftScope15.png" style="zoom:50%;" />
+
+<p>此时的场景有两种情况：</p>
+<ol>
+<li><p>S4 或 S5 的响应先到</p>
+<p>如果 follower 拥有更高的 term，会拒绝投同意票，并将自己更高的 term 值响应给 candidate。candidate 在收到更高 term 值的响应后，接受更高的 term，并且状态由 candidate 转为 follower。</p>
+</li>
+<li><p>S2 及 S3 的响应先到</p>
+<p>S1 在 election timeout 期间收到了大多数的同意票，当选 term 5 的 leader，随后接受 S4 或 S5 更高的 term，并且状态由 leader 转为 follower。</p>
+</li>
+</ol>
+<p><em>图：情况不同，结果相同，S1 的 term -&gt; highest 且 state -&gt; follower</em></p>
+<img src="/images/DistributedSystem/RaftScope16.png" style="zoom:50%;" />
+
+<p><em>图：S4 超时 term+1，state 转为 candidate 并发起投票</em></p>
+<img src="/images/DistributedSystem/RaftScope17.png" style="zoom:50%;" />
+
+<p><em>图：其他节点接受更高的 term，并投同意票，S4 最终当选 leader</em></p>
+<h3 id="Rank-System"><a href="#Rank-System" class="headerlink" title="Rank System"></a>Rank System</h3><p>论文中提到可以使用 Rank System 来给系统提供优先级的功能。每一个 candidate 需要指定一个 rank，如果在 election 的过程中，出现了多个 candidate，low rank 的 candidate 在接收到 higher rank 的 candidate 请求后会直接转换为 follower。这使得 high rank 的 candidate 可以很轻易地赢得选举，避免了 election timeout 相对区间太短导致的选举时 split votes 情况。</p>
+<blockquote>
+<p>这其实涉及到了一个新的问题：如果一个 highest rank 节点出现了反复下、上线的异常行为，当所在的集群需要重新选举时，异常的 high rank node 会不断的将 candidate 降级为 follower，导致选举反复失败，系统长时间不可用。</p>
+<p>注意：该场景比较极端且这种几率非常小，只是做理论上的分析。</p>
+</blockquote>
+<h2 id="状态机机制"><a href="#状态机机制" class="headerlink" title="状态机机制"></a>状态机机制</h2><p>当选举出 leader 后，就需要由状态机来保证整个 distributed system 的一致性。Raft 算法是基于复制状态机（Replicated State Machine）模型进行了实现。replicated state machine 将系统执行的指令包装成 log 记录在持久化存储中，在系统运行的过程中，只需要保证所有节点 log 的索引（index）和任期（term）一致，就可以在状态机按次序执行 log 后，保证状态机状态的一致性。</p>
+<p><img src="/images/DistributedSystem/ReplicatedStateMachine.png"></p>
+<p>我们曾提到过：Raft 赋予了 leader 节点 Strong Leader 的特性。因此 Raft 保证 log 一致的方式其实就是：将所有 log 都交给 leader 节点处理，并由 leader 节点复制给其它节点。这个过程称做日志复制（Log replication）。</p>
+<h3 id="Raft-日志复制机模型"><a href="#Raft-日志复制机模型" class="headerlink" title="Raft 日志复制机模型"></a>Raft 日志复制机模型</h3><h3 id="整体流程解析"><a href="#整体流程解析" class="headerlink" title="整体流程解析"></a>整体流程解析</h3><p>一旦 leader 被票选出来，它就承担起领导整个集群的责任了，开始接收客户端请求，并将操作包装成日志，并复制到其它节点上去。</p>
+<p>整体流程如下：</p>
+<ul>
+<li>Leader 接收客户端发送的 command，并将其封装为一条新日志 append 到自身的 log collection。</li>
+<li>append 操作成功后，向其它节点发起<strong>附加条目请求（AppendEntries RPC）</strong>，来要求它们将这条日志附加到各自本地的日志集合。</li>
+<li>当这条日志已经确保被安全地复制，即大多数（N&#x2F;2+1）节点都已经复制后，leader 会将该日志 apply 到它本地的状态机中，然后把操作成功的结果返回给客户端。</li>
+</ul>
+<p>整个集群的日志模型可以宏观表示为下图（x ← 3 代表 x 赋值为 3）：</p>
+<p><img src="/images/DistributedSystem/raft%E6%97%A5%E5%BF%97%E6%A8%A1%E5%9E%8B.png"></p>
+<p>每条日志会储存以下内容：</p>
+<ol>
+<li>全局唯一的日志索引（log index）：代表在日志集合中的位置</li>
+<li>任期号（term）：代表 leader 收到这条指令时的任期</li>
+</ol>
+<p>当一条日志由 leader 广播被集群过半的节点复制成功时，leader 会认为该日志可以安全地 apply 到状态机，并且称这条日志是 committed。</p>
+<blockquote>
+<p>Raft 保证所有 committed 日志都已经被<strong>持久化</strong>，且“<strong>最终</strong>”一定会被状态机apply。</p>
+<p><em>注：这里的“最终”用词很微妙，它表明了一个特点：Raft 保证的只是集群内日志的一致性，而我们真正期望的集群对外的状态机一致性需要我们做一些额外工作，这一点在《线性一致性与读性能优化》一章会着重介绍。</em></p>
+</blockquote>
+<p>如果 follower 在 log 附加的 index 和 term 中没有找到对应的日志，先拒绝。</p>
+<h3 id="正向流程的日志复制流程"><a href="#正向流程的日志复制流程" class="headerlink" title="正向流程的日志复制流程"></a>正向流程的日志复制流程</h3><p>我们通过 Raft 动画来模拟常规日志复制这一过程：</p>
+<p><img src="/images/DistributedSystem/RaftScope18.png"></p>
+<p>如上图，S1 当选 leader，此时还没有任何日志。我们模拟客户端向 S1 发起一个请求。</p>
+<p><img src="/images/DistributedSystem/RaftScope19.png"></p>
+<p>S1 收到客户端请求后新增了一条日志 (term2, index1)，然后并行地向其它节点发起 AppendEntries RPC。</p>
+<p><img src="/images/DistributedSystem/RaftScope20.png"></p>
+<p>S2 率先收到了请求，附加了该日志，并向 S1 回应响应</p>
+<p><img src="/images/DistributedSystem/RaftScope21.png"></p>
+<p>所有节点都附加了该日志，但由于 leader 尚未收到任何响应，因此暂时还不清楚该日志到底是否被成功复制。</p>
+<p><img src="/images/DistributedSystem/RaftScope22.png"></p>
+<p>当 S1 收到 2 个节点的响应时，该日志条目的边框就已经变为实线，表示该日志已经安全的复制，因为在 5 节点集群中，2 个 follower 节点加上 leader 节点自身，副本数已经确保过半，此时 S1 将响应客户端的请求。</p>
+<p><img src="/images/DistributedSystem/RaftScope23.png"></p>
+<p>此时，S1 收到了来自其他所有节点的响应。</p>
+<p><img src="/images/DistributedSystem/RaftScope24.png"></p>
+<p>leader 后续会持续发送心跳包给 followers，心跳包中会携带当前已经安全复制（我们称之为 committed）的日志索引，此处为 $(term2, index1)$。</p>
+<p><img src="/images/DistributedSystem/RaftScope25.png"></p>
+<p>所有 follower 都通过心跳包得知 $(term2, index1)$ 的 log 已经成功复制 （committed），因此所有节点中该日志条目的边框均变为实线。</p>
+<h2 id="安全性（Safety）"><a href="#安全性（Safety）" class="headerlink" title="安全性（Safety）"></a>安全性（Safety）</h2><p>在所有节点正常工作的时候，leader 和 follower的日志总是保持一致，AppendEntries RPC 也永远不会失败。然而我们总要面对任意节点随时可能宕机的风险，如何在这种情况下继续保持集群日志的一致性才是我们真正要解决的问题。</p>
+<h3 id="对日志一致性的保证"><a href="#对日志一致性的保证" class="headerlink" title="对日志一致性的保证"></a>对日志一致性的保证</h3><p>表示一条日志条目，这里为什么要使用（term，log index）的形式，而不只是用 log index？原因如下：</p>
+<p><strong>Raft 保证在如果不同的节点日志集合中的两个日志条目拥有相同的 term 和 index，那么它们一定存储了相同的指令，并且它们之前的所有日志条目也全部相同。</strong></p>
+<p>这是因为 leader 发出的 AppendEntries RPC 中会额外携带上一条日志的 (term, log index)，如果 follower 在本地找不到相同的 (term, log index) 日志，则拒绝接收这次新的日志。数学归纳法可证明。</p>
+<h3 id="可能的日志不一致场景"><a href="#可能的日志不一致场景" class="headerlink" title="可能的日志不一致场景"></a>可能的日志不一致场景</h3><p>前面的章节我们讲述了 Raft 算法复制日志的正向流程，然而到目前为止我们并没有讨论描述的 replicated state mechine 的严谨性，我们还不能确定每个节点的状态机会严格按照相同的顺序 apply 日志。Raft 使用 term 和 log index 来保证日志的一致性。由于网络的不确定性，对于这两个值的不同状态，全排列有以下 9 种情况。我们通过对以下情况的叙述并附加限制来保证日志的一致性。</p>
+<p><strong>1. 同一 term 时，leader index &#x3D; follower</strong></p>
+<blockquote>
+<p>系统正常且未收到客户端请求</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope26.png"></p>
+<p><strong>2. 同一 term 时，leader index &lt; follower</strong></p>
+<blockquote>
+<p>根据日志复制流程，日志是从 leader 复制到 follower 的。如果在 leader 不改变的情况下（也就是 term 相同），不可能 follower log index &gt; leader index 的情况。</p>
+</blockquote>
+<p><strong>3. 同一 term 时，leader index &gt; follower</strong></p>
+<blockquote>
+<p>系统正常且收到客户端请求</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope27.png"></p>
+<p>会按照流程，向 follower 发起 2PC 流程。</p>
+<p><strong>4. leader term &gt; follower，但 leader index &#x3D; follower</strong></p>
+<blockquote>
+<p>follower 下线一段时间后上线，这期间集群经过多轮选举。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope28.png"></p>
+<p>由于日志并无变化，并不涉及到日志不同步问题。follower 会在接收到 leader 心跳后，接受 leader 更高的 term。</p>
+<p><strong>5. leader term &gt; follower，但 leader index &gt; follower</strong></p>
+<blockquote>
+<p>S3 在 term 2 时下线，集群在发生过一轮选举并接收了一些客户端请求 后，S3 重新上线。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope29.png"></p>
+<p><em>图：S1 在 S3 上线后发送心跳请求。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope30.png"></p>
+<p><em>图：S3 在收到心跳后接收 term 并同步缺少的 log。</em></p>
+<p>leader 的 term 高于 follower，会在传递心跳信息后接受 leader 的 term。并如情况 5 时找到 leader 与 follower 一致的 log index，删除不一致的内容并同步 leader 日志。</p>
+<p>注：以上所说的不一致情况，只包含系统在随机的上线和下线后导致的不一致情况。脑裂和成员变更等情况不考虑在内。</p>
+<p><strong>6. leader term &gt; follower，但 leader index &lt; follower</strong></p>
+<blockquote>
+<p>leader S1 在 term 2 时接收多个客户端请求后未 commit 下线，剩余节点在 term 3 选举 S3 为 leader 后，S1 上线。 </p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope31.png"></p>
+<p><em>图：原场景</em></p>
+<p><img src="/images/DistributedSystem/RaftScope32.png"></p>
+<p><em>图：接受 S3 心跳包中 term，不对 S1 中的日志进行操作，因为 <strong>leader 只允许 commit 包含当前 term 的日志。</strong></em></p>
+<p>注：此 leader 行为详情请看《对提交的限制》节 </p>
+<p><em>图：初始化所有 next index 值为自身最后一条 log index + 1。</em></p>
+<blockquote>
+<p>但凡某个 follower 的日志跟 leader 不一致，那么下次 AppendEntries RPC 的一致性检查就会失败。在被 follower 拒绝这次 Append Entries RPC 后，leader 会减少 next index 的值并进行重试。</p>
+<p>最终一定会存在一个 next index 使得 leader 和 follower 在这之前的日志都保持一致。极端情况下 next index 为 1，表示 follower 没有任何日志与 leader 一致，leader 必须从第一条日志开始同步。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope33.png"></p>
+<p><em>图：S3 接收客户端请求，日志不一致。</em></p>
+<p>针对每个 follower，一旦确定了 next index 的值，leader 便开始从该 index 同步日志，follower 会删除掉现存的不一致的日志，保留 leader 最新同步过来的。</p>
+<p><img src="/images/DistributedSystem/RaftScope34.png"></p>
+<p><em>图：S1 发现自身与 leader 不一致的日志，直接删除并与 leader 同步。</em></p>
+<p>整个集群的日志会在这个简单的机制下自动趋于一致。此外要注意，leader 从来不会覆盖或者删除自己的日志，而是强制 follower 与它保持一致。</p>
+<p><img src="/images/DistributedSystem/RaftScope35.png"></p>
+<p><em>图：S1 日志与 leader 保持同步。</em></p>
+<p>注：日志操作详情请看《对行为的限制》</p>
+<p><strong>7. leader term &lt; follower，但 leader index &#x3D; follower</strong></p>
+<blockquote>
+<p>S2 与集群发生网络分区，S2 与其他节点无法相互访问。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope36.png"></p>
+<p><em>图：S2 在网络分区期间不断进行 eletion timeout，而集群的其他节点正常运行。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope37.png"></p>
+<p><em>图：由于 term 号高于其他节点且 log 一致，在收到 S2 的投票信息后，其他节点（包括曾经的 leader S5）直接转为 S2 的 follower。</em></p>
+<p><strong>8. leader term &lt; follower，但 leader index &lt; follower</strong></p>
+<blockquote>
+<p>S1 是 term 2 的 leader，接受了几个客户端请求后网络分区，期间宕机后又上线。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope38.png"></p>
+<p><em>图：S1 恢复与其他节点的网络联通。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope39.png"></p>
+<p><em>图：因为 term 号大于其他节点且 log index 新，整个集群接受其 term 并推举它为 leader。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope40.png"></p>
+<p><em>图：当前集群 leader 储存的 log next index 为 6，follower 需要从 log index 1 来同步 leader 日志。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope41.png"></p>
+<p><em>图：同步完成，但不提交。因为 leader 不能提交之前 term 的日志。</em></p>
+<p>注：此 leader 行为详情请看《对提交的限制》节 </p>
+<p><img src="/images/DistributedSystem/RaftScope43.png"></p>
+<p><em>图：之前 term 的日志即使被复制给了大多数节点，也必须等待当前 leader 对应的 term 请求来了一并提交。</em></p>
+<p><strong>9. leader term &lt; follower，但 leader index &gt; follower</strong></p>
+<blockquote>
+<p>S2 与集群发生网络分区，S2 与其他节点无法相互访问，后网络分区恢复。</p>
+</blockquote>
+<p><img src="/images/DistributedSystem/RaftScope44.png"></p>
+<p><em>图：S2 恢复与其他节点的通信。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope45.png"></p>
+<p><em>图：其他节点接受 S2 的最新 term，但由于 log 比 S2 新，均拒绝投票。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope46.png"></p>
+<p><em>图：term 11 并无 leader 选出，超时后 term + 1 继续下一轮选举。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope47.png"></p>
+<p><em>图：S1 多票当选 term 12 leader。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope48.png"></p>
+<p><em>图：S2 发现与 leader S1 的 log index 不一致。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope49.png"></p>
+<p><em>图：S2 后退一位继续检测与 S1 log 是否一致，结果依旧不一致。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope50.png"></p>
+<p><em>图：直到后退到 log index 1，开始同步 leader 日志。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope51.png"></p>
+<p><em>图：同步 log index 1 上的日志。同步期间不接受 leader 的新的客户端请求。</em></p>
+<p><img src="/images/DistributedSystem/RaftScope52.png"></p>
+<p><em>图：log全部同步完成。</em></p>
+<h3 id="如何处理日志不一致"><a href="#如何处理日志不一致" class="headerlink" title="如何处理日志不一致"></a>如何处理日志不一致</h3><p>通过上述场景我们可以看到，真实世界的集群情况很复杂，而 Raft 通过几个限制来保证日志的最新和一致。</p>
+<h4 id="对提交的限制"><a href="#对提交的限制" class="headerlink" title="对提交的限制"></a>对提交的限制</h4><p>所谓 commit 其实就是对日志简单进行一个标记，表明其可以被 apply 到状态机，并针对相应的客户端请求进行响应。然而 leader 并不能在任何时候都随意 commit 旧任期留下的日志，即使它已经被复制到了大多数节点。Raft 论文给出了一个经典场景：</p>
+<p><img src="/images/DistributedSystem/%E5%AF%B9%E6%8F%90%E4%BA%A4%E9%99%90%E5%88%B6%E7%9A%84%E5%8E%9F%E5%9B%A0.png"></p>
+<p>上图从左到右按时间顺序模拟了问题场景。</p>
+<p><strong>阶段a</strong>：S1 是 leader，收到请求后将 (term 2, index 2) 只复制给了 S2，尚未复制给 S3 ~ S5。</p>
+<p><strong>阶段b</strong>：S1 宕机，S5 当选 term3 的 Leader（S3、S4、S5 三票），收到请求后保存了 (term 3, index 2)，尚未复制给任何节点。</p>
+<p><strong>阶段c</strong>：S5 宕机，S1 恢复，S1 重新当选 term 4 的 Leader，继续将 (term 2, index 2) 复制给了 S3，已经满足大多数节点，我们将其 commit。</p>
+<p><strong>阶段d</strong>：S1 又宕机，S5 恢复，S5 重新当选 leader（S2、S3、S4 三票），将 (term 3, index 2) 复制给了所有节点并 commit。注意，此时发生了致命错误，已经 committed 的 (term 2, index 2) 被 (term 3, index 2) 覆盖了。</p>
+<p>为了避免这种错误，我们需要添加一个额外的限制：</p>
+<p><strong>Leader 只允许 commit 包含当前 term 的日志。</strong></p>
+<p>针对上述场景，问题发生在阶段c，即使作为 term4 Leader 的 S1 将 (term 2, index 2) 复制给了大多数节点，它也不能直接将其 commit，而是必须等待 term 4 的日志到来并成功复制后，一并进行 commit。</p>
+<p><strong>阶段e</strong>：在添加了这个限制后，要么 (term 2, index 2) 始终没有被 commit，这样 S5 在阶段 d 将其覆盖就是安全的；要么 (term 2, index 2) 同 (term 4, index 3) 一起被 commit，这样 S5 根本就无法当选 Leader，因为大多数节点的日志都比它新，也就不存在前边的问题了。</p>
+<h4 id="对选举的限制"><a href="#对选举的限制" class="headerlink" title="对选举的限制"></a>对选举的限制</h4><p>我们再来分析下前文所述的 committed 日志被覆盖的场景，根本问题其实发生在第 2 步。Candidate 必须有足够的资格才能当选集群 leader，否则它就会给集群带来不可预料的错误。Candidate 是否具备这个资格可以在选举时添加一个小小的条件来判断，即：</p>
+<p><strong>每个 Candidate 必须在 RequestVote RPC 中携带自己本地日志的最新 (term, index)，如果 follower 发现这个 candidate 的日志还没有自己的新，则拒绝投票给该 Candidate。</strong></p>
+<p>Candidate 想要赢得选举成为 leader，必须得到集群大多数节点的投票，那么<strong>它的日志就一定至少不落后于大多数节点</strong>。又因为一条日志只有复制到了大多数节点才能被 commit，因此<strong>能赢得选举的 Candidate 一定拥有所有 committed 日志</strong>。</p>
+<p>因此 Follower 不可能比 Leader 多出一些 committed 日志。</p>
+<p>判断日志 up-to-date 的方法：<strong>比较两个日志的 (term, index)，如果 term 不同 term 更大的日志更新，否则 index 大的日志更新。</strong></p>
+<h4 id="对行为的限制"><a href="#对行为的限制" class="headerlink" title="对行为的限制"></a>对行为的限制</h4><p>Raft 强制要求 Follower 必须复制 Leader 的日志集合来解决不一致问题。</p>
+<p>Leader 针对每个 Follower 都维护一个 next index（表示下一条需要发送给该 Follower 的日志索引），其值为自己最后一条日志的 log index + 1。要使得 Follower 的日志集合跟自己保持完全一致，Leader 必须先找到二者间最后一次达成一致的地方。而这个操作是通过 Follower 的日志跟 Leader 不一致，导致 AppendEntries RPC 的一致性检查失败，在被 Follower 拒绝这次 AppendEntries RPC 后，Leader 会减少 next index 的值并进行重试达成的。</p>
+<p>Follower 节点上任何与 Leader 不一致的日志，都会被 Leader 节点上的日志所删除，当然被删除的只会是 uncommitted log。在删除不一致的日志后，完成与 Leader 日志的同步。</p>
+<blockquote>
+<p>注意：Leader 从来不会覆盖或者删除自己的日志，而是强制 Follower 与它保持一致。这就要求集群票选出的 Leader 一定要具备“日志的正确性”，这也就关联到了前文提到的：对选举的限制。</p>
+</blockquote>
+<h4 id="对时间设定的限制"><a href="#对时间设定的限制" class="headerlink" title="对时间设定的限制"></a>对时间设定的限制</h4><p>Raft 的要求之一就是安全性不能依赖时间：整个系统不能因为某些事件运行的比预期快一点或者慢一点就产生了错误的结果。但是，可用性（系统可以及时的响应客户端）不可避免的要依赖于时间。例如，如果消息交换比服务器故障间隔时间长，候选人将没有足够长的时间来赢得选举；没有一个稳定的领导人，Raft 将无法工作。</p>
+<p>领导人选举是 Raft 中对时间要求最为关键的方面。Raft 可以选举并维持一个稳定的领导人,只要系统满足下面的时间要求：</p>
+<blockquote>
+<p>广播时间（broadcastTime） &lt;&lt; 选举超时时间（electionTimeout） &lt;&lt; 平均故障间隔时间（MTBF）</p>
+</blockquote>
+<p>在这个不等式中，广播时间指的是从一个服务器并行的发送 RPCs 给集群中的其他服务器并接收响应的平均时间；选举超时时间是选举的超时时间限制；然后平均故障间隔时间就是对于一台服务器而言，两次故障之间的平均时间。广播时间必须比选举超时时间小一个量级，这样领导人才能够发送稳定的心跳消息来阻止跟随者开始进入选举状态；通过随机化选举超时时间的方法，这个不等式也使得选票瓜分的情况变得不可能。选举超时时间应该要比平均故障间隔时间小上几个数量级，这样整个系统才能稳定的运行。当领导人崩溃后，整个系统会大约相当于选举超时的时间里不可用；我们希望这种情况在整个系统的运行中很少出现。</p>
+<p>广播时间和平均故障间隔时间是由系统决定的，但是选举超时时间是我们自己选择的。Raft 的 RPCs 需要接收方将信息持久化的保存到稳定存储中去，所以广播时间大约是 0.5 毫秒到 20 毫秒，取决于存储的技术。因此，选举超时时间可能需要在 10 毫秒到 500 毫秒之间。大多数的服务器的平均故障间隔时间都在几个月甚至更长，很容易满足时间的需求。</p>
+<h2 id="集群成员变更与日志压缩"><a href="#集群成员变更与日志压缩" class="headerlink" title="集群成员变更与日志压缩"></a>集群成员变更与日志压缩</h2><p>尽管我们已经通过前几章了解了 Raft 算法的核心部分，但相较于算法理论来说，在工程实践中仍有一些现实问题需要我们去面对。Raft 非常贴心的在论文中给出了两个常见问题的解决方案，它们分别是：</p>
+<ul>
+<li><strong>集群成员变更</strong>：如何安全地改变集群的节点成员。</li>
+<li><strong>日志压缩</strong>：如何解决日志集合无限制增长带来的问题。</li>
+</ul>
+<h3 id="集群成员变更"><a href="#集群成员变更" class="headerlink" title="集群成员变更"></a>集群成员变更</h3><p>在前文的理论描述中我们都假设了集群成员是不变的，然而在实践中有时会需要替换宕机机器或者改变复制级别（即增减节点）。一种最简单暴力达成目的的方式就是：停止集群、改变成员、启动集群。这种方式在执行时会导致集群整体不可用，此外还存在手工操作带来的风险。</p>
+<p>为了避免这样的问题，Raft 论文中给出了一种无需停机的、自动化的改变集群成员的方式，其实本质上还是利用了 Raft 的核心算法，将集群成员配置作为一个特殊日志从 leader 节点同步到其它节点去。</p>
+<h4 id="直接切换集群成员配置"><a href="#直接切换集群成员配置" class="headerlink" title="直接切换集群成员配置"></a>直接切换集群成员配置</h4><p>先说结论：<strong>所有将集群从旧配置直接完全切换到新配置的方案都是不安全的</strong>。</p>
+<p>因此我们不能想当然的将新配置直接作为日志同步给集群并 apply。因为我们不可能让集群中的全部节点在“<strong>同一时刻</strong>”<strong>原子地</strong>切换其集群成员配置，所以在切换期间不同的节点看到的集群视图可能存在不同，最终可能导致集群存在多个 leader。</p>
+<p>为了理解上述结论，我们来看一个实际出现问题的场景，下图对其进行了展现。</p>
+<p><img src="/images/DistributedSystem/%E6%96%B0%E8%8A%82%E7%82%B9%E6%89%A9%E5%B1%95%E7%9A%84%E8%BF%87%E7%A8%8B.png"></p>
+<p><strong>阶段a</strong>. 集群存在 S1 ~ S3 三个节点，我们将该成员配置表示为 C-old，绿色表示该节点当前视图（成员配置）为 C-old，其中红边的 S3 为 leader。</p>
+<p><strong>阶段b</strong>. 集群新增了 S4、S5 两个节点，该变更从 leader 写入，我们将 S1 ~ S5 的五节点新成员配置表示为 C-new，蓝色表示该节点当前视图为 C-new。</p>
+<p><strong>阶段c</strong>. 假设 S3 短暂宕机触发了 S1 与 S5 的超时选主。</p>
+<p><strong>阶段d</strong>. S1 向 S2、S3 拉票，S5 向其它全部四个节点拉票。由于 S2 的日志并没有比 S1 更新，因此 S2 可能会将选票投给 S1，S1 两票当选（因为 S1 认为集群只有三个节点）。而 S5 肯定会得到 S3、S4 的选票，因为 S1 感知不到 S4，没有向它发送 RequestVote RPC，并且 S1 的日志落后于 S3，S3 也一定不会投给 S1，结果 S5 三票当选。最终集群出现了多个主节点的致命错误，也就是所谓的脑裂。</p>
+<h4 id="两阶段切换集群成员配置（Joint-Consensus）"><a href="#两阶段切换集群成员配置（Joint-Consensus）" class="headerlink" title="两阶段切换集群成员配置（Joint Consensus）"></a>两阶段切换集群成员配置（Joint Consensus）</h4><hr>
+<p><strong>具体流程</strong></p>
+<p><strong>阶段一</strong></p>
+<ol>
+<li>客户端将 C-new 发送给 leader，leader 将 C-old 与 C-new 取并集并立即 apply，我们表示为 C-old,new。</li>
+<li>Leader 将 C-old,new 包装为日志同步给其它节点。</li>
+<li>Follower 收到 C-old,new 后立即 apply，当 C-old,new 的大多数节点（即 C-old 的大多数节点和 C-new 的大多数节点）都切换后，leader 将该日志 commit。</li>
+</ol>
+<p><strong>阶段二</strong></p>
+<ol>
+<li>Leader 接着将 C-new 包装为日志同步给其它节点。</li>
+<li>Follower 收到 C-new 后立即 apply，如果此时发现自己不在 C-new 列表，则主动退出集群。</li>
+<li>Leader 确认 <strong>C-new 的大多数节点</strong>都切换成功后，给客户端发送执行成功的响应。</li>
+</ol>
+<p><img src="/images/DistributedSystem/%E4%BA%8C%E9%98%B6%E6%AE%B5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE.png"></p>
+<p>上图展示了该流程的时间线。虚线表示已经创建但尚未 commit 的成员配置日志，实线表示 committed 的成员配置日志。</p>
+<hr>
+<p><strong>流程安全性分析</strong></p>
+<p><strong>阶段1. C-old,new 尚未 commit</strong></p>
+<p>该阶段所有节点的配置要么是 C-old，要么是 C-old,new，但无论是二者哪种，只要原 leader 发生宕机，新 leader 都<strong>必须得到大多数 C-old 集合内节点的投票</strong>。</p>
+<p>以《直接切换集群成员配置》场景为例，S5 在阶段 d 根本没有机会成为 leader，因为 C-old 中只有 S3 给它投票了，不满足大多数。</p>
+<p><strong>阶段2. C-old,new 已经 commit，C-new 尚未下发</strong></p>
+<p>该阶段 C-old,new 已经 commit，可以确保已经被 C-old,new 的大多数节点（<strong>再次强调：C-old 的大多数节点和 C-new 的大多数节点</strong>）复制。</p>
+<p>因此当 leader 宕机时，新选出的 leader 一定是已经拥有 C-old,new 的节点，不可能出现两个 leader。</p>
+<p><strong>阶段3. C-new 已经下发但尚未 commit</strong></p>
+<p>该阶段集群中可能有三种节点 C-old、C-old,new、C-new，但由于已经经历了阶段2，因此 C-old 节点不可能再成为 leader。而无论是 C-old,new 还是 C-new 节点发起选举，都需要经过大多数 C-new 节点的同意，因此也不可能出现两个 leader。</p>
+<p><strong>阶段4. C-new 已经 commit</strong></p>
+<p>该阶段 C-new 已经被 commit，因此只有 C-new 节点可以得到大多数选票成为 leader。此时集群已经安全地完成了这轮变更，可以继续开启下一轮变更了。</p>
+<h3 id="日志压缩"><a href="#日志压缩" class="headerlink" title="日志压缩"></a>日志压缩</h3><p>我们知道 Raft 核心算法维护了日志的一致性，通过 apply 日志我们也就得到了一致的状态机，客户端的操作命令会被包装成日志交给 Raft 处理。然而在实际系统中，客户端操作是连绵不断的，但日志却不能无限增长，首先它会占用很高的存储空间，其次每次系统重启时都需要完整回放一遍所有日志才能得到最新的状态机。</p>
+<p>因此 Raft 提供了一种机制去清除日志里积累的陈旧信息，叫做<strong>日志压缩</strong>。</p>
+<p><strong>快照（Snapshot）</strong>是一种常用的、简单的日志压缩方式，ZooKeeper、Chubby 等系统都在用。简单来说，就是将某一时刻系统的状态 dump 下来并落地存储，这样该时刻之前的所有日志就都可以丢弃了。所以大家对“压缩”一词不要产生错误理解，我们并没有办法将状态机快照“解压缩”回日志序列。</p>
+<p>注意，在 Raft 中我们只能为 committed 日志做 snapshot，因为只有 committed 日志才是确保最终会应用到状态机的。</p>
+<p><img src="/images/DistributedSystem/%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9.png"></p>
+<p>上图展示了一个节点用快照替换了 (term1, index1) ~ (term3, index5) 的日志。</p>
+<p>快照一般包含以下内容：</p>
+<ul>
+<li><strong>日志的元数据</strong>：最后一条被该快照 apply 的日志 term 及 index</li>
+<li><strong>状态机</strong>：前边全部日志 apply 后最终得到的状态机</li>
+</ul>
+<p>当 leader 需要给某个 follower 同步一些旧日志，但这些日志已经被 leader 做了快照并删除掉了时，leader 就需要把该快照发送给 follower。</p>
+<p>同样，当集群中有新节点加入，或者某个节点宕机太久落后了太多日志时，leader 也可以直接发送快照，大量节约日志传输和回放时间。</p>
+<p>同步快照使用一个新的 RPC 方法，叫做 <strong>InstallSnapshot RPC</strong>。</p>
+<h2 id="线性一致性与读性能优化"><a href="#线性一致性与读性能优化" class="headerlink" title="线性一致性与读性能优化"></a>线性一致性与读性能优化</h2><h3 id="什么是线性一致性？"><a href="#什么是线性一致性？" class="headerlink" title="什么是线性一致性？"></a>什么是线性一致性？</h3><p>在分布式系统中，为了消除单点提高系统可用性，通常会使用副本来进行容错，但这会带来另一个问题，即如何保证多个副本之间的一致性。</p>
+<p>什么是一致性？所谓一致性有很多种模型，不同的模型都是用来评判一个并发系统正确与否的不同程度的标准。而我们今天要讨论的是<strong>强一致性（Strong Consistency）</strong>模型，也就是<strong>线性一致性（Linearizability）</strong>，我们经常听到的 CAP 理论中的 C 指的就是它。</p>
+<p>其实我们在第一篇就已经简要描述过何为线性一致性：</p>
+<p><em>所谓的强一致性（线性一致性）并不是指集群中所有节点在任一时刻的状态必须完全一致，而是指一个目标，即让一个分布式系统看起来只有一个数据副本，并且读写操作都是原子的，这样应用层就可以忽略系统底层多个数据副本间的同步问题。也就是说，我们可以将一个强一致性分布式系统当成一个整体，一旦某个客户端成功的执行了写操作，那么所有客户端都一定能读出刚刚写入的值。即使发生网络分区故障，或者少部分节点发生异常，整个集群依然能够像单机一样提供服务。</em></p>
+<p>“<strong>像单机一样提供服务</strong>”从感官上描述了一个线性一致性系统应该具备的特性，那么我们该如何判断一个系统是否具备线性一致性呢？通俗来说就是不能读到旧（stale）数据，但具体分为两种情况：</p>
+<ul>
+<li>对于调用时间存在重叠（<strong>并发</strong>）的请求，生效顺序可以任意确定。</li>
+<li>对于调用时间存在先后关系（<strong>偏序</strong>）的请求，后一个请求不能违背前一个请求确定的结果。</li>
+</ul>
+<p>下图从客户端的外部视角展示了多个用户同时请求读写一个系统的场景，每条柱形都是用户发起的一个请求，左端是请求发起的时刻，右端是收到响应的时刻。由于网络延迟和系统处理时间并不固定，所以柱形长度并不相同。</p>
+<p><img src="/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%902.png"></p>
+<ul>
+<li>x 最初的值为 0，Client C 在某个时间段将 x 写为 1。</li>
+<li>Client A 第一个读操作位于 Client C 的写操作之前，因此必须读到原始值 0。</li>
+<li>Client A 最后一个读操作位于 Client C 的写操作之后，如果系统是线性一致的，那么必须读到新值 1。</li>
+<li>其它与写操作重叠的所有读操作，既可能返回 0，也可能返回 1，因为我们并不清楚写操作在哪个时间段内哪个精确的点生效，这种情况下读写是并发的。</li>
+</ul>
+<p>仅仅是这样的话，仍然不能说这个系统满足线性一致。假设 Client B 的第一次读取返回了 1，如果 Client A 的第二次读取返回了 0，那么这种场景并不破坏上述规则，但这个系统仍不满足线性一致，因为客户端在写操作执行期间看到 x 的值在新旧之间来回翻转，这并不符合我们期望的“看起来只有一个数据副本”的要求。</p>
+<p>所以我们需要额外添加一个约束，如下图所示。</p>
+<p><img src="/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%903.png"></p>
+<p>在任何一个客户端的读取返回新值后，所有客户端的后续读取也必须返回新值，这样系统便满足线性一致了。</p>
+<p>我们最后来看一个更复杂的例子，继续细化这个时序图。</p>
+<p><img src="/images/DistributedSystem/%E9%9D%9E%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E7%B3%BB%E7%BB%9F%E7%9A%84%E4%BE%8B%E5%AD%904.png"></p>
+<p>如上图所示，每个读写操作在某个特定的时间点都是<strong>原子性的生效</strong>，我们在柱形中用竖线标记出生效的时间点，将这些标记按时间顺序连接起来。那么线性一致的要求就是：<strong>连线总是按照时间顺序向右移动，而不会向左回退</strong>。所以这个连线结果必定是一个<strong>有效的寄存器读写序列</strong>：任何客户端的每次读取都必须返回该条目最近一次写入的值。</p>
+<p><em>线性一致性并非限定在分布式环境下，在单机单核系统中可以简单理解为“寄存器”的特性。</em></p>
+<p>Client B 的最后一次读操作并不满足线性一致，因为在连线向右移动的前提下，它读到的值是错误的（因为Client A 已经读到了由 Client C 写入的 4）。此外这张图里还有一些值得指出的细节点，可以解开很多我们在使用线性一致系统时容易产生的误解：</p>
+<ul>
+<li>Client B 的首个读请求在 Client D 的首个写请求和 Client A 的首个写请求之前发起，但最终读到的却是最后由 Client A 写成功之后的结果。</li>
+<li>Client A 尚未收到首个写请求成功的响应时，Client B 就读到了 Client A 写入的值。</li>
+</ul>
+<p>上述现象在线性一致的语义下都是合理的。</p>
+<p>所以<strong>线性一致性（Linearizability）</strong>除了叫<strong>强一致性（Strong Consistency）</strong>外，还叫做<strong>原子一致性（Atomic Consistency）</strong>、<strong>立即一致性（Immediate Consistency）</strong>或<strong>外部一致性（External Consistency）</strong>，这些名字看起来都是比较贴切的。</p>
+<h3 id="Raft-线性一致性读"><a href="#Raft-线性一致性读" class="headerlink" title="Raft 线性一致性读"></a>Raft 线性一致性读</h3><p>在了解了什么是线性一致性之后，我们将其与 Raft 结合来探讨。首先需要明确一个问题，使用了 Raft 的系统都是线性一致的吗？不是的，Raft 只是提供了一个基础，要实现整个系统的线性一致还需要做一些额外的工作。</p>
+<p>假设我们期望基于 Raft 实现一个线性一致的分布式 kv 系统，让我们从最朴素的方案开始，指出每种方案存在的问题，最终使整个系统满足线性一致性。</p>
+<h4 id="写主读从缺陷分析"><a href="#写主读从缺陷分析" class="headerlink" title="写主读从缺陷分析"></a>写主读从缺陷分析</h4><p>写操作并不是我们关注的重点，如果你稍微看了一些理论部分就应该知道，所有写操作都要作为提案从 leader 节点发起，当然所有的写命令都应该简单交给 leader 处理。真正关键的点在于<strong>读操作的处理方式，这涉及到整个系统关于一致性方面的取舍</strong>。</p>
+<p>在该方案中我们假设读操作直接简单地向 follower 发起，那么由于 Raft 的 Quorum 机制（大部分节点成功即可），针对某个提案在某一时间段内，集群可能会有以下两种状态：</p>
+<ul>
+<li>某次写操作的日志尚未被复制到一少部分 follower，但 leader 已经将其 commit。</li>
+<li>某次写操作的日志已经被同步到所有 follower，但 leader 将其 commit 后，心跳包尚未通知到一部分 follower。</li>
+</ul>
+<p>以上每个场景客户端都可能读到<strong>过时的数据</strong>，整个系统显然是不满足线性一致的。</p>
+<h4 id="写主读主缺陷分析"><a href="#写主读主缺陷分析" class="headerlink" title="写主读主缺陷分析"></a>写主读主缺陷分析</h4><p>在该方案中我们限定，所有的读操作也必须经由 leader 节点处理，读写都经过 leader 难道还不能满足线性一致？是的！并且该方案存在不止一个问题！</p>
+<p><strong>问题一：状态机落后于 committed log 导致脏读</strong></p>
+<p>回想一下前文讲过的，我们在解释什么是 commit 时提到了写操作什么时候可以响应客户端：</p>
+<p><em>所谓 commit 其实就是对日志简单进行一个标记，表明其可以被 apply 到状态机，并针对相应的客户端请求进行响应。</em></p>
+<p>也就是说一个提案只要被 leader commit 就可以响应客户端了，Raft 并没有限定提案结果在返回给客户端前必须先应用到状态机。所以从客户端视角当我们的某个写操作执行成功后，下一次读操作可能还是会读到旧值。</p>
+<p>这个问题的解决方式很简单，在 leader 收到读命令时我们只需记录下当前的 commit index，当 apply index 追上该 commit index 时，即可将状态机中的内容响应给客户端。</p>
+<p><strong>问题二：网络分区导致脏读</strong></p>
+<p>假设集群发生网络分区，旧 leader 位于少数派分区中，而且此刻旧 leader 刚好还未发现自己已经失去了领导权，当多数派分区选出了新的 leader 并开始进行后续写操作时，连接到旧 leader 的客户端可能就会读到旧值了。</p>
+<p>因此，仅仅是直接读 leader 状态机的话，系统仍然不满足线性一致性。</p>
+<h4 id="Raft-Log-Read"><a href="#Raft-Log-Read" class="headerlink" title="Raft Log Read"></a>Raft Log Read</h4><p>为了确保 leader 处理读操作时仍拥有领导权，我们可以将读请求同样作为一个提案走一遍 Raft 流程，当这次读请求对应的日志可以被应用到状态机时，leader 就可以读状态机并返回给用户了。</p>
+<p>这种读方案称为 Raft Log Read，也可以直观叫做 Read as Proposal。</p>
+<p>为什么这种方案满足线性一致？因为该方案根据 commit index 对所有读写请求都一起做了线性化，这样每个读请求都能感知到状态机在执行完前一写请求后的最新状态，将读写日志一条一条的应用到状态机，整个系统当然满足线性一致。但该方案的缺点也非常明显，那就是性能差，读操作的开销与写操作几乎完全一致。而且由于所有操作都线性化了，我们无法并发读状态机。</p>
+<h3 id="Raft-读性能优化"><a href="#Raft-读性能优化" class="headerlink" title="Raft 读性能优化"></a>Raft 读性能优化</h3><p>接下来我们将介绍几种优化方案，它们在不违背系统线性一致性的前提下，大幅提升了读性能。</p>
+<h4 id="Read-Index"><a href="#Read-Index" class="headerlink" title="Read Index"></a>Read Index</h4><p>与 Raft Log Read 相比，Read Index 省掉了同步 log 的开销，能够大幅提升读的吞吐，一定程度上降低读的时延。其大致流程为：</p>
+<ol>
+<li>Leader 在收到客户端读请求时，记录下当前的 commit index，称之为 read index。</li>
+<li>Leader 向 followers 发起一次心跳包，这一步是为了确保领导权，避免网络分区时少数派 leader 仍处理请求。</li>
+<li>等待状态机<strong>至少</strong>应用到 read index（即 apply index 大于等于 read index）。</li>
+<li>执行读请求，将状态机中的结果返回给客户端。</li>
+</ol>
+<p>这里第三步的 apply index 大于等于 read index 是一个关键点。因为在该读请求发起时，我们将当时的 commit index 记录了下来，只要使客户端读到的内容在该 commit index 之后，那么结果一定都满足线性一致（如不理解可以再次回顾下前文线性一致性的例子以及2.2中的问题一）。</p>
+<h4 id="Lease-Read"><a href="#Lease-Read" class="headerlink" title="Lease Read"></a>Lease Read</h4><p>与 Read Index 相比，Lease Read 进一步省去了网络交互开销，因此更能显著降低读的时延。</p>
+<p>基本思路是 leader 设置一个比选举超时（Election Timeout）更短的时间作为租期，在租期内我们可以相信其它节点一定没有发起选举，集群也就一定不会存在脑裂，所以在这个时间段内我们直接读主即可，而非该时间段内可以继续走 Read Index 流程，Read Index 的心跳包也可以为租期带来更新。</p>
+<p>Lease Read 可以认为是 Read Index 的时间戳版本，额外依赖时间戳会为算法带来一些不确定性，如果时钟发生漂移会引发一系列问题，因此需要谨慎的进行配置。</p>
+<h4 id="Follower-Read"><a href="#Follower-Read" class="headerlink" title="Follower Read"></a>Follower Read</h4><p>在前边两种优化方案中，无论我们怎么折腾，核心思想其实只有两点：</p>
+<ul>
+<li>保证在读取时的最新 commit index 已经被 apply。</li>
+<li>保证在读取时 leader 仍拥有领导权。</li>
+</ul>
+<p>其实无论是 Read Index 还是 Lease Read，最终目的都是为了解决第二个问题。换句话说，读请求最终一定都是由 leader 来承载的。</p>
+<p>那么读 follower 真的就不能满足线性一致吗？其实不然，这里我们给出一个可行的读 follower 方案：<strong>Follower 在收到客户端的读请求时，向 leader 询问当前最新的 commit index，反正所有日志条目最终一定会被同步到自己身上，follower 只需等待该日志被自己 commit 并 apply 到状态机后，返回给客户端本地状态机的结果即可</strong>。这个方案叫做 <strong>Follower Read</strong>。</p>
+<p>注意：Follower Read 并不意味着我们在读过程中完全不依赖 leader 了，在保证线性一致性的前提下完全不依赖 leader 理论上是不可能做到的。</p>
+<h1 id="Zab"><a href="#Zab" class="headerlink" title="Zab"></a>Zab</h1><blockquote>
+<p>Zab 协议全称：Zookeeper Atomic Broadcast（Zookeeper 原子广播协议）。</p>
+</blockquote>
+<p>Zab 采用的是主备模式的系统架构，相比于 Paxos，Paxos 可以同时存在多个提议者进行提案，而 Zab 同一时间只允许一个领导者进行提案，这样即解决客户端并发处理，又能规定提案的顺序性。在 Zab 协议中，如果一个事务操作被处理了，那么所有其依赖的事务操作都应该被提前处理了。</p>
+<h2 id="术语科普"><a href="#术语科普" class="headerlink" title="术语科普"></a>术语科普</h2><p>在学习 Zab 之前，我们需要先整理几个术语、因为在 Zab 的论文中，术语相对比较多，并且概念冗余。例如：</p>
+<ul>
+<li>提案（Proposal）：进行协商的基本单元，在一些文档中，也有称之为操作（Operation）、指令（Command）。</li>
+<li>事务（Transaction）：也是指提案，常出现在代码中，并非指具有 ACID 特性的一组操作。</li>
+<li>已提出的 Proposal：指广播的第一阶段所提出的 Proposal，未提交到状态机的 Proposal。</li>
+<li>已提交的 Proposal：指广播的第二阶段已提交到状态机的 Proposal。</li>
+</ul>
+<p>为了帮助我们理解，Zab 定义了三个角色、四种节点状态、四种 Zab 运行状态、以及两种运行模式。</p>
+<hr>
+<p><strong>三个角色</strong></p>
+<ul>
+<li><p>领导者（Leader）<br>Leader 是整个 Zab 协议的核心，其工作内容在于：接收并处理所有事务请求，也就是写请求。将每个事务请求，封装成提案（Proposal）广播给每个跟随者（Follower），根据跟随者（Follower）返回请求，控制是否需要提交该提案。</p>
+</li>
+<li><p>跟随者（Follower）</p>
+<p>跟随者的工作，可以分为三部分：</p>
+<ol>
+<li>接收leader提出的提案（Proposal），参与对提案（Proposal）的投票。</li>
+<li>接收并处理非事务请求，也就是读请求。如果 Follower 收到客户端的事务请求，则会将其转发给 Leader 进行处理。</li>
+<li>参与 Leader 选举投票。</li>
+</ol>
+</li>
+<li><p>观察者（Observer）<br>跟 Paxos 中学习者（Learner）类似，增加 Observer，可以在不影响集群写性能的情况下，提升读性能。</p>
+</li>
+</ul>
+<hr>
+<p><strong>四种节点状态</strong></p>
+<p>这是一个容易忽视的点，Zab 虽然规定了三种角色，但是他是通过定义四种状态来描述当前节点所处的角色的。包含以下状态：</p>
+<ul>
+<li>LOOKING，竞选状态，当前集群不存在 Leader。该状态下会发起领导者选举。</li>
+<li>FOLLOWING，随从状态，同步 Leader 状态，参与投票。</li>
+<li>OBSERVING，观察状态，同步 Leader 状态，不参与投票。</li>
+<li>LEADING，领导者状态，对应 Leader 角色。</li>
+</ul>
+<hr>
+<p><strong>四种 Zab 运行状态</strong></p>
+<p>这里是指 Zab 集群的运行状态，因为 Zab 除了正常向外部提供服务，还得有故障恢复功能。从整个集群的状态，我们可以了解 Zab 的运行过程。</p>
+<ul>
+<li>ELECTION，选举状态，表明节点正在进行 Leader 选举</li>
+<li>DISCOVERY，成员发现状态，在选举出新Leader后集群所处的状态，用于节点协商沟通Leader的合法性</li>
+<li>SYNCHRONIZATION，数据同步状态，在确认新Leader后，以Leader的数据为基础，修复各个节点的数据一致性</li>
+<li>BROADCARST，广播状态，集群处于正常运行状态，可向外提供服务</li>
+</ul>
+<hr>
+<p><strong>ZXID</strong></p>
+<p>Leader 在收到事务请求，将其封装成 Proposal 时，会为每个 Proposal 生成对应的 ZXID。</p>
+<p>在消息广播模式中 ZXID 标志者事务请求的先后顺序，在崩溃恢复模式中 ZXID 是 Leader 的选举的判断依据，以及在 Leader 选举后，数据同步中 ZXID 能方便的帮助 Zab 抛弃上一个 Leader 没完成的 Proposal。</p>
+<p>ZXID 它是一个 64 位，其中低 32 位可以看成一个简单的<strong>计数器</strong>，而高 32 位则代表了 Leader 周期的 epoch 编号。后文中使用标示一个 ZXID，例如 <code>&lt;1, 101&gt;</code>。</p>
+<ul>
+<li>epoch，则标示者当前集群所处的周期（年代），或者说当前 Leader 的周期（年代）。在每一次 Leader 变更后，新 Leader 产生的 epoch 则会在上一任 Leader 的 epoch 上进行加 1，作为自己的 epoch。</li>
+<li>计数器，则是针对客户端每一个事务请求，Leader 在产生新的 Proposal 事务时，都会对该计数器加 1。而 Leader 变更后，该计数器则会重置为 0。</li>
+</ul>
+<h2 id="运行模式"><a href="#运行模式" class="headerlink" title="运行模式"></a>运行模式</h2><p>从上述 Zab 运行状态中，可以归纳为两种运行模式，即消息广播模式、崩溃恢复模式。</p>
+<ul>
+<li>崩溃恢复模式：<br>在整个服务框架启动过程中、或者 Leader 服务器出现网络中断、崩溃退出等异常情况时，Zab 协议就会进入崩溃恢复模式并选举新的 Leader 服务器。当新的 Leader 服务器在集群中有过半的 Follower 与其完成成数据同步后，Zab 就会退出崩溃恢复模式。</li>
+<li>消息广播模式：<br>当集群中已有过半的 Follower 与 Leader 完成数据同步，那么整个集群就会进入消息广播模式。此时整个集群才可以对外提供服务，即数据的查询、修改。</li>
+</ul>
+<p>值得注意是，当一台新的 Zab 节点加入集群时，该节点会先进入崩溃恢复模式，找到 Leader，并与其进行数据同步，然后一起参与到消息广播流程中。</p>
+<h3 id="消息广播模式"><a href="#消息广播模式" class="headerlink" title="消息广播模式"></a>消息广播模式</h3><p>Zab 为了严格保证 Proposal 的因果关系，即事务请求的顺序性，Zab 为每个 Proposal 生成对应的 ZXID，并严格按照 ZXID 的顺序，进行消息的广播。具体的，Leader 会为了 Follower 分配一个单独的队列，将消息广播前，先将 Proposal 按照 ZXID 顺序依次放入这些队列中，并根据 FIFO 策略进行消息发送。</p>
+<p>Follower 在收到事务 Proposal 之后，都会将其以事务日志的形式写入本地磁盘中，并在写入成功后，返回给 Leader 一个 Ack 响应。当 Leader 服务器收到过半的 Follower 的 Ack 响应后，就会广播 Commit 消息给所有 Follower 通知其进行事务提交，同时 Leader 自身也会完成事务的提交。至此整个消息广播模式完成。</p>
+<blockquote>
+<p>这里需要注意，<strong>Leader 提交提案是有顺序性的</strong>，按照 ZXID 的大小，按顺序提交提案，<strong>如果前一个提案未提交，此时是不会提交后一个提案的</strong>。</p>
+</blockquote>
+<h3 id="崩溃恢复模式"><a href="#崩溃恢复模式" class="headerlink" title="崩溃恢复模式"></a>崩溃恢复模式</h3><p>Zab 是一个强领导者模型的协议。消息广播模式，只能在 Zab 正常运行中向外部提供服务。这也要求 Zab 设计者不得不考虑，当 Leader 宕机或者失去过半的 Follower 节点后，如何恢复整个集群。</p>
+<p>崩溃恢复模式原理分为三个阶段，即 Leader 选举、Leader 发现、数据同步。</p>
+<h4 id="基本约定"><a href="#基本约定" class="headerlink" title="基本约定"></a>基本约定</h4><p>在选举新的 Leader 后，向外部提供服务之前，Zab 还需要保证数据正确性，即上一个 Leader 崩溃之时，正在处理的事务请求，可能会出现两个数据不一致的隐患。针对这样情况，Zab 保证一下特性：</p>
+<ol>
+<li><p>Zab 需要确保那些已经在 Leader 上提交的事务最终被所有 Follower 提交</p>
+<p>即：ProposalA 在 Leader 上被提出后，收到过半的 Follower 的 Ack 响应，但是在将 Commit 请求广播给所有 Follower 机器之前，Leader 宕机了。Zab 会在崩溃恢复模式中，让所有的服务器都提交 Commit ProposalA。</p>
+</li>
+<li><p>Zab 需要确保丢弃已经被 Leader 提出的但是没有被提交的 Proposal</p>
+</li>
+</ol>
+<h4 id="Leader-选举（ELECTION）"><a href="#Leader-选举（ELECTION）" class="headerlink" title="Leader 选举（ELECTION）"></a>Leader 选举（ELECTION）</h4><p>Zab 采用的各节点广播自己所提议的 Leader，收到其他节点提议的 Leader 后，与自己所提议的 Leader 进行对比，根据规则重新选择提议的 Leader，直到有过半的节点都提议某一节点，即结束 Leader 选举。</p>
+<p><strong>选举规则</strong></p>
+<p>Leader 选举规则包含以下几个方面：</p>
+<ul>
+<li>任期编号（epoch），优先判断 epoch，epoch 大的节点当选 Leader</li>
+<li>事务标示符（ZXID），epoch 相同，则比较 ZXID，ZXID 大的当选 Leader</li>
+<li>节点 ID，epoch、ZXID 都一致，则比较节点 ID（在 myid 文件中指定的值）</li>
+</ul>
+<p>因为选举规则包含上述三个方面，则每个节点在广播自己所提议的 Leader 时，选票中都会包含上面三个值。后文使用，来表示一张选票，表明自己所有提议的 Leader。</p>
+<ul>
+<li>proposeLeader，表示自己所提议的 Leader 的节点 ID</li>
+<li>epoch，表示所提议的 Leader 节点所处的任期编号</li>
+<li>ZXID，表示所提议的 Leader 节点拥有的 Proposal 最大的事务编号</li>
+<li>node，表示本次提议的节点</li>
+</ul>
+<p>这里需要注意的是，这里的 ZXID 是指 Zab 在消息广播模式第一阶段的收到 Proposal 最大的 ZXID，即：<strong>节点收到被提出的 Proposal 最大的 ZXID，而不是已提交的 Proposal 最大的 ZXID</strong>。</p>
+<p><strong>算法陈述</strong></p>
+<p>集群中存在三个节点 A, B, C，各自节点 ID 依次为 1, 2, 3。其中 A 为 Leader，已提交两个 Proposal（<code>&lt;1, 101&gt;</code>，<code>&lt;1, 102&gt;</code>），B、C 为 Follower，B 已提交两个 Proposal（<code>&lt;1, 101&gt;</code>，<code>&lt;1, 102&gt;</code>），C 只提交了 <code>&lt;1, 101&gt;</code>。</p>
+<p><img src="/images/DistributedSystem/ZabScope1.png"></p>
+<p>当 A 节点宕机后，跟随者检测 Leader 异常，则退出 FOLLOWING 状态，变更为 LOOKING，发起 Leader 选举。</p>
+<p><img src="/images/DistributedSystem/ZabScope2.png"></p>
+<p>当 Follower 开始第一轮提议 Leader 时，都会推荐自己为 Leader，并向所有节点广播自己的提议，即 B 的选票为 <code>&lt;2, 1, 102, B&gt;</code>，C 的选票为 <code>&lt;3, 1, 101, C&gt;</code>。各自将选票发给其他节点，B 的选票发送给 B、C，C 的选票也发送给 B、C。</p>
+<p><img src="/images/DistributedSystem/ZabScope3.png"></p>
+<p>B, C 收到对方的选票后，根据上面描述的规则进行比对，依次比较 epoch、ZXID、节点 ID。B、C 首先会收到来自自己的提议的选票，因为收到选票与自己提议的选票相同，只需要接受和保存该选票。</p>
+<ul>
+<li>当 B 收到来自 C 的选票 <code>&lt;3, 1, 101, C&gt;</code>，由于 epoch 相同，B 的 ZXID 大于 C 的 ZXID，则 B 的选票获胜，不需要变更选票信息，保存即可。</li>
+<li>C 收到来自B的选票 <code>&lt;2, 1, 102, B&gt;</code>，由于 epoch 相同，C 的 ZXID 小于 B 的 ZXID，则 C 的选票落选。需要保存 B 的选票 <code>&lt;2, 1, 102, B&gt;</code>，并变更自己的选票为 <code>&lt;2, 1, 102, C&gt;</code></li>
+</ul>
+<p><img src="/images/DistributedSystem/ZabScope4.png"></p>
+<p>C 节点在变更自己的选票信息后，会重新广播选票 <code>&lt;2, 1, 102, C&gt;</code> 给其他节点。B, C 节点都收到来自C的新选票信息 <code>&lt;2, 1, 102, C&gt;</code>，根据规则继续比对，结果肯定是 B, C 都保存两个选票（<code>&lt;2, 1, 102, B&gt;</code>, <code>&lt;2, 1, 102, C&gt;</code>）</p>
+<p><img src="/images/DistributedSystem/ZabScope5.png"></p>
+<p>最后，B, C 所提议的领导者节点 ID 为 2（即 B 节点），赢得了过半选票。则 B 竞选为准 Leader，退出 LOOKING 状态，变更为 LEADING，C 节点变更状态为 FOLLOWING，完成 Leader 选举。</p>
+<p><img src="/images/DistributedSystem/ZabScope6.png"></p>
+<h4 id="发现（DISCOVERY）"><a href="#发现（DISCOVERY）" class="headerlink" title="发现（DISCOVERY）"></a>发现（DISCOVERY）</h4><p>该阶段用于确立 Leader 的领导关系，继上一阶段，也就是 ELECTION 完成后，每个节点都有自己所保存的选票池，当选池中有过半的选票都提议同一节点为 Leader 时，则进入发现（DISCOVERY）状态。</p>
+<p>继续上一小节的案例。A, B, C 三个节点，A 宕机了，B 为新选举的准 Leader。其中 B 已提交两个 Proposal（<code>&lt;1, 101&gt;</code>，<code>&lt;1, 102&gt;</code>），C 只提交了 <code>&lt;1, 101&gt;</code>。</p>
+<p>在该状态期间，由 Follower 会主动联系准 Leader，并将自己最后接受的事务 Proposal 的 epoch 值发送给准 Leader，这里记作 FOLLOWERINFO。</p>
+<p><img src="/images/DistributedSystem/ZabScope7.png"></p>
+<p>准 Leader 收到来自过半（包含 B 节点自己）的 FOLLOWERINFO 消息后，会从这个 FOLLOWERINFO 中选取最大的 epoch 值，对其进行加 1，作为新的 epoch 值，并封装成 LEADERINFO 消息发给这些过半的 Follower。</p>
+<p><img src="/images/DistributedSystem/ZabScope8.png"></p>
+<p>当 Follower 收到 LEADERINFO 消息后，会先校验 LEADERINFO 消息正确性。校验自己的 epoch 是否小于 LEADERINFO 消息中的 epoch，如果小于，就将 LEADERINFO 消息中的 epoch 赋值给自己的 epoch，并将自己的运行状态变更为 SYNCHRONIZATION，最后向准 Leader 返回 Ack 响应（ACKEPOCH）。</p>
+<p><img src="/images/DistributedSystem/ZabScope9.png"></p>
+<p>最后准 Leader 收到过半的 ACKEPOCH 消息后，也将自己的运行状态修改为 SYNCHRONIZATION。至此完成发现阶段的工作，集群确立 Leader 的领导关系。</p>
+<h4 id="数据同步（SYNCHRONIZATION）"><a href="#数据同步（SYNCHRONIZATION）" class="headerlink" title="数据同步（SYNCHRONIZATION）"></a>数据同步（SYNCHRONIZATION）</h4><p>进入到数据同步阶段，我们需要先了解三种同步方式（DIFF、TRUNC、SNAP）。Leader 会根据每个 Follower 的最大 ZXID，采用不同方式处理不一致的数据。</p>
+<p>在 Zab 的设计中，Leader 为了更高效的将 Proposal 复制给 Follower，会在自己的内存队列中缓存一定数量（默认500）的已提交的 Proposal。在内存中的 Proposal 就有 ZXID 的最大值和最小值，即：maxCommittedZXID 和 minCommittedZXID。</p>
+<ul>
+<li>DIFF：当 Follower 最大的 ZXID 小于 maxCommittedZXID 且大于 minCommittedZXID</li>
+<li>TRUNC：当 Follower 最大的ZXID大于 maxCommittedZXID 时，该方式要求 Follower 丢弃超出的那部分 Proposal</li>
+<li>SNAP：当 Follower 最大的 ZXID 小于 minCommittedZXID 时，该方式直接同步快照给 Follower</li>
+</ul>
+<p>了解了同步方式，接下来来看看具体怎么交互的吧。该阶段由 Leader 根据 Follower 的最大 ZXID 来选择同步方式和需要发送的数据。由于B已提交两个Proposal（<code>&lt;1, 101&gt;</code>，<code>&lt;1, 102&gt;</code>），C 只提交了 <code>&lt;1, 101&gt;</code>。该情况下 Leader 会选择 DIFF 的方式，并且和需要同步的数据，一起封装为 NEWLEADER 消息发给 Follower。</p>
+<p>Follower 在收到 NEW LEADER 消息后，进行修复不一致数据，并返回给 Leader 响应 Ack 消息。</p>
+<p><img src="/images/DistributedSystem/ZabScope10.png"></p>
+<p>Leader 在收到过半 Ack 消息后，则完成数据同步阶段，将自己运行状态修改为 BROADCARST（广播状态），并发送 UPTODATE 消息给过半的 Follower，通知他们完成数据同步，修改运行状态修改为 BROADCARST。</p>
+<h1 id="Gossip-协议"><a href="#Gossip-协议" class="headerlink" title="Gossip 协议"></a>Gossip 协议</h1><blockquote>
+<p>  Gossip</p>
+<p>  Trying to squash a rumor is like trying to unring a bell.</p>
+<p>  —— <a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Shana_Alexander">Shana Alexander</a>，American Journalist</p>
+</blockquote>
+<p>Paxos、Raft、Zab 等分布式算法经常会被称作是“强一致性”的分布式共识协议，其实这样的描述抠细节概念的话是很别扭的，会有语病嫌疑，但我们都明白它的意思其实是在说“尽管系统内部节点可以存在不一致的状态，但从系统外部看来，不一致的情况并不会被观察到，所以整体上看系统是强一致性的”。与它们相对的，还有另一类被冠以“最终一致性”的分布式共识协议，这表明系统中不一致的状态有可能会在一定时间内被外部直接观察到。一种典型且极为常见的最终一致的分布式系统就是<a target="_blank" rel="noopener" href="https://icyfenix.cn/architect-perspective/general-architecture/diversion-system/dns-lookup.html">DNS 系统</a>，在各节点缓存的 TTL 到期之前，都有可能与真实的域名翻译结果存在不一致。在本节中，笔者将介绍在比特币网络和许多重要分布式框架中都有应用的另一种具有代表性的“最终一致性”的分布式共识协议：Gossip 协议。</p>
+<p>Gossip 最早由<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Xerox">施乐公司</a>（Xerox，现在可能很多人不了解施乐了，或只把施乐当一家复印产品公司看待，这家公司是计算机许多关键技术的鼻祖，图形界面的发明者、以太网的发明者、激光打印机的发明者、MVC 架构的提出者、RPC 的提出者、BMP 格式的提出者……） Palo Alto 研究中心在论文《<a target="_blank" rel="noopener" href="http://bitsavers.trailing-edge.com/pdf/xerox/parc/techReports/CSL-89-1_Epidemic_Algorithms_for_Replicated_Database_Maintenance.pdf">Epidemic Algorithms for Replicated Database Maintenance</a>》中提出的一种用于分布式数据库在多节点间复制同步数据的算法。从论文题目中可以看出，最初它是被称作“流行病算法”（Epidemic Algorithm）的，只是不太雅观，今天 Gossip 这个名字已经用得更为普遍了，除此以外，它还有“流言算法”、“八卦算法”、“瘟疫算法”等别名，这些名字都是很形象化的描述，反应了 Gossip 的特点：要同步的信息如同流言一般传播、病毒一般扩散。</p>
+<p>笔者按照习惯也把 Gossip 也称作是“共识协议”，但首先必须强调它所解决的问题并不是直接与 Paxos、Raft 这些共识算法等价的，只是基于 Gossip 之上可以通过某些方法去实现与 Paxos、Raft 相类似的目标而已。一个最典型的例子是比特币网络中使用到了 Gossip 协议，用它来在各个分布式节点中互相同步区块头和区块体的信息，这是整个网络能够正常交换信息的基础，但并不能称作共识；比特币使用<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Proof_of_work">工作量证明</a>（Proof of Work，PoW）来对“这个区块由谁来记账”这一件事情在全网达成共识，这个目标才可以认为与 Paxos、Raft 的目标是一致的。</p>
+<p>下面，我们来了解 Gossip 的具体工作过程。相比 Paxos、Raft 等算法，Gossip 的过程十分简单，它可以看作是以下两个步骤的简单循环：</p>
+<ul>
+<li>如果有某一项信息需要在整个网络中所有节点中传播，那从信息源开始，选择一个固定的传播周期（譬如 1 秒），随机选择它相连接的 k 个节点（称为 Fan-Out）来传播消息。</li>
+<li>每一个节点收到消息后，如果这个消息是它之前没有收到过的，将在下一个周期内，选择除了发送消息给它的那个节点外的其他相邻 k 个节点发送相同的消息，直到最终网络中所有节点都收到了消息，尽管这个过程需要一定时间，但是理论上最终网络的所有节点都会拥有相同的消息。</li>
+</ul>
+<p><img src="https://icyfenix.cn/assets/img/gossip.0eb19e80.gif" alt="img"></p>
+<p>Gossip 传播示意图（<a target="_blank" rel="noopener" href="https://managementfromscratch.wordpress.com/2016/04/01/introduction-to-gossip/">图片来源</a>）</p>
+<p>上图是 Gossip 传播过程的示意图，根据示意图和 Gossip 的过程描述，我们很容易发现 Gossip 对网络节点的连通性和稳定性几乎没有任何要求，它一开始就将网络某些节点只能与一部分节点<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Network_topology#Partially_connected_network">部分连通</a>（Partially Connected Network）而不是以<a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Network_topology#Fully_connected_network">全连通网络</a>（Fully Connected Network）作为前提；能够容忍网络上节点的随意地增加或者减少，随意地宕机或者重启，新增加或者重启的节点的状态最终会与其他节点同步达成一致。Gossip 把网络上所有节点都视为平等而普通的一员，没有任何中心化节点或者主节点的概念，这些特点使得 Gossip 具有极强的鲁棒性，而且非常适合在公众互联网中应用。</p>
+<p>同时我们也很容易找到 Gossip 的缺点，消息最终是通过多个轮次的散播而到达全网的，因此它必然会存在全网各节点状态不一致的情况，而且由于是随机选取发送消息的节点，所以尽管可以在整体上测算出统计学意义上的传播速率，但对于个体消息来说，无法准确地预计到需要多长时间才能达成全网一致。另外一个缺点是消息的冗余，同样是由于随机选取发送消息的节点，也就不可避免的存在消息重复发送给同一节点的情况，增加了网络的传输的压力，也给消息节点带来额外的处理负载。</p>
+<p>达到一致性耗费的时间与网络传播中消息冗余量这两个缺点存在一定对立，如果要改善其中一个，就会恶化另外一个，由此，Gossip 设计了两种可能的消息传播模式：反熵（Anti-Entropy）和传谣（Rumor-Mongering），这两个名字都挺文艺的。熵（Entropy）是生活中少见但科学中很常用的概念，它代表着事物的混乱程度。反熵的意思就是反混乱，以提升网络各个节点之间的相似度为目标，所以在反熵模式下，会同步节点的全部数据，以消除各节点之间的差异，目标是整个网络各节点完全的一致。但是，在节点本身就会发生变动的前提下，这个目标将使得整个网络中消息的数量非常庞大，给网络带来巨大的传输开销。而传谣模式是以传播消息为目标，仅仅发送新到达节点的数据，即只对外发送变更信息，这样消息数据量将显著缩减，网络开销也相对较小。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Raft/" rel="tag"># Raft</a>
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/Zab/" rel="tag"># Zab</a>
+              <a href="/tags/Paxos/" rel="tag"># Paxos</a>
+              <a href="/tags/Gossip/" rel="tag"># Gossip</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/04/28/SE-%E6%9E%B6%E6%9E%84%E5%AE%89%E5%85%A8%E6%80%A7/" rel="prev" title="架构设计 架构安全性">
+      <i class="fa fa-chevron-left"></i> 架构设计 架构安全性
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/06/29/Flowable-0-%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA/" rel="next" title="Flowable 环境搭建">
+      Flowable 环境搭建 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Paxos"><span class="nav-number">1.</span> <span class="nav-text">Paxos</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Paxos-%E7%9A%84%E8%AF%9E%E7%94%9F"><span class="nav-number">1.1.</span> <span class="nav-text">Paxos 的诞生</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E5%AE%9E%E4%BE%8B"><span class="nav-number">1.2.</span> <span class="nav-text">工作实例</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Multi-Paxos"><span class="nav-number">2.</span> <span class="nav-text">Multi Paxos</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Raft"><span class="nav-number">3.</span> <span class="nav-text">Raft</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Leader%E9%80%89%E4%B8%BE"><span class="nav-number">3.1.</span> <span class="nav-text">Leader选举</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Follower-%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E8%BF%87%E7%A8%8B"><span class="nav-number">3.1.1.</span> <span class="nav-text">Follower 状态转换过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Candidate-%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E8%BF%87%E7%A8%8B"><span class="nav-number">3.1.2.</span> <span class="nav-text">Candidate 状态转换过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Leader%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E8%BF%87%E7%A8%8B"><span class="nav-number">3.1.3.</span> <span class="nav-text">Leader状态转换过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Rank-System"><span class="nav-number">3.1.4.</span> <span class="nav-text">Rank System</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%8A%B6%E6%80%81%E6%9C%BA%E6%9C%BA%E5%88%B6"><span class="nav-number">3.2.</span> <span class="nav-text">状态机机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Raft-%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%9C%BA%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.2.1.</span> <span class="nav-text">Raft 日志复制机模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90"><span class="nav-number">3.2.2.</span> <span class="nav-text">整体流程解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%A3%E5%90%91%E6%B5%81%E7%A8%8B%E7%9A%84%E6%97%A5%E5%BF%97%E5%A4%8D%E5%88%B6%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.3.</span> <span class="nav-text">正向流程的日志复制流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E6%80%A7%EF%BC%88Safety%EF%BC%89"><span class="nav-number">3.3.</span> <span class="nav-text">安全性（Safety）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E6%97%A5%E5%BF%97%E4%B8%80%E8%87%B4%E6%80%A7%E7%9A%84%E4%BF%9D%E8%AF%81"><span class="nav-number">3.3.1.</span> <span class="nav-text">对日志一致性的保证</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%AF%E8%83%BD%E7%9A%84%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4%E5%9C%BA%E6%99%AF"><span class="nav-number">3.3.2.</span> <span class="nav-text">可能的日志不一致场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E6%97%A5%E5%BF%97%E4%B8%8D%E4%B8%80%E8%87%B4"><span class="nav-number">3.3.3.</span> <span class="nav-text">如何处理日志不一致</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E6%8F%90%E4%BA%A4%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">3.3.3.1.</span> <span class="nav-text">对提交的限制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E9%80%89%E4%B8%BE%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">3.3.3.2.</span> <span class="nav-text">对选举的限制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E8%A1%8C%E4%B8%BA%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">3.3.3.3.</span> <span class="nav-text">对行为的限制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E6%97%B6%E9%97%B4%E8%AE%BE%E5%AE%9A%E7%9A%84%E9%99%90%E5%88%B6"><span class="nav-number">3.3.3.4.</span> <span class="nav-text">对时间设定的限制</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4%E4%B8%8E%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">3.4.</span> <span class="nav-text">集群成员变更与日志压缩</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E5%8F%98%E6%9B%B4"><span class="nav-number">3.4.1.</span> <span class="nav-text">集群成员变更</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE"><span class="nav-number">3.4.1.1.</span> <span class="nav-text">直接切换集群成员配置</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%A4%E9%98%B6%E6%AE%B5%E5%88%87%E6%8D%A2%E9%9B%86%E7%BE%A4%E6%88%90%E5%91%98%E9%85%8D%E7%BD%AE%EF%BC%88Joint-Consensus%EF%BC%89"><span class="nav-number">3.4.1.2.</span> <span class="nav-text">两阶段切换集群成员配置（Joint Consensus）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E5%8E%8B%E7%BC%A9"><span class="nav-number">3.4.2.</span> <span class="nav-text">日志压缩</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">3.5.</span> <span class="nav-text">线性一致性与读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%EF%BC%9F"><span class="nav-number">3.5.1.</span> <span class="nav-text">什么是线性一致性？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Raft-%E7%BA%BF%E6%80%A7%E4%B8%80%E8%87%B4%E6%80%A7%E8%AF%BB"><span class="nav-number">3.5.2.</span> <span class="nav-text">Raft 线性一致性读</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%BB%8E%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">3.5.2.1.</span> <span class="nav-text">写主读从缺陷分析</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%86%99%E4%B8%BB%E8%AF%BB%E4%B8%BB%E7%BC%BA%E9%99%B7%E5%88%86%E6%9E%90"><span class="nav-number">3.5.2.2.</span> <span class="nav-text">写主读主缺陷分析</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Raft-Log-Read"><span class="nav-number">3.5.2.3.</span> <span class="nav-text">Raft Log Read</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Raft-%E8%AF%BB%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96"><span class="nav-number">3.5.3.</span> <span class="nav-text">Raft 读性能优化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Read-Index"><span class="nav-number">3.5.3.1.</span> <span class="nav-text">Read Index</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Lease-Read"><span class="nav-number">3.5.3.2.</span> <span class="nav-text">Lease Read</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Follower-Read"><span class="nav-number">3.5.3.3.</span> <span class="nav-text">Follower Read</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Zab"><span class="nav-number">4.</span> <span class="nav-text">Zab</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%AF%E8%AF%AD%E7%A7%91%E6%99%AE"><span class="nav-number">4.1.</span> <span class="nav-text">术语科普</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%90%E8%A1%8C%E6%A8%A1%E5%BC%8F"><span class="nav-number">4.2.</span> <span class="nav-text">运行模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E5%B9%BF%E6%92%AD%E6%A8%A1%E5%BC%8F"><span class="nav-number">4.2.1.</span> <span class="nav-text">消息广播模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B4%A9%E6%BA%83%E6%81%A2%E5%A4%8D%E6%A8%A1%E5%BC%8F"><span class="nav-number">4.2.2.</span> <span class="nav-text">崩溃恢复模式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E7%BA%A6%E5%AE%9A"><span class="nav-number">4.2.2.1.</span> <span class="nav-text">基本约定</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Leader-%E9%80%89%E4%B8%BE%EF%BC%88ELECTION%EF%BC%89"><span class="nav-number">4.2.2.2.</span> <span class="nav-text">Leader 选举（ELECTION）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8F%91%E7%8E%B0%EF%BC%88DISCOVERY%EF%BC%89"><span class="nav-number">4.2.2.3.</span> <span class="nav-text">发现（DISCOVERY）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%EF%BC%88SYNCHRONIZATION%EF%BC%89"><span class="nav-number">4.2.2.4.</span> <span class="nav-text">数据同步（SYNCHRONIZATION）</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Gossip-%E5%8D%8F%E8%AE%AE"><span class="nav-number">5.</span> <span class="nav-text">Gossip 协议</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

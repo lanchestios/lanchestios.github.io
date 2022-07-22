@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 表">
+<meta property="og:url" content="http://example.com/2021/08/12/MySQL-%E8%A1%A8/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E9%A1%B5%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E7%BB%84%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E7%BB%84%E4%B8%AD%E7%9A%84%E9%A1%B5%E7%B1%BB%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/MySQL/COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E5%BD%93%E5%88%97%E5%8D%A0%E7%94%A8%E7%9A%84%E5%AD%98%E5%82%A8%E7%A9%BA%E9%97%B4%E7%9B%B8%E5%BD%93%E5%A4%A7%E6%97%B6COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png">
+<meta property="og:image" content="http://example.com/images/MySQL/Barracuda%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E7%9A%84%E6%BA%A2%E5%87%BA%E8%A1%8C.png">
+<meta property="og:image" content="http://example.com/images/MySQL/MySQL%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F.png">
+<meta property="article:published_time" content="2021-08-12T09:20:25.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.603Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="Form">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png">
+
+<link rel="canonical" href="http://example.com/2021/08/12/MySQL-%E8%A1%A8/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>MySQL 表 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/08/12/MySQL-%E8%A1%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL 表
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-08-12 17:20:25" itemprop="dateCreated datePublished" datetime="2021-08-12T17:20:25+08:00">2021-08-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。</p>
+<span id="more"></span>
+
+<h1 id="索引组织表"><a href="#索引组织表" class="headerlink" title="索引组织表"></a>索引组织表</h1><p>在 InnoDB 存储引擎中，表都是根据主键顺序组织存放的，这种存储方式的表称为索引组织表（index organized table）。在 InnoDB 存储引擎表中，每张表都有个主键（Primary Key），如果在创建表时没有显式地定义主键，则 InnoDB 存储引擎会按如下方式选择或创建主键：</p>
+<ul>
+<li>首先判断表中是否有非空的唯一索引（Unique NOT NULL），如果有，则该列即为主键。</li>
+<li>如果不符合上述条件，InnoDB 存储引擎自动创建一个 6 字节大小的指针。</li>
+</ul>
+<h1 id="InnoDB-逻辑存储结构"><a href="#InnoDB-逻辑存储结构" class="headerlink" title="InnoDB 逻辑存储结构"></a>InnoDB 逻辑存储结构</h1><p>从 InnoDB 存储引擎的逻辑存储结构看，所有数据都被逻辑地存放在一个空间中，称之为表空间（table space）。 表空间又由段（segment）、区（extent）、页（page）组成。页在一些文档中有时也称为块（block），InnoDB 存储引擎的逻辑存储结构大致如下图所示。</p>
+<p><img src="/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png"></p>
+<h2 id="行-Row"><a href="#行-Row" class="headerlink" title="行 Row"></a>行 Row</h2><p>InnoDB 存储引擎是面向列的（row-oriented），也就说数据是按行进行存放的。每个页存放的行记录也是有硬性定义的，最多允许存放 16KB &#x2F; 2 - 200 行的记录，即 7992 行记录。这里提到了 row-oriented 的数据库，也就是说，存在有 column-oriented 的数据库。MySQL infobright 存储引擎就是按列来存放数据的，这对于数据仓库下的分析类 SQL 语句的执行及数据压缩非常有帮助。类似的数据库还有 Google Big Table 等。面向列的数据库是当前数据库发展的一个方向。</p>
+<h2 id="页-Page"><a href="#页-Page" class="headerlink" title="页 Page"></a>页 Page</h2><p>同大多数数据库一样，InnoDB 有页（Page）的概念，页是 InnoDB 磁盘操作的最小单位。在 InnoDB 存储引擎中，默认每个页的大小为 16KB。而从 InnoDB 1.2.x 版本开始，可以通过参数 innodb_page_size 将页的大小设置为 4K、8K、16K。若设置完成，则所有表中页的大小都为 innodb_page_size，不可以对其再次进行修改。除非通过 mysql dump 导入和导出操作来产生新的库。</p>
+<p>在 InnoDB 存储引擎中，常见的页类型有：</p>
+<ul>
+<li>数据页（B-tree Node）</li>
+<li>undo 页（undo Log Page）</li>
+<li>系统页（System Page）</li>
+<li>事务数据页（Transaction system Page）</li>
+<li>插人缓冲位图页（Insert Buffer Bitmap）</li>
+<li>插人缓冲空闲列表页（Insert Buffer Free List）</li>
+<li>未压缩的二进制大对象页（Uncompressed BLOB Page）</li>
+<li>压缩的二进制大对象页（compressed BLOB Page）</li>
+</ul>
+<h2 id="区-Extent"><a href="#区-Extent" class="headerlink" title="区 Extent"></a>区 Extent</h2><p>区是由连续页组成的空间，在任何情况下每个区的大小都为 1MB。为了保证区中页的连续性，InnoDB 存储引擎一次从磁盘申请 4~5 个区。在默认情况下，InnoDB 存储引擎页的大小为 16KB，即一个区中一共有 64 个连续的页。</p>
+<p><img src="/images/MySQL/%E9%A1%B5%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<p>InnoDB 1.0.x 版本开始引入压缩页，即每个页的大小可以通过参数 KEY_BLOCK_SIZE 设置为 2K、4K、8K，因此每个区对应页的数量就应该为 512、256、128。</p>
+<p>InnoDB 1.2.x 版本新增了参数 innodb_page_size，通过该参数可以将默认页的大小设置为 4K、8K，但是页中的数据库不是压缩。这时区中页的数量同样也为 256、128。总之，不论页的大小怎么变化，区的大小总是为 1M。</p>
+<p>但是，这里还有这样一个问题：在用户启用了参数 innodb_file_per_table 后，创建的表默认大小是 96KB。区中是 64 个连续的页，创建的表的大小至少是 1MB 才对啊？其实这是因为在每个段开始时，先用 32 个页大小的碎片页（fragment page）来存放数据，在使用完这些页之后才是 64 个连续页的申请。这样做的目的是，对于一些小表，或者是 undo 这类的段，可以在开始时申请较少的空间，节省磁盘容量的开销。</p>
+<h2 id="组-Group"><a href="#组-Group" class="headerlink" title="组 Group"></a>组 Group</h2><p>而为了方便管理和记录，又将每 256 个区域划分成一组。</p>
+<p><img src="/images/MySQL/%E7%BB%84%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<p>这些组的头几个页类型都是相似的。</p>
+<p><img src="/images/MySQL/%E7%BB%84%E4%B8%AD%E7%9A%84%E9%A1%B5%E7%B1%BB%E5%9E%8B.png"></p>
+<p>每一个表空间的第一个组的最开始三个页面是固定的，分别如下：</p>
+<ul>
+<li>FSP_HDR：这个类型的页面用来登记整个表空间的一些整体属性以及本组所有的区（也就是 extent 0 ~ extent 255 这 256 个区）的属性。需要注意的<br>一点是，整个表空间只有一个FSP_ HDR类型的页面。</li>
+<li>IBUF_BITMAP：这个类型的页面用来存储关于 Change Buffer 的一些信息。</li>
+<li>INODE：这个类型的页面存储了许多称为 INODE Entry 的数据结构。</li>
+</ul>
+<p>其余各组最开始的 2 个页面的类型是固定的。也就是说 extent 256、extent 512 ….. 这些区最开始的 2 个页面的类型是固定的，分别如下：</p>
+<ul>
+<li>XDES：全称是 extent descriptor，用来登记本组 256 个区的属性。与 FSP_HDR 类型的页面相似，只不过 FSP_HDR 类型的页面还会额外存储一些表空间的属性。</li>
+<li>IBUF_BITMAP</li>
+</ul>
+<blockquote>
+<p>  <strong>为什么提出区的概念？</strong></p>
+<p>  页的物理位置不连续，对于传统的机械硬盘来说，需要重新定位磁头位置，也就是会产生随机 IO，这样会影响磁盘的性能。所以我们应该尽量让页面链表中相邻的页的物理位置也相邻，这样在扫描叶子节点中大量的记录时才可以使用顺序 I&#x2F;O。</p>
+<p>  所以才引入了区（extent）的概念。一个区就是在物理位置上连续的 64 个页（区里页面的页号都是连续的）。在表中的数据量很大时，为某个索引分配空间的时候就不再按照页为单位分配了，而是按照区为单位进行分配。甚至在表中的数据非常非常多的时候，可以一次性分配多个连续的区。虽然这可能造成一点点空间的浪费（数据不足以填充满整个区），但是从性能角度看，可以消除很多的随机 I&#x2F;O。</p>
+<p>  并且由于扫描叶子结点和非叶子结点是两种不同的场景，且如果不区分其查询效率会非常低，因此叶子结点和非叶子结点都有自己独有的区。因此，索引会生成两个段：一个叶子结点段和一个非叶子结点段。</p>
+</blockquote>
+<h2 id="段-Segment"><a href="#段-Segment" class="headerlink" title="段 Segment"></a>段 Segment</h2><p>表空间是由各个段组成的，常见的段有数据段、索引段、回滚段等。因为前面已经介绍过了 InnoDB 存储引擎表是索引组织的（index organized），因此数据即索引，索引即数据。那么数据段即为 B+ 树的叶子节点（Leaf node segment），索引段即为 B+ 树的非索引节点（Non-leaf node segment）。</p>
+<p>为了考虑“以完整的区为单位分配给某个段时，对于数据量较小的表来说太浪费存储空间”这种情况，提出了碎片（fragment）区的概念。也就是在一个碎片区中，并不是所有的页都是为了存储同一个段的数据而存在的，碎片区中的页可以用于不同的目的，比如有些页属于段 A，有些页属于段 B，有些页甚至不属于任何段。碎片区直属于表空间，并不属于任何一个段。所以此后为某个段分配存储空间的策略是这样的：</p>
+<ul>
+<li>在刚开始向表中插入数据时，段是从某个碎片区以单个页面为单位来分配存储空间的;</li>
+<li>当某个段已经占用了 32 个碎片区页面之后，就会以完整的区为单位来分配存储空间（原先占用的碎片区页面并不会被复制到新申请的完整的区中）。</li>
+</ul>
+<h2 id="表空间-Space"><a href="#表空间-Space" class="headerlink" title="表空间 Space"></a>表空间 Space</h2><p>表空间可以看做是 InnoDB 存储引擎逻辑结构的最高层，所有的数据都存放在表空间中。在默认情况下启用参数 <code>innodb_file_per_table</code>，即每张表内的数据可以单独放到一个表空间内。而 InnoDB 存储引擎还有一个共享表空间 ibdata1，当关闭参数 <code>innodb_file_per_table</code>，所有数据都存放在这个表空间内。</p>
+<p>如果启用了 innodb_file_per_table 的参数，需要注意的是每张表的表空间内存放的只是数据、索引和插人缓冲 Bitmap 页，其他类的数据，如回滚（undo）信息，插人缓冲索引页、系统事务信息、二次写缓冲（Double write buffer）等还是存放在原来的共享表空间内。这同时也说明了另一个问题：即使在启用了参数 innodb_file_per_table 之后，共享表空间（默认 ibdata1）还是会不断地增加其大小。</p>
+<h1 id="InnoDB-行记录格式"><a href="#InnoDB-行记录格式" class="headerlink" title="InnoDB 行记录格式"></a>InnoDB 行记录格式</h1><p>InnoDB 存储引擎提供了 Compact 格式来存放行记录数据。另一种存放记录格式 Redundant 是为兼容 5.1 之前版本而保留的。用户可以通过命令 <code>SHOW TABLE STATUS LIKE &#39;table_name&#39;</code> 来查看当前表使用的行格式，其中 row_format 属性表示当前所使用的行记录结构类型。</p>
+<h2 id="Compact-行记录格式"><a href="#Compact-行记录格式" class="headerlink" title="Compact 行记录格式"></a>Compact 行记录格式</h2><p>Compact 行记录是在 MySQL 5.0 中引人的，其设计目标是高效地存储数据。简单来说，一个页中存放的行数据越多，其性能就越高。下图显示了 Compact 行记录的存储方式：</p>
+<p><img src="/images/MySQL/COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<h3 id="记录的额外信息"><a href="#记录的额外信息" class="headerlink" title="记录的额外信息"></a>记录的额外信息</h3><p>这部分信息是服务器为了更好地管理记录而添加的一些信息。其中包括：变长字段长度列表、NULL标志位、记录头信息。</p>
+<p><strong>1. 变长字段长度列表</strong></p>
+<p>MySQL 支持一些变长的数据类型，比如 VARCHAR(M)、VARBINARY(M)、各种 TEXT 类型、各种 BLOB 类型。变长字段中存储多少字节的数据是不固定的，所以我们在存储真实数据的时候需要顺便把这些数据占用的字节数也存起来，这样才不至于把 MySQL 服务器搞懵。也就是说这些变长字段占用的存储空间分为两部分：真正的数据内容、该数据占用的字节数。</p>
+<p>在 COMPACT 行格式中，所有变长字段的真实数据占用的字节数都存放在记录的开头位<br>置，从而形成一个变长字段长度列表，各变长字段的真实数据占用的字节数按照列的顺序逆序存放。</p>
+<p>变长字段的长度最大不可以超过 2 字节，这是因在 MySQL 数据库中 VARCHAR 类型的最大长度限制为 65535。</p>
+<blockquote>
+<p>  对于 CHAR(M) 类型的列来说，当列采用的是定长编码的字符集时，该列占用的字节数不会被加到变长字段长度列表；而如果采用变长编码的字符集时，该列占用的字节数就会被加到变长字段长度列表。</p>
+</blockquote>
+<p><strong>2. NULL 标志位</strong></p>
+<p>变长字段之后的第二个部分是 NULL 标志位，该位指示了该行数据中是否有 NULL 值，有则用 1 表示。同变长字段长度列表，NULL 标志位也是按照列的顺序逆序存放的。</p>
+<p><strong>3. 记录头信息</strong></p>
+<p>接下来的部分是记录头信息（record header），固定占用 5 字节（40 位），每位的含义见下表。</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>大小</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>预留位1</td>
+<td>1</td>
+<td>未知</td>
+</tr>
+<tr>
+<td>预留位2</td>
+<td>1</td>
+<td>未知</td>
+</tr>
+<tr>
+<td>deleted_flag</td>
+<td>1</td>
+<td>标记该记录是否被删除</td>
+</tr>
+<tr>
+<td>min_rec_flag</td>
+<td>1</td>
+<td>B+树的每层非叶子节点中最小的目录项记录都会添加该标记</td>
+</tr>
+<tr>
+<td>n_owned</td>
+<td>4</td>
+<td>一个页面中的记录会被分成若干个组，每个组中有一个记录是“带头大哥”，其余的记录都是“小弟”。“带头大哥”记录的 n_owned 值代表该组中所有的记录条数，“小弟”记录的 n_owned 值都为 0</td>
+</tr>
+<tr>
+<td>heap_no</td>
+<td>13</td>
+<td>表示当前记录在页面堆中的相对位置</td>
+</tr>
+<tr>
+<td>record_type</td>
+<td>3</td>
+<td>表示当前记录的类型，0 表示普通记录，1表示B+树非叶子节点的目录项记录，2表示Infimum记录，3表示Supremum记录</td>
+</tr>
+<tr>
+<td>next_record</td>
+<td>16</td>
+<td>表示下一条记录的相对位置</td>
+</tr>
+</tbody></table>
+<h3 id="记录的真实数据"><a href="#记录的真实数据" class="headerlink" title="记录的真实数据"></a>记录的真实数据</h3><p>最后的部分就是实际存储每个列的数据。需要特别注意的是，NULL 不占该部分任何空间，即 NULL 除了占有 NULL 标志位，实际存储不占有任何空间。另外有一点需要注意的是，每行数据除了用户定义的列外，还有两个隐藏列：</p>
+<table>
+<thead>
+<tr>
+<th>列名</th>
+<th>是否必须</th>
+<th>占用空间</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>db_row_id</td>
+<td>否</td>
+<td>6 字节</td>
+<td>行 ID，唯一标识一条记录</td>
+</tr>
+<tr>
+<td>db_trx_id</td>
+<td>是</td>
+<td>6 字节</td>
+<td>事务 ID</td>
+</tr>
+<tr>
+<td>db_roll_ptr</td>
+<td>是</td>
+<td>7 字节</td>
+<td>回滚指针</td>
+</tr>
+</tbody></table>
+<p>这里需要提一下 InnoDB 表的主键生成策略：优先使用用户自定义的主键作为主键；如果用户没有定义主键，则选取一个不允许存储 NULL 值的 UNIQUE 键作为主键；如果表中连不允许存储 NULL 值的 UNIQUE 键都没有定义，则 InnoDB 会为表默认添加一个名为 row id 的隐藏列作为主键。</p>
+<h2 id="行溢出数据"><a href="#行溢出数据" class="headerlink" title="行溢出数据"></a>行溢出数据</h2><p>InnoDB 存储引擎可以将一条记录中的某些数据存储在真正的数据页面之外。前面介绍到，InnoDB 以页为基本单位管理存储空间，而一个页的大小一般是 16KB，也就是 16384 字节。而如果某条 VARCHAR 列的实际数据就大于 16384 字节（理论值为 65536 字节）显然一个页也存不了一条记录。此时，在 COMPACT 和 REDUNDANT 行格式中，对于占用存储空间非常多的列，在记录的真实数据处只会存储该列的一部分数据，而把剩余的数据分散存储在几个其他的页中，然后在记录的真实数据处用 20 字节存储指向这些页的地址（当然，这 20 字节还包括分散在其他页面中的数据所占用的字节数），从而可以找到剩余数据所在的页，如下图。</p>
+<p><img src="/images/MySQL/%E5%BD%93%E5%88%97%E5%8D%A0%E7%94%A8%E7%9A%84%E5%AD%98%E5%82%A8%E7%A9%BA%E9%97%B4%E7%9B%B8%E5%BD%93%E5%A4%A7%E6%97%B6COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png"></p>
+<p>从上图中可以看出，对于 COMPACT 和 REDUNDANT 行格式来说，如果某一列中的数据非常多，则在本记录的真实数据处只会存储该列前 768 字节的数据以及一个指向其他页的地址，然后把剩下的数据存放到其他页中。这些存储 768 字节之外的数据的页面也称为溢出页（off-page），当发生行溢出时，数据存放在页类型为 Uncompress BLOB 的页中。</p>
+<p>需要注意的是，VARCHAR(M)、TEXT、BLOB 在存储数据相当多的情况下都可能成为溢出页。</p>
+<h2 id="Compressed-和-Dynamic-行记录格式"><a href="#Compressed-和-Dynamic-行记录格式" class="headerlink" title="Compressed 和 Dynamic 行记录格式"></a>Compressed 和 Dynamic 行记录格式</h2><p>InnoDB 1.0.x 版本开始引入了新的文件格式（file format，用户可以理解为新的页格式），以前支持的 Compact 和 Redundant 格式称为 Antelope 文件格式，新的文件格式称为 Barracuda 文件格式。Barracuda 文件格式下拥有两种新的行记录格式：Compressed 和 Dynamic。</p>
+<p>新的两种记录格式对于存放在 BLOB 中的数据采用了完全的行溢出的方式，如下图所示，在数据页中只存放 20 个字节的指针，实际的数据都存放在 Off Page 中，而之前的 Compact 和 Redundant 两种格式会存放 768 个前缀字节。</p>
+<p><img src="/images/MySQL/Barracuda%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E7%9A%84%E6%BA%A2%E5%87%BA%E8%A1%8C.png"></p>
+<p>Compressed 行记录格式不同于 DYNAMIC 行记录格式的一点是，存储在其中的行数据会以 zlib 的算法进行压缩，因此对于 BLOB、TEXT、VARCHAR 这类大长度类型的数据能够进行非常有效的存储。</p>
+<h1 id="InnoDB-数据页结构"><a href="#InnoDB-数据页结构" class="headerlink" title="InnoDB 数据页结构"></a>InnoDB 数据页结构</h1><p>页是 InnoDB 存储引擎管理数据库的最小磁盘单位。页类型为 B-tree Node 的页存放的即是表中行的实际数据了。下表为数据页结构：</p>
+<table>
+<thead>
+<tr>
+<th>名称</th>
+<th>中文名</th>
+<th>占用空间大小</th>
+<th>简单描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>File Header</td>
+<td>文件头部</td>
+<td>38字节</td>
+<td>页的一些通用信息</td>
+</tr>
+<tr>
+<td>Page Header</td>
+<td>页面头部</td>
+<td>56字节</td>
+<td>数据页专有的一些信息</td>
+</tr>
+<tr>
+<td>Infimun Records 和 Supremum Records</td>
+<td>页面中的最小记录和最大纪录</td>
+<td>26字节</td>
+<td>两个虚拟的记录</td>
+</tr>
+<tr>
+<td>User Records</td>
+<td>用户记录，即行记录</td>
+<td>不确定</td>
+<td>用户存储的记录内容</td>
+</tr>
+<tr>
+<td>Free Space</td>
+<td>空闲空间</td>
+<td>不确定</td>
+<td>页中尚未使用的空间</td>
+</tr>
+<tr>
+<td>Page Directory</td>
+<td>页目录</td>
+<td>不确定</td>
+<td>页中某些记录的相对位置</td>
+</tr>
+<tr>
+<td>File Trailer</td>
+<td>文件结尾信息</td>
+<td>8字节</td>
+<td>校验页是否完整</td>
+</tr>
+</tbody></table>
+<h2 id="User-Records-和-Free-Space"><a href="#User-Records-和-Free-Space" class="headerlink" title="User Records 和 Free Space"></a>User Records 和 Free Space</h2><p>在页的 7 个组成部分中，我们自己存储的记录会按照指定的行格式存储到 User Records 部分。但是在一开始生成页的时候，其实并没有 User Records 部分，每当插入一条记录时，都会从 Free Space 部分（也就是尚未使用的存储空间）申请一个记录大小的空间， 并将这个空间划分到 User Records 部分。当 Free Space 部分的空间全部被 User Records 部分替代掉之后，也就意味着这个页使用完了，此时如果还有新的记录插入，就需要去申请新的页了。</p>
+<p>再次强调，InnoDB 存储引擎表总是 B+ 树索引组织的。Free Space 很明显指的就是空闲空间，同样也是个链表数据结构。在一条记录被删除后，该空间会被加入到空闲链表中。</p>
+<h2 id="Infimun-和-Supremum-Records"><a href="#Infimun-和-Supremum-Records" class="headerlink" title="Infimun 和 Supremum Records"></a>Infimun 和 Supremum Records</h2><p>在 InnoDB 存储引擎中，每个数据页中有两个虚拟的行记录，用来限定记录的边界。Infimum 记录是比该页中任何主键值都要小的值，Supremum 指比任何可能大的值还要大的值。这两个值在页创建时被建立，并且在任何情况下不会被删除。在 Compact 行格式和 Redundant 行格式下，两者占用的字节数各不相同。</p>
+<p>![](&#x2F;images&#x2F;MySQL&#x2F;Infimun和Supremum Records.png)</p>
+<h2 id="Page-Directory"><a href="#Page-Directory" class="headerlink" title="Page Directory"></a>Page Directory</h2><p>Page Directory（页目录）中存放了记录的相对位置（注意，这里存放的是页相对位置，而不是偏移量），有些时候这些记录指针称为 Slots（槽）。与其他数据库系统不同的是，在 InnoDB 中并不是每个记录拥有一个槽，InnoDB 存储引擎的槽是一个稀疏目录（sparse directory）， 即一个槽中可能包含多个记录。伪记录 Infimum 的 n_owned 值总是为 1，记录 Supremum 的 n_owned 的取值范围为 [1, 8]，其他用户记录 n_owned 的取值范围为 [4, 8]。当记录被插人或删除时需要对槽进行分裂或平衡的维护操作。在 Slots 中记录按照索引键值顺序存放，这样可以利用二叉查找迅速找到记录的指针。</p>
+<p>由于在 InnoDB 存储引擎中 Page Directory 是稀疏目录，二叉查找的结果只是一个粗略的结果，因此 InnoDB 存储引擎必须通过 record header 中的 next_record 来继续查找相关记录。同时，Page Directory 很好地解释了 record header 中的 n_owned 值的含义，因为这些记录并不包括在 Page Directory 中。</p>
+<p>需要牢记的是，B+ 树索引本身并不能找到具体的一条记录，能找到只是该记录所在的页。数据库把页载入到内存，然后通过 Page Directory 再进行二叉查找。只不过二叉查找的时间复杂度很低，同时在内存中的查找很快，因此通常忽略这部分查找所用的时间。</p>
+<blockquote>
+<p>  <strong>给 Page 分 Slot 的规则</strong></p>
+<ol>
+<li>在初始情况下，一个数据页中只有 Infimum 记录和 Supremum 记录这两条，它们分属于两个分组。页目录中也只有两个 Slot ，分别代表 Infimum 记录和 Supremum 记录在页面中的地址偏移量。</li>
+<li>之后每插入一条记录， 都会从页目录中找到对应记录的主键值比待插入记录的主键值大并且差值最小的槽（从本质上来说，槽是一个组内最大的那条记录在页面中的地址偏移量，通过 Slot 可以快速找到对应的记录的主键值），然后把该槽对应的记录的 n_owned 值加 1，表示本组内又添加了一条记录，直到该组中的记录数等于 8 个。</li>
+<li>当一个组中的记录数等于 8 后，再插入一条记录，会将组中的记录拆分成两个组，其中一个组中 4 条记录，另一个 5 条记录。这个拆分过程会在页目录中新增一个槽，记录这个新增分组中最大的那条记录的偏移量。</li>
+</ol>
+</blockquote>
+<h2 id="Page-Header"><a href="#Page-Header" class="headerlink" title="Page Header"></a>Page Header</h2><p>Page Header 占用固定的 56 字节，专门存储各种状态信息。</p>
+<table>
+<thead>
+<tr>
+<th>状态名称</th>
+<th>占用空间大小</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PAGE_N_DIR_SLOTS</td>
+<td>2字节</td>
+<td>在页目录中的槽数量</td>
+</tr>
+<tr>
+<td>PAGE_HEAP_TOP</td>
+<td>2字节</td>
+<td>还未使用的空间最小地址，即从该地址之后就是 Free Space</td>
+</tr>
+<tr>
+<td>PAGE_FREE</td>
+<td>2字节</td>
+<td>各个已删除的记录通过 next record 组成一个单向链表，这个单向链表中的记录所占用的存储空间可以被重新利用：PAGE FREE 表示该链表头节点对应记录在页面中的偏移量</td>
+</tr>
+<tr>
+<td>PAGE_GARBAGE</td>
+<td>2字节</td>
+<td>已删除记录占用的字节数</td>
+</tr>
+<tr>
+<td>PAGE_LAST_INSERT</td>
+<td>2字节</td>
+<td>最后插入记录的位置</td>
+</tr>
+<tr>
+<td>PAGE_DIRECTION</td>
+<td>2字节</td>
+<td>记录插入的方向（与上一条插入记录的主键相比）</td>
+</tr>
+<tr>
+<td>PAGE_N_DIRECTION</td>
+<td>2字节</td>
+<td>一个方向连续插入的记录数量</td>
+</tr>
+<tr>
+<td>PAGE_N_RECS</td>
+<td>2字节</td>
+<td>该页中用户记录的数量（不包括 Infimum 和 Supremum 记录以及被删除的记录）</td>
+</tr>
+<tr>
+<td>PAGE_MAX_TRX_ID</td>
+<td>8字节</td>
+<td>修改当前页的最大事务ID，该值仅在二级索引页面中定义</td>
+</tr>
+<tr>
+<td>PAGE_LEVEL</td>
+<td>2字节</td>
+<td>当前页在 B+ 树中所处的层级</td>
+</tr>
+<tr>
+<td>PAGE_INDEX_ID</td>
+<td>8字节</td>
+<td>索引ID，表示当前页属于哪个索引</td>
+</tr>
+<tr>
+<td>PAGE_BTR_SEG_LEAF</td>
+<td>10字节</td>
+<td>B+树叶子结点段的头部信息，仅在B+树的根页面中定义</td>
+</tr>
+<tr>
+<td>PAGE_BTR_SEG_TOP</td>
+<td>10字节</td>
+<td>B+树非叶子结点段的头部信息，仅在B+树的根页面中定义</td>
+</tr>
+</tbody></table>
+<h2 id="File-Header"><a href="#File-Header" class="headerlink" title="File Header"></a>File Header</h2><p>File Header 固定占用 38 字节，记录通用的页信息。</p>
+<table>
+<thead>
+<tr>
+<th>状态名称</th>
+<th>占用空间大小</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FIL_PAGE_SPACE_OR_CHKSUM</td>
+<td>4字节</td>
+<td>当MySQL的版本低于4.0.14时，该属性表示本页面所在的表空间ID;在之后的版本中，该属性表示页的校验和(checksum)</td>
+</tr>
+<tr>
+<td>FIL_PAGE_OFFSET</td>
+<td>4字节</td>
+<td>页号</td>
+</tr>
+<tr>
+<td>FIL_PAGE_PREV</td>
+<td>4字节</td>
+<td>上一个页的页号</td>
+</tr>
+<tr>
+<td>FIL_PAGE_NEXT</td>
+<td>4字节</td>
+<td>下一个页的页号</td>
+</tr>
+<tr>
+<td>FIL_PAGE_LSN</td>
+<td>8字节</td>
+<td>页面被最后修改时对应的LSN（Log Sequence Number，日志序列号）值</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE</td>
+<td>2字节</td>
+<td>该页的类型</td>
+</tr>
+<tr>
+<td>FIL_PAGE_FILE_FLUSH_LSN</td>
+<td>8字节</td>
+<td>仅在系统表空间的第一个页中定义，代表文件至少被刷新到了对应的 LSN 值</td>
+</tr>
+<tr>
+<td>FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID</td>
+<td>4字节</td>
+<td>页属于哪个表空间</td>
+</tr>
+</tbody></table>
+<p>下表是页类型的分类：</p>
+<table>
+<thead>
+<tr>
+<th>类型名称</th>
+<th>十六进制</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FIL_PAGE_TYPE_ALLOCATED</td>
+<td>0x0000</td>
+<td>最新分配还未使用</td>
+</tr>
+<tr>
+<td>FIL_PAGE_UNDO_LOG</td>
+<td>0x0002</td>
+<td>undo 日志页</td>
+</tr>
+<tr>
+<td>FIL_PAGE_INODE</td>
+<td>0x0003</td>
+<td>存储段信息</td>
+</tr>
+<tr>
+<td>FIL_PAGE_IBUF_FREE_LIST</td>
+<td>0x0004</td>
+<td>Change Buffer空闲列表</td>
+</tr>
+<tr>
+<td>FIL_PAGE_IBUF_BITMAP</td>
+<td>0x0005</td>
+<td>Change Buffer 的一些属性</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE_SYS</td>
+<td>0x0006</td>
+<td>存储一些系统数据</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE_TRX_SYS</td>
+<td>0x0007</td>
+<td>事务系统数据</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE_FSP_HDR</td>
+<td>0x0008</td>
+<td>表空间头部信息</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE_XDES</td>
+<td>0x0009</td>
+<td>存储区的一些属性信息</td>
+</tr>
+<tr>
+<td>FIL_PAGE_TYPE_BLOB</td>
+<td>0x000A</td>
+<td>溢出页</td>
+</tr>
+<tr>
+<td>FIL_PAGE_INDEX</td>
+<td>0x45BF</td>
+<td>索引页，也就是我们所说的数据页</td>
+</tr>
+</tbody></table>
+<h2 id="File-Trailer"><a href="#File-Trailer" class="headerlink" title="File Trailer"></a>File Trailer</h2><p>为了检测页是否已经完整地写入磁盘（如可能发生的写入过程中磁盘损坏、机器关机等），InnoDB 存储引擎的页中设置了 File Trailer 部分。File Trailer 只有一个 FIL_PAGE_END_LSN 部分，占用 8 字节。可以分为两部分：</p>
+<ol>
+<li>前 4 字节代表页的校验和。这个部分与 File Header 中的校验和相对应。每当一个页面在内存中发生修改时，在刷新之前就要把页面的校验和算出来。因为 File Header 在页面的前边，所以 File Header 中的校验和会被首先刷新到磁盘，当完全写完后，校验和也会被写到页的尾部。如果页面刷新成功，则页首和页尾的校验和应该是一致的。如果刷新了一部分后断电了，那么 File Header 中的校验和就代表着已经修改过的页，而 File Trailer 中的校验和代表着原先的页，二者不同则意味着刷新期间发生了错误。</li>
+<li>后 4 字节代表页面被最后修改时对应的 LSN 的后 4 字节，正常情况下应该与File Header 部分的 FIL_PAGE_LSN 的后4字节相同。这个部分也是用于校验页的完整性。</li>
+</ol>
+<p>在默认配置下，InnoDB 存储引擎每次从磁盘读取一个页就会检测该页的完整性，即页是否发生 Corrupt，这就是通过 File Trailer 部分进行检测，而该部分的检测会有一定的开销。用户可以通过参数 innodb_checksums 来开启或关闭对这个页完整性的检查。</p>
+<h1 id="Named-File-Formats-机制"><a href="#Named-File-Formats-机制" class="headerlink" title="Named File Formats 机制"></a>Named File Formats 机制</h1><p>随着 InnoDB 存储引擎的发展，新的页数据结构有时用来支持新的功能特性。比如前面提到的 InnoDB 1.0.x 版本提供了新的页数据结构来支持表压缩功能，完全的溢出（Offpage）大变长字符类型字段的存储。这些新的页数据结构和之前版本的页并不兼容，因此从 InnoDB 1.0.x 版本开始，InnoDB 存储引通过 Named File Formats 机制来解决不同版本下页结构兼容性的问题。</p>
+<p>InnoDB 存储引擎将 1.0.x 版本之前的文件格式（file format）定义为 Antelope，将这个版本支持的文件格式定义为 Barracuda。新的文件格式总是包含于之前的版本的页格式。下图显示了 Barracuda 文件格式和 Antelope 文件格式之间的关系，Antelope 文件格式有 Compact 和 Redudant 的行格式，Barracuda 文件格式既包括了 Antelope 所有的文件格式，另外新加入了之前已经提到过的 Compressed 和 Dynamic 行格式。</p>
+<p><img src="/images/MySQL/MySQL%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F.png"></p>
+<h1 id="视图"><a href="#视图" class="headerlink" title="视图"></a>视图</h1><h2 id="虚拟视图"><a href="#虚拟视图" class="headerlink" title="虚拟视图"></a>虚拟视图</h2><p>在 MySQL 数据库中，视图（View）是一个命名的虚表，它由一个 SQL 查询来定义，可以当做表使用。与持久表（permanent table）不同的是，视图中的数据没有实际的物理存储。</p>
+<h2 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h2><p>Oracle 数据库支持物化视图——该视图不是基于基表的虚表，而是根据基表实际存在的实表，即物化视图的数据存储在非易失的存储设备上。物化视图可以用于预先计算并保存多表的链接（JOIN）或聚集（GROUP BY）等耗时较多的 SQL 操作结果。这样，在执行复杂查询时，就可以避免进行这些耗时的操作，从而快速得到结果。物化视图的好处是对于一些复杂的统计类查询能直接查出结果。在 Microsoft SQL Server 数据库中，称这种视图为索引视图。</p>
+<h1 id="分区表"><a href="#分区表" class="headerlink" title="分区表"></a>分区表</h1><h2 id="分区概述"><a href="#分区概述" class="headerlink" title="分区概述"></a>分区概述</h2><p>分区功能并不是在存储引擎层完成的，因此不是只有 InnoDB 存储引擎支持分区，常见的存储引擎 MyISAM、NDB 等都支持。但也并不是所有的存储引擎都支持，如 CSV、FEDORATED、MERGE 等就不支持。在使用分区功能前，应该对选择的存储引擎对分区的支持有所了解。</p>
+<p>MySQL 数据库在 5.1 版本时添加了对分区的支持。分区的过程是将一个表或索引分解为多个更小、更可管理的部分。就访问数据库的应用而言，从逻辑上讲，只有一个表或一个索引，但是在物理上这个表或索引可能由数十个物理分区组成。每个分区都是独立的对象，可以独自处理，也可以作为一个更大对象的一部分进行处理。</p>
+<p>MySQL 数据库支持的分区类型为水平分区，并不支持垂直分区。此外，MySQL 数据库的分区是局部分区索引，一个分区中既存放了数据又存放了索引。而全局分区是指，数据存放在各个分区中，但是所有数据的索引放在一个对象中。目前，MySQL 数据还不支持全局分区。</p>
+<p>大多数 DBA 会有这样一个误区：只要启用了分区，数据库就会运行得更快。这个结论是存在很多问题的。就我的经验看来，分区可能会给某些 SQL 语句性能带来提高，但是分区主要用于数据库高可用性的管理。在 OLTP 应用中，对于分区的使用应该非常小心。总之，如果只是一味地使用分区，而不理解分区是如何工作的，也不清楚你的应用如何使用分区，那么分区极有可能会对性能产生负面的影响。</p>
+<p>当前 MySQL 数据库支持以下几种类型的分区：</p>
+<ul>
+<li><p>RANGE 分区:</p>
+<p>行数据基于属于一个给定连续区间的列值被放入分区。MySQL 5.5 开始支持 RANGE COLUMNS 的分区。</p>
+</li>
+<li><p>LIST分区：</p>
+<p>和 RANGE 分区类型，只是 LIST 分区面向的是离散的值。MySQL 5.5 开始支持 LIST COLUMNS 的分区。</p>
+</li>
+<li><p>HASH分区：</p>
+<p>根据用户自定义的表达式的返回值来进行分区，返回值不能为负数。</p>
+</li>
+<li><p>KEY分区：</p>
+<p>根据 MySQL 数据库提供的哈希函数来进行分区。不论创建何种类型的分区，如果表中存在主键或唯一索引时， 分区列必须是唯一索引的一个组成部分。</p>
+</li>
+</ul>
+<h2 id="分区类型"><a href="#分区类型" class="headerlink" title="分区类型"></a>分区类型</h2><h3 id="RANGE-分区"><a href="#RANGE-分区" class="headerlink" title="RANGE 分区"></a>RANGE 分区</h3><p>一个简单的例子是以日期作为 RANGE 的分区。</p>
+<ul>
+<li>以年作为区间 <code>PARTITION by RANGE (YEAR(date))</code>，在以年查询时会直接查询对应分区。查询速度大幅度提升。</li>
+<li>但如果以年月为区间 <code>PARTITION by RANGE (YEAR(date)*100+MONTH(date))</code>，在查询时并不会根据分区进行选择。主要原因是对于 RANGE 分区的查询，优化器只能对 <code>YEAR()</code> <code>TO_DAYS()</code> <code>TO_SECONDS()</code> <code>UNIX_TIMESTAMP()</code> 这类函数进行优化选择。</li>
+</ul>
+<blockquote>
+<p>  超出分区会报错。分区需要在创建表时指定。</p>
+</blockquote>
+<h3 id="LIST-分区"><a href="#LIST-分区" class="headerlink" title="LIST 分区"></a>LIST 分区</h3><p>LIST 分区和 RANGE 分区非常相似，只是分区列的值是离散的，而非连续的。</p>
+<blockquote>
+<p>  超出分区会报错。分区需要在创建表时指定。</p>
+</blockquote>
+<p>InnoDB 和 MyISAM 对于插入错误的处理是不同的。以 <code>INSERT INTO t VALUES (1,2),(2,4),(6,10);</code> 举例，如果 <code>(6,10)</code> 超出分区报错，MyISAM 会入库前两条，而 InnoDB 一条都不会入库。在使用分区时，需要对不同存储引擎支持的事务特性进行考虑。</p>
+<h3 id="HASH-分区"><a href="#HASH-分区" class="headerlink" title="HASH 分区"></a>HASH 分区</h3><p>HASH 分区的目的是将数据均匀地分布到预先定义的各个分区中，保证各分区的数据数量大致都是一样的。在 RANGE 和 LIST 分区中，必须明确指定一个给定的列值或列值集合应该保存在哪个分区中；而在 HASH 分区中，MySQL 自动完成这些工作，用户所要做的只是基于将要进行哈希分区的列值指定一个列值或表达式，以及指定被分区的表将要被分割成的分区数量。</p>
+<h3 id="LINEAR-HASH-分区"><a href="#LINEAR-HASH-分区" class="headerlink" title="LINEAR HASH 分区"></a>LINEAR HASH 分区</h3><p>MySQL 数据库还支持一种称为 LINEAR HASH 的分区，它使用线性2的幂算法来确定新行插人到已经分区的表中的位置。</p>
+<p>LINEAR HASH 分区的优点在于，增加、删除、合并和拆分分区将变得更加快捷，这有利于处理含有大量数据的表。它的缺点在于，与使用 HASH 分区得到的数据分布相比，各个分区间数据的分布可能不大均衡。</p>
+<h3 id="KEY-分区"><a href="#KEY-分区" class="headerlink" title="KEY 分区"></a>KEY 分区</h3><p>KEY 分区和 HASH 分区相似，不同之处在于 HASH 分区使用用户定义的函数进行分区，KEY 分区使用 MySQL 数据库提供的函数进行分区。对于 NDBCluster 引擎，MySQL 数据库使用 MD5 函数来分区；对于其他存储引擎，MySQL数据库使用其内部的哈希函数，这些函数基于与 <code>PASSWORD()</code> 一样的运算法则。</p>
+<h3 id="COLUMNS-分区"><a href="#COLUMNS-分区" class="headerlink" title="COLUMNS 分区"></a>COLUMNS 分区</h3><p>在前面介绍的 RANGE、LIST、HASH 和 KEY 这四种分区中，分区的条件是：数据必须是整型（interger），如果不是整型，那应该需要通过函数将其转化为整型，如 <code>YEAR()</code>，<code>TO_DAYS()</code>，<code>MONTH()</code> 等函数。MySQL 5.5 版本开始支持 COLUMNS 分区，可视为 RANGE 分区和 LIST 分区的一种进化。COLUMNS 分区可以直接使用非整型的数据进行分区，分区根据类型直接比较而得，不需要转化为整型。此外，RANGE COLUMNS 分区可以对多个列进行分区。</p>
+<p>COLUMNS 分区支持以下的数据类型：</p>
+<ul>
+<li>所有的整型类型，INT、SMALLINT、TINYINT、BIGINT。</li>
+<li>日期类型，DATE 和 DATETIME。</li>
+<li>字符串类型，CHAR、VARCHAR、BINARY 和 VARBINARY。</li>
+</ul>
+<p>对于之前的 RANGE 和 LIST 分区，用户可以用 RANGE COLUMNS 和 LIST COLUMNS 分区进行很好的代替。</p>
+<h2 id="子分区"><a href="#子分区" class="headerlink" title="子分区"></a>子分区</h2><p>子分区（subpartitioning）是在分区的基础上再进行分区，有时也称这种分区为复合分区（composite partitioning）。MySQL 数据库允许在 RANGE 和 LIST 的分区上再进行 HASH 或 KEY 的子分区。</p>
+<p>子分区可以用于特别大的表，在多个磁盘间分别分配数据和索引。假设有 6 个磁盘，分别为 &#x2F;disk0、&#x2F;disk1、 &#x2F;disk2 等。</p>
+<h2 id="分区中的-NULL-值"><a href="#分区中的-NULL-值" class="headerlink" title="分区中的 NULL 值"></a>分区中的 NULL 值</h2><p>MySQL 数据库允许对 NULL 值做分区，但是处理的方法与其他数据库可能完全不同。MYSQL 数据库的分区总是视 NULL 值视小于任何的一个非 NULL 值，这和 MySQL 数据库中处理 NULL 值的 ORDER BY 操作是一样的。因此对于不同的分区类型，MySQL 数据库对于 NULL 值的处理也是各不相同。</p>
+<h2 id="在表和分区间交换数据"><a href="#在表和分区间交换数据" class="headerlink" title="在表和分区间交换数据"></a>在表和分区间交换数据</h2><p>MySQL 5.6 开始支持 <code>ALTER TABLE ... EXCHANGE PARTITION</code> 语法。该语句允许分区或子分区中的数据与另一个非分区的表中的数据进行交换。如果非分区表中的数据为空，那么相当于将分区中的数据移动到非分区表中。若分区表中的数据为空，则相当于将外部表中的数据导入到分区中。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/Form/" rel="tag"># Form</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/09/MySQL-%E6%96%87%E4%BB%B6/" rel="prev" title="MySQL 文件">
+      <i class="fa fa-chevron-left"></i> MySQL 文件
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/13/MySQL-%E7%B4%A2%E5%BC%95/" rel="next" title="MySQL 索引">
+      MySQL 索引 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E7%BB%84%E7%BB%87%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">索引组织表</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84"><span class="nav-number">2.</span> <span class="nav-text">InnoDB 逻辑存储结构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%8C-Row"><span class="nav-number">2.1.</span> <span class="nav-text">行 Row</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%B5-Page"><span class="nav-number">2.2.</span> <span class="nav-text">页 Page</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8C%BA-Extent"><span class="nav-number">2.3.</span> <span class="nav-text">区 Extent</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%84-Group"><span class="nav-number">2.4.</span> <span class="nav-text">组 Group</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%AE%B5-Segment"><span class="nav-number">2.5.</span> <span class="nav-text">段 Segment</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A8%E7%A9%BA%E9%97%B4-Space"><span class="nav-number">2.6.</span> <span class="nav-text">表空间 Space</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E8%A1%8C%E8%AE%B0%E5%BD%95%E6%A0%BC%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">InnoDB 行记录格式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Compact-%E8%A1%8C%E8%AE%B0%E5%BD%95%E6%A0%BC%E5%BC%8F"><span class="nav-number">3.1.</span> <span class="nav-text">Compact 行记录格式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%B0%E5%BD%95%E7%9A%84%E9%A2%9D%E5%A4%96%E4%BF%A1%E6%81%AF"><span class="nav-number">3.1.1.</span> <span class="nav-text">记录的额外信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%B0%E5%BD%95%E7%9A%84%E7%9C%9F%E5%AE%9E%E6%95%B0%E6%8D%AE"><span class="nav-number">3.1.2.</span> <span class="nav-text">记录的真实数据</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%8C%E6%BA%A2%E5%87%BA%E6%95%B0%E6%8D%AE"><span class="nav-number">3.2.</span> <span class="nav-text">行溢出数据</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Compressed-%E5%92%8C-Dynamic-%E8%A1%8C%E8%AE%B0%E5%BD%95%E6%A0%BC%E5%BC%8F"><span class="nav-number">3.3.</span> <span class="nav-text">Compressed 和 Dynamic 行记录格式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E6%95%B0%E6%8D%AE%E9%A1%B5%E7%BB%93%E6%9E%84"><span class="nav-number">4.</span> <span class="nav-text">InnoDB 数据页结构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#User-Records-%E5%92%8C-Free-Space"><span class="nav-number">4.1.</span> <span class="nav-text">User Records 和 Free Space</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Infimun-%E5%92%8C-Supremum-Records"><span class="nav-number">4.2.</span> <span class="nav-text">Infimun 和 Supremum Records</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Page-Directory"><span class="nav-number">4.3.</span> <span class="nav-text">Page Directory</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Page-Header"><span class="nav-number">4.4.</span> <span class="nav-text">Page Header</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#File-Header"><span class="nav-number">4.5.</span> <span class="nav-text">File Header</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#File-Trailer"><span class="nav-number">4.6.</span> <span class="nav-text">File Trailer</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Named-File-Formats-%E6%9C%BA%E5%88%B6"><span class="nav-number">5.</span> <span class="nav-text">Named File Formats 机制</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%A7%86%E5%9B%BE"><span class="nav-number">6.</span> <span class="nav-text">视图</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%99%9A%E6%8B%9F%E8%A7%86%E5%9B%BE"><span class="nav-number">6.1.</span> <span class="nav-text">虚拟视图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%89%A9%E5%8C%96%E8%A7%86%E5%9B%BE"><span class="nav-number">6.2.</span> <span class="nav-text">物化视图</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E8%A1%A8"><span class="nav-number">7.</span> <span class="nav-text">分区表</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E6%A6%82%E8%BF%B0"><span class="nav-number">7.1.</span> <span class="nav-text">分区概述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E7%B1%BB%E5%9E%8B"><span class="nav-number">7.2.</span> <span class="nav-text">分区类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RANGE-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.1.</span> <span class="nav-text">RANGE 分区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#LIST-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.2.</span> <span class="nav-text">LIST 分区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HASH-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.3.</span> <span class="nav-text">HASH 分区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#LINEAR-HASH-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.4.</span> <span class="nav-text">LINEAR HASH 分区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#KEY-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.5.</span> <span class="nav-text">KEY 分区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#COLUMNS-%E5%88%86%E5%8C%BA"><span class="nav-number">7.2.6.</span> <span class="nav-text">COLUMNS 分区</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%90%E5%88%86%E5%8C%BA"><span class="nav-number">7.3.</span> <span class="nav-text">子分区</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E4%B8%AD%E7%9A%84-NULL-%E5%80%BC"><span class="nav-number">7.4.</span> <span class="nav-text">分区中的 NULL 值</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8%E8%A1%A8%E5%92%8C%E5%88%86%E5%8C%BA%E9%97%B4%E4%BA%A4%E6%8D%A2%E6%95%B0%E6%8D%AE"><span class="nav-number">7.5.</span> <span class="nav-text">在表和分区间交换数据</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

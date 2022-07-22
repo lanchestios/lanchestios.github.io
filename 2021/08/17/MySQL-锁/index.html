@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="介绍了数据库中的锁。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 锁">
+<meta property="og:url" content="http://example.com/2021/08/17/MySQL-%E9%94%81/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="介绍了数据库中的锁。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MySQL/MySQL%E4%B8%ADLock%E5%92%8CLatch%E7%9A%84%E5%8C%BA%E5%88%AB.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E5%90%84%E7%B1%BB%E5%9E%8B%E9%94%81%E5%85%BC%E5%AE%B9%E6%83%85%E5%86%B5.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E8%87%AA%E5%A2%9E%E9%95%BF%E6%8F%92%E5%85%A5%E7%B1%BB%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/MySQL/innodb_autoinc_lock_mode.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E9%9D%9E%E9%94%81%E5%AE%9A%E4%B8%80%E8%87%B4%E8%AF%BB.png">
+<meta property="og:image" content="http://example.com/images/MySQL/脏读.png">
+<meta property="og:image" content="http://example.com/images/MySQL/不可重复读.png">
+<meta property="og:image" content="http://example.com/images/MySQL/幻读.png">
+<meta property="og:image" content="http://example.com/images/MySQL/第一类更新丢失.png">
+<meta property="og:image" content="http://example.com/images/MySQL/第二类更新丢失.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E4%BA%8B%E5%8A%A1%E7%8A%B6%E6%80%81%E5%92%8C%E9%94%81%E7%9A%84%E4%BF%A1%E6%81%AF.png">
+<meta property="og:image" content="http://example.com/images/MySQL/wait-for-graph.png">
+<meta property="article:published_time" content="2021-08-17T02:00:25.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.531Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="Lock">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MySQL/MySQL%E4%B8%ADLock%E5%92%8CLatch%E7%9A%84%E5%8C%BA%E5%88%AB.png">
+
+<link rel="canonical" href="http://example.com/2021/08/17/MySQL-%E9%94%81/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>MySQL 锁 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/08/17/MySQL-%E9%94%81/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL 锁
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-08-17 10:00:25" itemprop="dateCreated datePublished" datetime="2021-08-17T10:00:25+08:00">2021-08-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>介绍了数据库中的锁。</p>
+<span id="more"></span>
+
+<h1 id="InnoDB-存储引擎中的锁"><a href="#InnoDB-存储引擎中的锁" class="headerlink" title="InnoDB 存储引擎中的锁"></a>InnoDB 存储引擎中的锁</h1><h2 id="锁的形态"><a href="#锁的形态" class="headerlink" title="锁的形态"></a>锁的形态</h2><p>锁的形态分为 Lock 和 Latch。</p>
+<p><img src="/images/MySQL/MySQL%E4%B8%ADLock%E5%92%8CLatch%E7%9A%84%E5%8C%BA%E5%88%AB.png"></p>
+<p>对于 InnoDB 的 Latch，可通过 SHOW ENGINE INNODB MUTEX 进行查看。Lock 信息可通过 SHOW ENGINE INNODB STATUS 及 information_schema 架构下的表 INNODB_LOCK_WAITS 来观察锁信息。</p>
+<h2 id="锁的类型"><a href="#锁的类型" class="headerlink" title="锁的类型"></a>锁的类型</h2><h3 id="行级别的-S、X-锁"><a href="#行级别的-S、X-锁" class="headerlink" title="行级别的 S、X 锁"></a>行级别的 S、X 锁</h3><p>InnoDB 存储引擎实现了如下两种标准的行锁：</p>
+<ul>
+<li>共享锁（Shared Lock，S Lock）</li>
+<li>排他锁（Exclusive Lock，X Lock）</li>
+</ul>
+<p>InnoDB 引擎在事务读取一条记录时要先获取该记录的 S 锁，在事务要改动一条记录时要先获取该记录的 X 锁。</p>
+<p>以下是 InnoDB 引擎对 SELECT 语句支持的两种一致性锁定读操作：</p>
+<ul>
+<li>SELECT … FOR UPDATE （加 X 锁）</li>
+<li>SELECT … LOCK IN SHARE MODE （加 S 锁）</li>
+</ul>
+<p>当事务提交时，锁会自动释放。</p>
+<h3 id="表级别的-S、X-锁"><a href="#表级别的-S、X-锁" class="headerlink" title="表级别的 S、X 锁"></a>表级别的 S、X 锁</h3><p>在对某个表执行 SELECT、INSERT、DELETE、UPDATE 语句时，InnoDB 存储引擎是不会为这个表添加表级别的 S 锁或者 X 锁的。<br>另外，在对某个表执行一些诸如 ALTER TABLE、DROP TABLE 的 DDL 语句时，其他事务在对这个表并发执行诸如 SELECT、INSERT、DELETE、UPDATE 等语句，会发生阻塞。同理，某个事务在对某个表执行 SELECT、INSERT、DELETE、UPDATE 语句时，在其他会话中对这个表执行 DDL 语句也会发生阻塞。这个过程其实是通过在 server 层使用一种称为元数据锁（Metadata Lock, MDL）的东西来实现的，一般情况下也不会使用 InnoDB 存储引擎自己提供的表级别的 S 锁和 X 锁。</p>
+<p>表级别的 S、X 锁只会在一些特殊情况（如系统崩溃恢复时）用到。</p>
+<h3 id="表级别的-IS、IX-锁"><a href="#表级别的-IS、IX-锁" class="headerlink" title="表级别的 IS、IX 锁"></a>表级别的 IS、IX 锁</h3><p>InnoDB 存储引擎还支持多粒度（granular）锁定，这种锁定允许事务在行级上的锁和表级上的锁同时存在。InnoDB 通过意向锁的方式实现了多粒度锁定的功能。当对使用 InnoDB 存储引擎的表的某些记录加 S 锁之前，需要先在表级别加一个 IS 锁；当对使用 InnoDB 存储引擎的表的某些记录加 X 锁之前，需要先在表级别加一个 IX 锁。IS 锁和 IX 锁的使命只是为了后续在加表级别的 S 锁和 X 锁时，判断表中是否有已经被加锁的记录，以避免用遍历的方式来查看表中有没有上锁的记录。</p>
+<p>InnoDB 存储引擎支持意向锁设计比较简练，其设计目的主要是为了在一个事务中揭示下一行将被请求的锁类型。其支持两种意向锁：</p>
+<ol>
+<li>意向共享锁（IS Lock），事务想要获得一张表中某几行的共享锁</li>
+<li>意向排他锁（IX Lock），事务想要获得一张表中某几行的排他锁</li>
+</ol>
+<p>由于 InnoDB 存储引擎支持的是行级别的锁，因此意向锁其实不会阻塞除全表扫描以外的任何请求。故表级意向锁与行级锁的兼容性如下表所示。</p>
+<p><img src="/images/MySQL/%E5%90%84%E7%B1%BB%E5%9E%8B%E9%94%81%E5%85%BC%E5%AE%B9%E6%83%85%E5%86%B5.png"></p>
+<p>用户可通过 SHOW FULL PROCESSLIST、SHOW ENGINE INNODB STATUS 命令查看当前锁请求信息。也可在 information_schema 架构的 innodb_trx、innodb_locks、innodb_lock_waits 监控当前事物并分析可能存在的锁问题。</p>
+<h3 id="表级别的-AUTO-INC-锁"><a href="#表级别的-AUTO-INC-锁" class="headerlink" title="表级别的 AUTO-INC 锁"></a>表级别的 AUTO-INC 锁</h3><p>一般对于自增序列实现方式有下面两个：</p>
+<ol>
+<li><p>采用 AUTO-INC 锁，也就是在执行插入语句时就加一个表级别的 AUTO-INC 锁，然后为每条待插入记录的 AUTO_INCREMENT 修饰的列分配递增的值。在该语句执行结束后，再把 AUTO-INC 锁释放掉。这样一来，一个事务在持有 AUTO-INC 锁的过程中，其他事务的插入语句都要被阻塞，从而保证一个语句中分配的递增值是连续的。在无法预计即将插入记录的数量时（如 INSERT…SELECT、REPLACE…SELECT 或者 LOAD DATA）一般使用此种方法。</p>
+</li>
+<li><p>采用一个轻量级的锁，在为插入语句生成 AUTO_INCREMENT 修饰的列的值时获取这个轻量级锁，然后在生成本次插入语句需要用到的 AUTO_INCREMENT 修饰的列的值之后，就把该轻量级锁释放掉，而不需要等到整个插入语句执行完后才释放锁。</p>
+<blockquote>
+<p>  如果我们的插入语句在执行前就可以确定具体要插入多少条记录，比如在语句执行前就可以确定要插入 2 条记录，那么一般采用轻量级锁的方式对 AUTO_INCREMENT 修饰的列进行赋值。这种方式可以避免锁定表，可以提升插入性能。</p>
+</blockquote>
+</li>
+</ol>
+<p>下面是自增长的插入类型：</p>
+<p><img src="/images/MySQL/%E8%87%AA%E5%A2%9E%E9%95%BF%E6%8F%92%E5%85%A5%E7%B1%BB%E5%9E%8B.png"></p>
+<p>下面是参数 innodb_autoinc_lock_mode 对自增的影响：</p>
+<p><img src="/images/MySQL/innodb_autoinc_lock_mode.png"></p>
+<p>此外，还需要特别注意的是 InnoDB 存储引擎中自增长的实现和 MyISAM 不同，MyISAM 存储引擎是表锁设计，自增长不用考虑并发插入的问题。因此在 master 上用 InnoDB 存储引擎，在 slave 上用 MyISAM存储引擎的 replication 架构下，用户必须考虑这种情况。</p>
+<h3 id="外键关联锁"><a href="#外键关联锁" class="headerlink" title="外键关联锁"></a>外键关联锁</h3><p>外键主要用于引用完整性的约束检查。在 InnoDB 存储引擎中，对于一个外键列，如果没有显式地对这个列加索引，InnoDB 存储引擎自动对其加一个索引，因为这样可以避免表锁。这比 Oracle 数据库做得好，Oracle 数据库不会自动添加索引，用户必须自己手动添加，这也导致了 Oracle 数据库中可能产生死锁。</p>
+<p>对于外键值的插人或更新，首先需要查询父表中的记录，即 SELECT 父表。但是对于父表的 SELECT 操作，不是使用一致性非锁定读的方式，因为这样会发生数据不一致的问题，因此这时使用的是 SELECT..LOCK IN SHARE MODE 方式，即主动对父表加一个 S 锁。如果这时父表上已经这样加 X 锁，子表上的操作会被阻塞。</p>
+<h2 id="一致性非锁定读"><a href="#一致性非锁定读" class="headerlink" title="一致性非锁定读"></a>一致性非锁定读</h2><p>一致性的非锁定读（consistent nonlocking read）是指 InnoDB 存储引擎通过行多版本控制（multi versioning）的方式来读取当前执行时间数据库中行的数据。如果读取的行正在执行 DELETE 或 UPDATE 操作，这时读取操作不会因此去等待行上锁的释放。相反地，InnoDB 存储引擎会去读取行的一个快照数据。</p>
+<p><img src="/images/MySQL/%E9%9D%9E%E9%94%81%E5%AE%9A%E4%B8%80%E8%87%B4%E8%AF%BB.png"></p>
+<p>如上图所示，之所以称其为非锁定读，因为不需要等待访问的行上 X 锁的释放。快照数据是指该行的之前版本的数据，该实现是通过 undo 段来完成。而 undo 用来在事务中回滚数据，因此快照数据本身是没有额外的开销。此外，读取快照数据是不需要上锁的，因为没有事务需要对历史的数据进行修改操作。</p>
+<p>快照数据其实就是当前行数据之前的历史版本，每行记录可能有多个版本，一般称这种技术为行多版本技术。由此带来的并发控制，称之为多版本并发控制（Multi Version Concurrency Control, MVCC）。</p>
+<p>在事务隔离级别 READ COMMITTED 和 REPEATABLE READ 下，InnoDB 存储引擎使用非锁定的一致性读。然而，对于快照数据的定义却不相同。在 READ COMMITTED 事务隔离级别下，对于快照数据，非一致性读总是读取被锁定行的最新一份快照数据。而在 REPEATABLE READ 事务隔离级别下，对于快照数据，非一致性读总是读取事务开始时的行数据版本。</p>
+<h1 id="并发事务的问题"><a href="#并发事务的问题" class="headerlink" title="并发事务的问题"></a>并发事务的问题</h1><p>并发的事务如果没有有效的机制进行避免就会导致出现脏读、不可重复读、幻读、第一类更新丢失、第二类更新丢失。</p>
+<h2 id="脏读"><a href="#脏读" class="headerlink" title="脏读"></a>脏读</h2><p>在不同事务下，当前事务可以读取到另外事务未提交的数据。</p>
+<img src="/images/MySQL/脏读.png" style="zoom:48%;" />
+
+<h2 id="不可重复读"><a href="#不可重复读" class="headerlink" title="不可重复读"></a>不可重复读</h2><p>不可重复读是指在一个事务内多次读取同一数据集合。在这个事务还没有结束时，另外一个事务也访问该同一数据集合，并做了一些 DML 操作。因此，在第一个事务中的两次读数据之间，由于第二个事务的修改，那么第一个事务两次读到的数据可能是不一样的。这样就发生了在一个事务内两次读到的数据是不一样的情况，这种情况称为不可重复读。</p>
+<p>不可重复读和脏读的区别是：脏读是读到未提交的数据，而不可重复读读到的却是已经提交的数据，但是其违反了数据库事务一致性的要求。 </p>
+<img src="/images/MySQL/不可重复读.png" style="zoom: 50%;" />
+
+<h2 id="幻读"><a href="#幻读" class="headerlink" title="幻读"></a>幻读</h2><img src="/images/MySQL/幻读.png" style="zoom:46%;" />
+
+<h2 id="更新丢失"><a href="#更新丢失" class="headerlink" title="更新丢失"></a>更新丢失</h2><p>丢失更新是另一个锁导致的问题，简单来说其就是一个事务的更新操作会被另一个事务的更新操作所覆盖，从而导致数据的不一致。这种现象只是零星的、随机的，极难发现。</p>
+<h3 id="第一类更新丢失"><a href="#第一类更新丢失" class="headerlink" title="第一类更新丢失"></a>第一类更新丢失</h3><img src="/images/MySQL/第一类更新丢失.png" style="zoom:42%;" />
+
+<h3 id="第二类更新丢失"><a href="#第二类更新丢失" class="headerlink" title="第二类更新丢失"></a>第二类更新丢失</h3><img src="/images/MySQL/第二类更新丢失.png" style="zoom:43%;" />
+
+<h1 id="锁机制"><a href="#锁机制" class="headerlink" title="锁机制"></a>锁机制</h1><p>InnoDB 存储引擎有三种行锁算法：</p>
+<ul>
+<li>Record Lock，单个行记录上的锁</li>
+<li>Gap Lock，锁定一个范围，但不包含记录本身</li>
+<li>Next-Key Lock，锁定一个范围并锁定记录本身，即左开右闭区间</li>
+<li>Intention Lock，意向锁</li>
+</ul>
+<p>需要重点说明的是 Gap Lock，间隙锁存在的目的主要是在可重复读的隔离条件下防止幻读的出现。实际的做法是将可能导致幻读区域的记录锁定，一是防止间隙内有新数据被插入，二是防止已存在的数据更新成间隙内的数据。例如有以下四条数据 <code>(id:1, s_index:2)</code>、<code>(id:3, s_index:3)</code>、<code>(id:5, s_index:5)</code>、<code>(id:6, s_index:5)</code>。如果要插入 <code>(id:4, s_index:4)</code>，间隙锁锁住的就是 <code>(3,5)</code> 这个区间，具体点说也就是插入位置所在的间隙，即 <code>(id:3, s_index:3)</code>、<code>(id:5, s_index:5)</code>这两条记录中间形成的间隙。</p>
+<blockquote>
+<p>  需要注意的是，在通过 SHOW ENGINE INNODB STATUS 查询锁信息时，有以下几种对应关系：</p>
+<ol>
+<li>Record Lock 对应 lock_mode X locks rec but not gap 或 lock_mode S locks rec but not gap</li>
+<li>Gap Lock 对应 lock_mode X locks gap before rec 或 lock_mode S locks gap before rec</li>
+<li>Next-Key Lock 对应 lock_mode X</li>
+<li>Intention Lock 对应 lock mode IX 或 lock mode IS</li>
+</ol>
+<p>  另外，在使用之前需要 <code>set GLOBAL innodb_status_output_locks=ON</code>，这样在查看 engine innodb status 的时候可以更加清晰的查到到锁的情况。</p>
+</blockquote>
+<h2 id="根据二级索引修改一条记录"><a href="#根据二级索引修改一条记录" class="headerlink" title="根据二级索引修改一条记录"></a>根据二级索引修改一条记录</h2><p><strong>以根据非唯一索引删除一条存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><div class="caption"><span>l</span></div><code class="language-null">&gt; DELETE FROM t WHERE c1&#x3D;5;
+Query OK, 1 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146749, ACTIVE 9 sec
+4 lock struct(s), heap size 1184, 3 row lock(s), undo log entries 1
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 104 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;t&#96; trx id 146749 lock mode IX
+RECORD LOCKS space id 53 page no 5 n bits 72 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146749 lock_mode X
+RECORD LOCKS space id 53 page no 3 n bits 72 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146749 lock_mode X locks rec but not gap
+RECORD LOCKS space id 53 page no 5 n bits 72 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146749 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据非唯一索引进行删除的时候，锁情况为：</p>
+<ol>
+<li>4 lock struct(s)：4 种锁结构，分别为 IX，idx_c1 的 next key 锁(3,5] ，主键的行锁，还有 idx_c1 的 gap 锁 (5,7)</li>
+<li>3 row lock(s)：除去 IX 的都是算在 row lock 里面</li>
+</ol>
+<p><strong>以根据非唯一索引删除一条不存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">&gt; delete from t where c1 &#x3D; 4;
+Query OK, 0 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146786, ACTIVE 1 sec
+2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 671 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;t&#96; trx id 146786 lock mode IX
+RECORD LOCKS space id 53 page no 5 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146786 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据非唯一索引删除一条不存在记录，锁情况为：</p>
+<ol>
+<li>2 lock struct(s)：2种锁结构，分别为 IX 和 X 类型的 gap 锁</li>
+<li>1 row lock(s)：为非唯一索引的 gap(X) 锁</li>
+</ol>
+<h2 id="根据唯一索引修改一条记录"><a href="#根据唯一索引修改一条记录" class="headerlink" title="根据唯一索引修改一条记录"></a>根据唯一索引修改一条记录</h2><p><strong>以根据唯一索引删除一条存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">&gt; delete from tu where c1&#x3D;5;
+Query OK, 1 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146751, ACTIVE 2 sec
+3 lock struct(s), heap size 360, 2 row lock(s), undo log entries 1
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 134 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146751 lock mode IX
+RECORD LOCKS space id 45 page no 5 n bits 72 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146751 lock_mode X locks rec but not gap
+RECORD LOCKS space id 45 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146751 lock_mode X locks rec but not gap<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据唯一索引进行删除的时候，锁情况为：</p>
+<ol>
+<li>3 lock struct(s)：3 种锁结构，分别为 IX，idx_c1 和主键的行锁，没有 gap 锁</li>
+<li>2 row lock(s)：除去 IX 的都是算在 row lock 里面，没有 gap，因此为 2 个</li>
+</ol>
+<p><strong>以根据唯一索引删除一条不存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">&gt; delete from tu where c1 &#x3D; 4;
+Query OK, 0 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146787, ACTIVE 2 sec
+2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 711 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146787 lock mode IX
+RECORD LOCKS space id 45 page no 5 n bits 72 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146787 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据唯一索引删除一条不存在记录，发现和非唯一索引一样，锁情况为：</p>
+<ol>
+<li>2 lock struct(s)：2 种锁结构，分别为 IX 和 X 类型的 gap 锁</li>
+<li>1 row lock(s)：为唯一索引的gap(X)锁</li>
+</ol>
+<h2 id="根据主键修改一条存在记录"><a href="#根据主键修改一条存在记录" class="headerlink" title="根据主键修改一条存在记录"></a>根据主键修改一条存在记录</h2><p><strong>以根据主键删除一条存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">&gt; delete from tu where id&#x3D;2;
+Query OK, 1 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146753, ACTIVE 2 sec
+2 lock struct(s), heap size 360, 1 row lock(s), undo log entries 1
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 147 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146753 lock mode IX
+RECORD LOCKS space id 45 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146753 lock_mode X locks rec but not gap<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据主键进行删除的时候，锁情况为：</p>
+<ol>
+<li>2 lock struct(s)：2 种锁结构，分别为 IX 和主键的行锁，没有 gap 锁</li>
+<li>1 row lock(s)：就主键记录上的行锁，没有 gap，因此为1个</li>
+</ol>
+<p><strong>以根据主键删除一条不存在记录举例</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">delete from tu where id &#x3D; 6;
+Query OK, 0 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146831, ACTIVE 24 sec
+2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 881 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146831 lock mode IX
+RECORD LOCKS space id 45 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146831 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据主键删除一条不存在记录，发现和非唯一索引一样，锁情况为：</p>
+<ol>
+<li>2 lock struct(s)：2种锁结构，分别为IX和X类型的gap锁</li>
+<li>1 row lock(s)：为主键上的gap(X)锁</li>
+</ol>
+<h2 id="根据主键删除两条存在的记录"><a href="#根据主键删除两条存在的记录" class="headerlink" title="根据主键删除两条存在的记录"></a>根据主键删除两条存在的记录</h2><h3 id="用-in-关键字删除"><a href="#用-in-关键字删除" class="headerlink" title="用 in 关键字删除"></a>用 in 关键字删除</h3><p>根据主键删除两条的时候，使用 in 的锁情况为：</p>
+<ol>
+<li>2 lock struct(s)：2 种锁结构，分别为 IX 和主键的行锁，没有 gap 锁</li>
+<li>2 row lock(s)：两条主键记录上的行锁，没有 gap，因此为 2 个</li>
+</ol>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有3,4两条记录
+
+&gt; delete from tu where id in (3,4);
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146880, ACTIVE 1 sec
+2 lock struct(s), heap size 360, 2 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 928 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146880 lock mode IX
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146880 lock_mode X locks rec but not gap<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="用-range-方式删除"><a href="#用-range-方式删除" class="headerlink" title="用 range 方式删除"></a>用 range 方式删除</h3><p>根据主键删除两条的时候，使用&gt;,&lt;,&gt;&#x3D;,&lt;&#x3D;,比较符号的锁情况为：</p>
+<ol>
+<li>无论如何，匹配到 2 条记录，因此必须会有 2 row lock(s)</li>
+<li>如果只有 <code>&gt;</code>、<code>&lt;</code>，那么毫无疑问，是不会锁定两个边界的记录，因此他只会锁定边界到边界内的整个范围，锁的类型为 next key，此时为 2 lock struct(s) ，3 row lock(s)</li>
+<li>碰到 &gt;&#x3D; 的时候，判断 &gt;&#x3D; 的值是否存在，如果存在，则锁定该记录。所以除了IX,next key锁，还有行锁，因此存在的时候为3 lock struct(s), 3 row lock(s)。如果不存在，和第二种是一样的，为2 lock struct(s) ，3 row lock(s) 。</li>
+</ol>
+<p><strong>左闭右闭区间</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有 5,9 这两条记录
+
+&gt; delete from tu where id&gt;&#x3D;5 and id&lt;&#x3D;9;
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146912, ACTIVE 12 sec
+3 lock struct(s), heap size 360, 3 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 1022 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146912 lock mode IX
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146912 lock_mode X locks rec but not gap
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146912 lock_mode X<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>左闭右开区间</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有 5,10 这两条记录
+
+&gt; delete from tu where id&gt;&#x3D;5 and id&lt;10;
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146900, ACTIVE 35 sec
+3 lock struct(s), heap size 360, 3 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 995 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146900 lock mode IX
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146900 lock_mode X locks rec but not gap
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146900 lock_mode X<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>左开右开区间</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有 4,10 这两条记录
+
+&gt; delete from tu where id&gt;4 and id&lt;10;
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146906, ACTIVE 13 sec
+2 lock struct(s), heap size 360, 3 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 1011 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146906 lock mode IX
+RECORD LOCKS space id 56 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146906 lock_mode X<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>左边界未匹配上的左闭右闭区间</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有 10 没 7 
+
+&gt; delete from tu where id&gt;&#x3D;7 and id&lt;&#x3D;10;
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146966, ACTIVE 2 sec
+2 lock struct(s), heap size 360, 3 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 1172 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146966 lock mode IX
+RECORD LOCKS space id 57 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146966 lock_mode X<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>右边界未匹配上的左闭右闭区间</strong></p>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">有 4 没 8 
+
+&gt; delete from tu where id&gt;&#x3D;4 and id&lt;&#x3D;8;
+Query OK, 2 rows affected (0.00 sec)
+
+&gt; SHOW ENGINE INNODB STATUS;
+---TRANSACTION 146972, ACTIVE 20 sec
+3 lock struct(s), heap size 360, 3 row lock(s), undo log entries 2
+MySQL thread id 1, OS thread handle 0x7f61ab1c7700, query id 1201 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146972 lock mode IX
+RECORD LOCKS space id 57 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146972 lock_mode X locks rec but not gap
+RECORD LOCKS space id 57 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146972 lock_mode X<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="非唯一索引删除一条已经标记删除的记录"><a href="#非唯一索引删除一条已经标记删除的记录" class="headerlink" title="非唯一索引删除一条已经标记删除的记录"></a>非唯一索引删除一条已经标记删除的记录</h2><table>
+<thead>
+<tr>
+<th>Sess1</th>
+<th>Sess2</th>
+<th>Sess3</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>begin;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>delete from t where c1&#x3D;8;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>delete from t where c1&#x3D;8;</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>@1 show engine innodb status</td>
+</tr>
+<tr>
+<td>commit;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>@2 show engine innodb status</td>
+</tr>
+</tbody></table>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">@1 show engine innodb status
+
+
+---TRANSACTION 146981, ACTIVE 12 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 363, OS thread handle 0x7f61ab1c7700, query id 2804 localhost msandbox updating
+delete from t where c1&#x3D;8
+------- TRX HAS BEEN WAITING 12 SEC FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146981 lock_mode X waiting
+------------------
+TABLE LOCK table &#96;test&#96;.&#96;t&#96; trx id 146981 lock mode IX
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146981 lock_mode X waiting
+---TRANSACTION 146980, ACTIVE 16 sec
+4 lock struct(s), heap size 1184, 3 row lock(s), undo log entries 1
+MySQL thread id 355, OS thread handle 0x7f61ab145700, query id 2802 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;t&#96; trx id 146980 lock mode IX
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146980 lock_mode X
+RECORD LOCKS space id 54 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146980 lock_mode X locks rec but not gap
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146980 lock_mode X locks gap before rec
+
+@2 show engine innodb status
+
+---TRANSACTION 146981, ACTIVE 50 sec
+3 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 363, OS thread handle 0x7f61ab1c7700, query id 2804 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;t&#96; trx id 146981 lock mode IX
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146981 lock_mode X
+RECORD LOCKS space id 54 page no 4 n bits 80 index &#96;idx_c1&#96; of table &#96;test&#96;.&#96;t&#96; trx id 146981 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>非唯一索引删除一条已经标记删除的记录的锁情况为：</p>
+<ul>
+<li>加锁等待时: 2 lock struct(s) ，持有 IX 锁，等待记录上的 next key 锁</li>
+<li>加锁成功时：3 lock struct(s)，持有 IX、next key 锁和 gap 锁，这个和非唯一索引删除一条不存在的记录是基本一样的，多了个因 Sess1 提交成功后多获得的 next key 锁。</li>
+</ul>
+<h2 id="唯一索引删除一条已经标记删除的记录"><a href="#唯一索引删除一条已经标记删除的记录" class="headerlink" title="唯一索引删除一条已经标记删除的记录"></a>唯一索引删除一条已经标记删除的记录</h2><table>
+<thead>
+<tr>
+<th>Sess1</th>
+<th>Sess2</th>
+<th>Sess3</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>begin;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>delete from tu where c1&#x3D;8;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>delete from tu where c1&#x3D;8;</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>@1 show engine innodb status</td>
+</tr>
+<tr>
+<td>commit;</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>@2 show engine innodb status</td>
+</tr>
+</tbody></table>
+<pre class="line-numbers language-null" data-language="null"><code class="language-null">@1 show engine innodb status
+
+---TRANSACTION 146984, ACTIVE 2 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 2 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 363, OS thread handle 0x7f61ab1c7700, query id 2842 localhost msandbox updating
+delete from tu where c1&#x3D;8
+------- TRX HAS BEEN WAITING 2 SEC FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 57 page no 4 n bits 80 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock_mode X waiting
+------------------
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock mode IX
+RECORD LOCKS space id 57 page no 4 n bits 80 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock_mode X waiting
+---TRANSACTION 146983, ACTIVE 9 sec
+3 lock struct(s), heap size 360, 2 row lock(s), undo log entries 1
+MySQL thread id 355, OS thread handle 0x7f61ab145700, query id 2839 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146983 lock mode IX
+RECORD LOCKS space id 57 page no 4 n bits 80 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146983 lock_mode X locks rec but not gap
+RECORD LOCKS space id 57 page no 3 n bits 80 index &#96;PRIMARY&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146983 lock_mode X locks rec but not gap
+
+@2 show engine innodb status
+
+---TRANSACTION 146984, ACTIVE 23 sec
+3 lock struct(s), heap size 360, 1 row lock(s)
+MySQL thread id 363, OS thread handle 0x7f61ab1c7700, query id 2842 localhost msandbox cleaning up
+TABLE LOCK table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock mode IX
+RECORD LOCKS space id 57 page no 4 n bits 80 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock_mode X
+RECORD LOCKS space id 57 page no 4 n bits 80 index &#96;uniq_c1&#96; of table &#96;test&#96;.&#96;tu&#96; trx id 146984 lock_mode X locks gap before rec<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>唯一索引删除一条已经标记删除的记录的锁情况为：</p>
+<ul>
+<li>加锁等待时: 2 lock struct(s) ，持有 IX 锁，等待记录上的 next key 锁</li>
+<li>加锁成功时：3 lock struct(s)，持有 IX，next key，和 gap 锁，和非唯一索引删除一条标记为已删除的记录的情况一模一样。</li>
+</ul>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><ol>
+<li>在非唯一索引的情况下，删除一条存在的记录是有 gap 锁，锁住记录本身和记录之前的 gap</li>
+<li>在唯一索引和主键的情况下删除一条存在的记录，因为都是唯一值，进行删除的时候，是不会有 gap 存在</li>
+<li>非唯一索引，唯一索引和主键在删除一条不存在的记录，均会在这个区间加 gap 锁</li>
+<li>通过非唯一索引和唯一索引去删除一条标记为删除的记录的时候，都会请求该记录的行锁，同时锁住记录之前的 gap</li>
+<li>RC 情况下是没有 gap 锁的，除了遇到唯一键冲突的情况，如插入唯一键冲突。</li>
+</ol>
+<h1 id="阻塞及死锁"><a href="#阻塞及死锁" class="headerlink" title="阻塞及死锁"></a>阻塞及死锁</h1><h2 id="阻塞、超时及回滚"><a href="#阻塞、超时及回滚" class="headerlink" title="阻塞、超时及回滚"></a>阻塞、超时及回滚</h2><p>因为不同锁之间的兼容性关系，在有些时刻一个事务中的锁需要等待另一个事务中的锁释放它所占用的资源，这就是阻塞。阻塞并不是一件坏事，其是为了确保事务可以并发且正常地运行。</p>
+<p>在 InnoDB 存储引擎中，参数 <code>innodb_lock_wait_timeout</code> 用来控制等待的时间（默认是 50 秒），innodb_rollback_on_timeout 用来设定是否在等待超时时对进行中的事务进行回滚操作（默认是 OFF，代表不回滚）。数据库默认不回滚除死锁以外的事务。</p>
+<h2 id="死锁"><a href="#死锁" class="headerlink" title="死锁"></a>死锁</h2><p>死锁是指两个或两个以上的事务在执行过程中，因争夺锁资源而造成的一种互相等待的现象。若无外力作用，事务都将无法推进下去。解决死锁问题最简单的方式是不要有等待，将任何的等待都转化为回滚，并且事务重新开始。毫无疑问，这的确可以避免死锁问题的产生。然而在线上环境中，这可能导致并发性能的下降，甚至任何一个事务都不能进行。而这所带来的问题远比死锁问题更为严重，因为这很难被发现并且浪费资源。</p>
+<h3 id="检测死锁"><a href="#检测死锁" class="headerlink" title="检测死锁"></a>检测死锁</h3><h4 id="超时机制"><a href="#超时机制" class="headerlink" title="超时机制"></a>超时机制</h4><p>解决死锁问题最简单的一种方法是超时，即当两个事务互相等待时，当一个等待时间超过设置的某一阈值时，其中一个事务进行回滚，另一个等待的事务就能继续进行。</p>
+<p>超时机制虽然简单，但是其仅通过超时后对事务进行回滚的方式来处理，或者说其是根据 FIFO 的顺序选择回滚对象。但若超时的事务所占权重比较大，如事务操作更新了很多行，占用了较多的 undo log，这时采用 FIFO 的方式，就显得不合适了，因为回滚这个事务的时间相对另一个事务所占用的时间可能会很多。</p>
+<h4 id="wait-for-graph"><a href="#wait-for-graph" class="headerlink" title="wait-for graph"></a>wait-for graph</h4><p>除了超时机制，当前数据库还都普遍采用 wait-for graph（等待图）的方式来进行死锁检测。较之超时的解决方案，这是一种更为主动的死锁检测方式。InnoDB 存储引擎也采用的这种方式。wait-for graph 要求数据库保存以下两种信息：</p>
+<ul>
+<li>锁的信息链表</li>
+<li>事务等待链表</li>
+</ul>
+<p>通过上述链表可以构造出一张图，而在这个图中若存在回路，就代表存在死锁，因此资源间相互发生等待。在 wait-for graph 中，事务为图中的节点。而在图中，事务 T1 指向 T2 边的定义为：</p>
+<ul>
+<li>事务 T1 等待事务 T2 所占用的资源</li>
+<li>事务 T1 最终等待 T2 所占用的资源，也就是事务之间在等待相同的资源，而事务 T1 发生在事务 T2 的后面</li>
+</ul>
+<p>下面看一个例子，当前事务和锁的状态如下图：</p>
+<p><img src="/images/MySQL/%E4%BA%8B%E5%8A%A1%E7%8A%B6%E6%80%81%E5%92%8C%E9%94%81%E7%9A%84%E4%BF%A1%E6%81%AF.png"></p>
+<p>在 Transaction Wait Lists 中可以看到共有 4 个事务 t1、t2、t3、t4，故在 wait-for<br>graph 中应有 4 个节点。而事务 t2 对 row1 占用 x 锁，事务 t1 对 row2 占用 s 锁。事务 t1 需要等待事务 t2 中 row1 的资源，因此在 wait-for graph 中有条边从节点 t1 指向节点 t2。事务 t2 需要等待事务 t1、t4 所占用的 row2 对象，故而存在节点 t2 到节点 t1、t4 的边。同样，存在节点 t3 到节点 t1、t2、t4 的边，因此最终的 wait-for graph 如图所示。</p>
+<p><img src="/images/MySQL/wait-for-graph.png"></p>
+<p>通过上图可以发现存在回路<code>(t1, t2)</code>， 因此存在死锁。wait-for graph 是一种较为主动的死锁检测机制，在每个事务请求锁并发生等待时都会判断是否存在回路，若存在则有死锁，通常来说 InnoDB 存储引擎选择回滚 undo 量最小的事务。wait-for graph 采用的是非递归深度优先的方式。</p>
+<h3 id="死锁概率"><a href="#死锁概率" class="headerlink" title="死锁概率"></a>死锁概率</h3><p>死锁应该非常少发生，若经常发生，则系统是不可用的。此外，死锁的次数应该还要少于等待，因为至少需要 2 次等待才会产生一次死锁。本节将从纯数学的概率角度来分析，死锁发生的概率是非常小的。</p>
+<p>假设当前数据库中共有 n+1 个线程执行，即当前总共有 n+1 个事务。并假设每个事务所做的操作相同。若每个事务由 r+1 个操作组成，每个操作为从 R 行数据中随机地操作一行数据，并占用对象的锁。每个事务在执行完最后一个步骤释放所占用的所有锁资源。最后，假设 <code>nr&lt;&lt;R</code>，即线程操作的数据只占所有数据的一小部分。</p>
+<p>在上述的模型下，事务获得一个锁需要等待的概率是多少呢？当事务获得一个锁，其他任何一个事务获得锁的情况为：</p>
+<p>$$<br>(1+2+3+…r)&#x2F;(r+1) \approx  r&#x2F;2<br>$$</p>
+<p>由于每个操作为从 R 行数据中取一条数据，每行数据被取到的概率为 1&#x2F;R，因此，事务中每个操作需要等待的概率 PW 为：</p>
+<p>$$<br>PW&#x3D;nr&#x2F;2R<br>$$</p>
+<p>事务是由 r 个操作所组成，因此事务发生等待的概率 <code>PW(T)</code> 为：</p>
+<p>$$<br>PW(T)&#x3D;1-(1-PW)^r \approx r*PW \approx \frac{nr^2}{2R}<br>$$</p>
+<p>死锁是由于产生回路，也就是事务互相等待而发生的，若死锁的长度为 2，即两个等待节点间发生死锁，那么其概率为：</p>
+<p>$$<br>一个事务发生死锁的概率 \approx 1-(1-PW(T))^2 \approx r*PW \approx \frac{nr^4}{4R^2}<br>$$</p>
+<p>由于大部分死锁发生的长度为 2，因此上述公式基本代表了一个事务发生死锁的概率。从整个系统来看，任何一个事务发生死锁的概率为：</p>
+<p>$$<br>系统中任何一个事务发生死锁的概率 \approx \frac{n^2r^4}{4R^2}<br>$$</p>
+<p>从上述的公式中可以发现，由于 nr&lt;&lt;R，因此事务发生死锁的概率是非常低的。同时，事务发生死锁的概率与以下几点因素有关：</p>
+<ul>
+<li>系统中事务的数量<code>(n)</code>，数量越多发生死锁的概率越大。</li>
+<li>每个事务操作的数量<code>(r)</code>, 每个事务操作的数量越多，发生死锁的概率越大。</li>
+<li>操作数据的集合<code>(R)</code>，越小则发生死锁的概率越大。</li>
+</ul>
+<h1 id="锁升级"><a href="#锁升级" class="headerlink" title="锁升级"></a>锁升级</h1><p>锁升级（Lock Escalation）是指将当前锁的粒度降低。举例来说，数据库可以把一个表的 1000 个行锁升级为一个页锁，或者将页锁升级为表锁。如果在数据库的设计中，认为锁是一种稀有资源，而且想避免锁的开销，那数据库中会频繁出现锁升级现象。</p>
+<p>Microsoft SQL Server 数据库的设计认为锁是一种稀有的资源，在适合的时候会自动地将行、键或分页锁升级为更粗粒度的表级锁。这种升级保护了系统资源，防止系统使用太多的内存来维护锁，在一定程度上提高了效率。</p>
+<p>即使在 Microsoft SQL Server 2005 版本之后，SQL Server 数据库支持了行锁，但是其设计和 InnoDB 存储引擎完全不同，在以下情况下依然可能发生锁升级：</p>
+<ul>
+<li>由一句单独的 SQL 语句在一个对象上持有的锁的数量超过了阈值，默认这个阈值为 5000。值得注意的是，如果是不同对象，则不会发生锁升级。</li>
+<li>锁资源占用的内存超过了激活内存的 40% 时就会发生锁升级。</li>
+</ul>
+<p>在 Microsoft SQL Server 数据库中，由于锁是一种稀有的资源，因此锁升级会带来一定的效率提高。但是锁升级带来的一个问题却是因为锁粒度的降低而导致并发性能的降低。</p>
+<p>InnoDB 存储引擎不存在锁升级的问题。因为其不是根据每个记录来产生行锁的，相反，其根据每个事务访问的每个页对锁进行管理的，采用的是位图的方式。因此不管一个事务锁住页中一个记录还是多个记录，其开销通常都是一致的。</p>
+<p>假设一张表有 3 000 000 个数据页，每个页大约有 100 条记录，那么总共有 300 000 000 条记录。若有一个事务执行全表更新的 SQL 语句，则需要对所有记录加 X 锁。若根据每行记录产生锁对象进行加锁，并且每个锁占用 10 字节，则仅对锁管理就需要差不多需要 3GB 的内存。而 InnoDB 存储引擎根据页进行加锁，并采用位图方式，假设每个页存储的锁信息占用 30 个字节，则锁对象仅需 90MB 的内存。由此可见两者对于锁资源开销的差距之大。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/Lock/" rel="tag"># Lock</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/13/MySQL-%E7%B4%A2%E5%BC%95/" rel="prev" title="MySQL 索引">
+      <i class="fa fa-chevron-left"></i> MySQL 索引
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/22/Spring-SpringBoot%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90/" rel="next" title="SpringBoot 启动流程解析">
+      SpringBoot 启动流程解析 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E4%B8%AD%E7%9A%84%E9%94%81"><span class="nav-number">1.</span> <span class="nav-text">InnoDB 存储引擎中的锁</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%81%E7%9A%84%E5%BD%A2%E6%80%81"><span class="nav-number">1.1.</span> <span class="nav-text">锁的形态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%81%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.2.</span> <span class="nav-text">锁的类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%8C%E7%BA%A7%E5%88%AB%E7%9A%84-S%E3%80%81X-%E9%94%81"><span class="nav-number">1.2.1.</span> <span class="nav-text">行级别的 S、X 锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%A8%E7%BA%A7%E5%88%AB%E7%9A%84-S%E3%80%81X-%E9%94%81"><span class="nav-number">1.2.2.</span> <span class="nav-text">表级别的 S、X 锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%A8%E7%BA%A7%E5%88%AB%E7%9A%84-IS%E3%80%81IX-%E9%94%81"><span class="nav-number">1.2.3.</span> <span class="nav-text">表级别的 IS、IX 锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%A8%E7%BA%A7%E5%88%AB%E7%9A%84-AUTO-INC-%E9%94%81"><span class="nav-number">1.2.4.</span> <span class="nav-text">表级别的 AUTO-INC 锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%96%E9%94%AE%E5%85%B3%E8%81%94%E9%94%81"><span class="nav-number">1.2.5.</span> <span class="nav-text">外键关联锁</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7%E9%9D%9E%E9%94%81%E5%AE%9A%E8%AF%BB"><span class="nav-number">1.3.</span> <span class="nav-text">一致性非锁定读</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91%E4%BA%8B%E5%8A%A1%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">2.</span> <span class="nav-text">并发事务的问题</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%84%8F%E8%AF%BB"><span class="nav-number">2.1.</span> <span class="nav-text">脏读</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E5%8F%AF%E9%87%8D%E5%A4%8D%E8%AF%BB"><span class="nav-number">2.2.</span> <span class="nav-text">不可重复读</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%BB%E8%AF%BB"><span class="nav-number">2.3.</span> <span class="nav-text">幻读</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0%E4%B8%A2%E5%A4%B1"><span class="nav-number">2.4.</span> <span class="nav-text">更新丢失</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E7%B1%BB%E6%9B%B4%E6%96%B0%E4%B8%A2%E5%A4%B1"><span class="nav-number">2.4.1.</span> <span class="nav-text">第一类更新丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E7%B1%BB%E6%9B%B4%E6%96%B0%E4%B8%A2%E5%A4%B1"><span class="nav-number">2.4.2.</span> <span class="nav-text">第二类更新丢失</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%94%81%E6%9C%BA%E5%88%B6"><span class="nav-number">3.</span> <span class="nav-text">锁机制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E4%BA%8C%E7%BA%A7%E7%B4%A2%E5%BC%95%E4%BF%AE%E6%94%B9%E4%B8%80%E6%9D%A1%E8%AE%B0%E5%BD%95"><span class="nav-number">3.1.</span> <span class="nav-text">根据二级索引修改一条记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E5%94%AF%E4%B8%80%E7%B4%A2%E5%BC%95%E4%BF%AE%E6%94%B9%E4%B8%80%E6%9D%A1%E8%AE%B0%E5%BD%95"><span class="nav-number">3.2.</span> <span class="nav-text">根据唯一索引修改一条记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E4%B8%BB%E9%94%AE%E4%BF%AE%E6%94%B9%E4%B8%80%E6%9D%A1%E5%AD%98%E5%9C%A8%E8%AE%B0%E5%BD%95"><span class="nav-number">3.3.</span> <span class="nav-text">根据主键修改一条存在记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E4%B8%BB%E9%94%AE%E5%88%A0%E9%99%A4%E4%B8%A4%E6%9D%A1%E5%AD%98%E5%9C%A8%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="nav-number">3.4.</span> <span class="nav-text">根据主键删除两条存在的记录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8-in-%E5%85%B3%E9%94%AE%E5%AD%97%E5%88%A0%E9%99%A4"><span class="nav-number">3.4.1.</span> <span class="nav-text">用 in 关键字删除</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%A8-range-%E6%96%B9%E5%BC%8F%E5%88%A0%E9%99%A4"><span class="nav-number">3.4.2.</span> <span class="nav-text">用 range 方式删除</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%9E%E5%94%AF%E4%B8%80%E7%B4%A2%E5%BC%95%E5%88%A0%E9%99%A4%E4%B8%80%E6%9D%A1%E5%B7%B2%E7%BB%8F%E6%A0%87%E8%AE%B0%E5%88%A0%E9%99%A4%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="nav-number">3.5.</span> <span class="nav-text">非唯一索引删除一条已经标记删除的记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%94%AF%E4%B8%80%E7%B4%A2%E5%BC%95%E5%88%A0%E9%99%A4%E4%B8%80%E6%9D%A1%E5%B7%B2%E7%BB%8F%E6%A0%87%E8%AE%B0%E5%88%A0%E9%99%A4%E7%9A%84%E8%AE%B0%E5%BD%95"><span class="nav-number">3.6.</span> <span class="nav-text">唯一索引删除一条已经标记删除的记录</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.7.</span> <span class="nav-text">总结</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%98%BB%E5%A1%9E%E5%8F%8A%E6%AD%BB%E9%94%81"><span class="nav-number">4.</span> <span class="nav-text">阻塞及死锁</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%98%BB%E5%A1%9E%E3%80%81%E8%B6%85%E6%97%B6%E5%8F%8A%E5%9B%9E%E6%BB%9A"><span class="nav-number">4.1.</span> <span class="nav-text">阻塞、超时及回滚</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%AD%BB%E9%94%81"><span class="nav-number">4.2.</span> <span class="nav-text">死锁</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A3%80%E6%B5%8B%E6%AD%BB%E9%94%81"><span class="nav-number">4.2.1.</span> <span class="nav-text">检测死锁</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%B6%85%E6%97%B6%E6%9C%BA%E5%88%B6"><span class="nav-number">4.2.1.1.</span> <span class="nav-text">超时机制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#wait-for-graph"><span class="nav-number">4.2.1.2.</span> <span class="nav-text">wait-for graph</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%AD%BB%E9%94%81%E6%A6%82%E7%8E%87"><span class="nav-number">4.2.2.</span> <span class="nav-text">死锁概率</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%94%81%E5%8D%87%E7%BA%A7"><span class="nav-number">5.</span> <span class="nav-text">锁升级</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

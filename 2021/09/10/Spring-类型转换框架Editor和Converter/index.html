@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Spring 类型转换框架经过了几个版本的演进，由 PropertyEditor Framework 转变为 Converter Framework + Formatter Framework 的形式，其为 SpringMVC 的字段转换提供了丰富的功能，保证了在 Web 字段处理的安全、高效进行。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spring 类型转换框架 Editor 和 Converter">
+<meta property="og:url" content="http://example.com/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Spring 类型转换框架经过了几个版本的演进，由 PropertyEditor Framework 转变为 Converter Framework + Formatter Framework 的形式，其为 SpringMVC 的字段转换提供了丰富的功能，保证了在 Web 字段处理的安全、高效进行。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Spring/PropertyEditorRegistry.png">
+<meta property="og:image" content="http://example.com/images/Spring/ConversionService.png">
+<meta property="og:image" content="http://example.com/images/Spring/Format.png">
+<meta property="og:image" content="http://example.com/images/Spring/FormatterRegistry.png">
+<meta property="article:published_time" content="2021-09-10T03:01:00.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.537Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Spring">
+<meta property="article:tag" content="PropertyEditor">
+<meta property="article:tag" content="Converter Framework">
+<meta property="article:tag" content="Formatter Framework">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Spring/PropertyEditorRegistry.png">
+
+<link rel="canonical" href="http://example.com/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Spring 类型转换框架 Editor 和 Converter | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spring 类型转换框架 Editor 和 Converter
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-09-10 11:01:00" itemprop="dateCreated datePublished" datetime="2021-09-10T11:01:00+08:00">2021-09-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Spring 类型转换框架经过了几个版本的演进，由 PropertyEditor Framework 转变为 Converter Framework + Formatter Framework 的形式，其为 SpringMVC 的字段转换提供了丰富的功能，保证了在 Web 字段处理的安全、高效进行。</p>
+<span id="more"></span>
+
+<h1 id="类型转换接口演进"><a href="#类型转换接口演进" class="headerlink" title="类型转换接口演进"></a>类型转换接口演进</h1><h2 id="类型转换接口：PropertyEditor"><a href="#类型转换接口：PropertyEditor" class="headerlink" title="类型转换接口：PropertyEditor"></a>类型转换接口：PropertyEditor</h2><p>Spring 3.0 前的 PropertyEditor，基于 Java Bean 接口 <code>java.beans.PropertyEditor</code> 并全部继承自 PropertyEditorSupport。</p>
+<p>基于 <code>PropertyEditor</code> 的类型转换作为一种古老的、遗留下来的方式，是具有一些设计缺陷的，如：职责不单一，类型不安全，只能实现 <code>String</code> 类型的转换等。虽然自 Spring 3.0 起提供了现代化的类型转换接口，但是此部分机制一直得以保留，保证了向下兼容性。</p>
+<h2 id="类型转换接口：Converter"><a href="#类型转换接口：Converter" class="headerlink" title="类型转换接口：Converter"></a>类型转换接口：Converter</h2><p>为了解决 PropertyEditor 作为类型转换方式的设计缺陷，Spring 3.0 版本重新设计了一套类型转换接口，其中主要包括：<code>Converter&lt;S, T&gt;</code>、<code>ConverterFactory&lt;S, R&gt;</code>、<code>GenericConverter</code>、<code>ConditionalConverter</code>。对于使用者而言，如果做个类型转换需要了解到这三套体系无疑成本太高，因此就有了 ConversionService 用于统一化底层类型转换实现的差异，对外提供统一服务。</p>
+<p>它主要有两大实现：</p>
+<ol>
+<li>GenericConversionService：提供模版实现，如转换器的注册、删除、匹配查找等，但并不内置转换器实现</li>
+<li>DefaultConversionService：继承自 GenericConversionService。在它基础上默认注册了非常多的内建的转换器实现，从而能够实现绝大部分的类型转换需求</li>
+</ol>
+<p>ConversionService 转换服务它贯穿于 Spring 上下文 ApplicationContext 的多项功能，包括但不限于：BeanWrapper 处理 Bean 属性、DataBinder 数据绑定、PropertySource 外部化属性处理等等。</p>
+<h2 id="类型转换格式化接口：Formatter"><a href="#类型转换格式化接口：Formatter" class="headerlink" title="类型转换格式化接口：Formatter"></a>类型转换格式化接口：Formatter</h2><p>Spring 3.0 新增了一个 <code>Formatter&lt;T&gt;</code> 接口，作用为：将 Object 格式化为类型 T。从语义上理解它也具有类型转换（数据转换的作用），相较于 <code>Converter&lt;S,T&gt;</code> 它强调的是格式化，因此一般用于时间&#x2F;日期、数字（小数、分数、科学计数法等等）、货币等场景，举例它的实现：</p>
+<ul>
+<li><code>DurationFormatter</code>：字符串和<code>Duration</code>类型的互转</li>
+<li><code>CurrencyUnitFormatter</code>：字符串和<code>javax.money.CurrencyUnit</code>货币类型互转</li>
+<li><code>DateFormatter</code>：字符串和<code>java.util.Date</code>类型互转。</li>
+<li>……</li>
+</ul>
+<p>为了和类型转换服务 ConversionService 完成整合，对外只提供统一的 API。Spring 提供了 FormattingConversionService 专门用于整合 Converter 和 Formatter，从而使得两者具有一致的编程体验，对开发者更加友好。</p>
+<h2 id="类型转换底层接口-TypeConvert"><a href="#类型转换底层接口-TypeConvert" class="headerlink" title="类型转换底层接口 TypeConvert"></a>类型转换底层接口 TypeConvert</h2><p>定义类型转换方法的接口，它在 Spring 2.0 就已经存在。在还没有 ConversionService 之前，它的类型转换动作均委托给已注册的 PropertyEditor 来完成。但自 3.0 之后，这个转换动作可能被 PropertyEditor 来做，也可能交给 ConversionService 处理。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">TypeConverter</span> <span class="token punctuation">&#123;</span>
+    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">convertIfNecessary</span><span class="token punctuation">(</span><span class="token class-name">Object</span> value<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">TypeMismatchException</span><span class="token punctuation">;</span>
+    <span class="token comment">// methodParam：转换的目标方法参数，主要为了分析泛型类型，可能为 null</span>
+    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">convertIfNecessary</span><span class="token punctuation">(</span><span class="token class-name">Object</span> value<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">,</span> <span class="token class-name">MethodParameter</span> methodParam<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">TypeMismatchException</span><span class="token punctuation">;</span>
+    <span class="token comment">// field：目标的反射字段，为了泛型，可能为 null</span>
+    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">convertIfNecessary</span><span class="token punctuation">(</span><span class="token class-name">Object</span> value<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">,</span> <span class="token class-name">Field</span> field<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">TypeMismatchException</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>它是 Spring 内部使用类型转换的入口，最终委托给 PropertyEditor 或者注册到 ConversionService 里的转换器去完成。它的主要实现有：TypeConverterSupport，其继承自 PropertyEditorRegistrySupport，主要是为子类 BeanWrapperImpl 提供功能支撑。</p>
+<p>作用有如下两方面：</p>
+<ol>
+<li>提供对默认编辑器（支持 JDK 内置类型的转换如：Charset、Class、Class[]、Properties、Collection 等等）和自定义编辑器的管理（PropertyEditorRegistry#registerCustomEditor）</li>
+<li>提供 get&#x2F;set 方法，把 <code>ConversionService</code> 管理上（可选依赖，可为 null）</li>
+</ol>
+<p>数据绑定相关：因为数据绑定强依赖于类型转换，因此数据绑定涉及到的属性访问操作将会依赖于此组件，不管是直接访问属性的 DirectFieldAccessor 还是功能更强大的 BeanWrapperImpl 均是如此。</p>
+<p>总的来说，TypeConverter 能把类型的各种实现、API 收口于此，Spring 把类型转换的能力都转嫁到 TypeConverter 这个 API 里面去了。虽然方便了使用，但其内部实现原理稍显复杂。</p>
+<h1 id="PropertyEditor"><a href="#PropertyEditor" class="headerlink" title="PropertyEditor"></a>PropertyEditor</h1><p><code>PropertyEditor</code> 位于 java.beans 包中，此接口提供的方法和本文类型转换有关的有以下四个接口：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">void setValue(Object value); \\ 设置属性值
+Object getValue(); \\ 获取属性值
+String getAsText(); \\ 将属性值转换成String输出
+void setAsText(String text); \\ 将String转换为属性值类型输入<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>JDK 对 PropertyEditor 接口提供了一个默认实现 <code>java.beans.PropertyEditorSupport</code>，因此我们若需扩展此接口，仅需继承此类，根据需要复写 <code>getAsText/setAsText</code> 这两个方法即可，Spring 无一例外都是这么做的。</p>
+<p><strong>注意：PropertyEditorSupport线程不安全</strong></p>
+<p>PropertyEditor 实现的是双向类型转换：String 和 Object 互转。调用 <code>setValue()</code> 方法后，需要先“缓存”起来后续才能够使用。PropertyEditorSupport 为此提供了一个成员属性来做：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">PropertyEditorSupport</span>：
+  <span class="token comment">// 调用 setValue()赋值 getValue()取值</span>
+	<span class="token keyword">private</span> <span class="token class-name">Object</span> value<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>这么一来 PropertyEditorSupport 就是有状态的了，因此是线程不安全的。在使用过程中需要特别注意，避免出现并发风险。Spring 内置的所有扩展均是基于 PropertyEditorSupport 来实现的，因此也都是线程不安全的。</p>
+<h2 id="标准扩展实现"><a href="#标准扩展实现" class="headerlink" title="标准扩展实现"></a>标准扩展实现</h2><p>Spring 为了扩展自身功能，提高配置灵活性，扩展出了非常非常多的<code>PropertyEditor</code>实现，并把标准实现都放在<code>org.springframework.beans.propertyeditors</code>包下，下面是几个代表性 API。</p>
+<table>
+<thead>
+<tr>
+<th>PropertyEditor</th>
+<th>功能</th>
+<th>举例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ZoneIdEditor</td>
+<td>转为java.time.ZoneId</td>
+<td>Asia&#x2F;Shanghai</td>
+</tr>
+<tr>
+<td>URLEditor</td>
+<td>转为URL，支持传统方式 <code>file:</code>、<code>http:</code>，也支持 Spring 风格：<code>classpath:</code>、<code>context上下文相对路径</code> 等等</td>
+<td><a target="_blank" rel="noopener" href="http://www.baidu.com/">http://www.baidu.com</a></td>
+</tr>
+<tr>
+<td>StringTrimmerEditor</td>
+<td>trim()字符串，也可删除指定字符char</td>
+<td>任意字符串</td>
+</tr>
+<tr>
+<td>StringArrayPropertyEditor</td>
+<td>转为字符串数组</td>
+<td>A,B,C</td>
+</tr>
+<tr>
+<td>PropertiesEditor</td>
+<td>转为 Properties</td>
+<td>name &#x3D; YourBatman</td>
+</tr>
+<tr>
+<td>PatternEditor</td>
+<td>转为 Pattern</td>
+<td>(\D*)(\d+)(.*)</td>
+</tr>
+<tr>
+<td>PathEditor</td>
+<td>转为 java.nio.file.Path。支持传统 URL 和 Spring 风格的 url</td>
+<td>classpath:xxx</td>
+</tr>
+<tr>
+<td>ClassEditor</td>
+<td>转为 Class</td>
+<td>全类名</td>
+</tr>
+<tr>
+<td>CustomBooleanEditor</td>
+<td>转为Boolean</td>
+<td>对传入的 true、on、yes、1 等都会被“翻译”成 true，大大提高兼容性。</td>
+</tr>
+<tr>
+<td>CharsetEditor</td>
+<td>转为 Charset</td>
+<td></td>
+</tr>
+<tr>
+<td>CustomDateEditor</td>
+<td>转为 java.util.Date</td>
+<td></td>
+</tr>
+<tr>
+<td>…</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2 id="PropertyEditorRegistry-注册中心"><a href="#PropertyEditorRegistry-注册中心" class="headerlink" title="PropertyEditorRegistry 注册中心"></a>PropertyEditorRegistry 注册中心</h2><p>它是管理PropertyEditor的中心接口，负责注册、查找对应的PropertyEditor。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">PropertyEditorRegistry</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">void</span> <span class="token function">registerCustomEditor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span> propertyEditor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">void</span> <span class="token function">registerCustomEditor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">,</span> <span class="token class-name">String</span> propertyPath<span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span> propertyEditor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token class-name">PropertyEditor</span> <span class="token function">findCustomEditor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">,</span> <span class="token class-name">String</span> propertyPath<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>接口的继承关系如下：</p>
+<p><img src="/images/Spring/PropertyEditorRegistry.png"></p>
+<h3 id="PropertyEditorRegistrySupport"><a href="#PropertyEditorRegistrySupport" class="headerlink" title="PropertyEditorRegistrySupport"></a>PropertyEditorRegistrySupport</h3><p>它是 PropertyEditorRegistry 接口的实现，提供对 <code>default editors</code> 和 <code>custom editors</code> 的管理，最终主要为 <code>BeanWrapperImpl</code> 和 <code>DataBinder</code> 服务。</p>
+<p>一般来说，Registry 注册中心内部会使用多个 Map 来维护组件间映射关系。此处也不例外：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 装载【默认的】编辑器，初始化的时候会注册好</span>
+<span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span><span class="token punctuation">></span></span> defaultEditors<span class="token punctuation">;</span>
+<span class="token comment">// 如果想覆盖掉【默认行为】，可通过此Map覆盖（比如处理Charset类型你不想用默认的编辑器处理）</span>
+<span class="token comment">// 通过API：overrideDefaultEditor(...)放进此Map里</span>
+<span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span><span class="token punctuation">></span></span> overriddenDefaultEditors<span class="token punctuation">;</span>
+
+<span class="token comment">// ======================注册自定义的编辑器======================</span>
+<span class="token comment">// 通过API：registerCustomEditor(...)放进此Map里（若没指定propertyPath）</span>
+<span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span><span class="token punctuation">></span></span> customEditors<span class="token punctuation">;</span>
+<span class="token comment">// 通过API：registerCustomEditor(...)放进此Map里（若指定了propertyPath）</span>
+<span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">CustomEditorHolder</span><span class="token punctuation">></span></span> customEditorsForPath<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>customEditorCache 作用</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span><span class="token punctuation">></span></span> customEditorCache<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>从属性名上理解，它表示<code>customEditors</code>属性的缓存，其用于缓存自定义的编辑器，辅以成员属性 customEditors 属性一起使用。唯一使用方式在私有方法：根据类型获取自定义编辑器<code>PropertyEditorRegistrySupport#getCustomEditor</code></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">PropertyEditor</span> <span class="token function">getCustomEditor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> requiredType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">if</span> <span class="token punctuation">(</span>requiredType <span class="token operator">==</span> <span class="token keyword">null</span> <span class="token operator">||</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customEditors <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token class-name">PropertyEditor</span> editor <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customEditors<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>requiredType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+	<span class="token comment">// 重点：若customEditors没有并不代表处理不了，因为还得考虑父子关系、接口关系</span>
+	<span class="token keyword">if</span> <span class="token punctuation">(</span>editor <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token comment">// 去缓存里查询，是否存在父子类作为key的情况</span>
+		<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>customEditorCache <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			editor <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customEditorCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>requiredType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token punctuation">&#125;</span>
+	
+		<span class="token comment">// 若缓存没命中，就得遍历customEditors了，时间复杂度为O(n)</span>
+		<span class="token keyword">if</span> <span class="token punctuation">(</span>editor <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+			<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Iterator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">></span></span> it <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customEditors<span class="token punctuation">.</span><span class="token function">keySet</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">iterator</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> it<span class="token punctuation">.</span><span class="token function">hasNext</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> editor <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+				<span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> key <span class="token operator">=</span> it<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+				<span class="token keyword">if</span> <span class="token punctuation">(</span>key<span class="token punctuation">.</span><span class="token function">isAssignableFrom</span><span class="token punctuation">(</span>requiredType<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+					editor <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customEditors<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+					<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>customEditorCache <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+						<span class="token keyword">this</span><span class="token punctuation">.</span>customEditorCache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Class</span><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span><span class="token punctuation">,</span> <span class="token class-name">PropertyEditor</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+					<span class="token punctuation">&#125;</span>
+					<span class="token keyword">this</span><span class="token punctuation">.</span>customEditorCache<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>requiredType<span class="token punctuation">,</span> editor<span class="token punctuation">)</span><span class="token punctuation">;</span>
+				<span class="token punctuation">&#125;</span>
+			<span class="token punctuation">&#125;</span>
+		<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token keyword">return</span> editor<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>因为遍历 customEditors 属于比较重的操作（复杂度为 O(n)），从而使用了 customEditorCache 避免每次出现父子类的匹配情况就去遍历一次，大大提高匹配效率。</p>
+<blockquote>
+<p>  父子类匹配：即对于统一父类 Parent 有其对应的解析器 ParentPropertyEditor，但子类 Child 即使没有对应的解析器，也可被其父类的解析器解析成功。</p>
+<p>  注意：每次调用 API 向 customEditors 添加新元素时，customEditorCache 就会被清空，因此因尽量避免在运行期注册编辑器，以避免缓存失效而降低性能。</p>
+</blockquote>
+<h3 id="customEditors-与-customEditorsForPath-作用"><a href="#customEditors-与-customEditorsForPath-作用" class="headerlink" title="customEditors 与 customEditorsForPath 作用"></a>customEditors 与 customEditorsForPath 作用</h3><p>customEditors 与 customEditorsForPath 是互斥的。customEditors 是粗粒度的 Editor，key 为类型，即对类型的转换全部交由此 Editor 处理，如 <code>registerCustomEditor(UUID.class,new UUIDEditor())</code>。而 customEditorsForPath 是细粒度的 Editor，key 为字段导航，仅能处理对应类型的指定字段。</p>
+<blockquote>
+<p>  字段导航：Person.bags[0].name 或 Person.name 的形式</p>
+</blockquote>
+<p>有了这种区别，注册中心在<code>findCustomEditor(requiredType,propertyPath)</code>匹配的时候也是按照优先级顺序执行匹配的：</p>
+<ol>
+<li>若指定了propertyPath（不为null），就先去<code>customEditorsForPath</code>里找。否则就去<code>customEditors</code>里找</li>
+<li>若没有指定 propertyPath（为null），就直接去<code>customEditors</code>里找</li>
+</ol>
+<h3 id="PropertyEditorRegistrar"><a href="#PropertyEditorRegistrar" class="headerlink" title="PropertyEditorRegistrar"></a>PropertyEditorRegistrar</h3><p>Registrar：登记员。它一般和 Registry 配合使用，其实内核还是 Registry，只是运用了倒排思想屏蔽一些内部实现。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">PropertyEditorRegistrar</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">void</span> <span class="token function">registerCustomEditors</span><span class="token punctuation">(</span><span class="token class-name">PropertyEditorRegistry</span> registry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>PropertyEditorRegistrar 接口在 Spring 体系内唯一实现为：ResourceEditorRegistrar。</p>
+<p><strong>ResourceEditorRegistrar</strong></p>
+<p>从命名上就知道它和 Resource 资源有关，其主要负责将 ResourceEditor 注册到注册中心里面去，用于处理形如 Resource、File、URI 等这些资源类型。</p>
+<blockquote>
+<p>  配置 classpath:xxx.xml 用来启动 Spring 容器的配置文件，String -&gt; Resource 转换就是它的功能。</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">ResourceEditorRegistrar</span><span class="token punctuation">(</span><span class="token class-name">ResourceLoader</span> resourceLoader<span class="token punctuation">,</span> <span class="token class-name">PropertyResolver</span> propertyResolver<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>resourceLoader <span class="token operator">=</span> resourceLoader<span class="token punctuation">;</span> <span class="token comment">// 一般传入ApplicationContext</span>
+	<span class="token keyword">this</span><span class="token punctuation">.</span>propertyResolver <span class="token operator">=</span> propertyResolver<span class="token punctuation">;</span> <span class="token comment">// 一般传入Environment</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>很明显，它的设计就是服务于 ApplicationContext 上下文，在 Bean 创建过程中辅助 BeanWrapper 实现资源加载、转换。BeanFactory 在初始化的准备过程中（prepareBeanFactory）将它实例化，从而具备资源处理能力。</p>
+<h1 id="Converter"><a href="#Converter" class="headerlink" title="Converter"></a>Converter</h1><h2 id="PropertyEditor-设计缺陷"><a href="#PropertyEditor-设计缺陷" class="headerlink" title="PropertyEditor 设计缺陷"></a>PropertyEditor 设计缺陷</h2><ol>
+<li>职责不单一：该接口有非常多的方法，但只用到 2 个而已</li>
+<li>类型不安全：setValue() 方法入参是 Object，getValue() 返回值是Object，依赖于约定好的类型强转，不安全</li>
+<li>线程不安全：依赖于 setValue() 后 getValue()，实例是线程不安全的</li>
+<li>语义不清晰：从语义上根本不能知道它是用于类型转换的组件</li>
+<li>只能用于 String 类型：它只能进行 String &lt;-&gt; 其它类型的转换，而非更灵活的 Object &lt;-&gt; Object</li>
+</ol>
+<p>PropertyEditor 存在这五宗“罪”，让 Spring 决定自己设计一套全新 API 用于专门服务于类型转换，其包含 Converter、ConverterFactory、GenericConverter。</p>
+<h2 id="新一代类型转换-Converter"><a href="#新一代类型转换-Converter" class="headerlink" title="新一代类型转换 Converter"></a>新一代类型转换 Converter</h2><p>为了解决PropertyEditor作为类型转换方式的设计缺陷，Spring 3.0版本重新设计了一套类型转换接口，有3个核心接口：</p>
+<ol>
+<li><p><code>Converter&lt;S, T&gt;</code>：Source -&gt; Target类型转换接口，适用于1:1转换</p>
+</li>
+<li><p><code>ConverterFactory&lt;S, R&gt;</code>：Source -&gt; R类型转换接口，适用于1:N转换</p>
+</li>
+<li><p><code>GenericConverter</code>：更为通用的类型转换接口，适用于 N:N 转换</p>
+</li>
+</ol>
+<p>另外，还有一个条件接口 <code>ConditionalConverter</code>，可跟上面 3 个接口搭配组合使用，提供前置条件判断验证。</p>
+<p>这套接口，解决了PropertyEditor做类型转换存在的<strong>所有缺陷</strong>，且具有非常高的灵活性和可扩展性。</p>
+<h3 id="Converter-1"><a href="#Converter-1" class="headerlink" title="Converter"></a>Converter</h3><p>将源类型 S 转换为目标类型 T。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">Converter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">S</span><span class="token punctuation">,</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+  <span class="token class-name">T</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">S</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>Converter 用于解决 1:1 的任意类型转换，因此它必然存在一个不足：解决 1:N 转换问题需要写 N 遍，造成重复冗余代码。</p>
+<h3 id="ConverterFactory"><a href="#ConverterFactory" class="headerlink" title="ConverterFactory"></a>ConverterFactory</h3><p>将对象 S 转换为 R 的所有子类型，从而形成 1:N 的关系。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ConverterFactory</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">S</span><span class="token punctuation">,</span> <span class="token class-name">R</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+	<span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span> <span class="token keyword">extends</span> <span class="token class-name">R</span><span class="token punctuation">></span></span> <span class="token class-name">Converter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">S</span><span class="token punctuation">,</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token function">getConverter</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>既然有了 1:1、1:N，自然就有 N:N。比如集合转换、数组转换、Map 到 Map 的转换等等，这些 N:N 的场景，就需要借助下一个接口 GenericConverter 来实现。</p>
+<h3 id="GenericConverter"><a href="#GenericConverter" class="headerlink" title="GenericConverter"></a>GenericConverter</h3><p>它是一个通用的转换接口，用于在两个或多个类型之间进行转换。相较于前两个，这是最灵活的 SPI 转换器接口，但也是最复杂的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">GenericConverter</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">// 维护 N:N 的集合</span>
+	<span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConvertiblePair</span><span class="token punctuation">></span></span> <span class="token function">getConvertibleTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token class-name">Object</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Object</span> source<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	
+	<span class="token comment">// 普通POJO</span>
+	<span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">ConvertiblePair</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> sourceType<span class="token punctuation">;</span>
+		<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>GenericConverter的内置实现部分如下：</p>
+<blockquote>
+<p>  ConditionalGenericConverter 是 GenericConverter 和条件接口 ConditionalConverter 的组合，作用是在执行 GenericConverter 转换时增加一个前置条件判断方法。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>转换器</th>
+<th>描述</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ArrayToArrayConverter</td>
+<td>数组转数组Object[] -&gt; Object[]</td>
+<td>[“1”,”2”] -&gt; [1,2]</td>
+</tr>
+<tr>
+<td>ArrayToCollectionConverter</td>
+<td>数组转集合 Object[] -&gt; Collection</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>CollectionToCollectionConverter</td>
+<td>数组转集合 Collection -&gt; Collection</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>StringToCollectionConverter</td>
+<td>字符串转集合String -&gt; Collection</td>
+<td>1,2 -&gt; [1,2]</td>
+</tr>
+<tr>
+<td>StringToArrayConverter</td>
+<td>字符串转数组String -&gt; Array</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>MapToMapConverter</td>
+<td>Map -&gt; Map（需特别注意：key和value都支持转换才行）</td>
+<td>略</td>
+</tr>
+<tr>
+<td>CollectionToStringConverter</td>
+<td>集合转字符串Collection -&gt; String</td>
+<td>[1,2] -&gt; 1,2</td>
+</tr>
+<tr>
+<td>ArrayToStringConverter</td>
+<td>委托给CollectionToStringConverter完成</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>--</code></td>
+<td><code>--</code></td>
+<td><code>--</code></td>
+</tr>
+<tr>
+<td>StreamConverter</td>
+<td>集合&#x2F;数组 <code>&lt;-&gt;</code> Stream互转</td>
+<td>集合&#x2F;数组类型 -&gt; Stream类型</td>
+</tr>
+<tr>
+<td>IdToEntityConverter</td>
+<td>ID-&gt;Entity的转换</td>
+<td>传入任意类型ID -&gt; 一个Entity实例</td>
+</tr>
+<tr>
+<td>ObjectToObjectConverter</td>
+<td>很复杂的对象转换，任意对象之间</td>
+<td>obj -&gt; obj</td>
+</tr>
+<tr>
+<td>FallbackObjectToStringConverter</td>
+<td>上个转换器的兜底，调用Obj.toString()转换</td>
+<td>obj -&gt; String</td>
+</tr>
+</tbody></table>
+<h3 id="ConditionalConverter"><a href="#ConditionalConverter" class="headerlink" title="ConditionalConverter"></a>ConditionalConverter</h3><p>ConditionalConverter 是条件接口，它可以为 Converter、GenericConverter、ConverterFactory 转换增加一个前置判断条件。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ConditionalConverter</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">boolean</span> <span class="token function">matches</span><span class="token punctuation">(</span><span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+
+<p>通用转换器 GenericConverter 大多都与它进行了组合实现。这也很容易理解，作为通用的转换器，加个前置判断将更加严谨和更安全。对于专用的转换器如 Converter，它已明确规定了转换的类型，自然就不需要做前置判断。</p>
+<p><strong>ConditionalGenericConverter 实现示例</strong></p>
+<p>以 CollectionToCollectionConverter 做示范：<code>List&lt;String&gt; -&gt; Set&lt;Integer&gt;</code></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">ConditionalGenericConverter</span> conditionalGenericConverter <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CollectionToCollectionConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+ 
+    <span class="token comment">// Console: [java.util.Collection -> java.util.Collection]</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>conditionalGenericConverter<span class="token punctuation">.</span><span class="token function">getConvertibleTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> sourceList <span class="token operator">=</span> <span class="token class-name">Arrays</span><span class="token punctuation">.</span><span class="token function">asList</span><span class="token punctuation">(</span><span class="token string">"1"</span><span class="token punctuation">,</span> <span class="token string">"2"</span><span class="token punctuation">,</span> <span class="token string">"2"</span><span class="token punctuation">,</span> <span class="token string">"3"</span><span class="token punctuation">,</span> <span class="token string">"4"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">TypeDescriptor</span> sourceTypeDesp <span class="token operator">=</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">collection</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">TypeDescriptor</span> targetTypeDesp <span class="token operator">=</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">collection</span><span class="token punctuation">(</span><span class="token class-name">Set</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span><span class="token class-name">Integer</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Console: true</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>conditionalGenericConverter<span class="token punctuation">.</span><span class="token function">matches</span><span class="token punctuation">(</span>sourceTypeDesp<span class="token punctuation">,</span> targetTypeDesp<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+    <span class="token class-name">Object</span> convert <span class="token operator">=</span> conditionalGenericConverter<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span>sourceList<span class="token punctuation">,</span> sourceTypeDesp<span class="token punctuation">,</span> targetTypeDesp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+    <span class="token comment">// Console: class java.util.LinkedHashSet</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>convert<span class="token punctuation">.</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// Console: [1, 2, 3, 4]</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>convert<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p>  关注点：target 最终使用的是 LinkedHashSet 来存储，这结果和 <code>CollectionFactory#createCollection</code> 该 API 的实现逻辑是相关（Set 类型默认创建的是 LinkedHashSet 实例）。</p>
+<p>  不足：如果说它的优点是功能强大，能够处理复杂类型的转换（PropertyEditor 和前 2 个接口都只能转换单元素类型），那么缺点就是使用、自定义实现起来比较复杂。这不官方也给出了使用指导意见：在 Converter&#x2F;ConverterFactory 接口能够满足条件的情况下，可不使用此接口就不使用。</p>
+</blockquote>
+<h2 id="底层转换器"><a href="#底层转换器" class="headerlink" title="底层转换器"></a>底层转换器</h2><p>按照添加转换器的顺序，Spring 在最后添加了 4 个通用的转换器用于兜底。</p>
+<h3 id="ObjectToObjectConverter"><a href="#ObjectToObjectConverter" class="headerlink" title="ObjectToObjectConverter"></a>ObjectToObjectConverter</h3><p>将源对象转换为目标类型，非常的通用：Object -&gt; Object：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConvertiblePair</span><span class="token punctuation">></span></span> <span class="token function">getConvertibleTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">singleton</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ConvertiblePair</span><span class="token punctuation">(</span><span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>虽然它支持的是Object -&gt; Object，看似没有限制但其实是有约定条件的：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">matches</span><span class="token punctuation">(</span><span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> <span class="token punctuation">(</span>sourceType<span class="token punctuation">.</span><span class="token function">getType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> targetType<span class="token punctuation">.</span><span class="token function">getType</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span>
+			<span class="token function">hasConversionMethodOrConstructor</span><span class="token punctuation">(</span>targetType<span class="token punctuation">.</span><span class="token function">getType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> sourceType<span class="token punctuation">.</span><span class="token function">getType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>是否能够处理的判断逻辑在于<code>hasConversionMethodOrConstructor</code>方法，直译为：是否有转换方法或者构造器。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token keyword">boolean</span> <span class="token function">hasConversionMethodOrConstructor</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> targetClass<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> sourceClass<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token function">getValidatedMember</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">,</span> sourceClass<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@Nullable</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">Member</span> <span class="token function">getValidatedMember</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> targetClass<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> sourceClass<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token comment">// 直接从缓存中取值，判断Member的可用性</span>
+   <span class="token class-name">Member</span> member <span class="token operator">=</span> conversionMemberCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">/**
+    * 当不是首次进入处理时，会走快速返回流程。
+    *  - Member包括Method或者Constructor
+    *  - Method：若是static静态方法，要求方法的第1个入参类型必须是源类型sourceType；若不是static方法，则要求源类型sourceType必须是method.getDeclaringClass()的子类型/相同类型
+    *  - Constructor：要求构造器的第1个入参类型必须是源类型sourceType
+    */</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">isApplicable</span><span class="token punctuation">(</span>member<span class="token punctuation">,</span> sourceClass<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token keyword">return</span> member<span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+
+   <span class="token comment">/**
+    * 创建目标对象的实例，此转换器支持两种方式：
+    * 1. 通过工厂方法/实例方法创建实例（method.invoke(source)）
+    * 2. 通过构造器创建实例（ctor.newInstance(source)）
+    */</span>
+   member <span class="token operator">=</span> <span class="token function">determineToMethod</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">,</span> sourceClass<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>member <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      member <span class="token operator">=</span> <span class="token function">determineFactoryMethod</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">,</span> sourceClass<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>member <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+         member <span class="token operator">=</span> <span class="token function">determineFactoryConstructor</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">,</span> sourceClass<span class="token punctuation">)</span><span class="token punctuation">;</span>
+         <span class="token keyword">if</span> <span class="token punctuation">(</span>member <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+         <span class="token punctuation">&#125;</span>
+      <span class="token punctuation">&#125;</span>
+   <span class="token punctuation">&#125;</span>
+
+   conversionMemberCache<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>targetClass<span class="token punctuation">,</span> member<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">return</span> member<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>对于首次处理的转换，就会进入到三部曲逻辑：通过反射尝试找到合适的 Member 用于创建目标实例。</p>
+<p>step1：determineToMethod，从sourceClass里找实例方法，对方法有如下要求：</p>
+<ul>
+<li>方法名必须叫<code>&quot;to&quot; + targetClass.getSimpleName()</code>，如<code>toPerson()</code></li>
+<li>方法的访问权限必须是public</li>
+<li>该方法的返回值必须是目标类型或其子类型</li>
+</ul>
+<p>step2：determineFactoryMethod，找静态工厂方法，对方法有如下要求：</p>
+<ul>
+<li>方法名必须为 <code>valueOf(sourceClass)</code> 或者 <code>of(sourceClass)</code> 或者 <code>from(sourceClass)</code></li>
+<li>方法的访问权限必须是public</li>
+</ul>
+<p>step3：determineFactoryConstructor，找构造器，对构造器有如下要求：</p>
+<ul>
+<li>存在一个参数，且参数类型是 sourceClass 类型的构造器</li>
+<li>构造器的访问权限必须是public</li>
+</ul>
+<p>特别值得注意的是：此转换器不支持 <code>Object.toString()</code> 方法将 sourceType 转换为 <code>java.lang.String</code>。对于 <code>toString()</code> 支持，请使用下面介绍的更为兜底的 FallbackObjectToStringConverter。</p>
+<p><strong>ObjectToObjectConverter 实例方法示例</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// sourceClass</span>
+<span class="token annotation punctuation">@Data</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Customer</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">Long</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> address<span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">Person</span> <span class="token function">toPerson</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Person</span> person <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Person</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        person<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span><span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        person<span class="token punctuation">.</span><span class="token function">setName</span><span class="token punctuation">(</span><span class="token string">"YourBatman-"</span><span class="token punctuation">.</span><span class="token function">concat</span><span class="token punctuation">(</span><span class="token function">getAddress</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> person<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// tartgetClass</span>
+<span class="token annotation punctuation">@Data</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">Long</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token class-name">Customer</span> customer <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Customer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  customer<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span><span class="token number">1L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  customer<span class="token punctuation">.</span><span class="token function">setAddress</span><span class="token punctuation">(</span><span class="token string">"Peking"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// Converter方式</span>
+  <span class="token class-name">ConditionalGenericConverter</span> converter <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ObjectToObjectConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token class-name">Object</span> convert <span class="token operator">=</span> converter<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span>customer<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">forObject</span><span class="token punctuation">(</span>customer<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span><span class="token class-name">Person</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// Console: Person(id=1, name=YourBatman-Peking)</span>
+  <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>convert<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// ConversionService方式（实际使用方式）</span>
+  <span class="token class-name">ConversionService</span> conversionService <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token class-name">Person</span> person <span class="token operator">=</span> conversionService<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span>customer<span class="token punctuation">,</span> <span class="token class-name">Person</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// Console: Person(id=1, name=YourBatman-Peking)</span>
+  <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>person<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="IdToEntityConverter"><a href="#IdToEntityConverter" class="headerlink" title="IdToEntityConverter"></a>IdToEntityConverter</h3><p>Id(S) –&gt; Entity(T)。通过调用静态查找方法将实体 ID 兑换为实体对象。Entity 里的该查找方法需要满足如下条件 <code>find[EntityName]([IdType])</code>：</p>
+<ol>
+<li>必须是 static 静态方法</li>
+<li>方法名必须为 <code>find + entityName</code>。如 Person 类的话，那么方法名叫 <code>findPerson</code></li>
+<li>方法参数列表必须为 1 个</li>
+<li>返回值类型必须是 Entity 类型</li>
+</ol>
+<blockquote>
+<p>  说明：此方法可以不必是 public，但建议用 public。这样即使 JVM 的 Security 安全级别开启也能够正常访问</p>
+</blockquote>
+<p>支持的转换Pair如下：ID 和 Entity 都可以是任意类型，能转换就成</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConvertiblePair</span><span class="token punctuation">></span></span> <span class="token function">getConvertibleTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">singleton</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ConvertiblePair</span><span class="token punctuation">(</span><span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>判断是否能执行准换的条件是：存在符合条件的find方法，且 <strong>source可以转换为ID类型</strong>（注意 source 能转换成 ID 类型就成，并非目标类型哦）</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">matches</span><span class="token punctuation">(</span><span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token class-name">Method</span> finder <span class="token operator">=</span> <span class="token function">getFinder</span><span class="token punctuation">(</span>targetType<span class="token punctuation">.</span><span class="token function">getType</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">return</span> <span class="token punctuation">(</span>finder <span class="token operator">!=</span> <span class="token keyword">null</span> 
+		<span class="token operator">&amp;&amp;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>conversionService<span class="token punctuation">.</span><span class="token function">canConvert</span><span class="token punctuation">(</span>sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span>finder<span class="token punctuation">.</span><span class="token function">getParameterTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据ID定位到Entity实体对象简直太太太常用了，运用好此转换器的提供的能力，或许能让你事半功倍，<strong>大大减少</strong>重复代码，写出更优雅、更简洁、更易于维护的代码。</p>
+<h4 id="用法示例"><a href="#用法示例" class="headerlink" title="用法示例"></a>用法示例</h4><p>Entity 实体：准备好符合条件的 findXXX 方法</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Person</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token class-name">Long</span> id<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>
+
+    <span class="token comment">/**
+     * 根据ID定位一个Person实例
+     */</span>
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Person</span> <span class="token function">findPerson</span><span class="token punctuation">(</span><span class="token class-name">Long</span> id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// 一般根据id从数据库查，本处通过new来模拟</span>
+        <span class="token class-name">Person</span> person <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Person</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        person<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        person<span class="token punctuation">.</span><span class="token function">setName</span><span class="token punctuation">(</span><span class="token string">"YourBatman-byFindPerson"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> person<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">ConditionalGenericConverter</span> converter <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">IdToEntityConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">TypeDescriptor</span> sourceTypeDesp <span class="token operator">=</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">TypeDescriptor</span> targetTypeDesp <span class="token operator">=</span> <span class="token class-name">TypeDescriptor</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span><span class="token class-name">Person</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">boolean</span> matches <span class="token operator">=</span> converter<span class="token punctuation">.</span><span class="token function">matches</span><span class="token punctuation">(</span>sourceTypeDesp<span class="token punctuation">,</span> targetTypeDesp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// Console: 是否能够转换：true</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"是否能够转换："</span> <span class="token operator">+</span> matches<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 执行转换</span>
+    <span class="token class-name">Object</span> convert <span class="token operator">=</span> converter<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span><span class="token string">"1"</span><span class="token punctuation">,</span> sourceTypeDesp<span class="token punctuation">,</span> targetTypeDesp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// Console: Person(id=1, name=YourBatman-byFindPerson)</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>convert<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h4><p>凡是需要使用到 <code>findById()</code> 的地方都可以通过它来代替掉。如：</p>
+<p>Controller 层：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@GetMapping</span><span class="token punctuation">(</span><span class="token string">"/ids/&#123;id&#125;"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">Object</span> <span class="token function">getById</span><span class="token punctuation">(</span><span class="token annotation punctuation">@PathVariable</span> <span class="token class-name">Person</span> id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> id<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@GetMapping</span><span class="token punctuation">(</span><span class="token string">"/ids"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">Object</span> <span class="token function">getById</span><span class="token punctuation">(</span><span class="token annotation punctuation">@RequestParam</span> <span class="token class-name">Person</span> id<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> id<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Tips：在 Controller 层这么写我并不建议，因为语义上没有对齐，势必在代码书写过程中带来一定的麻烦。</p>
+<p>Service层：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Autowired</span>
+<span class="token keyword">private</span> <span class="token class-name">ConversionService</span> conversionService<span class="token punctuation">;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">Object</span> <span class="token function">findById</span><span class="token punctuation">(</span><span class="token class-name">String</span> id<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+    <span class="token class-name">Person</span> person <span class="token operator">=</span> conversionService<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span>id<span class="token punctuation">,</span> <span class="token class-name">Person</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">return</span> person<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Tips：在 Service 层这么写，用类型转换的领域设计思想代替了自上而下的过程编程思想。</p>
+<h3 id="FallbackObjectToStringConverter"><a href="#FallbackObjectToStringConverter" class="headerlink" title="FallbackObjectToStringConverter"></a>FallbackObjectToStringConverter</h3><p>通过简单的调用 <code>Object#toString()</code> 方法将任何支持的类型转换为String类型，它作为底层兜底。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConvertiblePair</span><span class="token punctuation">></span></span> <span class="token function">getConvertibleTypes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	<span class="token keyword">return</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">singleton</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ConvertiblePair</span><span class="token punctuation">(</span><span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>该转换器支持 CharSequence&#x2F;StringWriter 等类型，以及所有 <code>ObjectToObjectConverter.hasConversionMethodOrConstructor(sourceClass, String.class)</code> 的类型。</p>
+<blockquote>
+<p>  说明：ObjectToObjectConverter 不处理任何 String 类型的转换都交给 FallbackObjectToStringConverter 处理</p>
+</blockquote>
+<h3 id="ObjectToOptionalConverter"><a href="#ObjectToOptionalConverter" class="headerlink" title="ObjectToOptionalConverter"></a>ObjectToOptionalConverter</h3><p>将任意类型转换为一个 <code>Optional&lt;T&gt;</code> 类型。</p>
+<h4 id="代码示例"><a href="#代码示例" class="headerlink" title="代码示例"></a>代码示例</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">ConversionService</span> conversionService <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">Optional</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Integer</span><span class="token punctuation">></span></span> result <span class="token operator">=</span> conversionService<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Arrays</span><span class="token punctuation">.</span><span class="token function">asList</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">Optional</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// Console：Optional[[2]]</span>
+    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="使用场景-1"><a href="#使用场景-1" class="headerlink" title="使用场景"></a>使用场景</h4><p>一个典型的应用场景：在 Controller 中可传可不传的参数中，我们不仅可以通过 <code>@RequestParam(required = false) Long id</code> 来做，还是可以这么写：<code>@RequestParam Optional&lt;Long&gt; id</code>。</p>
+<h1 id="Converter-Framework"><a href="#Converter-Framework" class="headerlink" title="Converter Framework"></a>Converter Framework</h1><p>ConverterRegistry和ConversionService的关系密不可分，前者为后者提供转换器管理支撑，后者面向使用者提供服务。本文涉及到的接口&#x2F;类有：</p>
+<ul>
+<li>ConverterRegistry：转换器注册中心。负责转换器的注册、删除</li>
+<li>ConversionService：统一的类型转换服务。属于面向开发者使用的门面接口</li>
+<li>ConfigurableConversionService：上两个接口的组合接口</li>
+<li>GenericConversionService：上个接口的实现，实现了注册管理、转换服务的几乎所有功能，是个实现类而非抽象类</li>
+<li>DefaultConversionService：继承自 GenericConversionService，在其基础上注册了一批默认转换器（Spring内建），从而具备基础转换能力，能解决日常绝大部分场景</li>
+</ul>
+<p><img src="/images/Spring/ConversionService.png"></p>
+<h2 id="ConverterRegistry"><a href="#ConverterRegistry" class="headerlink" title="ConverterRegistry"></a>ConverterRegistry</h2><p>Spring 3.0 引入的转换器注册中心，用于管理新一套的转换器们。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ConverterRegistry</span> <span class="token punctuation">&#123;</span>
+	
+	<span class="token keyword">void</span> <span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> converter<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">S</span><span class="token punctuation">,</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">S</span><span class="token punctuation">></span></span> sourceType<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">,</span> <span class="token class-name">Converter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">S</span><span class="token punctuation">,</span> <span class="token operator">?</span> <span class="token keyword">extends</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> converter<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">void</span> <span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token class-name">GenericConverter</span> converter<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">void</span> <span class="token function">addConverterFactory</span><span class="token punctuation">(</span><span class="token class-name">ConverterFactory</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> factory<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	
+	<span class="token comment">// 唯一移除方法：按照转换pair对来移除</span>
+	<span class="token keyword">void</span> <span class="token function">removeConvertible</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> sourceType<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="ConversionService"><a href="#ConversionService" class="headerlink" title="ConversionService"></a>ConversionService</h2><p>面向使用者的统一类型转换服务。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ConversionService</span> <span class="token punctuation">&#123;</span>
+	
+	<span class="token keyword">boolean</span> <span class="token function">canConvert</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> sourceType<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">boolean</span> <span class="token function">canConvert</span><span class="token punctuation">(</span><span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	
+	<span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Object</span> source<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token class-name">Object</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Object</span> source<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="ConfigurableConversionService"><a href="#ConfigurableConversionService" class="headerlink" title="ConfigurableConversionService"></a>ConfigurableConversionService</h2><p><code>ConversionService</code> 和 <code>ConverterRegistry</code> 的组合接口，自己并未新增任何接口方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ConfigurableConversionService</span> <span class="token keyword">extends</span> <span class="token class-name">ConversionService</span><span class="token punctuation">,</span> <span class="token class-name">ConverterRegistry</span> <span class="token punctuation">&#123;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="GenericConversionService"><a href="#GenericConversionService" class="headerlink" title="GenericConversionService"></a>GenericConversionService</h2><p>对 <code>ConfigurableConversionService</code> 接口提供了完整实现的实现类。换句话说： ConversionService 和 ConverterRegistry 接口的功能均通过此类得到了实现，所以它是本文重点。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">GenericConversionService</span> <span class="token keyword">implements</span> <span class="token class-name">ConfigurableConversionService</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Converters</span> converters <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Converters</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConverterCacheKey</span><span class="token punctuation">,</span> <span class="token class-name">GenericConverter</span><span class="token punctuation">></span></span> converterCache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ConcurrentReferenceHashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConverterCacheKey</span><span class="token punctuation">,</span> <span class="token class-name">GenericConverter</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token number">64</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>它用两个成员变量来管理转换器们。converterCache 是缓存用于加速查找。Converters 是 GenericConversionService 的内部类，用于管理（添加、删除、查找）转换器们。也就说对 ConverterRegistry 接口的实现最终是委托给它去完成的，它是整个转换服务正常工作的内核。</p>
+<h2 id="DefaultConversionService"><a href="#DefaultConversionService" class="headerlink" title="DefaultConversionService"></a>DefaultConversionService</h2><p>Spirng 容器默认使用的转换服务实现，继承自 GenericConversionService，在其基础行只做了一件事：构造时添加内建的默认转换器们。从而天然具备有了基本的类型转换能力，适用于不同的环境。如：XML 解析、@Value 解析、http 协议参数自动转换等等。</p>
+<blockquote>
+<p>  Tip：它并非Spring 3.0就有，而是Spring 3.1新推出的API</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DefaultConversionService</span> <span class="token keyword">extends</span> <span class="token class-name">GenericConversionService</span> <span class="token punctuation">&#123;</span>
+	<span class="token comment">// 唯一构造器</span>
+	<span class="token keyword">public</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token function">addDefaultConverters</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Spring 新一代类型转换内建了非常多的实现，这些在初始化阶段大都被默认注册进去。注册在 DefaultConversionService 提供的一个 static 静态工具方法里：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">addDefaultConverters</span><span class="token punctuation">(</span><span class="token class-name">ConverterRegistry</span> converterRegistry<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// 1、添加标量转换器(和数字相关)</span>
+  <span class="token function">addScalarConverters</span><span class="token punctuation">(</span>converterRegistry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// 2、添加处理集合的转换器</span>
+  <span class="token function">addCollectionConverters</span><span class="token punctuation">(</span>converterRegistry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// 3、添加对JSR310时间类型支持的转换器</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ByteBufferConverter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">ConversionService</span><span class="token punctuation">)</span> converterRegistry<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StringToTimeZoneConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ZoneIdToTimeZoneConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ZonedDateTimeToCalendarConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// 4、添加底层转换器（上面处理不了的全转交它们处理）</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ObjectToObjectConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">IdToEntityConverter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">ConversionService</span><span class="token punctuation">)</span> converterRegistry<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">FallbackObjectToStringConverter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  converterRegistry<span class="token punctuation">.</span><span class="token function">addConverter</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ObjectToOptionalConverter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">ConversionService</span><span class="token punctuation">)</span> converterRegistry<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>最后，需要特别强调的是：它是一个静态方法，并且还是 public 的访问权限，且不仅仅只有本类调用。实际上，DefaultConversionService 仅仅只做了这一件事，所以任何地方只要调用了该静态方法都能达到前者相同的效果，使用上可谓给与了较大的灵活性。比如 Spring Boot 环境下不是使用 DefaultConversionService 而是 ApplicationConversionService，后者是对 FormattingConversionService 扩展。Spring Boot 在 Web 环境默认向容器注册了一个 WebConversionService，因此你有需要可直接 @Autowired 使用。</p>
+<h2 id="ConversionServiceFactoryBean"><a href="#ConversionServiceFactoryBean" class="headerlink" title="ConversionServiceFactoryBean"></a>ConversionServiceFactoryBean</h2><p>顾名思义，它是用于产生 ConversionService 类型转换服务的工厂 Bean，为了方便和 Spring 容器整合而使用。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ConversionServiceFactoryBean</span> <span class="token keyword">implements</span> <span class="token class-name">FactoryBean</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ConversionService</span><span class="token punctuation">></span></span><span class="token punctuation">,</span> <span class="token class-name">InitializingBean</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token annotation punctuation">@Nullable</span>
+	<span class="token keyword">private</span> <span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> converters<span class="token punctuation">;</span>
+	<span class="token annotation punctuation">@Nullable</span>
+	<span class="token keyword">private</span> <span class="token class-name">GenericConversionService</span> conversionService<span class="token punctuation">;</span>
+
+	<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">setConverters</span><span class="token punctuation">(</span><span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> converters<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">this</span><span class="token punctuation">.</span>converters <span class="token operator">=</span> converters<span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token annotation punctuation">@Override</span>
+	<span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">afterPropertiesSet</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token comment">// 使用的是默认实现，表示Spring标准实现都会被注册进容器</span>
+		<span class="token keyword">this</span><span class="token punctuation">.</span>conversionService <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DefaultConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		<span class="token class-name">ConversionServiceFactory</span><span class="token punctuation">.</span><span class="token function">registerConverters</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>converters<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>conversionService<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	
+	<span class="token annotation punctuation">@Override</span>
+	<span class="token annotation punctuation">@Nullable</span>
+	<span class="token keyword">public</span> <span class="token class-name">ConversionService</span> <span class="token function">getObject</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>conversionService<span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="Formatter"><a href="#Formatter" class="headerlink" title="Formatter"></a>Formatter</h1><p>格式化器的作用似乎跟转换器的作用类似，但是它们的关注点却不一样：</p>
+<ul>
+<li>转换器：将类型 S 转换为类型 T，关注的是类型而非格式</li>
+<li>格式化器： String &lt;-&gt; Java 类型。这么一看它似乎和 PropertyEditor 类似，但是它的关注点是字符串的格式</li>
+</ul>
+<p>Spring 有自己的格式化器抽象 <code>org.springframework.format.Formatter</code>，但是谈到格式化器，必然就会联想起来 JDK 自己的 <code>java.text.Format</code> 体系。</p>
+<h2 id="JDK-Formatter"><a href="#JDK-Formatter" class="headerlink" title="JDK Formatter"></a>JDK Formatter</h2><p>JDK 内置有格式化器，便是<code>java.text.Format</code>体系。</p>
+<p><img src="/images/Spring/Format.png"></p>
+<p>Format 提供了以下两个接口：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Format</span> <span class="token keyword">implements</span> <span class="token class-name">Serializable</span><span class="token punctuation">,</span> <span class="token class-name">Cloneable</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">StringBuffer</span> <span class="token function">format</span><span class="token punctuation">(</span><span class="token class-name">Object</span> obj<span class="token punctuation">,</span> <span class="token class-name">StringBuffer</span> toAppendTo<span class="token punctuation">,</span> <span class="token class-name">FieldPosition</span> pos<span class="token punctuation">)</span><span class="token punctuation">;</span>	
+	<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Object</span> parseObject <span class="token punctuation">(</span><span class="token class-name">String</span> source<span class="token punctuation">,</span> <span class="token class-name">ParsePosition</span> pos<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="DateFormat：日期时间格式化"><a href="#DateFormat：日期时间格式化" class="headerlink" title="DateFormat：日期时间格式化"></a>DateFormat：日期时间格式化</h3><p>抽象类。用于用于格式化日期&#x2F;时间类型 <code>java.util.Date</code>。虽然是抽象类，但它提供了几个静态方法用于获取它的 Prototype 实例：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 格式化日期 + 时间 示例：20-12-25 上午7:19</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">static</span> <span class="token class-name">DateFormat</span> <span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">getDateTimeInstance</span><span class="token punctuation">(</span>SHORT<span class="token punctuation">,</span> SHORT<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token comment">// 格式化日期 + 时间 示例：2020-12-25 7:19:30</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">static</span> <span class="token class-name">DateFormat</span> <span class="token function">getDateTimeInstance</span><span class="token punctuation">(</span><span class="token keyword">int</span> dateStyle<span class="token punctuation">,</span> <span class="token keyword">int</span> timeStyle<span class="token punctuation">,</span> <span class="token class-name">Locale</span> aLocale<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">get</span><span class="token punctuation">(</span>timeStyle<span class="token punctuation">,</span> dateStyle<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> aLocale<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 格式化日期 示例：2020-12-25</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">static</span> <span class="token class-name">DateFormat</span> <span class="token function">getDateInstance</span><span class="token punctuation">(</span><span class="token keyword">int</span> style<span class="token punctuation">,</span> <span class="token class-name">Locale</span> aLocale<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">get</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> style<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> aLocale<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 格式化时间 示例：7:19:30</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">static</span> <span class="token class-name">DateFormat</span> <span class="token function">getTimeInstance</span><span class="token punctuation">(</span><span class="token keyword">int</span> style<span class="token punctuation">,</span> <span class="token class-name">Locale</span> aLocale<span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token function">get</span><span class="token punctuation">(</span>style<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> aLocale<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="NumberFormat：数字格式化"><a href="#NumberFormat：数字格式化" class="headerlink" title="NumberFormat：数字格式化"></a>NumberFormat：数字格式化</h3><p>抽象类。用于格式化数字，它可以对数字进行任意格式化，如小数、百分数、十进制数等等。</p>
+<h4 id="DecimalFormat"><a href="#DecimalFormat" class="headerlink" title="DecimalFormat"></a>DecimalFormat</h4><p>以其主要实现 DecimalFormat 实现举例。DecimalFormat 用于格式化十进制数字。它具有各种特性，可以解析和格式化数字，包括：西方数字、阿拉伯数字和印度数字。它还支持不同种类的数字，包括：整数(123)、小数(123.4)、科学记数法(1.23E4)、百分数(12%)和货币金额($123)。所有这些都可以进行本地化。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">NumberFormat</span><span class="token punctuation">.</span><span class="token function">getInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//1,220.045</span>
+<span class="token class-name">NumberFormat</span><span class="token punctuation">.</span><span class="token function">getCurrencyInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//￥1,220.05</span>
+<span class="token class-name">NumberFormat</span><span class="token punctuation">.</span><span class="token function">getIntegerInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">// 1,220</span>
+<span class="token class-name">NumberFormat</span><span class="token punctuation">.</span><span class="token function">getNumberInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">// 1,220.045</span>
+<span class="token class-name">NumberFormat</span><span class="token punctuation">.</span><span class="token function">getPercentInstance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">// 122,005%</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>DecimalFormat 构造器 pattern 模版</strong></p>
+<table>
+<thead>
+<tr>
+<th>符号</th>
+<th>Localtion</th>
+<th>是否本地化</th>
+<th>释义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0</code></td>
+<td>Number</td>
+<td>是</td>
+<td>Digit</td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td>Number</td>
+<td>是</td>
+<td>Digit。若是0就显示为空</td>
+</tr>
+<tr>
+<td><code>.</code></td>
+<td>Number</td>
+<td>是</td>
+<td>小数&#x2F;货币分隔符</td>
+</tr>
+<tr>
+<td><code>-</code></td>
+<td>Number</td>
+<td>是</td>
+<td>就代表减号</td>
+</tr>
+<tr>
+<td><code>,</code></td>
+<td>Number</td>
+<td>是</td>
+<td>分组分隔符</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td>Number</td>
+<td>是</td>
+<td>科学计数法分隔符（位数和指数）</td>
+</tr>
+<tr>
+<td><code>%</code></td>
+<td>前&#x2F;后缀</td>
+<td>是</td>
+<td>乘以100并显示为百分数</td>
+</tr>
+<tr>
+<td><code>¤</code></td>
+<td>前&#x2F;后缀</td>
+<td>否</td>
+<td>货币记号。若连续出现两次就用国际货币符号代替</td>
+</tr>
+<tr>
+<td><code>&#39;</code></td>
+<td>前后缀</td>
+<td>否</td>
+<td>用于引用特殊字符。作用类似于转义字符</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>  说明：Number 和 Digit 的区别：</p>
+<ul>
+<li>Number 是个抽象概念，其表达形式可以是数字、手势、声音等等。如 1024 就是个number</li>
+<li>Digit 是用来表达的单独符号。如 0-9 这是个 digit 就可以用来表示 number，如 1024 就是由 1、0、2、4 这四个 digit 组成的</li>
+</ul>
+</blockquote>
+<h5 id="0和-的用法"><a href="#0和-的用法" class="headerlink" title="0和#的用法"></a>0和#的用法</h5><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 只保留整数部分 1220
+new DecimalFormat(&quot;0&quot;).format(1220.0455); 
+&#x2F;&#x2F; 保留3位小数 1220.045
+new DecimalFormat(&quot;0.000&quot;).format(1220.0455);
+&#x2F;&#x2F; 整数部分、小数部分都5位。不够的都用0补位(整数高位部，小数低位补) 01220.04550
+new DecimalFormat(&quot;00000.00000&quot;).format(1220.0455);
+&#x2F;&#x2F; 只保留整数部分 1220
+new DecimalFormat(&quot;#&quot;).format(1220.0455);
+&#x2F;&#x2F; 保留两位小数并以百分比输出：122004.55%
+new DecimalFormat(&quot;#.##%&quot;).format(1220.0455);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h5 id="科学计数法E"><a href="#科学计数法E" class="headerlink" title="科学计数法E"></a>科学计数法E</h5><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 1E3</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"0E0"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 1E03</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"0E00"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 12200E-00001</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"00000E00000"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// .1E4</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"#E0"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// .1E04</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"#E00"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 1220E00000</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"#####E00000"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h5 id="分组分隔符"><a href="#分组分隔符" class="headerlink" title="分组分隔符,"></a>分组分隔符,</h5><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 1,220</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">",###"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 12,20</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">",##"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 分隔符,左边是无效的 12,20</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"###,##"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h5 id="百分号"><a href="#百分号" class="headerlink" title="百分号%"></a>百分号%</h5><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 百分位表示 122004.55%</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"#.##%"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 千分位表示 1220045.5‰</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"#.##\u2030"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h5 id="本地货币符号¤"><a href="#本地货币符号¤" class="headerlink" title="本地货币符号¤"></a>本地货币符号¤</h5><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 1,220.05￥</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">",000.00¤"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 1,220.05￥</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">",000.¤00"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//1,220.05￥￥</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"¤,000.00"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// ￥1,220.05￥</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">"¤,000.¤00"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 世界货币表达形式 1,220.05CNY</span>
+<span class="token keyword">new</span> <span class="token class-name">DecimalFormat</span><span class="token punctuation">(</span><span class="token string">",000.00¤¤"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1220.0455</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="ChoiceFormat"><a href="#ChoiceFormat" class="headerlink" title="ChoiceFormat"></a>ChoiceFormat</h4><p>这个格式化器非常有意思：<strong>相当于以数字为键，字符串为值的键值对</strong>。使用一组 double 类型的数组作为键，一组 String 类型的数组作为值，两数组相同（不一定必须是相同，见示例）索引值的元素作为一对。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">double</span><span class="token punctuation">[</span><span class="token punctuation">]</span> limits <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+<span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> formats <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token string">"周一"</span><span class="token punctuation">,</span> <span class="token string">"周二"</span><span class="token punctuation">,</span> <span class="token string">"周三"</span><span class="token punctuation">,</span> <span class="token string">"周四"</span><span class="token punctuation">,</span> <span class="token string">"周五"</span><span class="token punctuation">,</span> <span class="token string">"周六"</span><span class="token punctuation">,</span> <span class="token string">"周天"</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+<span class="token class-name">NumberFormat</span> numberFormat <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ChoiceFormat</span><span class="token punctuation">(</span>limits<span class="token punctuation">,</span> formats<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+numberFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//周一</span>
+numberFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">4.3</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//周四</span>
+numberFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">5.8</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//周五</span>
+numberFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">9.1</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//周天</span>
+numberFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">//周天</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="MessageFormat：字符串格式化"><a href="#MessageFormat：字符串格式化" class="headerlink" title="MessageFormat：字符串格式化"></a>MessageFormat：字符串格式化</h3><p>MessageFormat 提供了一种与语言无关（不管你在中国还是其它国家，效果一样）的方式生成拼接消息&#x2F;拼接字符串的方法。使用它来构造显示给最终用户的消息。MessageFormat 接受一组对象，对它们进行格式化，然后在模式的适当位置插入格式化的字符串。</p>
+<p>先来个最简单的使用示例体验一把：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">String</span> sourceStrPattern <span class="token operator">=</span> <span class="token string">"Hello &#123;0&#125;, my name is &#123;1&#125;"</span><span class="token punctuation">;</span>
+<span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">&#123;</span><span class="token string">"girl"</span><span class="token punctuation">,</span> <span class="token string">"Elijah"</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+<span class="token comment">// Console: Hello girl, my name is Elijah</span>
+<span class="token class-name">String</span> formatedStr <span class="token operator">=</span> <span class="token class-name">MessageFormat</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span>sourceStrPattern<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="参数模式"><a href="#参数模式" class="headerlink" title="参数模式"></a>参数模式</h4><p>MessageFormat采用 <code>&#123;&#125;</code> 来标记需要被替换&#x2F;插入的部分，其中 <code>&#123;&#125;</code> 里面的参数结构具有一定模式：<code>&#123;[ArgumentIndex],[FormatType],[FormatStyle] </code>。</p>
+<ul>
+<li>ArgumentIndex：非必须。从0开始的索引值</li>
+<li>FormatType：非必须。使用不同的 <code>java.text.Format</code> 实现类对入参进行格式化处理。它能有如下值：number（调用 NumberFormat 进行格式化）、date（调用 DateFormat 进行格式化）、time（调用 DateFormat 进行格式化）、choice（调用 ChoiceFormat 进行格式化）</li>
+<li>FormatStyle：非必须。设置FormatType使用的样式。它能有如下值：short、medium、long、full、integer、currency、percent、SubformPattern（如日期格式、数字格式#.##等）</li>
+</ul>
+<blockquote>
+<p>  说明：FormatType 和 FormatStyle 只有在传入值为日期时间、数字、百分比等类型时才有可能需要设置，使用得并不多。</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">MessageFormat</span> messageFormat <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MessageFormat</span><span class="token punctuation">(</span><span class="token string">"Hello, my name is &#123;0&#125;. I’am &#123;1,number,#.##&#125; years old. Today is &#123;2,date,yyyy-MM-dd HH:mm:ss&#125;"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 亦可通过编程式 显示指定某个位置要使用的格式化器</span>
+<span class="token comment">// messageFormat.setFormatByArgumentIndex(1, new DecimalFormat("#.###"));</span>
+
+<span class="token comment">// Console: Hello, my name is YourBatman. I’am 24.12 years old. Today is 2020-12-26 15:24:28</span>
+messageFormat<span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">&#123;</span><span class="token string">"Elijah"</span><span class="token punctuation">,</span> <span class="token number">24.123456</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="与-String-format-对比"><a href="#与-String-format-对比" class="headerlink" title="与 String.format 对比"></a>与 String.format 对比</h4><p>二者都能用于字符串拼接（格式化）上，撇开 MessageFormat 支持各种模式不说，我们只需要考虑它俩的性能上差异。</p>
+<ul>
+<li><p>MessageFormat：模版可提前分析，且可以只分析一次，再在指定位置上插入相应的值</p>
+</li>
+<li><p>String.format：该静态方法是采用运行时用正则表达式匹配到占位符，然后执行替换的</p>
+</li>
+</ul>
+<h2 id="Spring-Formatter"><a href="#Spring-Formatter" class="headerlink" title="Spring Formatter"></a>Spring Formatter</h2><p>在应用中，我们经常需要将 Client 端传入的字符串转换成指定格式&#x2F;指定数据类型，同样的服务端也希望能把指定类型的数据按照指定格式返回给 Client 端，这种情况下 Converter 已经无法满足我们的需求了。为此，Spring 提供了格式化模块专门用于解决此类问题。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">Formatter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">Printer</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">,</span> <span class="token class-name">Parser</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>可以看到，该接口本身没有任何方法，而是聚合了另外两个接口 Printer 和 Parser。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public interface Printer&lt;T&gt; &#123;
+  &#x2F;&#x2F; 格式化显示（输出）接口。将 T 类型转为 String 形式，Locale 用于控制国际化。
+	String print(T object, Locale locale);
+&#125;
+
+public interface Parser&lt;T&gt; &#123;
+  &#x2F;&#x2F; 解析接口。将 String 类型转到 T 类型，Locale 用于控制国际化。
+	T parse(String text, Locale locale) throws ParseException;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>根据继承树来看，格式化动作只需关心到两个领域：时间日期领域、数字领域（其中包括货币）。</p>
+<h3 id="时间日期格式化"><a href="#时间日期格式化" class="headerlink" title="时间日期格式化"></a>时间日期格式化</h3><p>Spring 框架从 4.0 开始支持 Java 8，针对 JSR 310 日期时间类型的格式化专门有个包 <code>org.springframework.format.datetime.standard</code>。Java 中对时间日期的格式化还需分为两大阵营来处理：<code>java.util.Date</code> 以及 <code>JSR 310</code>。</p>
+<h4 id="Date类型"><a href="#Date类型" class="headerlink" title="Date类型"></a>Date类型</h4><p>Spring 提供了 <code>DateFormatter</code> 用于支持它的格式化。</p>
+<blockquote>
+<p>  因为 Date 早就存在，所以 DateFormatter 是伴随着 Formatter 的出现而出现，@since 3.0</p>
+</blockquote>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">DateFormatter</span> <span class="token keyword">implements</span> <span class="token class-name">Formatter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Date</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+	<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">TimeZone</span> UTC <span class="token operator">=</span> <span class="token class-name">TimeZone</span><span class="token punctuation">.</span><span class="token function">getTimeZone</span><span class="token punctuation">(</span><span class="token string">"UTC"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span>ISO<span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">></span></span> ISO_PATTERNS<span class="token punctuation">;</span>
+	<span class="token keyword">static</span> <span class="token punctuation">&#123;</span>
+		<span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span>ISO<span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">></span></span> formats <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EnumMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>ISO<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		formats<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>ISO<span class="token punctuation">.</span>DATE<span class="token punctuation">,</span> <span class="token string">"yyyy-MM-dd"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		formats<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>ISO<span class="token punctuation">.</span>TIME<span class="token punctuation">,</span> <span class="token string">"HH:mm:ss.SSSXXX"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		formats<span class="token punctuation">.</span><span class="token function">put</span><span class="token punctuation">(</span>ISO<span class="token punctuation">.</span>DATE_TIME<span class="token punctuation">,</span> <span class="token string">"yyyy-MM-dd'T'HH:mm:ss.SSSXXX"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+		ISO_PATTERNS <span class="token operator">=</span> <span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">unmodifiableMap</span><span class="token punctuation">(</span>formats<span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>默认使用的 TimeZone 是 UTC 标准时区，<code>ISO_PATTERNS</code> 代表 ISO 标准模版，这和 <code>@DateTimeFormat</code> 注解的 ISO 属性是一一对应的。也就是说如果你不想指定 Pattern，可以快速通过指定 ISO 来实现。另外，不管输入还是输出，底层依赖的都是 JDK 的 <code>java.text.DateFormat</code>，万变不离其宗。</p>
+<p>注意：ISO格式输出的时间，是存在时差问题的，因为它使用的是 UTC 时间，请稍加注意。</p>
+<h4 id="JSR-310类型"><a href="#JSR-310类型" class="headerlink" title="JSR 310类型"></a>JSR 310类型</h4><p>JSR 310日期时间类型是 Java8 引入的一套全新的时间日期 API。新的时间及日期 API 位于 java.time 中，此包中的是类是不可变且线程安全的。下面是一些关键类</p>
+<ul>
+<li><strong>Instant</strong>——代表的是时间戳（另外可参考Clock类）</li>
+<li><strong>LocalDate</strong>——日期，如 2020-12-12。</li>
+<li><strong>LocalTime</strong>——时间，如 18:00:00。</li>
+<li><strong>LocalDateTime</strong>——日期及时间（无时区）</li>
+<li><strong>ZonedDateTime</strong>——日期及时间（有时区，以UTC&#x2F;格林威治时间为基准）</li>
+<li><strong>Timezone</strong>——时区。在新API中时区使用ZoneId来表示。时区可以很方便的使用静态方法of来获取到</li>
+</ul>
+<p>同时还有一些辅助类，如：Year、Month、YearMonth、MonthDay、Duration、Period 等等。</p>
+<p>从  <code>Formatter</code> 的继承树来看，Spring 只提供了一些辅助类的格式化器实现，如 MonthFormatter、PeriodFormatter、YearMonthFormatter 等，且实现方式都是趋同的：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">class</span> <span class="token class-name">MonthFormatter</span> <span class="token keyword">implements</span> <span class="token class-name">Formatter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Month</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+	<span class="token annotation punctuation">@Override</span>
+	<span class="token keyword">public</span> <span class="token class-name">Month</span> <span class="token function">parse</span><span class="token punctuation">(</span><span class="token class-name">String</span> text<span class="token punctuation">,</span> <span class="token class-name">Locale</span> locale<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ParseException</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> <span class="token class-name">Month</span><span class="token punctuation">.</span><span class="token function">valueOf</span><span class="token punctuation">(</span>text<span class="token punctuation">.</span><span class="token function">toUpperCase</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+	<span class="token annotation punctuation">@Override</span>
+	<span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">print</span><span class="token punctuation">(</span><span class="token class-name">Month</span> object<span class="token punctuation">,</span> <span class="token class-name">Locale</span> locale<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+		<span class="token keyword">return</span> object<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	<span class="token punctuation">&#125;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们会发现，Spring 并没有为 <code>LocalDateTime、LocalDate、LocalTime</code> 提供 Formatter，是因为 JDK8 自身提供了 <code>java.time.format.DateTimeFormatter</code> 格式化器，Spring 只需要通过 Factory 等方式做整合即可。</p>
+<p>以后对日期时间类型（包括 JSR310 类型）就不要自己去写原生的 <code>SimpleDateFormat/DateTimeFormatter</code> 了，建议可以用 Spring 包装过的 <code>DateFormatter/DateTimeFormatterFactory</code> ，使用体验更佳。</p>
+<h3 id="数字格式化"><a href="#数字格式化" class="headerlink" title="数字格式化"></a>数字格式化</h3><p>Spring 提供了 <code>AbstractNumberFormatter</code> 抽象来专门处理数字格式化议题。与 <code>DateFormatter</code> 的实现模式相同，底层实现委托给 <code>java.text.NumberFormat</code> 去完成。</p>
+<p>此抽象类共有三个具体实现：</p>
+<ul>
+<li>NumberStyleFormatter：数字格式化，如小数，分组等</li>
+<li>PercentStyleFormatter：百分数格式化</li>
+<li>CurrencyStyleFormatter：钱币格式化</li>
+</ul>
+<h1 id="Formatter-Framework"><a href="#Formatter-Framework" class="headerlink" title="Formatter Framework"></a>Formatter Framework</h1><h2 id="FormatterRegistry"><a href="#FormatterRegistry" class="headerlink" title="FormatterRegistry"></a>FormatterRegistry</h2><p>FormatterRegistry 是格式化器注册中心。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">FormatterRegistry</span> <span class="token keyword">extends</span> <span class="token class-name">ConverterRegistry</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">void</span> <span class="token function">addPrinter</span><span class="token punctuation">(</span><span class="token class-name">Printer</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addParser</span><span class="token punctuation">(</span><span class="token class-name">Parser</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addFormatter</span><span class="token punctuation">(</span><span class="token class-name">Formatter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addFormatterForFieldType</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var1<span class="token punctuation">,</span> <span class="token class-name">Formatter</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addFormatterForFieldType</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var1<span class="token punctuation">,</span> <span class="token class-name">Printer</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var2<span class="token punctuation">,</span> <span class="token class-name">Parser</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> var3<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">void</span> <span class="token function">addFormatterForFieldAnnotation</span><span class="token punctuation">(</span><span class="token class-name">AnnotationFormatterFactory</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">extends</span> <span class="token class-name">Annotation</span><span class="token punctuation">></span></span> var1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>此接口继承自类型转换器注册中心  <code>ConverterRegistry</code>，所以格式化注册中心是转换器注册中心的加强版。虽然 <code>FormatterRegistry</code> 提供了多种添加方法，但其实都是在描述同一个功能：为指定类型 <code>FieldType</code> 添加格式化器（ Printer 或 Parser）。</p>
+<blockquote>
+<p>  说明：最后一个接口方法除外，<code>addFormatterForFieldAnnotation()</code> 和格式化注解相关，它非常重要。</p>
+</blockquote>
+<p>FormatterRegistry 接口的继承树如下：</p>
+<img src="/images/Spring/FormatterRegistry.png" style="zoom:80%;" />
+
+<p>有了学过 ConverterRegistry 的经验，这种设计套路很容易被看穿。这两个实现类按层级进行分工：</p>
+<ul>
+<li>FormattingConversionService：实现所有接口方法</li>
+<li>DefaultFormattingConversionService：继承自上面的 FormattingConversionService，在其基础上注册默认的格式化器</li>
+</ul>
+<h2 id="FormattingConversionService"><a href="#FormattingConversionService" class="headerlink" title="FormattingConversionService"></a>FormattingConversionService</h2><p>它是 FormatterRegistry 接口的实现类，实现其所有接口方法。</p>
+<p>FormatterRegistry 是 ConverterRegistry 的子接口，而 ConverterRegistry 接口的所有方法均已由 GenericConversionService 全部实现了，所以可以通过继承它来间接完成 ConverterRegistry 接口方法的实现。</p>
+<p>格式化器的注册管理远没有转换器那么复杂，因为它是基于上层适配的思想，最终适配为 Converter 来完成注册的。所以最终注册进去的实际是个经由格式化器适配来的转换器，完美复用了那套复杂的转换器管理逻辑。</p>
+<h3 id="PrinterConverter：Printer-接口适配器"><a href="#PrinterConverter：Printer-接口适配器" class="headerlink" title="PrinterConverter：Printer 接口适配器"></a>PrinterConverter：Printer 接口适配器</h3><p>把<code>Printer&lt;?&gt;</code>适配为转换器，转换目标为<code>fieldType -&gt; String</code>。既然是转换器，重点当然是它的convert转换方法：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"unchecked"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">Object</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token annotation punctuation">@Nullable</span> <span class="token class-name">Object</span> source<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> sourceType<span class="token punctuation">,</span> <span class="token class-name">TypeDescriptor</span> targetType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// 若sourceType不是printerObjectType的子类型</span>
+  <span class="token comment">// 就尝试用conversionService转一下类型试试</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>sourceType<span class="token punctuation">.</span><span class="token function">isAssignableTo</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>printerObjectType<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    source <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>conversionService<span class="token punctuation">.</span><span class="token function">convert</span><span class="token punctuation">(</span>source<span class="token punctuation">,</span> sourceType<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>printerObjectType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>source <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token string">""</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>printer<span class="token punctuation">.</span><span class="token function">print</span><span class="token punctuation">(</span>source<span class="token punctuation">,</span> <span class="token class-name">LocaleContextHolder</span><span class="token punctuation">.</span><span class="token function">getLocale</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>这样主要是做一个中间态转换，假设我们想将 Entity 转换为 String，如果没有 Entity -&gt; String 的转换器，就无法转换出期望的值。这时加一个中间层 ConversionService，我们就可以通过在 ConversionService 中注册的 Entity -&gt; Integer 先转换一次，再将 Integer -&gt; String（基础实现）完成相应的转换。</p>
+<h3 id="ParserConverter：Parser接口适配器"><a href="#ParserConverter：Parser接口适配器" class="headerlink" title="ParserConverter：Parser接口适配器"></a>ParserConverter：Parser接口适配器</h3><p>把<code>Parser&lt;?&gt;</code>适配为转换器，转换目标为 <code>String -&gt; fieldType</code>。其设计思想和 PrinterConverter 相同。</p>
+<blockquote>
+<p>  <code>addConverter()</code> 注册转换器时请务必不要使用lambda表达式代替输入，否则会失去泛型类型，导致出错。</p>
+</blockquote>
+<p>对于 PrinterConverter 和 ParserConverter 来讲，它们的源目的是实现  <code>String &lt;-&gt; Object</code>，特点是：</p>
+<ul>
+<li>PrinterConverter：出口必须是 String 类型，入口类型也已确定，即 <code>Printer&lt;T&gt;</code> 的泛型类型，只能处理  <code>T(或T的子类型) -&gt; String</code></li>
+<li>ParserConverter：入口必须是 String 类型，出口类型也已确定，即 <code>Parser&lt;T&gt;</code> 的泛型类型，只能处理  <code>String -&gt; T(或T的子类型)</code></li>
+</ul>
+<p>按既定“规则”，它俩的能力范围还是蛮受限的。Spring 厉害的地方就在于此，可以巧妙的通过组合的方式，扩大现有组件的能力边界。比如本例中它就在 PrinterConverter&#x2F;ParserConverter 里分别放入了 ConversionService 引用，从而到这样的效果：通过能力组合协作，起到串联作用，从而扩大输入&#x2F;输出“范围”，感觉就像起到了放大镜的效果一样，这个设计还是很讨巧的。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+              <a href="/tags/PropertyEditor/" rel="tag"># PropertyEditor</a>
+              <a href="/tags/Converter-Framework/" rel="tag"># Converter Framework</a>
+              <a href="/tags/Formatter-Framework/" rel="tag"># Formatter Framework</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/09/06/Spring-SpringMVC%E7%BB%84%E4%BB%B6%E8%A7%A3%E6%9E%90/" rel="prev" title="SpringMVC 组件解析">
+      <i class="fa fa-chevron-left"></i> SpringMVC 组件解析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/" rel="next" title="SpringMVC 参数绑定工具 DataBinder">
+      SpringMVC 参数绑定工具 DataBinder <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%8E%A5%E5%8F%A3%E6%BC%94%E8%BF%9B"><span class="nav-number">1.</span> <span class="nav-text">类型转换接口演进</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%8E%A5%E5%8F%A3%EF%BC%9APropertyEditor"><span class="nav-number">1.1.</span> <span class="nav-text">类型转换接口：PropertyEditor</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%8E%A5%E5%8F%A3%EF%BC%9AConverter"><span class="nav-number">1.2.</span> <span class="nav-text">类型转换接口：Converter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A0%BC%E5%BC%8F%E5%8C%96%E6%8E%A5%E5%8F%A3%EF%BC%9AFormatter"><span class="nav-number">1.3.</span> <span class="nav-text">类型转换格式化接口：Formatter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E5%BA%95%E5%B1%82%E6%8E%A5%E5%8F%A3-TypeConvert"><span class="nav-number">1.4.</span> <span class="nav-text">类型转换底层接口 TypeConvert</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PropertyEditor"><span class="nav-number">2.</span> <span class="nav-text">PropertyEditor</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%87%E5%87%86%E6%89%A9%E5%B1%95%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.1.</span> <span class="nav-text">标准扩展实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PropertyEditorRegistry-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83"><span class="nav-number">2.2.</span> <span class="nav-text">PropertyEditorRegistry 注册中心</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PropertyEditorRegistrySupport"><span class="nav-number">2.2.1.</span> <span class="nav-text">PropertyEditorRegistrySupport</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#customEditors-%E4%B8%8E-customEditorsForPath-%E4%BD%9C%E7%94%A8"><span class="nav-number">2.2.2.</span> <span class="nav-text">customEditors 与 customEditorsForPath 作用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PropertyEditorRegistrar"><span class="nav-number">2.2.3.</span> <span class="nav-text">PropertyEditorRegistrar</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Converter"><span class="nav-number">3.</span> <span class="nav-text">Converter</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#PropertyEditor-%E8%AE%BE%E8%AE%A1%E7%BC%BA%E9%99%B7"><span class="nav-number">3.1.</span> <span class="nav-text">PropertyEditor 设计缺陷</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E4%B8%80%E4%BB%A3%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2-Converter"><span class="nav-number">3.2.</span> <span class="nav-text">新一代类型转换 Converter</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Converter-1"><span class="nav-number">3.2.1.</span> <span class="nav-text">Converter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ConverterFactory"><span class="nav-number">3.2.2.</span> <span class="nav-text">ConverterFactory</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GenericConverter"><span class="nav-number">3.2.3.</span> <span class="nav-text">GenericConverter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ConditionalConverter"><span class="nav-number">3.2.4.</span> <span class="nav-text">ConditionalConverter</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BA%95%E5%B1%82%E8%BD%AC%E6%8D%A2%E5%99%A8"><span class="nav-number">3.3.</span> <span class="nav-text">底层转换器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#ObjectToObjectConverter"><span class="nav-number">3.3.1.</span> <span class="nav-text">ObjectToObjectConverter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IdToEntityConverter"><span class="nav-number">3.3.2.</span> <span class="nav-text">IdToEntityConverter</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%94%A8%E6%B3%95%E7%A4%BA%E4%BE%8B"><span class="nav-number">3.3.2.1.</span> <span class="nav-text">用法示例</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="nav-number">3.3.2.2.</span> <span class="nav-text">使用场景</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#FallbackObjectToStringConverter"><span class="nav-number">3.3.3.</span> <span class="nav-text">FallbackObjectToStringConverter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ObjectToOptionalConverter"><span class="nav-number">3.3.4.</span> <span class="nav-text">ObjectToOptionalConverter</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BB%A3%E7%A0%81%E7%A4%BA%E4%BE%8B"><span class="nav-number">3.3.4.1.</span> <span class="nav-text">代码示例</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%9C%BA%E6%99%AF-1"><span class="nav-number">3.3.4.2.</span> <span class="nav-text">使用场景</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Converter-Framework"><span class="nav-number">4.</span> <span class="nav-text">Converter Framework</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ConverterRegistry"><span class="nav-number">4.1.</span> <span class="nav-text">ConverterRegistry</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ConversionService"><span class="nav-number">4.2.</span> <span class="nav-text">ConversionService</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ConfigurableConversionService"><span class="nav-number">4.3.</span> <span class="nav-text">ConfigurableConversionService</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GenericConversionService"><span class="nav-number">4.4.</span> <span class="nav-text">GenericConversionService</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DefaultConversionService"><span class="nav-number">4.5.</span> <span class="nav-text">DefaultConversionService</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ConversionServiceFactoryBean"><span class="nav-number">4.6.</span> <span class="nav-text">ConversionServiceFactoryBean</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Formatter"><span class="nav-number">5.</span> <span class="nav-text">Formatter</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#JDK-Formatter"><span class="nav-number">5.1.</span> <span class="nav-text">JDK Formatter</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#DateFormat%EF%BC%9A%E6%97%A5%E6%9C%9F%E6%97%B6%E9%97%B4%E6%A0%BC%E5%BC%8F%E5%8C%96"><span class="nav-number">5.1.1.</span> <span class="nav-text">DateFormat：日期时间格式化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#NumberFormat%EF%BC%9A%E6%95%B0%E5%AD%97%E6%A0%BC%E5%BC%8F%E5%8C%96"><span class="nav-number">5.1.2.</span> <span class="nav-text">NumberFormat：数字格式化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#DecimalFormat"><span class="nav-number">5.1.2.1.</span> <span class="nav-text">DecimalFormat</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#0%E5%92%8C-%E7%9A%84%E7%94%A8%E6%B3%95"><span class="nav-number">5.1.2.1.1.</span> <span class="nav-text">0和#的用法</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%A7%91%E5%AD%A6%E8%AE%A1%E6%95%B0%E6%B3%95E"><span class="nav-number">5.1.2.1.2.</span> <span class="nav-text">科学计数法E</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%86%E7%BB%84%E5%88%86%E9%9A%94%E7%AC%A6"><span class="nav-number">5.1.2.1.3.</span> <span class="nav-text">分组分隔符,</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%99%BE%E5%88%86%E5%8F%B7"><span class="nav-number">5.1.2.1.4.</span> <span class="nav-text">百分号%</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%9C%AC%E5%9C%B0%E8%B4%A7%E5%B8%81%E7%AC%A6%E5%8F%B7%C2%A4"><span class="nav-number">5.1.2.1.5.</span> <span class="nav-text">本地货币符号¤</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ChoiceFormat"><span class="nav-number">5.1.2.2.</span> <span class="nav-text">ChoiceFormat</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MessageFormat%EF%BC%9A%E5%AD%97%E7%AC%A6%E4%B8%B2%E6%A0%BC%E5%BC%8F%E5%8C%96"><span class="nav-number">5.1.3.</span> <span class="nav-text">MessageFormat：字符串格式化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8F%82%E6%95%B0%E6%A8%A1%E5%BC%8F"><span class="nav-number">5.1.3.1.</span> <span class="nav-text">参数模式</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%8E-String-format-%E5%AF%B9%E6%AF%94"><span class="nav-number">5.1.3.2.</span> <span class="nav-text">与 String.format 对比</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spring-Formatter"><span class="nav-number">5.2.</span> <span class="nav-text">Spring Formatter</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E6%97%A5%E6%9C%9F%E6%A0%BC%E5%BC%8F%E5%8C%96"><span class="nav-number">5.2.1.</span> <span class="nav-text">时间日期格式化</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Date%E7%B1%BB%E5%9E%8B"><span class="nav-number">5.2.1.1.</span> <span class="nav-text">Date类型</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#JSR-310%E7%B1%BB%E5%9E%8B"><span class="nav-number">5.2.1.2.</span> <span class="nav-text">JSR 310类型</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E5%AD%97%E6%A0%BC%E5%BC%8F%E5%8C%96"><span class="nav-number">5.2.2.</span> <span class="nav-text">数字格式化</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Formatter-Framework"><span class="nav-number">6.</span> <span class="nav-text">Formatter Framework</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#FormatterRegistry"><span class="nav-number">6.1.</span> <span class="nav-text">FormatterRegistry</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FormattingConversionService"><span class="nav-number">6.2.</span> <span class="nav-text">FormattingConversionService</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PrinterConverter%EF%BC%9APrinter-%E6%8E%A5%E5%8F%A3%E9%80%82%E9%85%8D%E5%99%A8"><span class="nav-number">6.2.1.</span> <span class="nav-text">PrinterConverter：Printer 接口适配器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ParserConverter%EF%BC%9AParser%E6%8E%A5%E5%8F%A3%E9%80%82%E9%85%8D%E5%99%A8"><span class="nav-number">6.2.2.</span> <span class="nav-text">ParserConverter：Parser接口适配器</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

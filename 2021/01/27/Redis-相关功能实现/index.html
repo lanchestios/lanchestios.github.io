@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="介绍了服务器与客户端相关联的结构及相关功能，二进制位数组的表示以及计算汉明重量的方法。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 相关功能实现">
+<meta property="og:url" content="http://example.com/2021/01/27/Redis-%E7%9B%B8%E5%85%B3%E5%8A%9F%E8%83%BD%E5%AE%9E%E7%8E%B0/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="介绍了服务器与客户端相关联的结构及相关功能，二进制位数组的表示以及计算汉明重量的方法。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Redis/pubsub_patterns.png">
+<meta property="og:image" content="http://example.com/images/Redis/%E7%9B%91%E8%A7%86%E5%99%A8%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/Redis/%E7%9B%91%E8%A7%86%E5%99%A8%E6%8E%A5%E6%94%B6%E5%91%BD%E4%BB%A4.png">
+<meta property="og:image" content="http://example.com/images/Redis/bitmap.png">
+<meta property="og:image" content="http://example.com/images/Redis/bitmap3.png">
+<meta property="article:published_time" content="2021-01-27T14:17:17.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.588Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="订阅与发布">
+<meta property="article:tag" content="监视器">
+<meta property="article:tag" content="二进制位数组">
+<meta property="article:tag" content="关联客户端">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Redis/pubsub_patterns.png">
+
+<link rel="canonical" href="http://example.com/2021/01/27/Redis-%E7%9B%B8%E5%85%B3%E5%8A%9F%E8%83%BD%E5%AE%9E%E7%8E%B0/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Redis 相关功能实现 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/01/27/Redis-%E7%9B%B8%E5%85%B3%E5%8A%9F%E8%83%BD%E5%AE%9E%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 相关功能实现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-01-27 22:17:17" itemprop="dateCreated datePublished" datetime="2021-01-27T22:17:17+08:00">2021-01-27</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index"><span itemprop="name">Redis</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>介绍了服务器与客户端相关联的结构及相关功能，二进制位数组的表示以及计算汉明重量的方法。</p>
+<span id="more"></span>
+
+<h1 id="服务器与客户端交互"><a href="#服务器与客户端交互" class="headerlink" title="服务器与客户端交互"></a>服务器与客户端交互</h1><h2 id="关联客户端"><a href="#关联客户端" class="headerlink" title="关联客户端"></a>关联客户端</h2><h3 id="客户端链表结构"><a href="#客户端链表结构" class="headerlink" title="客户端链表结构"></a>客户端链表结构</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//保存了全部客户端状态的链表, 便于通知客户端</span>
+    list <span class="token operator">*</span>clients<span class="token punctuation">;</span> <span class="token comment">// Client A -> Client B -> Client C</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="客户端标志位"><a href="#客户端标志位" class="headerlink" title="客户端标志位"></a>客户端标志位</h3><p>客户端的标志属性 flags 记录了客户端的角色（role），以及客户端目前所处的状态：</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisClient</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//...</span>
+    
+    <span class="token keyword">int</span> flags<span class="token punctuation">;</span>
+    
+    <span class="token comment">//...</span>
+<span class="token punctuation">&#125;</span> redisClient<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>flags 属性的值可以是单个标志：<code>flags = &lt;flag&gt;</code><br>也可以是多个标志的二进制或，比如：<code>flags = &lt;flagl&gt; | &lt;flag2&gt; | ...</code></p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* Client flags */</span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_SLAVE</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">0</span><span class="token punctuation">)</span>   </span><span class="token comment">/* This client is a replica */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_MASTER</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">1</span><span class="token punctuation">)</span>  </span><span class="token comment">/* This client is a master */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_MONITOR</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">2</span><span class="token punctuation">)</span> </span><span class="token comment">/* This client is a slave monitor, see MONITOR */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_MULTI</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">3</span><span class="token punctuation">)</span>   </span><span class="token comment">/* This client is in a MULTI context */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_BLOCKED</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">4</span><span class="token punctuation">)</span> </span><span class="token comment">/* The client is waiting in a blocking operation */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_DIRTY_CAS</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">5</span><span class="token punctuation">)</span> </span><span class="token comment">/* Watched keys modified. EXEC will fail. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_CLOSE_AFTER_REPLY</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">6</span><span class="token punctuation">)</span> </span><span class="token comment">/* Close after writing entire reply. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_UNBLOCKED</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">7</span><span class="token punctuation">)</span> </span><span class="token comment">/* This client was unblocked and is stored in
+                                  server.unblocked_clients */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_LUA</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">8</span><span class="token punctuation">)</span> </span><span class="token comment">/* This is a non connected client used by Lua */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_ASKING</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">9</span><span class="token punctuation">)</span>     </span><span class="token comment">/* Client issued the ASKING command */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_CLOSE_ASAP</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">10</span><span class="token punctuation">)</span></span><span class="token comment">/* Close this client ASAP */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_UNIX_SOCKET</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">11</span><span class="token punctuation">)</span> </span><span class="token comment">/* Client connected via Unix domain socket */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_DIRTY_EXEC</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">12</span><span class="token punctuation">)</span>  </span><span class="token comment">/* EXEC will fail for errors while queueing */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_MASTER_FORCE_REPLY</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">13</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Queue replies even if is master */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_FORCE_AOF</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">14</span><span class="token punctuation">)</span>   </span><span class="token comment">/* Force AOF propagation of current cmd. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_FORCE_REPL</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">15</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Force replication of current cmd. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PRE_PSYNC</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">16</span><span class="token punctuation">)</span>   </span><span class="token comment">/* Instance don't understand PSYNC. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_READONLY</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">17</span><span class="token punctuation">)</span>    </span><span class="token comment">/* Cluster client is in read-only state. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PUBSUB</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">18</span><span class="token punctuation">)</span>      </span><span class="token comment">/* Client is in Pub/Sub mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PREVENT_AOF_PROP</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">19</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Don't propagate to AOF. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PREVENT_REPL_PROP</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">20</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Don't propagate to slaves. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PREVENT_PROP</span> <span class="token expression"><span class="token punctuation">(</span>CLIENT_PREVENT_AOF_PROP<span class="token operator">|</span>CLIENT_PREVENT_REPL_PROP<span class="token punctuation">)</span></span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PENDING_WRITE</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">21</span><span class="token punctuation">)</span> </span><span class="token comment">/* Client has output to send but a write
+                                        handler is yet not installed. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_REPLY_OFF</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">22</span><span class="token punctuation">)</span>   </span><span class="token comment">/* Don't send replies to client. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_REPLY_SKIP_NEXT</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">23</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Set CLIENT_REPLY_SKIP for next cmd */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_REPLY_SKIP</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">24</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Don't send just this reply. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_LUA_DEBUG</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">25</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Run EVAL in debug mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_LUA_DEBUG_SYNC</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">26</span><span class="token punctuation">)</span>  </span><span class="token comment">/* EVAL debugging without fork() */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_MODULE</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">27</span><span class="token punctuation">)</span> </span><span class="token comment">/* Non connected client used by some module. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PROTECTED</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">28</span><span class="token punctuation">)</span> </span><span class="token comment">/* Client should not be freed for now. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PENDING_READ</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">29</span><span class="token punctuation">)</span> </span><span class="token comment">/* The client has pending reads and was put
+                                       in the list of clients we can read
+                                       from. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PENDING_COMMAND</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1</span><span class="token operator">&lt;&lt;</span><span class="token number">30</span><span class="token punctuation">)</span> </span><span class="token comment">/* Indicates the client has a fully
+                                        * parsed command ready for execution. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">31</span><span class="token punctuation">)</span> </span><span class="token comment">/* Client enabled keys tracking in order to
+                                   perform client side caching. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_BROKEN_REDIR</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">32</span><span class="token punctuation">)</span> </span><span class="token comment">/* Target client is invalid. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_BCAST</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">33</span><span class="token punctuation">)</span> </span><span class="token comment">/* Tracking in BCAST mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_OPTIN</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">34</span><span class="token punctuation">)</span>  </span><span class="token comment">/* Tracking in opt-in mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_OPTOUT</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">35</span><span class="token punctuation">)</span> </span><span class="token comment">/* Tracking in opt-out mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_CACHING</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">36</span><span class="token punctuation">)</span> </span><span class="token comment">/* CACHING yes/no was given,
+                                              depending on optin/optout mode. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_TRACKING_NOLOOP</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">37</span><span class="token punctuation">)</span> </span><span class="token comment">/* Don't send invalidation messages
+                                             about writes performed by myself.*/</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_IN_TO_TABLE</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">38</span><span class="token punctuation">)</span> </span><span class="token comment">/* This client is in the timeout table. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_PROTOCOL_ERROR</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">39</span><span class="token punctuation">)</span> </span><span class="token comment">/* Protocol error chatting with it. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_CLOSE_AFTER_COMMAND</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">40</span><span class="token punctuation">)</span> </span><span class="token comment">/* Close after executing commands
+                                               * and writing entire reply. */</span></span>
+<span class="token macro property"><span class="token directive-hash">#</span><span class="token directive keyword">define</span> <span class="token macro-name">CLIENT_DENY_BLOCKING</span> <span class="token expression"><span class="token punctuation">(</span><span class="token number">1ULL</span><span class="token operator">&lt;&lt;</span><span class="token number">41</span><span class="token punctuation">)</span> </span><span class="token comment">/* Indicate that the client should not be blocked.
+                                           currently, turned on inside MULTI, Lua, RM_Call,
+                                           and AOF client */</span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p>PUBSUB 命令和 SCRIPT LOAD 命令的特殊性</p>
+<p>通常情况下， Redis 只会将那些对数据库进行了修改的命令写入到 AOF 文件，并复制到各个从服务器。如果一个命令没有对数据库进行任何修改，那么它就会被认为是只读命令，这个命令不会被写入到 AOF 文件，也不会被复制到从服务器。</p>
+<p>以上规则适用于绝大部分 Redis 命令，但 PUBSUB命令和 SCRIPT LOAD 命令是其中的例外。 PUBSUB 命令虽然没有修改数据库，但 PUBSUB 命令向频道的所有订阅者发送消息。这一行为带有副作用，接收到消息的所有客户端的状态都会因为这个命令而改变。因此，服务器需要使用 REDIS FORCE AOF 标志，强制将这个命令写入 AOF 文件这样在将来载入 AOF 文件时，服务器就可以再次执行相同的 PUBSUB 命令，并产生相同的副作用。SCRIPT LOAD 命令的情况与 PUBSUB 命令类似：虽然 SCRIPT LOAD 命令没有修改数据库，但它修改了服务器状态，所以它是一个带有副作用的命令，服务器需要使用 REDIS FORCE AOF 标志，强制将这个命令写入 AOF 文件，使得将来在载入 AOF 文件时，服务器可以产生相同的副作用。</p>
+<p>另外，为了让主服务器和从服务器都可以正确地载入 SCRIPT LOAD 命令指定的脚本，服务器需要使用 REDIS FORCE REPL 标志，强制将 SCRIPT LOAD 命令复制给所有从服务器。</p>
+</blockquote>
+<h2 id="订阅发布"><a href="#订阅发布" class="headerlink" title="订阅发布"></a>订阅发布</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java">CLIENT1<span class="token operator">></span>SUBSCRIBE <span class="token string">"news.it"</span> <span class="token comment">//订阅 new.it 频道</span>
+    
+CLIENT1<span class="token operator">></span>PSUBSCRIBE <span class="token string">"news.*"</span> <span class="token comment">//订阅与 new.* 表达式相匹配的频道</span>
+
+CLIENT2<span class="token operator">></span>PUBLISH <span class="token string">"news.it"</span> <span class="token string">"new message"</span> <span class="token comment">// 向news.it频道推送信息</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们可以看到订阅分成两种指定频道订阅以及模式匹配订阅</p>
+<h3 id="指定频道订阅"><a href="#指定频道订阅" class="headerlink" title="指定频道订阅"></a>指定频道订阅</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//...</span>
+    
+    <span class="token comment">//所有指定频道的订阅关系</span>
+    dict <span class="token operator">*</span>pubsub_channels<span class="token punctuation">;</span>
+    
+    <span class="token comment">//...</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>客户端订阅频道</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">SUBSCRIBE <span class="token string">"news.it"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>Redis 客户端向服务器发送订阅频道请求，服务端通过将频道与客户端的映射关系存放到 redisServer 来实现对客户端订阅的管理，服务端会在对应频道的客户端链表上加入当前请求的客户端。</p>
+<p><strong>向频道推送数据</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">PUBLISH <span class="token string">"news.it"</span> <span class="token string">"new message"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>当客户端向某个频道 PUBLISH 一条新消息，服务端会遍历该频道对应的客户端链表并发送相应的数据。</p>
+<p><strong>取消订阅频道</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">UNSUBSCRIBE <span class="token string">"news.it"</span> <span class="token string">"news.movie"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>服务端收到客户端的取消订阅信息，将该客户端从 pubsub_channels 中对应的频道删除。</p>
+<h3 id="模式匹配订阅"><a href="#模式匹配订阅" class="headerlink" title="模式匹配订阅"></a>模式匹配订阅</h3><pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">struct</span> <span class="token class-name">redisServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//..</span>
+    
+    <span class="token comment">//保存所有模式匹配的订阅关系</span>
+    list <span class="token operator">*</span>pubsub_patterns<span class="token punctuation">;</span>
+    
+    <span class="token comment">//..</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">pubsubPattern</span> <span class="token punctuation">&#123;</span>
+    
+    <span class="token comment">//订阅模式的客户端</span>
+    redisClient <span class="token operator">*</span>client<span class="token punctuation">;</span>
+    <span class="token comment">//被订阅的模式</span>
+    robj <span class="token operator">*</span>pattern<span class="token punctuation">;</span>
+    
+<span class="token punctuation">&#125;</span> pubsubPattern<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下图 pubsub_patterns 属性是一个链表，链表中的每个节点都包含着一个 pubsubPattern 结构，这个结构的 pattern 属性记录了被订阅的模式，而 client 属性则记录了订阅模式的客户端</p>
+<p><img src="/images/Redis/pubsub_patterns.png"></p>
+<p><strong>客户端订阅频道</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">PSUBSCRIBE <span class="token string">"news.*"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>Redis 客户端向服务器发送订阅频道请求，服务端通过将频道与客户端的映射关系存放到 redisServer 来实现对客户端订阅的管理，服务端会在对应频道的客户端链表上加入当前请求的客户端。</p>
+<p><strong>向频道推送数据</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">PUBLISH <span class="token string">"news.it"</span> <span class="token string">"new message"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>当客户端向某个频道 PUBLISH 一条新消息，服务端会遍历 pubsub_patterns 链表并为匹配成功的客户端发送相应的数据。</p>
+<p><strong>取消订阅频道</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">PUNSUBSCRIBE <span class="token string">"news.*"</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>服务端收到客户端的取消订阅信息，将该客户端从 pubsub_patterns 中删除。</p>
+<h2 id="监视器"><a href="#监视器" class="headerlink" title="监视器"></a>监视器</h2><p>发送 MONITOR 命令可以让一个普通客户端变为一个监视器。并将该客户端引用保存在 monitors 链表中。</p>
+<p><img src="/images/Redis/%E7%9B%91%E8%A7%86%E5%99%A8%E7%BB%93%E6%9E%84.png"></p>
+<p>每当一个客户端向服务器发送一条命令请求时，服务器除了会处理这条命令请求之外，还会将关于这条命令请求的信息发送给所有监视器。监视器可以看到所有监视服务器接收到的命令。</p>
+<p><img src="/images/Redis/%E7%9B%91%E8%A7%86%E5%99%A8%E6%8E%A5%E6%94%B6%E5%91%BD%E4%BB%A4.png"></p>
+<h1 id="二进制位数组"><a href="#二进制位数组" class="headerlink" title="二进制位数组"></a>二进制位数组</h1><h2 id="位数组的表示"><a href="#位数组的表示" class="headerlink" title="位数组的表示"></a>位数组的表示</h2><p>Redis 使用字符串对象来表示位数组，因为字符串对象使用的 SDS 数据结构是二进制安全的，所以程序可以直接使用 SDS 结构来保存位数组，并使用 SDS 结构的操作函数来处理位数组。</p>
+<p>对于这个<code>len</code>为 1 的<code>buf</code>数组，<code>buf[0]</code>储存着一字节长的位数组，<code>buf[1]</code>储存着 SDS 程序自动追加到值的末尾的空字符<code>\0</code>。</p>
+<p><img src="/images/Redis/bitmap.png"></p>
+<p>而下图是<code>len</code>为 3 的位数组。</p>
+<p><img src="/images/Redis/bitmap3.png"></p>
+<h2 id="BITCOUNT命令的实现"><a href="#BITCOUNT命令的实现" class="headerlink" title="BITCOUNT命令的实现"></a>BITCOUNT命令的实现</h2><p>BITCOUNT 命令用于统计给定位数组中，值为 1 的二进制位的数量。而高效地实现这个命令需要用到一些精巧的算法。</p>
+<h3 id="BITCOUNT遍历算法"><a href="#BITCOUNT遍历算法" class="headerlink" title="BITCOUNT遍历算法"></a>BITCOUNT遍历算法</h3><p>实现 BITCOUNT命令最简单直接的方法，就是遍历位数组中的每个二进制位，并在遇到值为 1 的二进制位时，将计数器的值增一。</p>
+<h3 id="BITCOUNT查表算法"><a href="#BITCOUNT查表算法" class="headerlink" title="BITCOUNT查表算法"></a>BITCOUNT查表算法</h3><p>优化检查操作的一个办法是使用查表法：</p>
+<ul>
+<li>对于一个有限集合来说，集合元素的排列方式是有限的。</li>
+<li>而对于一个有限长度的位数组来说，它能表示的二进制位排列也是有限的。</li>
+</ul>
+<p>但查表法的实际效果会受到内存和缓存两方面因素的限制：</p>
+<ul>
+<li>因为査表法是典型的空间换时间策略。对于 8 位的二进制位的问题来说，创建键长为8位的表仅需数百个字节，但创建键长为 32 位的表却需要十多个 GB。在实际中，服务器只可能接受数百个字节或者数百KB的内存消耗。</li>
+<li>除了内存大小的问题之外，查表法的效果还会受到 CPU 缓存的限制：对于固定大小的 CPU 缓存来说，创建的表格越大，CPU 缓存所能保存的内容相比整个表格的比例就越少，查表时出现缓存不命中的情况就会越高，缓存的换入和换出操作就会越频繁，最终影响查表法的实际效率。</li>
+</ul>
+<p>由于以上列举的两个原因，我们可以得出结论，查表法是一种比遍历算法更好的统计办法，但受限于查表法带来的内存压力，以及缓存不命中可能带来的影响，我们只能考虑创建键长为8位或者键长为16位的表，而这两种表带来的效率提升，对于处理非常长的位数组来说仍然远远不够。</p>
+<h3 id="variable-precision-SWAR算法"><a href="#variable-precision-SWAR算法" class="headerlink" title="variable-precision SWAR算法"></a>variable-precision SWAR算法</h3><p>BITCOUNT 命令要解决的问题 — 统计一个位数组中非 0 二进制位的数量，在数学上被称为”计算汉明重量（Hamming Weight）”。</p>
+<p>因为汉明重量经常被用于信息论、编码理论和密码学，所以研究人员针对计算汉明重量开发了多种不同的算法，一些处理器甚至直接带有计算汉明重量的指令，而对于不具备这种特殊指令的普通处理器来说，目前已知效率最好的通用算法为 variable-precision SWAR 算法，该算法通过一系列位移和位运算操作，可以在常数时间内计算多个字节的汉明重量，并且不需要使用任何额外的内存。</p>
+<p>以下是一个处理32位长度位数组的 variable-precision S WAR算法的实现：</p>
+<pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token class-name">uint32_t</span> <span class="token function">swar</span><span class="token punctuation">(</span><span class="token class-name">uint32_t</span> i<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//步骤1 0x55555555 -> 01010101010101010101010101010101</span>
+    <span class="token comment">//将 i 按每两个二进制位为一组进行分组，各组的十进制表示就是该组的汉明重量</span>
+    i <span class="token operator">=</span> <span class="token punctuation">(</span>i <span class="token operator">&amp;</span> <span class="token number">0x55555555</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token operator">>></span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0x55555555</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//步骤2 0x33333333 -> 00110011001100110011001100110011</span>
+    <span class="token comment">//将 i 按每四个二进制位为一组进行分组，各组的十进制表示就是该组的汉明重量</span>
+    i <span class="token operator">=</span> <span class="token punctuation">(</span>i <span class="token operator">&amp;</span> <span class="token number">0x33333333</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token operator">>></span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0x33333333</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//步骤3 0x0F0F0F0F -> 00001111000011110000111100001111</span>
+    <span class="token comment">//将 i 按每八个二进制位为一组进行分组，各组的十进制表示就是该组的汉明重量</span>
+    i <span class="token operator">=</span> <span class="token punctuation">(</span>i <span class="token operator">&amp;</span> <span class="token number">0x0F0F0F0F</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token operator">>></span> <span class="token number">4</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0x0F0F0F0F</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//步骤4</span>
+    <span class="token comment">//i * 0x01010101 计算出 bitarray 的汉明重量并记录在二进制位的最高八位</span>
+    <span class="token comment">//>> 24 语句则通过右移运算，将 bitarray 的汉明重量移动到最低八位</span>
+    i <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token operator">*</span> <span class="token number">0x01010101</span><span class="token punctuation">)</span> <span class="token operator">>></span> <span class="token number">24</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> i<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>swar 函数每次执行可以计算 32 个二进制位的汉明重量，它比之前介绍的遍历算法要快 32 倍，比键长为 8 位的查表法快 4 倍，并且因为 swar 函数空间和时间复杂度都是 O(1) 。当然，在一个循环里执行多个 swar 调用这种优化方式是有极限的：一旦循环中处理的位数组的大小超过了缓存的大小，这种优化的效果就会降低并最终消失。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+              <a href="/tags/%E8%AE%A2%E9%98%85%E4%B8%8E%E5%8F%91%E5%B8%83/" rel="tag"># 订阅与发布</a>
+              <a href="/tags/%E7%9B%91%E8%A7%86%E5%99%A8/" rel="tag"># 监视器</a>
+              <a href="/tags/%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%BD%8D%E6%95%B0%E7%BB%84/" rel="tag"># 二进制位数组</a>
+              <a href="/tags/%E5%85%B3%E8%81%94%E5%AE%A2%E6%88%B7%E7%AB%AF/" rel="tag"># 关联客户端</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/25/Redis-%E4%BA%8B%E4%BB%B6%E5%92%8C%E4%BA%8B%E5%8A%A1/" rel="prev" title="Redis 事件和事务">
+      <i class="fa fa-chevron-left"></i> Redis 事件和事务
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/30/Network-%E6%8E%A2%E7%B4%A2%E6%B5%8F%E8%A7%88%E5%99%A8%E5%86%85%E9%83%A8/" rel="next" title="Network 探索浏览器内部">
+      Network 探索浏览器内部 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E5%99%A8%E4%B8%8E%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%BA%A4%E4%BA%92"><span class="nav-number">1.</span> <span class="nav-text">服务器与客户端交互</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E8%81%94%E5%AE%A2%E6%88%B7%E7%AB%AF"><span class="nav-number">1.1.</span> <span class="nav-text">关联客户端</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF%E9%93%BE%E8%A1%A8%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.1.</span> <span class="nav-text">客户端链表结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF%E6%A0%87%E5%BF%97%E4%BD%8D"><span class="nav-number">1.1.2.</span> <span class="nav-text">客户端标志位</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A2%E9%98%85%E5%8F%91%E5%B8%83"><span class="nav-number">1.2.</span> <span class="nav-text">订阅发布</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%87%E5%AE%9A%E9%A2%91%E9%81%93%E8%AE%A2%E9%98%85"><span class="nav-number">1.2.1.</span> <span class="nav-text">指定频道订阅</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E8%AE%A2%E9%98%85"><span class="nav-number">1.2.2.</span> <span class="nav-text">模式匹配订阅</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%91%E8%A7%86%E5%99%A8"><span class="nav-number">1.3.</span> <span class="nav-text">监视器</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%BD%8D%E6%95%B0%E7%BB%84"><span class="nav-number">2.</span> <span class="nav-text">二进制位数组</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%8D%E6%95%B0%E7%BB%84%E7%9A%84%E8%A1%A8%E7%A4%BA"><span class="nav-number">2.1.</span> <span class="nav-text">位数组的表示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#BITCOUNT%E5%91%BD%E4%BB%A4%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.2.</span> <span class="nav-text">BITCOUNT命令的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#BITCOUNT%E9%81%8D%E5%8E%86%E7%AE%97%E6%B3%95"><span class="nav-number">2.2.1.</span> <span class="nav-text">BITCOUNT遍历算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BITCOUNT%E6%9F%A5%E8%A1%A8%E7%AE%97%E6%B3%95"><span class="nav-number">2.2.2.</span> <span class="nav-text">BITCOUNT查表算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#variable-precision-SWAR%E7%AE%97%E6%B3%95"><span class="nav-number">2.2.3.</span> <span class="nav-text">variable-precision SWAR算法</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

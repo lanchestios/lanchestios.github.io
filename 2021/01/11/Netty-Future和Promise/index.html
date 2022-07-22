@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="由于 Netty 消息通知都采用了异步的方式，因此需要引入 Future-Listener 机制，通过观察者模式将消息返还给结果验证方进行下一步事件的触发。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Netty Future-Listener机制">
+<meta property="og:url" content="http://example.com/2021/01/11/Netty-Future%E5%92%8CPromise/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="由于 Netty 消息通知都采用了异步的方式，因此需要引入 Future-Listener 机制，通过观察者模式将消息返还给结果验证方进行下一步事件的触发。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Netty/Future-Listener%E6%9C%BA%E5%88%B6.png">
+<meta property="og:image" content="http://example.com/images/Netty/Future%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ChannelFuture%E7%8A%B6%E6%80%81%E8%BF%81%E7%A7%BB%E5%9B%BE.png">
+<meta property="article:published_time" content="2021-01-11T14:03:11.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.553Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="Future-Listener机制">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Netty/Future-Listener%E6%9C%BA%E5%88%B6.png">
+
+<link rel="canonical" href="http://example.com/2021/01/11/Netty-Future%E5%92%8CPromise/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Netty Future-Listener机制 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/01/11/Netty-Future%E5%92%8CPromise/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Netty Future-Listener机制
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-01-11 22:03:11" itemprop="dateCreated datePublished" datetime="2021-01-11T22:03:11+08:00">2021-01-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>由于 Netty 消息通知都采用了异步的方式，因此需要引入 Future-Listener 机制，通过观察者模式将消息返还给结果验证方进行下一步事件的触发。</p>
+<span id="more"></span>
+
+<h1 id="Future-Listener机制"><a href="#Future-Listener机制" class="headerlink" title="Future-Listener机制"></a>Future-Listener机制</h1><p>Channel 通过事件驱动来执行 Flow，异步发起 Task（如超时断连），Task 执行完成后调用 Listener 来执行对 Task 执行结果的后续处理。</p>
+<p><img src="/images/Netty/Future-Listener%E6%9C%BA%E5%88%B6.png"></p>
+<h2 id="层次继承结构"><a href="#层次继承结构" class="headerlink" title="层次继承结构"></a>层次继承结构</h2><p>Netty 重新封装了 jdk 原生的 Future 类，并根据业务需求附加了相应的功能特性，这个后续会详细介绍。</p>
+<p><img src="/images/Netty/Future%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<h2 id="Future（java-util-concurrent）"><a href="#Future（java-util-concurrent）" class="headerlink" title="Future（java.util.concurrent）"></a>Future（java.util.concurrent）</h2><p>Future 最早来源于 JDK 的<code>java.util.concurrent.Future</code>，它用于代表异步操作的结果。</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>get()</code> &#x2F; <code>get(timeout)</code></td>
+<td>可以通过 get 方法获取操作结果，如果操作尚未完成，则会同步阻塞当前调用的线程；如果不允许阻塞太长时间或者无限期阻塞，可以通过带超时时间的 get 方法获取结果</td>
+</tr>
+<tr>
+<td><code>isDone()</code></td>
+<td>可以判断当前的异步操作是否完成，如果完成，无论成功与否，都返回 true，否则返回 false</td>
+</tr>
+<tr>
+<td><code>cancel()</code></td>
+<td>通过 cancel 可以尝试取消异步操作，它的结果是未知的，如果操作已经完成，或者发生其他未知的原因拒绝取消，取消操作将会失败。</td>
+</tr>
+<tr>
+<td><code>isCancelled()</code></td>
+<td>可以判断当前的异步操作是否在它完成前被取消</td>
+</tr>
+</tbody></table>
+<h2 id="Future（io-netty-util-concurrent）"><a href="#Future（io-netty-util-concurrent）" class="headerlink" title="Future（io.netty.util.concurrent）"></a>Future（io.netty.util.concurrent）</h2><p>Netty 对 Future 进行了进一步的扩展，添加了 Future-Listener 机制。简单的来说，coder 可以通过添加 Listener 的方式异步获取 Future 的异步操作结果信息。</p>
+<h2 id="ChannelFuture"><a href="#ChannelFuture" class="headerlink" title="ChannelFuture"></a>ChannelFuture</h2><p>ChannelFuture 解决的问题：异步IO调用都立即返回，如何取得异步操作的结果的问题。以及获取相对应的 Channel 的操作。</p>
+<p>下图为 ChannelFuture 状态迁移图</p>
+<p><img src="/images/Netty/ChannelFuture%E7%8A%B6%E6%80%81%E8%BF%81%E7%A7%BB%E5%9B%BE.png"></p>
+<p>Netty 推荐使用 <code>&#123;@link #addListener(GenericFutureListener)&#125;</code> 获取异步操作结果。同时 Netty 也提供了对 Listener 的其他管理方式</p>
+<p>当 IO 操作完成之后，IO线程会回调 ChannelFuture 中 GenericFutureListener 的 operationComplete 方法，并把 ChannelFuture 对象当作方法的入参。如果用户需要做上下文相关的操作，需要将上下文信息保存到对应的 ChannelFuture 中。</p>
+<p>推荐通过 GenericFutureListener 代替 ChannelFuture 的 get 等方法的原因是：当我们进行异步 IO 操作时，完成的时间是无法预测的，如果不设置超时时间，它会导致调用线程长时间被阻塞，甚至挂死。而设置超时时间，时间又无法精确预测。利用异步通知机制回调 GenericFutureListener 是最佳的解决方案，它的性能最优。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; BAD - NEVER DO THIS
+@Override
+public void channelRead(ChannelHandlerContext ctx, GoodByeMessage msg) &#123;
+    ChannelFuture future &#x3D; ctx.channel().close();
+    future.awaitUninterruptibly();
+    &#x2F;&#x2F; Perform post-closure operation
+    &#x2F;&#x2F; ...
+&#125;
+
+&#x2F;&#x2F; GOOD
+@Override
+public void channelRead(ChannelHandlerContext ctx,  GoodByeMessage msg) &#123;
+    ChannelFuture future &#x3D; ctx.channel().close();
+    future.addListener(new ChannelFutureListener() &#123;
+        public void operationComplete(ChannelFuture future) &#123;
+            &#x2F;&#x2F; Perform post-closure operation
+            &#x2F;&#x2F; ...
+        &#125;
+    &#125;);
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>异步 I&#x2F;O 操作有两类超时：一个是 TCP 层面的 I&#x2F;O 超时，另一个是业务逻辑层面的操作超时。两者没有必然的联系，但是通常情况下业务逻辑超时时间应该大于 I&#x2F;O 超时时间，它们两者是包含的关系。</p>
+<p>需要指出的是：ChannelFuture 超时并不代表 I&#x2F;O 超时，这意味着 ChannelFuture 超时后，如果没有关闭连接资源，随后连接依旧可能会成功，这会导致严重的问题。所以通常情况下，必须要考虑究竟是设置 IO 超时还是 ChannelFuture 超时。</p>
+<blockquote>
+<p>现在我们可以总结两种获取IO操作结果的能力：</p>
+<ol>
+<li>sync() 同步阻塞等待结果，直到有结果返回</li>
+<li>addListener() 添加监听器对异步返回结果进行处理</li>
+</ol>
+</blockquote>
+<h2 id="Promise"><a href="#Promise" class="headerlink" title="Promise"></a>Promise</h2><p>Promise 是可写的 Future，Future 自身并没有写操作相关的接口，Netty 通过 Promise 对 Future 进行扩展，当 I&#x2F;O 操作发生异常或者完成时，用于设置 IO 操作的结果。</p>
+<p>Netty 发起 I&#x2F;O 操作的时候，会创建一个新的 Promise 对象，例如调用 ChannelHandlerContext 的 <code>write(Object object)</code>方法时，会创建一个新的 ChannelPromise。</p>
+<p><strong>DefaultPromise 对 setSuccess 方法的实现</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Promise</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">V</span><span class="token punctuation">></span></span> <span class="token function">setSuccess</span><span class="token punctuation">(</span><span class="token class-name">V</span> result<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   ` <span class="token comment">//调用setSuccess方法并对其操作结果进行判断</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">setSuccess0</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//如果成功，调用notifyListeners方法通知Listener</span>
+        <span class="token function">notifyListeners</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalStateException</span><span class="token punctuation">(</span><span class="token string">"complete already: "</span> <span class="token operator">+</span> <span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">boolean</span> <span class="token function">setSuccess0</span><span class="token punctuation">(</span><span class="token class-name">V</span> result<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//判断当前Promise的操作结果是否已经被设置，如果已经被设置，则不允许重复设置，返回设置失败</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">isDone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">synchronized</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Allow only once.</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">isDone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">//如果操作结果为空，说明仅仅需要notify在等待的业务线程，不包含具体的业务逻辑对象</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>result <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">//将result设置为系统默认的SUCCESS</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>result <span class="token operator">=</span> SUCCESS<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>result <span class="token operator">=</span> result<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">hasWaiters</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">notifyAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于可能存在IO线程和用户线程同时操作 Promise，所以设置操作结果的时候需要加锁保护，防止并发操作对操作结果是否被设置进行二次判断（为了提升并发性能的二次判断），如果已经被设置，则返回操作失败。</p>
+<p><strong>DefaultPromise 对 await 方法的实现</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">Promise</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">V</span><span class="token punctuation">></span></span> <span class="token function">await</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//如果当前Promise已经被设置直接返回</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">isDone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+	<span class="token comment">//如果线程被中断则抛出中断一场</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">interrupted</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">(</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+	<span class="token comment">//sync锁定当前Promise对象</span>
+    <span class="token keyword">synchronized</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//通过循环判断对isDone结果进行判断</span>
+        <span class="token comment">//循环判断就是如果程序执行到while体内部，就必须满足条件才可能退出循环体</span>
+        <span class="token comment">//如果使用if来判断，则会直接退出循环体</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token function">isDone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">checkDeadLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token function">incWaiters</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">wait</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">decWaiters</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于在 I&#x2F;O 线程中调用 Promise 的 await 或者 sync 方法会导致死锁，所以在循环体中需要对死锁进行保护性校验，防止 I&#x2F;O 线程被挂死，最后调用<code>java.lang.Object.wait()</code>方法进行无限期等待，直到 I&#x2F;O 线程调用 setSuccess 方法、trySuccess 方法、setFailure 或者 tryFailure 方法。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/Future-Listener%E6%9C%BA%E5%88%B6/" rel="tag"># Future-Listener机制</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/09/Netty-ChannelPipeline%E5%92%8CChannelHandler/" rel="prev" title="Netty ChannelPipeline和ChannelHandler">
+      <i class="fa fa-chevron-left"></i> Netty ChannelPipeline和ChannelHandler
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/" rel="next" title="Netty ByteBuf及相关辅助类">
+      Netty ByteBuf及相关辅助类 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Future-Listener%E6%9C%BA%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">Future-Listener机制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B1%82%E6%AC%A1%E7%BB%A7%E6%89%BF%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">层次继承结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Future%EF%BC%88java-util-concurrent%EF%BC%89"><span class="nav-number">1.2.</span> <span class="nav-text">Future（java.util.concurrent）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Future%EF%BC%88io-netty-util-concurrent%EF%BC%89"><span class="nav-number">1.3.</span> <span class="nav-text">Future（io.netty.util.concurrent）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ChannelFuture"><span class="nav-number">1.4.</span> <span class="nav-text">ChannelFuture</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Promise"><span class="nav-number">1.5.</span> <span class="nav-text">Promise</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

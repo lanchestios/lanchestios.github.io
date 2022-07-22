@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="当对象分配失败，会进入到 Evac 失败过程，在 GC 日志详情中会打印相关信息。发生失败一般意味着不能继续分配，此时需要做两件事：  处理失败 再次尝试分配，仍不成功，进行Full GC（FGC）">
+<meta property="og:type" content="article">
+<meta property="og:title" content="G1 FullGC过程">
+<meta property="og:url" content="http://example.com/2022/07/22/G1-4-FullGC%E8%BF%87%E7%A8%8B/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="当对象分配失败，会进入到 Evac 失败过程，在 GC 日志详情中会打印相关信息。发生失败一般意味着不能继续分配，此时需要做两件事：  处理失败 再次尝试分配，仍不成功，进行Full GC（FGC）">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/Evac失败1.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/Evac失败2.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/Evac失败3.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/Evac失败4.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/FGC开始之前的内存情况.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/标记活跃对象.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/计算活跃对象的新位置.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/更新对象的引用.png">
+<meta property="og:image" content="http://example.com/2022/07/22/images/JDK/活跃对象移动到新位置.png">
+<meta property="article:published_time" content="2022-07-22T07:52:21.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.571Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="GC">
+<meta property="article:tag" content="G1">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2022/07/22/images/JDK/Evac失败1.png">
+
+<link rel="canonical" href="http://example.com/2022/07/22/G1-4-FullGC%E8%BF%87%E7%A8%8B/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>G1 FullGC过程 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/07/22/G1-4-FullGC%E8%BF%87%E7%A8%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          G1 FullGC过程
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-07-22 15:52:21 / Modified: 16:13:23" itemprop="dateCreated datePublished" datetime="2022-07-22T15:52:21+08:00">2022-07-22</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index"><span itemprop="name">Java</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>当对象分配失败，会进入到 Evac 失败过程，在 GC 日志详情中会打印相关信息。发生失败一般意味着不能继续分配，此时需要做两件事：</p>
+<ol>
+<li>处理失败</li>
+<li>再次尝试分配，仍不成功，进行Full GC（FGC）</li>
+</ol>
+<span id="more"></span>
+
+<h1 id="Evac-失败"><a href="#Evac-失败" class="headerlink" title="Evac 失败"></a>Evac 失败</h1><p>假设在根处理时对象 3 复制发生失败，不能复制。则把对象 3 里面的 Pointer 标记指向自己，形成自引用。然后继续向下处理，注意这里的处理类似于跳过失败的对象，然后进行正常路径的处理。只不过需要一个额外的动作，即把对象放入到一个特殊的 dirty card 队列中。</p>
+<img src="../images/JDK/Evac失败1.png" style="zoom: 60%;" />
+
+<p>继续向下即处理 RSet，处理RSet时发现对象 2 已经成功复制，所以正常更新指针，即用对象 2 的新地址更新对象 5 的 field。假设之后对象都不能成功复制，最终的内存布局如下图所示。</p>
+<img src="../images/JDK/Evac失败2.png" style="zoom:60%;" />
+
+<p>接下来就是 Evac 特有的步骤，删除自引用。自引用对象都应该是活跃对象。同时对于已经被复制的对象需要把他们变成 dummy 对象，因为这个时候他们已经可以被回收了。</p>
+<img src="../images/JDK/Evac失败3.png" style="zoom:70%;" />
+
+
+
+<p>最后一步也是执行 Redirty 重构整个 RSet，如下图所示，确保引用的正确性。</p>
+<img src="../images/JDK/Evac失败4.png" style="zoom:60%;" />
+
+<h1 id="FGC-算法过程"><a href="#FGC-算法过程" class="headerlink" title="FGC 算法过程"></a>FGC 算法过程</h1><h2 id="串行-FGC"><a href="#串行-FGC" class="headerlink" title="串行 FGC"></a>串行 FGC</h2><p>Evac 失败后会进入到 FGC，在 JDK 10 之前 FGC 都是串行回收。在串行回收之前需要做一些预处理，主要有停止并发标记、停止增量回收等动作。串行回收采用的标记清除算法，主要分为 4 步：</p>
+<ol>
+<li>标记活跃对象</li>
+<li>计算新对象的地址</li>
+<li>把所有的引用都更新到新的地址上</li>
+<li>移动对象</li>
+<li>后处理</li>
+</ol>
+<h3 id="标记活跃对象"><a href="#标记活跃对象" class="headerlink" title="标记活跃对象"></a>标记活跃对象</h3><p>与 YGC 标记类似，且是串行执行的。</p>
+<p>以下是标记活跃对象的处理内容：</p>
+<ol>
+<li>所有的根要顺序处理（处理对象的时候会把对象对应的 klass 对象也标记处理）</li>
+<li>对 reference 对象的标记处理</li>
+<li>对系统字典、符号表标记、编译代码、klass 做卸载处理。（卸载：从全局对象中删除无用对象，但不释放）</li>
+</ol>
+<p>下图是 FGC 开始之前的内存情况</p>
+<img src="../images/JDK/FGC开始之前的内存情况.png" alt="FGC开始之前的内存情况" style="zoom:67%;" />
+
+<p>在标记完活跃对象后，内存情况如下图：</p>
+<img src="../images/JDK/标记活跃对象.png" alt="标记活跃对象" style="zoom:67%;" />
+
+<h3 id="计算新对象地址"><a href="#计算新对象地址" class="headerlink" title="计算新对象地址"></a>计算新对象地址</h3><p>第二步最主要的工作就是找到每个对象应该在什么位置。从分区的底部开始扫描，同时设置 compact top 也为底部，当对象被标记，即活跃时，把对象的 oop 指针设置为 compact top，这个值就是对象应该所处的位置。</p>
+<img src="../images/JDK/计算活跃对象的新位置.png" alt="计算活跃对象的新位置" style="zoom:67%;" />
+
+<h3 id="更新引用对象的地址"><a href="#更新引用对象的地址" class="headerlink" title="更新引用对象的地址"></a>更新引用对象的地址</h3><p>在上一步中，我们找到了对象的新位置，然后通过对象头里面的指针指向新位置。这一步最主要的工作就是遍历活跃对象，然后把活跃对象和活跃对象中的引用更新到新位置。</p>
+<img src="../images/JDK/更新对象的引用.png" alt="更新对象的引用" style="zoom:67%;" />
+
+<blockquote>
+<p>虚线指针表示对象的新位置<br>点划线指针表示对象引用所在的新位置</p>
+</blockquote>
+<h3 id="移动对象完成压缩"><a href="#移动对象完成压缩" class="headerlink" title="移动对象完成压缩"></a>移动对象完成压缩</h3><p>最后一步就是完成空间的压缩。遍历时必须从前向后依次开始，否则数据会被破坏。</p>
+<img src="../images/JDK/活跃对象移动到新位置.png" alt="活跃对象移动到新位置" style="zoom:67%;" />
+
+<p>复制之后，通过双点划指针还是可以有效地访问对象，而虚线指针变成无用的。</p>
+<h3 id="后处理"><a href="#后处理" class="headerlink" title="后处理"></a>后处理</h3><p>在第四步压缩结束以后，实际上我们看到分区并没有发生调整，仅仅是把已经死亡的对象回收，而活跃的对象仍然保留在本分区内。所以还需要进行后处理，下面是几个主要的步骤：</p>
+<ol>
+<li><p>尝试调整整个堆空间的大小</p>
+<blockquote>
+<p>根据GC发生后已经使用的内存除以期望的占比得到期望的空间大小，然后利用期望值和实际值的比较来判断是否需要扩展或者收缩堆空间。扩展堆空间我们在前面已经介绍，这里稍微提一下收缩空间，收缩主要发生的动作就是把空闲分区标记为uncommit，用于后续分配。</p>
+</blockquote>
+</li>
+<li><p>遍历堆，重构RSet</p>
+<blockquote>
+<p>因为所有的分区里面的对象位置都发生了变化，我们在第三步的时候也把对象位置变化的指针都更新了，但是这里还有一个重要的事情，就是重构 RSet，否则下一次发生 GC 就会丢失根集合，导致回收错误。重构 Rset 主要通过 ParRebuildRSTask 完成，对每一个分区根据对象的引用关系重构 RSet。</p>
+</blockquote>
+</li>
+<li><p>清除 Dirty Card 队列，并把所有的分区都认为是 Old 分区</p>
+</li>
+<li><p>最后记录各种信息，同时会调整 YGC 的大小，重建Eden，用于下一次回收。</p>
+</li>
+</ol>
+<h2 id="并行-FGC"><a href="#并行-FGC" class="headerlink" title="并行 FGC"></a>并行 FGC</h2><p>在 JDK 10 以后，G1 的 FGC 也被优化为可并行执行的过程。并行调用可以分为：</p>
+<ol>
+<li>收集前处理（保存一些信息，如对象头、偏向锁等）</li>
+<li>并行收集</li>
+</ol>
+<p>而并行收集的过程和串行 FGC 类似，分为以下四步：</p>
+<ol>
+<li>并行标记活跃对象（从 Root Set 出发，并且还会对引用进行处理）</li>
+<li>针对 C2 的优化（记录对象的派生关系，开始 GC 前先暂停更新）</li>
+<li>并行准备压缩，找到对象的新位置</li>
+<li>并行调整指针</li>
+<li>并行压缩</li>
+<li>后处理（恢复对象头等信息）</li>
+</ol>
+<h3 id="并行标记活跃对象"><a href="#并行标记活跃对象" class="headerlink" title="并行标记活跃对象"></a>并行标记活跃对象</h3><p>FGC 的并行标记类似于并发标记，</p>
+<p>以下是标记活跃对象的处理内容：</p>
+<ol>
+<li>从根出发，做并行标记。</li>
+<li>对 reference 对象的标记处理</li>
+<li>对系统字典、符号表标记、编译代码、klass 做卸载处理。（卸载：从全局对象中删除无用对象，但不释放）</li>
+</ol>
+<h3 id="计算对象的新地址"><a href="#计算对象的新地址" class="headerlink" title="计算对象的新地址"></a>计算对象的新地址</h3><p>并行处理是针对每一个分区，计算对象的新地址。与串行 FGC 不一样的地方就是，串行处理中，每一个分区的有效对象都会移动到该分区的头部。而并行处理的时候，一个并发线程通常要处理多个分区，所以在计算对象的新地址时可以把这一批分区里面的对象进行压缩，这样就可能出现完全空闲的分区。</p>
+<p>由于并行处理可能需要跨多个分区，所以引入了 G1FullGCCompactionPoint，就是为了记录单个 GC 线程在计算对象位置时所用的分区情况。这里需要提示的是，除了大对象，对象是不能垮分区存放。例如前面一个分区剩下 1KB，新的对象需要 2KB，此时这个分区就不能存放这个对象，分区里面的起始地址都是对象的起始地址，对象不能跨分区存放，否则在对分区进行遍历的时候问题就大了。</p>
+<p>与串行处理一样，该步完成之后，每个对象头存储的都是新地址。</p>
+<h3 id="更新引用对象的地址-1"><a href="#更新引用对象的地址-1" class="headerlink" title="更新引用对象的地址"></a>更新引用对象的地址</h3><p>在上一步中，我们找到了所有对象的新位置，并通过对象头里面的指针指向新的位置。这一步最主要的工作就是从根集合出发遍历活跃对象，然后把活跃对象和活跃对象中的引用都更新到新的位置。</p>
+<h3 id="移动对象完成压缩-1"><a href="#移动对象完成压缩-1" class="headerlink" title="移动对象完成压缩"></a>移动对象完成压缩</h3><p>第二步中每个线程处理一部分分区，都已经计算好了对象的位置，这一步直接把对象复制到新的位置。</p>
+<h3 id="后处理-1"><a href="#后处理-1" class="headerlink" title="后处理"></a>后处理</h3><p>更新对象头等。</p>
+<h1 id="FGC-过程日志"><a href="#FGC-过程日志" class="headerlink" title="FGC 过程日志"></a>FGC 过程日志</h1><pre class="line-numbers language-none"><code class="language-none">0.458: [Full GC (System.gc())  210M-&gt;388K(8192K), 0.0202676 secs]
+   [Eden: 1024.0K(3072.0K)-&gt;0.0B(4096.0K) Survivors: 1024.0K-&gt;0.0B Heap: 210.5M(239.0M)-&gt;388.7K(8192.0K)], [Metaspace: 3086K-&gt;3086K(1056768K)]
+ [Times: user&#x3D;0.01 sys&#x3D;0.01, real&#x3D;0.02 secs] <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="FGC-参数"><a href="#FGC-参数" class="headerlink" title="FGC 参数"></a>FGC 参数</h1><p><strong>MinHeapFreeRatio</strong></p>
+<p>参数 MinHeapFreeRatio，这个值用于判断是否可以扩展堆空间，增大该值扩展概率变小，减小该值扩展几率变大。</p>
+<p><strong>MaxHeapFreeRatio</strong></p>
+<p>参数 MaxHeapFreeRatio，这个值用于判断是否可以收缩堆空间，增大该值收缩概率变小，减小该值收缩概率变大。</p>
+<p><strong>MarkSweepAlwaysCompactCount</strong></p>
+<p>参数 MarkSweepAlwaysCompactCount，默认值为 4，这个值表示经过一定次数的 GC 之后，允许当前区域空间中一定比例的空间用来将死亡对象当作存活对象处理，这里姑且将这些对象称为弥留对象，把这片空间称为弥留。这个比例由 MarkSweepDeadRatio 控制，默认值为 5，该参数的作用是加快FGC的处理速度。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/GC/" rel="tag"># GC</a>
+              <a href="/tags/G1/" rel="tag"># G1</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/07/22/G1-3-MixedGC%E8%BF%87%E7%A8%8B/" rel="prev" title="G1 MixedGC过程">
+      <i class="fa fa-chevron-left"></i> G1 MixedGC过程
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/07/22/G1-5-%E5%B8%B8%E7%94%A8GC%E5%8F%82%E6%95%B0/" rel="next" title="G1 常用GC参数">
+      G1 常用GC参数 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Evac-%E5%A4%B1%E8%B4%A5"><span class="nav-number">1.</span> <span class="nav-text">Evac 失败</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#FGC-%E7%AE%97%E6%B3%95%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">FGC 算法过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%B2%E8%A1%8C-FGC"><span class="nav-number">2.1.</span> <span class="nav-text">串行 FGC</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%87%E8%AE%B0%E6%B4%BB%E8%B7%83%E5%AF%B9%E8%B1%A1"><span class="nav-number">2.1.1.</span> <span class="nav-text">标记活跃对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97%E6%96%B0%E5%AF%B9%E8%B1%A1%E5%9C%B0%E5%9D%80"><span class="nav-number">2.1.2.</span> <span class="nav-text">计算新对象地址</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0%E5%BC%95%E7%94%A8%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%9C%B0%E5%9D%80"><span class="nav-number">2.1.3.</span> <span class="nav-text">更新引用对象的地址</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A7%BB%E5%8A%A8%E5%AF%B9%E8%B1%A1%E5%AE%8C%E6%88%90%E5%8E%8B%E7%BC%A9"><span class="nav-number">2.1.4.</span> <span class="nav-text">移动对象完成压缩</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E5%A4%84%E7%90%86"><span class="nav-number">2.1.5.</span> <span class="nav-text">后处理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E8%A1%8C-FGC"><span class="nav-number">2.2.</span> <span class="nav-text">并行 FGC</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B9%B6%E8%A1%8C%E6%A0%87%E8%AE%B0%E6%B4%BB%E8%B7%83%E5%AF%B9%E8%B1%A1"><span class="nav-number">2.2.1.</span> <span class="nav-text">并行标记活跃对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97%E5%AF%B9%E8%B1%A1%E7%9A%84%E6%96%B0%E5%9C%B0%E5%9D%80"><span class="nav-number">2.2.2.</span> <span class="nav-text">计算对象的新地址</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0%E5%BC%95%E7%94%A8%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%9C%B0%E5%9D%80-1"><span class="nav-number">2.2.3.</span> <span class="nav-text">更新引用对象的地址</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A7%BB%E5%8A%A8%E5%AF%B9%E8%B1%A1%E5%AE%8C%E6%88%90%E5%8E%8B%E7%BC%A9-1"><span class="nav-number">2.2.4.</span> <span class="nav-text">移动对象完成压缩</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E5%A4%84%E7%90%86-1"><span class="nav-number">2.2.5.</span> <span class="nav-text">后处理</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#FGC-%E8%BF%87%E7%A8%8B%E6%97%A5%E5%BF%97"><span class="nav-number">3.</span> <span class="nav-text">FGC 过程日志</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#FGC-%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">FGC 参数</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

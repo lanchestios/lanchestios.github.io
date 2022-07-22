@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="现代操作系统中最基本的构件是进程，操作系统的基本功能是创建、管理和终止进程。当进程处于活跃状态时，操作系统必须设法使每个进程都分配到处理器执行时间，并协调它们的活动、管理有冲突的请求、给进程分配系统资源。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OS 进程描述和控制">
+<meta property="og:url" content="http://example.com/2021/02/07/OS-%E8%BF%9B%E7%A8%8B%E6%8F%8F%E8%BF%B0%E5%92%8C%E6%8E%A7%E5%88%B6/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="现代操作系统中最基本的构件是进程，操作系统的基本功能是创建、管理和终止进程。当进程处于活跃状态时，操作系统必须设法使每个进程都分配到处理器执行时间，并协调它们的活动、管理有冲突的请求、给进程分配系统资源。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9.png">
+<meta property="og:image" content="http://example.com/images/OS/进程在内存的分配位置.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E4%B8%AD%E7%9A%84%E8%BD%A8%E8%BF%B9.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E7%9A%84%E7%BB%84%E5%90%88%E8%BD%A8%E8%BF%B9.png">
+<meta property="og:image" content="http://example.com/images/OS/%E4%B8%A4%E7%8A%B6%E6%80%81%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%AF%BC%E8%87%B4%E8%BF%9B%E7%A8%8B%E7%BB%88%E6%AD%A2%E7%9A%84%E5%8E%9F%E5%9B%A0.png">
+<meta property="og:image" content="http://example.com/images/OS/%E4%BA%94%E7%8A%B6%E6%80%81%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/单阻塞队列.png">
+<meta property="og:image" content="http://example.com/images/OS/多阻塞队列.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%8C%85%E5%90%AB%E5%8D%95%E6%8C%82%E8%B5%B7%E6%80%81%E7%9A%84%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%8C%85%E5%90%AB%E5%8F%8C%E6%8C%82%E8%B5%B7%E6%80%81%E7%9A%84%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%8C%82%E8%B5%B7%E7%9A%84%E5%8E%9F%E5%9B%A0.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%98%A0%E5%83%8F%E4%B8%AD%E7%9A%84%E5%85%B8%E5%9E%8B%E5%85%83%E7%B4%A0.png">
+<meta property="og:image" content="http://example.com/images/OS/Linuxx8632%E4%B8%AD%E5%85%B8%E5%9E%8B%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%86%85%E5%AD%98%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/OS/操作系统控制表的通用结构.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6%E5%9D%97%E4%B8%AD%E7%9A%84%E5%85%B8%E5%9E%8B%E5%85%83%E7%B4%A0.png">
+<meta property="og:image" content="http://example.com/images/OS/x86EFLAGS%E5%AF%84%E5%AD%98%E5%99%A8.png">
+<meta property="og:image" content="http://example.com/images/OS/x86%E7%9A%84EFLAGS%E5%AF%84%E5%AD%98%E5%99%A8%E4%BD%8D.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%99%9A%E5%AD%98%E4%B8%AD%E7%9A%84%E7%94%A8%E6%88%B7%E8%BF%9B%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E9%93%BE%E8%A1%A8%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/OS/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8%E7%9A%84%E5%85%B8%E5%9E%8B%E5%8A%9F%E8%83%BD.png">
+<meta property="og:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%89%A7%E8%A1%8C%E7%9A%84%E4%B8%AD%E6%96%AD%E6%9C%BA%E5%88%B6.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%88%86%E7%A6%BB%E7%9A%84%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8.png">
+<meta property="og:image" content="http://example.com/images/OS/%E5%9C%A8%E7%94%A8%E6%88%B7%E8%BF%9B%E7%A8%8B%E5%86%85%E6%89%A7%E8%A1%8C%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E4%BE%8B%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/OS/进程映像.png">
+<meta property="og:image" content="http://example.com/images/OS/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E4%BE%8B%E7%A8%8B%E4%BD%9C%E4%B8%BA%E5%88%86%E7%A6%BB%E7%9A%84%E8%BF%9B%E7%A8%8B%E6%89%A7%E8%A1%8C.png">
+<meta property="og:image" content="http://example.com/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81.png">
+<meta property="og:image" content="http://example.com/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E6%98%A0%E5%83%8F.png">
+<meta property="og:image" content="http://example.com/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E8%A1%A8%E9%A1%B9.png">
+<meta property="og:image" content="http://example.com/images/OS/UNIX%E7%9A%84%E7%94%A8%E6%88%B7%E5%8C%BA.png">
+<meta property="article:published_time" content="2021-02-07T14:01:05.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.555Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Operation System">
+<meta property="article:tag" content="Process">
+<meta property="article:tag" content="Unix">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/OS/%E8%BF%9B%E7%A8%8B%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9.png">
+
+<link rel="canonical" href="http://example.com/2021/02/07/OS-%E8%BF%9B%E7%A8%8B%E6%8F%8F%E8%BF%B0%E5%92%8C%E6%8E%A7%E5%88%B6/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>OS 进程描述和控制 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/02/07/OS-%E8%BF%9B%E7%A8%8B%E6%8F%8F%E8%BF%B0%E5%92%8C%E6%8E%A7%E5%88%B6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OS 进程描述和控制
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-02-07 22:01:05" itemprop="dateCreated datePublished" datetime="2021-02-07T22:01:05+08:00">2021-02-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Operation-System/" itemprop="url" rel="index"><span itemprop="name">Operation System</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>现代操作系统中最基本的构件是进程，操作系统的基本功能是创建、管理和终止进程。当进程处于活跃状态时，操作系统必须设法使每个进程都分配到处理器执行时间，并协调它们的活动、管理有冲突的请求、给进程分配系统资源。</p>
+<span id="more"></span>
+
+<p>操作系统想要执行进程管理功能，必须维护每个进程的描述（或进程映像），包括执行进程的地址空间和一个进程控制块。进程控制块含有操作系统管理进程需要的全部信息，包括进程的当前状态、分配给进程的资源、优先级和其他相关数据。</p>
+<p>在整个生命周期内，进程总是在一些状态之间转换。最重要的状态有就绪态、运行态和阻塞态。就绪态进程是指当前未执行但已做好执行准备的进程，只要操作系统调度到它，它就会立即执行；运行态进程是指当前正被处理器执行的进程，在多处理器系统中会有多个进程处于这种状态；阻塞态进程是指正在等待某一事件完成（如一次 IO 操作）的进程。</p>
+<p>正运行进程可被进程外发生并被处理器识别的中断事件打断，或被执行操作系统的系统调用打断。不论在哪种情况下，处理器都会执行一次模式切换，将控制权转交给操作系统例程。操作系统完成必需的操作后，可以恢复被中断的进程或切换到其他进程。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E6%8E%A8%E8%8D%90%E8%AF%BB%E7%89%A9.png"></p>
+<h1 id="进程和进程控制块"><a href="#进程和进程控制块" class="headerlink" title="进程和进程控制块"></a>进程和进程控制块</h1><p><strong>进程的定义</strong></p>
+<p>可将进程视为由一组基本元素组成的实体，进程的基本元素是<strong>程序代码</strong>（可能被执行相同程序的其他进程共享）、与代码相关联的<strong>数据集</strong>和进程控制块。当处理器开始执行进程，构成进程的实体转为活动单元，通常将这个<strong>执行实体</strong>称之为进程。</p>
+<p><strong>进程控制块</strong></p>
+<p>进程的运行态可由以下元素来表征：</p>
+<ul>
+<li>标识符：与进程相关的唯一标识符，用来区分其他进程</li>
+<li>状态：若进程正在执行，则进程处于运行态</li>
+<li>优先级：相对于其他进程的优先顺序</li>
+<li>程序计数器：程序中即将执行的下一条指令的地址</li>
+<li>内存指针：包括程序代码和进程相关数据的指针，以及与其他进程共享内存块的指针</li>
+<li>上下文数据：进程执行时处理器的寄存器中的数据</li>
+<li>IO 状态信息：包括显式IO请求、分配给进程的IO设备（如磁带驱动器）和被进程使用的文件列表等</li>
+<li>记账信息：包括处理器时间总和、使用的时钟数总和、时间限制、记帐号等</li>
+</ul>
+<p>以上信息存放在进程控制块的数据结构中，控制块由操作系统创建和管理，其中储存了全部当前环境下的信息。当进程被中断后可用来恢复执行环境。进程控制块是操作系统为支持多进程并提供多重处理技术的关键工具。进程中断时，操作系统会把程序计数器和处理器寄存器（上下文数据）保存到进程控制块中的相应位置，进程状态相应地改为其他值，如阻塞态或就绪态。现代操作系统可以随意将其他进程置为运行态，并把它的程序计数器和进程上下文数据加载到处理器寄存器中，进而执行这一进程。</p>
+<h1 id="进程状态"><a href="#进程状态" class="headerlink" title="进程状态"></a>进程状态</h1><h2 id="进程切换的过程"><a href="#进程切换的过程" class="headerlink" title="进程切换的过程"></a>进程切换的过程</h2><p>列出为进程执行的指令序列，可描述单个进程的行为，这样的序列称为进程轨迹（trace）。给出各个进程轨迹的交替方式，就可描述处理器的行为。</p>
+<p>考虑一个非常简单的例子。下图给出了三个进程在内存中的布局，为简化讨论，假设未使用虚存，因此所有三个进程都由完全载入内存中的程序表示；此外，有一个小分派器使处理器切换进程。</p>
+<img src="/images/OS/进程在内存的分配位置.png" style="zoom: 50%;" />
+
+<p>下图显示了三个进程在执行过程早期的轨迹，给出了进程 A 和 C 中最初执行的 12 条指令以及进程 B 中执行的 4 条指令，假设第 4 条指令调用了进程须等待的 IO 操作。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E4%B8%AD%E7%9A%84%E8%BD%A8%E8%BF%B9.png"></p>
+<p>下图中，阴影部分代表由分派器执行的代码。在每个实例中由分派器执行的指令顺序是相同的，因为执行的是分派器的同一功能行。假设操作系统为避免任何一个进程独占处理器时间，仅允许一个进程最多连续执行 6 个指令周期，此后将被中断。如下图所示，进程 A 的前 6 条指令执行后，出现一个超时，然后执行分派器的某些代码，在将控制权转移给进程 B 前，分派器执行了 6 条指令。在进程 B 的 4 条指令执行后，进程 B 请求一个它必须等待的 IO 动作，因此处理器停止执行进程 B，并通过分派器转移到进程 C，在超时后，处理器返回进程 A，这次超时后，进程 B 仍然等待那个 IO 操作的完成，因此分派器再次转移到进程 C。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E7%9A%84%E7%BB%84%E5%90%88%E8%BD%A8%E8%BF%B9.png"></p>
+<h2 id="两状态进程模型"><a href="#两状态进程模型" class="headerlink" title="两状态进程模型"></a>两状态进程模型</h2><p>我们必须用某种方式来表示每个进程，以便使得操作系统能够跟踪到它，即必须有一些与进程相关的信息，包括进程在内存中的当前状态和位置，即进程控制块。未运行进程必须位于某种类型的队列中，并等待执行时机。下图（b）给出了一个结构，该结构中有一个队列，队列中的每项都指向某个特定进程的指针，或队列可以由数据块构成的链表组成，每个数据块表示一个进程。我们可以用这个排队图来描述分派器的行为。被中断的进程转移到等待进程队列中，或在进程结束或取消时销毁它。在任何情形下，分派器均从队列中选择个进程来执行。</p>
+<p><img src="/images/OS/%E4%B8%A4%E7%8A%B6%E6%80%81%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B.png"></p>
+<h2 id="进程的创建与终止"><a href="#进程的创建与终止" class="headerlink" title="进程的创建与终止"></a>进程的创建与终止</h2><p>进程的创建将一个新进程添加到正被管理的进程集时，操作系统需要建立用于管理该进程的数据结构，并在内存中给它分配地址空间，这些行为构成了一个新进程的创建过程。</p>
+<blockquote>
+<p>当操作系统为另一个进程的显式请求创建一个进程时，该动作称为进程派生（ process spawning ）。</p>
+<p>当一个进程派生另一个进程时，前一个称为父进程（ parent process ），被派生的进程称为子进程<br>（ child process ）。典型情况下，相关进程需要相互之间的通信和合作。</p>
+</blockquote>
+<p>进程终止表（下图）概括了进程终止的典型原因。任何一个计算机系统都必须为进程提供表示其完成的方法，批处理作业中应包含一个 Halt 指令或其他操作系统显式服务调用来终止。在前一种情况下，Halt 指令将产生一个中断，警告操作系统一个进程已经完成。对交互式应用程序，用户的行为将指出何时进程完成。所有这些行为最终将导致给操作系统发出一个服务请求，以终止发出请求的进程。</p>
+<p>此外，很多错误和故障条件会导致进程终止。</p>
+<p>最后，在有些操作系统中，进程可被创建它的进程终止，或在父进程终止时而终止。</p>
+<p><img src="/images/OS/%E5%AF%BC%E8%87%B4%E8%BF%9B%E7%A8%8B%E7%BB%88%E6%AD%A2%E7%9A%84%E5%8E%9F%E5%9B%A0.png"></p>
+<h2 id="五状态模型"><a href="#五状态模型" class="headerlink" title="五状态模型"></a>五状态模型</h2><p>如果所有进程都做好了执行的准备，那么两状态模型所给出的排队原则是有效的。队列是 FIFO 表，对于可运行的进程，处理器以一种轮转（ round-robin）方式操作（依次给队列中每个进程一定的执行时间，然后进程返回队列。阻塞情况除外）。但是，即使对前面描述的简单例子，这一实现都是不合适的：存在一些处于非运行态但已就绪等待执行的进程，同时还存在另外一些处于阻塞态等待 IO 操作结束的进程。因此，若使用单个队列，分派器不能只考虑选择队列中最老的进程，而应扫描这个列表，查找那些未被阻塞且在队列中时间最长的进程。</p>
+<p>解决该问题的一种较好方法是，将非运行态分成两个状态：就绪态（ ready ）和阻塞态（ blocked ）。</p>
+<p>新建态和退出态对进程管理非常有用。新建态对应于刚刚定义的进程。例如，如果一位新用户试图登录到分时系统中，或新的批作业被提交执行，那么操作系统可以分两步定义新进程。首先，操作系统执行一些必需的辅助工作，将标识符关联到进程，并分配和创建管理进程所需要的全部表格。此时，进程处于新建态，这意味着操作系统已经执行了创建进程的必需动作，但还未执行进程。例如，操作系统可能会因性能不高或内存不足，而限制系统中的进程数量。进程处于新建态时，操作系统所需的关于该进程的信息保存在内存中的进程表内，但进程本身还未进入内存，也就是说，即将执行的程序代码不在内存中，也没有为与这个程序相关的数据分配空间。进程处于新建态时，程序保留在外存中，通常保留在磁盘中。</p>
+<blockquote>
+<p>在该段的讨论中，忽略了虚存的概念。在支持虚存的系统中，当进程从新建态转换为就绪态时，其程序代码和数据被加载到虚存中。</p>
+</blockquote>
+<p><img src="/images/OS/%E4%BA%94%E7%8A%B6%E6%80%81%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B.png"></p>
+<blockquote>
+<p><strong>新建→就绪</strong>：操作系统准备好再接纳一个进程时，把一个进程从新建态转换到就绪态。大多数系统会基于现有的进程数或分配给现有进程的虚存数量设置一些限制，以确保不会因为活跃进程的数量过多而导致系统性能下降。</p>
+<p><strong>就绪→运行</strong>：需要选择一个新进程运行时，操作系统选择一个处于就绪态的进程，这是调度器或分派器的工作。进程的选择问题将在后面讨论。</p>
+<p><strong>运行→退出</strong>：若当前正运行的进程表示自身已完成或取消，则它将被操作系统终止。</p>
+<p><strong>运行→就绪</strong>：这类转换最常见的原因是，正在运行的进程已到达“允许不中断执行”的最大时间段；实际上所有多道程序操作系统都实行了这类时间限制。这类转换还有很多其他原因，例如操作系统给不同的进程分配不同的优先级，但这并未在所有操作系统中实现。</p>
+<p>假设进程 A 以一个给定的优先级运行，而具有更高优先级的进程 B 正处于阻塞态。如果操作系统知道进程 B 等待的事件已经发生，则将进程 B 转换到就绪态，然后因为优先级的原因中断进程 A 的执行，将处理器分派给进程 B，此时我们说操作系统抢占（ preempted ）了进程 A。最后一种情况是，进程自愿释放对处理器的控制，例如一个周期性进行记账和维护的后台进程。</p>
+<p><strong>运行→阻塞</strong>：进程请求其必须等待的某些事件时，则进入阻塞态。对操作系统的请求通常以系统服务调用的形式发出，即正在运行的程序请求调用操作系统中一部分代码所发生的过程。例如，进程可能请求操作系统的一个服务，但操作系统无法立即予以服务；也可能请求一个无法立即得到的资源，如文件或虚存中的共享区域；还有可能需要进行某种初始化的工作，如 IO 操作所遇到的情况，并且只有在该初始化工作完成后才能继续执行。当进程互相通信，一个进程等待另一个进程提供输入时，或等待来自另一个进程的信息时都可能被阻塞。</p>
+<p><strong>阻塞→就绪</strong>：所等待的事件发生时，处于阻塞态的进程转换到就绪态。</p>
+<p><strong>就绪→退出</strong>：为清楚起见，状态图中未表示这种转换。在某些系统中，父进程可在任何时刻终止一个子进程。如果父进程终止，那么与该父进程相关的所有子进程都将被终止。</p>
+<p><strong>阻塞→退出</strong>：前一项给出了注释。</p>
+</blockquote>
+<h2 id="排队模型"><a href="#排队模型" class="headerlink" title="排队模型"></a>排队模型</h2><p><strong>单阻塞队列</strong></p>
+<img src="/images/OS/单阻塞队列.png" style="zoom:67%;" />
+
+<p><strong>多阻塞队列</strong></p>
+<img src="/images/OS/多阻塞队列.png" style="zoom:67%;" />
+
+<p>当一个事件发生时，操作系统必须扫描整个阻塞队列，搜索那些等待该事件的进程。在大型操作系统中，队列中可能有几百甚至几千个进程，此时拥有多个队列将会很有效，一个事件可以对应一个队列。因此，事件发生时，相应队列中的所有进程都将转换到就绪态。</p>
+<p><strong>多阻塞队列：细分多优先级队列</strong></p>
+<p>按照优先级方案分派进程，维护多个就绪队列，每个优先级一个队列，将会带来很大的便利。操作系统很容易就可确定哪个就绪进程具有最高优先级且等待时间最长。</p>
+<h2 id="挂起的线程"><a href="#挂起的线程" class="headerlink" title="挂起的线程"></a>挂起的线程</h2><p>回忆可知，机器变得复杂的原因是，IO 活动远慢于计算速度使得单道程序系统中的处理器大多数时间处于空闲状态。但上图（b）所示的方案并未完全解决这个问题。此时，内存中保存有多个进程，当一个进程被阻塞时，处理器可移向另一个进程，但由于处理器远快于 IO，会出现内存中的所有进程都在等待 IO 的现象。因此，即便是多道程序设计，处理器多数时间仍可能处于空闲状态。</p>
+<p>解决方案之一是扩充内存来容纳更多的进程，但这种方法有两个缺点。首先是内存的价格问题，当内存大小增加到兆位及千兆位时，价格也会随之增加；其次是程序对内存空间需求的增长速度要快于内存价格的下降速度。因此，更大的内存往往会导致更大的进程而非更多的进程。</p>
+<p>解决方案之二是交换，即把内存中某个进程的一部分或全部移到磁盘中。当内存中不存在就绪态的进程时，操作系统就把被阻塞的进程换出到磁盘中的挂起队列（ suspend queue），即临时从内存中“踢出”的进程队列。操作系统此后要么从挂起队列中取出另一个进程，要么接受一个新进程的请求，将其放入内存运行。</p>
+<p>交换是 IO 操作，因此可能会使问题更加恶化。由于磁盘 IO 一般是系统中最快的 IO（相对于磁带或打印机IO），因此交换通常会提高性能。</p>
+<p>要使用前面介绍的交换，在五状态进程行为模型中必须增加另一个状态：挂起态。当内存中的所有进程都处于阻塞态时，操作系统可把其中的一个进程置为挂起态，并将它转移到磁盘，此时内存所释放的空间就可被调入的另一个进程使用。操作系统执行换出操作后，将进程取到内存中的方式有两种：接纳一个新近创建的进程，或调入一个此前挂起的进程。显然，操作系统倾向于调入一个此前挂起的进程，并为它提供服务，而非增加系统的总负载数。</p>
+<p><img src="/images/OS/%E5%8C%85%E5%90%AB%E5%8D%95%E6%8C%82%E8%B5%B7%E6%80%81%E7%9A%84%E6%A8%A1%E5%9E%8B.png"></p>
+<p>操作系统执行换岀操作后，将进程取到内存中的方式有两种：接纳一个新近创建的进程，或调入一个此前挂起的进程。显然，操作系统倾向于调入一个此前挂起的进程，并为它提供服务，而非增加系统的总负载数。</p>
+<p>但这一推理也带来了一个难题，即所有已被挂起的进程都处于阻塞态。显然，这时把被阻塞的进程取回内存没有任何意义，因为它仍然未做好执行的准备。但是，由于每个挂起的进程最初都阻塞在某个特定的事件上，因此发行该事件时，进程将不再阻塞而可以继续执行。</p>
+<p>因此，我们需要重新考虑设计方式。下面是两个无关的概念：进程是在等待一个事件（阻塞与否）还是已被换出内存（挂起与否）。为容纳这一 2×2 组合，需要 4 个状态：</p>
+<ul>
+<li>就绪态：进程已在内存中并可以执行。</li>
+<li>阻塞态：进程已在内存中并等待一个事件。</li>
+<li>阻塞&#x2F;挂起态：进程已在外存中并等待一个事件。</li>
+<li>就绪&#x2F;挂起态：进程已在外存中，但只要载入内存就可执行。</li>
+</ul>
+<p>在查看包含两个新挂起态的状态转换图前，必须注意迄今为止的论述都假设未使用虚存，进程要么都在内存中，要么都在内存外。使用虚存中，可能会执行只有部分内容在内存中的进程，若访问的进程地址不在内存中，则将进程的相应部分调入内存。使用虚存看上去不需要显式交换，因为通过处理器中的存储管理硬件，任何进程中的任何地址都可移入或移出内存。然而，如后章节所述，若活动进程很多，且所有的进程都有一部分在内存中时，则可能会导致虚存系统崩溃。因此，即使是在虚存系统中，操作系统也需要不时地根据执行情况完全显式地换出进程。</p>
+<p><img src="/images/OS/%E5%8C%85%E5%90%AB%E5%8F%8C%E6%8C%82%E8%B5%B7%E6%80%81%E7%9A%84%E6%A8%A1%E5%9E%8B.png"></p>
+<p>现在来看上图（b）中的状态转换模型（图中虚线表示可能但非必需的转换）。重要的新转换如下：</p>
+<p><strong>阻塞→阻塞&#x2F;挂起</strong>：若没有就绪进程，则至少换出一个阻塞进程，以便为另一个未阻塞进程腾出空间。即使有可用的就绪态进程，也能完成这种转换。若操作系统需要确定当前正运行的进程，或就绪进程为了维护基本的性能而需要更多的内存空间，则会挂起一个阻塞的进程。</p>
+<p>阻塞&#x2F;挂起→就绪&#x2F;挂起：若等待的事件发生，则处于阻塞&#x2F;挂起态的进程可转换到就绪&#x2F;挂起态。注意，此时要求操作系统必须得到挂起进程的状态信息。</p>
+<p><strong>就绪&#x2F;挂起→就绪</strong>：若内存中没有就绪态进程，则操作系统需要调入一个进程继续执行。此外，处于就绪&#x2F;挂起态的进程与处于就绪态的任何进程相比，优先级更高时，也可进行这种转换。出现这种情况的原因是，操作系统设计者规定，调入高优先级的进程比减少交换量更重要。</p>
+<p><strong>就绪→就绪&#x2F;挂起</strong>：通常，操作系统更倾向于挂起阻塞态进程而非就绪态进程，因为就绪态进程可以立即执行，而阻塞态进程虽然占用了内存空间但不能执行。若释放内存来得到足够空间的唯一方法是挂起一个就绪态进程，则这种转换也是必需的。此外，若操作系统确信高优先级的阻塞态进程很快将会就绪，则它可能会选择挂起一个低优先级的就绪态进程，而非一个高优先级的阻塞态进程。</p>
+<p>值得考虑的其他几种转换如下：</p>
+<p><strong>新建→就绪&#x2F;挂起和新建→就绪</strong>：创建一个新进程时，该进程要么加入就绪队列，要么加入就绪&#x2F;挂起队列。不论哪种情况，操作系统都须建立一些表来管理进程，并为进程分配地址空间。操作系统可能更倾向于在初期执行这些辅助工作，以便能维护大量的未阻塞进程。采用这种策略时，经常出现无足够空间分配给新进程的情况，因此使用了“新建→就绪&#x2F;挂起”转换。另一方面，我们可以证明创建进程的适时（ Just-In-time）原理，即尽可能推迟创建进程以减少操作系统的开销，并在系统被阻塞态进程阻塞时，允许操作系统执行进程创建任务。</p>
+<p><strong>阻塞&#x2F;挂起→阻塞</strong>：这种转换在设计中很少见，原因是如果一个进程未准备好执行且不在内存中，调入它没有意义。但此时要考虑如下情况：一个进程终止后，会释放一些内存空间，而阻塞&#x2F;挂起队列中有一个进程的优先级要比就绪挂起队列中任何进程的优先级都高，并且操作系统有理由相信阻塞进程的事件很快就会发生。这时，把阻塞进程而非就绪进程调入内存是合理的。</p>
+<p><strong>运行→就绪&#x2F;挂起</strong>：通常，当一个运行进程的分配时间到期后，它将转换到就绪态。但在阻塞&#x2F;挂起队列中具有较高优先级的进程不再被阻塞时，操作系统会抢占这个进程，或直接把这个运行进程转换到就绪&#x2F;挂起队形中，并释放一些内存空间。</p>
+<p><strong>各种状态→退出</strong>：典型情况下，一个进程的运行终止，要么是它已完成运行，要么是出现了一些错误条件。但在某些操作系统中，进程可被父进程终止，或在父进程终止时终止。若这种情况允许，则进程在任何状态下都可转换到退出态。</p>
+<p>挂起进程等价于不在内存中的进程。不在内存中的进程，不论是否在等待一个事件，都不能立即执行。下面总结挂起进程的概念。首先，挂起进程具有如下特点：</p>
+<ol>
+<li>该进程不能立即执行。</li>
+<li>该进程可能在也可能不在等待一个事件。若在等待一个事件，那么阻塞条件不依赖于挂起条件，阻塞事件的发生不会使进程立即执行。</li>
+<li>为阻止该进程执行，可通过代理使其置于挂起态，代理可以是进程本身，也可以是父进程或操作系统。</li>
+<li>除非代理显式地命令系统进行状态转换，否则该进程无法从这一状态转移。</li>
+</ol>
+<p>下表中列出了挂起进程的一些原因：</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E6%8C%82%E8%B5%B7%E7%9A%84%E5%8E%9F%E5%9B%A0.png"></p>
+<h1 id="进程描述"><a href="#进程描述" class="headerlink" title="进程描述"></a>进程描述</h1><p>操作系统控制计算机系统内部的事件，为处理器执行进程进行调度和分派，给进程分配资源，并响应用户程序的基本服务请求。因此，我们可把操作系统视为管理系统资源的实体。</p>
+<h2 id="操作系统的控制结构"><a href="#操作系统的控制结构" class="headerlink" title="操作系统的控制结构"></a>操作系统的控制结构</h2><p>操作系统为了管理进程和资源，必须掌握每个进程和资源的当前状态。普遍采用的方法是，操作系统构造并维护其管理的每个实体的信息表。下图给出了这种方法的大致范围，即操作系统维护的 4 种不同类型的表：内存、IO、文件和进程。尽管不同操作系统的实现细节不同，但所有操作系统维护的信息基本都可以分为这 4 类。</p>
+<ol>
+<li><p>内存表（ memory table ）用于跟踪内（实）存和外（虚）存。内存的某些部分为操作系统保留，剩余部分供进程使用，外存中保存的进程使用某种虚存或简单的交换机制。内存表必须包含如下信息：</p>
+<ul>
+<li>分配给进程的内存</li>
+<li>分配给进程的外存</li>
+<li>内存块或虚存块的任何保护属性，如哪些进程可以访问某些共享内存区域</li>
+<li>管理虚存所需要的任何信息</li>
+</ul>
+</li>
+<li><p>操作系统使用 IO 表管理计算机系统中的 IO 设备和通道。</p>
+</li>
+<li><p>操作系统还会维护文件表。文件表提供关于文件是否存在、文件在外存中的位置、当前状态和其他属性的信息。大部分信息（非全部信息）可能由文件管理系统维护和使用。此时操作系统仅有少许或没有关于文件的信息：在其他操作系统中，文件管理的许多细节由操作系统本身管理。</p>
+</li>
+<li><p>最后，为管理进程，操作系统必须维护进程表。</p>
+</li>
+</ol>
+<p>在此之前，我们需要先明确两点：</p>
+<p>首先，尽管给出了 4 种不同的表，但这些表必须以某种方式链接起来或交叉引用。内存、IO 和文件是代表进程而被管理的，因此进程表中必须有对这些资源的直接或间接引用。文件表中的文件可通过 IO 设备访问，有时它们也位于内存中或虚存中。这些表自身必须可被操作系统访问到，因此它们受制于内存管理。</p>
+<p>其次，操作系统最初是如何知道创建表的？显然，操作系统必须具有基本环境的一些信息，如有多少内存空间、IO 设备是什么及它们的标识符是什么等。这是配置问题，即操作系统初始化后，必须能使用定义基本环境的某些配置数据，而这些数据必须在操作系统之外通过人的帮助产生，或由一些自动配置软件产生。</p>
+<h2 id="进程控制结构"><a href="#进程控制结构" class="headerlink" title="进程控制结构"></a>进程控制结构</h2><p>操作系统在管理和控制进程时，首先要知道进程的位置，其次要知道进程的属性（如进程 ID、进程状态）。</p>
+<h3 id="进程位置"><a href="#进程位置" class="headerlink" title="进程位置"></a>进程位置</h3><p>进程位置在处理进程位置和属性问题前，首先要解决一个更基本的问题：进程的物理表示是什么？进程最少必须包括一个或一组被执行的程序，而与这些程序相关联的是局部变量、全局变量和任何已定义常量的数据单元。因此，一个进程至少应有足够的内存空间来保存其的程序和数据；此外，程序的执行通常涉及用于跟踪过程调用和过程间参数传递的栈。最后，还有与每个进程相关的许多属性，以便操作系统控制该进程。通常，属性集称为进程控制块（ process control block ）。程序、数据、栈和属性的集合称为进程映像（ process image ），如下图。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E6%98%A0%E5%83%8F%E4%B8%AD%E7%9A%84%E5%85%B8%E5%9E%8B%E5%85%83%E7%B4%A0.png"></p>
+<p>进程映像的位置取决于所用的内存管理方案。在最简单的情形下，进程映像保存在相邻的内存块中或连续的内存块中。存储块位于外存（通常是磁盘）中，因此在操作系统管理进程时，其进程映像至少应有一部分位于内存中。而要执行该进程，则必须将整个进程映像载入内存中或至少载入虚存中。因此，操作系统需要知道每个进程在磁盘中的位置，并知道每个进程在内存中的位置。</p>
+<p>下图是 Linux&#x2F;x86-32 中典型的进程内存结构</p>
+<p><img src="/images/OS/Linuxx8632%E4%B8%AD%E5%85%B8%E5%9E%8B%E7%9A%84%E8%BF%9B%E7%A8%8B%E5%86%85%E5%AD%98%E7%BB%93%E6%9E%84.png"></p>
+<p>下面介绍 CTSS 操作系统关于这种方案的一个复杂变体。在 CTSS 中，当进程被换出时，部分进程映像可能仍保留在内存中。因此，操作系统必须跟踪每个进程映像的哪一部分仍然在内存中。</p>
+<p>现代操作系统假定分页硬件允许使用不连续的物理内存来支持部分常驻内存的进程。在任意时刻，进程映像的一部分可在内存中，剩余部分可在外存中。因此，操作系统维护的进程表必须给出每个进程映像中的每页的位置。</p>
+<img src="/images/OS/操作系统控制表的通用结构.png" style="zoom: 67%;" />
+
+<p>上图给出了位置信息的结构。有一个主进程表，每个进程在表中都有一个表项，每个表项至少包含一个指向进程映像的指针。如果进程映像包括多个块，则这一信息直接包含在主进程表中，或通过交叉引用内存表中的表项得到。当然，这种描述是一般性描述，不同操作系统会按自身的方式来组织位置信息</p>
+<h3 id="进程属性"><a href="#进程属性" class="headerlink" title="进程属性"></a>进程属性</h3><p>进程属性复杂的多道程序系统需要关于每个进程的大量信息。如前所述，该信息可以保留在进程控制块中。不同的系统以不同的方式组织该信息。这里先简要介绍操作系统将会用到的信息，而不详细考虑信息是如何组织的。</p>
+<p>下表给出了操作系统所需进程信息的简单分类。这些信息量初看之下令人惊讶，但随着对操作系统了解的深入，这一列表看起来会更加合理。</p>
+<p>进程控制块信息分为三类：</p>
+<ul>
+<li>进程标识信息</li>
+<li>进程状态信息</li>
+<li>进程控制信息</li>
+</ul>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6%E5%9D%97%E4%B8%AD%E7%9A%84%E5%85%B8%E5%9E%8B%E5%85%83%E7%B4%A0.png"></p>
+<p><strong>进程标识信息</strong></p>
+<p>实际上，对于所有操作系统中的进程标识符（ process identification ）来说，每个进程都分配了个唯一的数字标识符。进程标识符可以简单地表示为主进程表中的一个索引；否则，就必须有一个映射，以便操作系统可以根据进程标识符定位相应的表。该标识符可用在很多地方，且操作系统控制的其他许多表可以使用进程标识符来交叉引用进程表。例如，内存表可以组织起来提供一个内存映射，以说明每个区域分配给了哪个进程。IO 表和文件表中也存在类似的引用。进程相互之间进行通信时，进程标识符可用于通知操作系统某一特定通信的目标；允许进程创建其他进程时，标识符可用于指明每个进程的父进程和后代进程。除进程标识符外，还给进程分配了一个用户标识符，用于说明拥有该进程的用户。</p>
+<p><strong>处理器状态信息</strong></p>
+<p>处理器状态信息（ processor state information ）由处理器寄存器的内容组成。运行一个进程时，进程的信息一定会出现在寄存器中。中断进程时，必须保存该寄存器的所有信息，以便进程恢复执行时可以恢复所有这些信息。所涉寄存器的性质和数量取决于处理器的设计。典型情况下，寄存器组包括用户可见寄存器、控制和状态寄存器及栈指针。</p>
+<blockquote>
+<p>注意，所有处理器设计都包括一个或组称为程序状态字（ Program Status Word，PSW）的寄存器，它包含有状态信息。PSW 通常包含条件码和其他状态信息。Intel x86 处理器中的处理器状态字就是一个很好的例子，它称为 EFLAGS 寄存器（见下图结构图和下表条目表），能被运行在 x86 处理器上的任何操作系统（包括 UNIX 和 Windows）使用。</p>
+</blockquote>
+<p><img src="/images/OS/x86EFLAGS%E5%AF%84%E5%AD%98%E5%99%A8.png"></p>
+<p><img src="/images/OS/x86%E7%9A%84EFLAGS%E5%AF%84%E5%AD%98%E5%99%A8%E4%BD%8D.png"></p>
+<p><strong>进程控制信息</strong></p>
+<p>进程控制信息（ process control information ），它是操作系统控制和协调各种活动进程所需的额外信息。下图给出了进程映像在虚存中的结构。每个进程映像都由进程控制块、用户栈、进程专用地址空间以及与其他进程共享的其他地址空间组成。图中每个进程映像的地址范围看起来是连续的，但实际情况可能并非如此，具体取决于内存管理方案和操作系统组织控制结构的方式。</p>
+<p><img src="/images/OS/%E8%99%9A%E5%AD%98%E4%B8%AD%E7%9A%84%E7%94%A8%E6%88%B7%E8%BF%9B%E7%A8%8B.png"></p>
+<p>进程控制块还包括结构信息，包含链接进程控制块的指针。因此，前节所述的j进程态队列可实现为进程控制块的链表。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E9%93%BE%E8%A1%A8%E7%BB%93%E6%9E%84.png"></p>
+<blockquote>
+<p>进程控制块的作用</p>
+<p>进程控制块是操作系统中最重要的数据结构。每个进程控制玦都包含操作系统所需进程的所有信息。实际上，操作系统中的每个模块，包括那些涉及调度、资源分配、中断处理、性能监控和分析的模块，都能读取和修改它们。我们可以说资源控制块集合定义了操作系统的状态。</p>
+<p>这就带来了一个重要的设计问题。操作系统中的很多例程需要访问进程控制块中的信息。直接访问这些表并不困难。每个进程都有一个唯一的 ID 号，它可用作进程控制块的指针表的索引。困难不是访问而是保护，具体表现为两个问题：</p>
+<ul>
+<li>一个例程（如中断处理程序）中的错误可能会破坏进程控制块，进而破坏系统对受影响进程的管理能力。</li>
+<li>进程控制块结构或语义中的设计变化可能会影响到操作系统中的许多模块。</li>
+</ul>
+<p>这些问题可要求操作系统中的所有例程都通过一个处理程序例程来解决，即处理程序例程的任务仅是保护进程控制块，且是读写这些块的唯一仲裁程序。使用这类进程时，需要在性能和其他系统软件结其的信任度之间进行折中。</p>
+</blockquote>
+<h1 id="进程控制"><a href="#进程控制" class="headerlink" title="进程控制"></a>进程控制</h1><h2 id="执行模式"><a href="#执行模式" class="headerlink" title="执行模式"></a>执行模式</h2><p>非特权模式通常称为用户模式（ user mode ），因为用户程序通常在该模式下运行；特权模式称为系统模式（ system mode ）、控制模式（ control mode ）或內核模式（ kernel mode ），内核模式指的是操作系统的内核。下表列出了通常可在操作系统内核中发现的功能。</p>
+<p><img src="/images/OS/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8%E7%9A%84%E5%85%B8%E5%9E%8B%E5%8A%9F%E8%83%BD.png"></p>
+<p>使用两种模式的原因是保护操作系统和重要的操作系统表（如进程控制块）不受用户程序的干扰。在内核模式下，软件会完全控制处理器及其所有指令、寄存器和内存。为安全起见，这种级别的控制对用户程序而言没有必要。</p>
+<p>这样就出现了两个问题：处理器如何才能知道它正在什么模式下执行？模式如何变化？对第一个问题，程序状态字中通常存在一个指示执行模式的位，该位会因事件的改变而变化。典型情况下，当用户调用一个操作系统服务或中断来触发系统例程的执行时，执行模式将被置为内核模式；而当从系统服务返回到用户进程时，执行模式则置为用户模式。例如，实现 64 位 IA-64 体系结构的 Intel Itanium 处理器中，就有一个包含 2 位 CPL（ Current Privilege Level，当前特权级别）字段的处理器状态寄存器（PSR）。级别 0 是最高特权级别，级别 3 是最低特权级别。多数操作系统（如 Linux）为内核模式使用级别 0，为用户模式使用其他级别。发生中断时，处理器会清空 PSR 中的大部分位，包括 CPL 字段。这会自动地将 CPL 设置为级别 0。中断处理例程末尾的最后一个指令是IRT（ Interrupt Return，中断返回），它会使得处理器恢复中断程序的 PSR，即恢复该程序的特权级别。应用程序进行系统调用时，会出现类似的顺序。对于 Itanium 而言，应用程序通过如下方式实现系统调用：将系统调用标识符和参数放到一个预定义的区域，然后执行一个特殊指令中断用户模式下的程序执行，将控制权交给内核。</p>
+<h2 id="进程的切换"><a href="#进程的切换" class="headerlink" title="进程的切换"></a>进程的切换</h2><h3 id="进程切换的时机"><a href="#进程切换的时机" class="headerlink" title="进程切换的时机"></a>进程切换的时机</h3><p>进程切换可在操作系统从当前正运行进程中获得控制权的任何时刻发生。下表给出了可能把控制权交给操作系统的事件。</p>
+<p><img src="/images/OS/%E8%BF%9B%E7%A8%8B%E6%89%A7%E8%A1%8C%E7%9A%84%E4%B8%AD%E6%96%AD%E6%9C%BA%E5%88%B6.png"></p>
+<p>首先考虑系统中断。实际上，大多数操作系统都会区分两种系统中断：一种称为中断，另一种称为陷阱。前者与当前正运行进程无关的某种外部事件相关，如完成一次 IO 操作；后者与当前正运行进程产生的错误或异常条件相关，如非法的文件访问。对于普通中断，控制权首先转给中断处理器，中断处理器完成一些基本的辅助工作后，再将控制权转给与已发生的特定中断相关的操作系统例程。</p>
+<p>下面举几个例子：</p>
+<p>时钟中断：操作系统确定当前正运行进程的执行时间是否已超过最大允许时间段 [ 时间片（time slice），即进程中断前可以执行的最大时间段 ]。若超过，进程就切换到就绪态，并调入另一个进程。</p>
+<p>IO 中断：操作系统确定是否已发生 IO 活动。若 IO 活动是一个或多个进程正在等待的事件，则操作系统就把所有处于阻塞态的进程转换为就绪态（阻塞&#x2F;挂起态进程转换为就绪&#x2F;挂起态）。操作系统必须决定是继续执行当前处于运行态的进程，还是让具有高优先级的就绪态进程抢占这个进程。</p>
+<p>内存失效：处理器遇到一个引用不在内存中的字的虚存地址时，操作系统就必须从外存中把包含这一引用的内存块（页或段）调入内存。发出调入内存块的 IO 请求后，内存失效进程将进入阻塞态；操作系统然后切换进程，恢复另一个进程的执行。期望的块调入内存后，该进程置为就绪态。</p>
+<p>对于陷阱（ trap ），操作系统则确定错误或异常条件是否致命。致命时，当前正运行进程置为退出态，并切换进程；不致命时，操作系统的动作将取决于错误的性质和操作系统的设计，操作系统可能会尝试恢复程序，或简单地通知用户。操作系统可能会切换进程，或继续当前运行的进程。</p>
+<p>最后，操作系统可被来自正执行程序的系统调用（ supervisor call ）激活。例如，正运行用户进程执行了一个请求 IO 操作的指令（如打开文件），这时该调用会转移到作为操作系统代码一部分的个例程。使用系统调用时会将用户进程置为阻塞态。</p>
+<h3 id="模式切换"><a href="#模式切换" class="headerlink" title="模式切换"></a>模式切换</h3><p>在中断阶段，处理器会根据出现的中断信号来检査中断是否出现。无中断出现时，处理器会继续取指阶段，并在当前进程中取当前程序的下一条指令；出现中断时，处理器会做如下工作：</p>
+<ol>
+<li>将程序计数器置为中断处理程序的开始地址。</li>
+<li>从用户模式切换到内核模式，以便中断处理代码包含特权指令。</li>
+</ol>
+<p>处理器现在继续取指阶段，并取中断处理程序的第一条指令来服务该中断。此时，将已中断进程的上下文保存到已中断程序的进程控制块中。</p>
+<p>现在的问题是，保存的上下文包括哪些内容？答案是，它必须包含中断处理程序可能改变的所有信息，以及恢复被中断程序时所需要的所有信息。因此，必须保存称为处理器状态信息的进程控制块部分，包括程序计数器、其他处理器寄存器和栈信息。</p>
+<p>还需要做哪些工作？这取决于下一步会发生什么。中断处理程序通常是执行一些与中断相关的基本任务的小程序。例如，它会重置表示中断出现的标志或指示器，为发出中断的实体如IO模块发送应答，做一些与中断事件的影响相关的辅助工作。例如，若中断与 IO 事件有关，则中断处理程序检査错误条件；若发生了错误，则中断处理程序给最初请求 IO 操作的进程发一个信号。若是时钟中断，则处理程序把控制权移交给分派器，由分派器将控制权传递给另一个进程，因为给当前运行进程分配的时间片已用尽。</p>
+<p>进程控制块中的其他信息如何处理？若中断之后切换到另一个应用程序，则需要做一些工作。但在多数操作系统中，中断发生后并不一定进行进程切换。可能的情况是，执行中断处理程序后，继续执行正运行的进程。此时，所要做的工作是发生中断时保存处理器状态信息，并在控制权返回给该程序时恢复这些信息。保存和恢复功能通常由硬件实现。</p>
+<h3 id="进程状态的变化"><a href="#进程状态的变化" class="headerlink" title="进程状态的变化"></a>进程状态的变化</h3><p>进程状态的变化显然，模式切换与进程切换是不同的。模式切换可在不改变运行态进程的状态的情况下出现。此时保存上下文并在以后恢复上下文仅需很少的开销。但是，若当前正运行进程将转换为另一状态（就绪、阻塞等），则操作系统必须使环境产生实质性的变化。完整的进程切换步骤如下：</p>
+<ol>
+<li>保存处理器的上下文，包括程序计数器和其他寄存器。</li>
+<li>更新当前处于运行态进程的进程控制块，包括把进程的状态改变为另一状态（就绪态、阻塞态、就绪&#x2F;挂起态或退出态）。还须更新其他相关的字段，包括退出运行态的原因和记账信息。</li>
+<li>把该进程的进程控制块移到相应的队列（就绪、在事件处阻塞、就绪&#x2F;挂起）。</li>
+<li>选择另一个进程执行。</li>
+<li>更新所选进程的进程控制块，包括把进程的状态改为运行态。</li>
+<li>更新内存管理数据结构。是否需要更新取决于管理地址转换的方式。</li>
+<li>载入程序计数器和其他寄存器先前的值，将处理器的上下文恢复为所选进程上次退出运行态时的上下文。</li>
+</ol>
+<p>因此，涉及状态变化的进程切换与模式切换相比，要做的工作更多。</p>
+<h1 id="操作系统的执行"><a href="#操作系统的执行" class="headerlink" title="操作系统的执行"></a>操作系统的执行</h1><h2 id="无进程内核"><a href="#无进程内核" class="headerlink" title="无进程内核"></a>无进程内核</h2><p>在许多老操作系统中，传统且通用的一种方法是在所有进程外部执行操作系统内核（见下图 a）。</p>
+<p><img src="/images/OS/%E5%88%86%E7%A6%BB%E7%9A%84%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8.png"></p>
+<p>采用这种方法时，若当前正运行进程被中断或产生一个系统调用，则会保存该进程的模式上下文，并将控制权转交给内核。操作系统本身具有控制过程调用和返回的内存区域与系统栈。操作系统可执行任何预期的功能，并恢复被中断进程的上下文，恢复中断用户进程的执行；操作系统也可保存进程的模式上下文，并继续调度和分派另一个进程，但是否这样做取决于中断的原因和当前的情况无论哪种情况，关键都是进程这一概念仅适用于用户程序，而操作系统代码则是在特权模式下单独运行的实体。</p>
+<h2 id="用户进程内运行"><a href="#用户进程内运行" class="headerlink" title="用户进程内运行"></a>用户进程内运行</h2><p>较小计算机（PC、工作站）的操作系统通常采用另一种方法，即在用户进程的上下文中执行所有操作系统软件。此时，操作系统是用户调用的一组例程，它在用户进程的环境内执行并实现各种功能（如下图 b）。</p>
+<p><img src="/images/OS/%E5%9C%A8%E7%94%A8%E6%88%B7%E8%BF%9B%E7%A8%8B%E5%86%85%E6%89%A7%E8%A1%8C%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E4%BE%8B%E7%A8%8B.png"></p>
+<p>仼何时刻操作系统都管理着 n 个进程映像，这些映像不仅包括下图中列出的区域，还包括内核程序的程序、数据和栈区域。下图给出了该策略下的典型进程映像结构。当进程在内核模式下运行时，单独的内核栈用于管理调用&#x2F;返回。操作系统代码和数据位于共享地址空间中，并被所有用户进程共享。</p>
+<img src="/images/OS/进程映像.png" style="zoom: 50%;" />
+
+<p>发生中断、陷阱或系统调用时，处理器置于内核模式，控制权转交给操作系统。要把控制杈从用户程序转交给操作系统，需要保存模式上下文并切换模式，再切换到一个操作系统例程，但此时仍然是在当前的用户进程内继续执行，不需要切换进程，只是在同一进程中切换模式操作系统完成操作后，需要继续运行当前的进程，则会切换模式以在当前进程内恢复已中断的程序。这种方法的关键优点是：中断一个用户程序，使用某些操作系统例程，然后恢复用户程序，所有这些都不会招致两次进程切换的惩罚。然而，若确认将出现进程切换而非返回到先前正执行的程序，则控制权会传递给一个进程切换例程，进程切换例程是否在当前进程中执行，则取决于系统的设计。然而，在某些特殊情况下，当前进程必须置于非运行态，而另一个进程则指定为正运行进程。此时，将执行视为发生在所有进程外部逻辑上最为方便。</p>
+<p>这种看待操作系统的方式很独特。有时，会保存一个进程的状态信息，从就绪态进程中选择另一个进程，并把控制权交给这个新进程。这种混乱但并不任意情况的原因是，关键时候用户进程中执行的代码是共享的操作系统代码而非用户代码。根据用户模式和内核模式的概念，即使操作系统例程在用户进程环境内执行，用户也不能篡改或干涉操作系统例程。这进一步表明进程和程序并不相同，即它们之间并非一对一的关系。在一个进程内，用户程序和操作系统程序都可执行，而在不同用户进程中执行的操作系统程序是相同的。</p>
+<h2 id="基于进程的操作系统"><a href="#基于进程的操作系统" class="headerlink" title="基于进程的操作系统"></a>基于进程的操作系统</h2><p>下图所示的另一种方法是把操作系统作为一组系统进程来实现。</p>
+<p><img src="/images/OS/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E4%BE%8B%E7%A8%8B%E4%BD%9C%E4%B8%BA%E5%88%86%E7%A6%BB%E7%9A%84%E8%BF%9B%E7%A8%8B%E6%89%A7%E8%A1%8C.png"></p>
+<p>类似于其他方法，该软件是在内核对模式下运行的内核的一部分。但在这种情况下，主要的内核功能被组织为独立的进程同样，此时存在一些在任何进程之外执行的进行切换代码这种方法有几个优点。首先，它利用了鼓励使用模块化操作系统的程序设计原理，可使模块间的接口最小且最简单。其次，有些非关键操作系统功能可简单地用独立的进程来实现，例如前面提及的监视各种资源（处理器、内存、通道）利用率和系统中用户进程进展状态的程序。因为这种程序不向任何活动进程提供特殊的服务，因此只能被操作系统调用。作为一个进程，这一功能可以任何指定的优先级在分派器的控制下与其他进程交替执行。第三，把操作系统作为一组进程来实现时，在多处理器或多机环境中很有用，因此此时为提高性能，有些操作系统服务可传送到专用的处理上执行。</p>
+<h1 id="UNIX-SVR4进程管理"><a href="#UNIX-SVR4进程管理" class="headerlink" title="UNIX SVR4进程管理"></a>UNIX SVR4进程管理</h1><p>UNIX System V 使用了一种对用户可见的简单但功能强大的进程机制。UNIX 采用了用户进程内运行的模型，在该模型中操作系统的大部分都在用户进程环境内执行。UNIX 使用了两类进程，即系统进程和用户进程。系统进程在内核模式下运行，执行操作系统代码来实现管理功能和内部处理，如内存空间的分配和进程交换；用户进程则在用户模式下运行并执行用户程序和实用程序，在内核模式下运行并执行属于内核的指令。当产生异常（错误）、发生中断或用户进程发出系统调用时，用户进程可进入内核模式。</p>
+<h2 id="进程状态-1"><a href="#进程状态-1" class="headerlink" title="进程状态"></a>进程状态</h2><p>UNIX 操作系统中共有 9 种进程状态，两个 UNIX 休眠态对应上述进程状态的阻塞态和阻塞挂起态。不同如下：</p>
+<ul>
+<li><p>UNIX 采用两个运行态表示进程是在用户模式下执行还是在内核模式下执行。</p>
+</li>
+<li><p>UNIX 区分两种状态，即内存中的就绪态和被抢占态。从本质上说，它们是同一状态，如图中它们间的虚线所示。之所以区分这两个状态，是为了强调进入被抢占状态的方式。当一个进程在内核模式下运行（系统调用、时钟中断或 IO 中断的结果），且内核已完成了其任务并准备把控制权返回给用户程序时，就可能会出现抢占的时机。这时，内核可能决定抢占当前进程，转而支持另一个已就绪并具有较高优先级的进程。在这种情况下，当前进程转换为被抢占态，但为了分派处理，处于被抢占态的进程和在内存中处理就绪态的进程就构成了一个队列。</p>
+</li>
+</ul>
+<p><img src="/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81.png"></p>
+<p><img src="/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81%E8%BD%AC%E6%8D%A2%E5%9B%BE.png"></p>
+<p>只有在进程准备从内核模式转换到用户模式时才可能发生抢占，进程在内核模式下运行时不会被抢占，因此 UNIX 不适用于实时处理。有关实时处理需求的讨论后面会介绍。</p>
+<p>UNIX 中有两个独特的进程。进程 0 是一个特殊的进程，它是在系统启动时创建的。实际上，它是启动时加载的一个预定义数据结构，是交换程序进程。此外，进程 0 产生称为初始进程的进程 1，进程 1 是系统中所有其他进程的祖先。当新的交互用户登录到系统时，进程 1 会为该用户创建一个用户进程。随后，用户进程创建构成分支树的子进程，因此任何应用程序都由一组相关的进程组成。</p>
+<h2 id="进程描述-1"><a href="#进程描述-1" class="headerlink" title="进程描述"></a>进程描述</h2><p>UNIX 中的进程是一组相当复杂的数据结构，这些数据结构为操作系统提供管理进程和分派进程所需的全部信息。下表概括了进程映像中的元素，这些元素分为三部分：用户级上下文、寄存器上下文和系统级上下文。</p>
+<p><img src="/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E6%98%A0%E5%83%8F.png"></p>
+<p>用户级上下文（ user-level context ）包含用户程序的基本元素，它可直接由已编辑的目标文件生成。用户程序分为正文和数据两个区域，正文区只读，用于保存程序指令。执行进程时，处理器使用用户栈区域调用过程、返回结果并传递能数。共享内存区是与其他进程共享的数据区域，它只有个物理副本，但使用虚存时，共享内存区的每个共享进程看上去都位于其地址空间中。进程未运行时，处理器状态信息保存在寄存器上下文（ register context ）区域中。</p>
+<p>系统级上下文（ system- level context ）包含操作系统管理进程所需的其余信息，它由静态部分和动态部分组成，静态部分的大小在进程的生命周期内固定不变，动态部分的大小在进程的生命周期内可变。静态部分的一个元素是进程表项，它实际上是由操作系统维护的进程表的一部分，每个进程一个表项。进程表项包含内核总可访问的进程控制信息。因此，在虚存系统中，所有的进程表项都位于内存中。 下表列出了进程表项的内容。</p>
+<p><img src="/images/OS/UNIX%E8%BF%9B%E7%A8%8B%E8%A1%A8%E9%A1%B9.png"></p>
+<p>用户区（即U区）包含内核在进程上下文中执行时所需的其他进程控制信息，从内存中调入或调出进程时也会用到这些控制信息。下表列出了这些信息。</p>
+<p><img src="/images/OS/UNIX%E7%9A%84%E7%94%A8%E6%88%B7%E5%8C%BA.png"></p>
+<p>进程表项和用户区的区别反映了 UNIX 内核总在某些进程的上下文中执行的事实。多数时候内核都处理与该进程相关的部分，但在内核执行调度算法来分派另一个进程时，则需要访问其他进程的相关信息。给定进程不是当前进程时，可以访问进程表中的信息。</p>
+<p>系统级上下文的第三个静态部分是由内存管理系统使用的本进程区表。最后，内核栈是系统级上下文的动态部分。进程在内核模式下执行时需要使用内核栈，它包含出现过程调用和中断时，必须保存和恢复的信息。</p>
+<h2 id="进程控制-1"><a href="#进程控制-1" class="headerlink" title="进程控制"></a>进程控制</h2><p>UNIX 中的进程创建是由内核系统调用 fork 实现的。一个进程发出一个 fork 请求时，操作系统执行如下功能：</p>
+<ol>
+<li>在进程表中为新进程分配一个空项。</li>
+<li>为子进程分配一个唯一进程标识符</li>
+<li>复制父进程的进程映像，但共享内存除外。</li>
+<li>增加父进程所拥有文件的计数器，反映另一个进程现在也拥有这些文件的事实。</li>
+<li>将子进程置为就绪态。</li>
+<li>将子进程的 ID 号返回给父进程，将 0 值返回给子进程。</li>
+</ol>
+<p>所有这些工作都在父进程的内核模式下完成。内核完成这些功能后，可继续分派器例程工作一部分的如下三种操作之一：</p>
+<ul>
+<li>停留在父进程中。控制权返回到用户模式下父进程调用 fork 的位置。</li>
+<li>处理器控制权交给子进程。子进程开始执行代码，执行点与父进程相同，即在 fork 调用的返回处。</li>
+<li>控制权转交给另一个进程。父进程和子进程都置于就绪态。</li>
+</ul>
+<p>很难想象在这种创建进程的方法中，父进程和子进程都执行相同的代码。区别在于：从 fork 调用返回时，测试返回参数。若值为零，则它是子进程，此时可转移到相应的用户程序中继续执行；若值非零，则它是父进程，此时继续执行主程序。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Operation-System/" rel="tag"># Operation System</a>
+              <a href="/tags/Process/" rel="tag"># Process</a>
+              <a href="/tags/Unix/" rel="tag"># Unix</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/02/04/Network-%E7%BD%91%E7%BB%9C%E5%8C%85%E7%9A%84%E6%97%85%E7%A8%8B/" rel="prev" title="Network 网络包的旅程">
+      <i class="fa fa-chevron-left"></i> Network 网络包的旅程
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/02/08/OS-%E7%BA%BF%E7%A8%8B/" rel="next" title="OS 线程">
+      OS 线程 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E5%92%8C%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6%E5%9D%97"><span class="nav-number">1.</span> <span class="nav-text">进程和进程控制块</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81"><span class="nav-number">2.</span> <span class="nav-text">进程状态</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E5%88%87%E6%8D%A2%E7%9A%84%E8%BF%87%E7%A8%8B"><span class="nav-number">2.1.</span> <span class="nav-text">进程切换的过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%A4%E7%8A%B6%E6%80%81%E8%BF%9B%E7%A8%8B%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.2.</span> <span class="nav-text">两状态进程模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%88%9B%E5%BB%BA%E4%B8%8E%E7%BB%88%E6%AD%A2"><span class="nav-number">2.3.</span> <span class="nav-text">进程的创建与终止</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E7%8A%B6%E6%80%81%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.4.</span> <span class="nav-text">五状态模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8E%92%E9%98%9F%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.5.</span> <span class="nav-text">排队模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%82%E8%B5%B7%E7%9A%84%E7%BA%BF%E7%A8%8B"><span class="nav-number">2.6.</span> <span class="nav-text">挂起的线程</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%8F%8F%E8%BF%B0"><span class="nav-number">3.</span> <span class="nav-text">进程描述</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%8E%A7%E5%88%B6%E7%BB%93%E6%9E%84"><span class="nav-number">3.1.</span> <span class="nav-text">操作系统的控制结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6%E7%BB%93%E6%9E%84"><span class="nav-number">3.2.</span> <span class="nav-text">进程控制结构</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E4%BD%8D%E7%BD%AE"><span class="nav-number">3.2.1.</span> <span class="nav-text">进程位置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E5%B1%9E%E6%80%A7"><span class="nav-number">3.2.2.</span> <span class="nav-text">进程属性</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6"><span class="nav-number">4.</span> <span class="nav-text">进程控制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E6%A8%A1%E5%BC%8F"><span class="nav-number">4.1.</span> <span class="nav-text">执行模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%9A%84%E5%88%87%E6%8D%A2"><span class="nav-number">4.2.</span> <span class="nav-text">进程的切换</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E5%88%87%E6%8D%A2%E7%9A%84%E6%97%B6%E6%9C%BA"><span class="nav-number">4.2.1.</span> <span class="nav-text">进程切换的时机</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A8%A1%E5%BC%8F%E5%88%87%E6%8D%A2"><span class="nav-number">4.2.2.</span> <span class="nav-text">模式切换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81%E7%9A%84%E5%8F%98%E5%8C%96"><span class="nav-number">4.2.3.</span> <span class="nav-text">进程状态的变化</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F%E7%9A%84%E6%89%A7%E8%A1%8C"><span class="nav-number">5.</span> <span class="nav-text">操作系统的执行</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%A0%E8%BF%9B%E7%A8%8B%E5%86%85%E6%A0%B8"><span class="nav-number">5.1.</span> <span class="nav-text">无进程内核</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E8%BF%9B%E7%A8%8B%E5%86%85%E8%BF%90%E8%A1%8C"><span class="nav-number">5.2.</span> <span class="nav-text">用户进程内运行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E8%BF%9B%E7%A8%8B%E7%9A%84%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F"><span class="nav-number">5.3.</span> <span class="nav-text">基于进程的操作系统</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#UNIX-SVR4%E8%BF%9B%E7%A8%8B%E7%AE%A1%E7%90%86"><span class="nav-number">6.</span> <span class="nav-text">UNIX SVR4进程管理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E7%8A%B6%E6%80%81-1"><span class="nav-number">6.1.</span> <span class="nav-text">进程状态</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%8F%8F%E8%BF%B0-1"><span class="nav-number">6.2.</span> <span class="nav-text">进程描述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E6%8E%A7%E5%88%B6-1"><span class="nav-number">6.3.</span> <span class="nav-text">进程控制</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

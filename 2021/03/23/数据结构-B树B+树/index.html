@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="介绍了 B 树和 B+ 树的定义及操作，并对比了两者之间的特点。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数据结构 B树和B+树">
+<meta property="og:url" content="http://example.com/2021/03/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-B%E6%A0%91B+%E6%A0%91/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="介绍了 B 树和 B+ 树的定义及操作，并对比了两者之间的特点。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A51.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A52.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A53.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A54.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A55.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A41.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A42.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A43.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A44.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A45.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A46.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A47.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A48.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A49.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A51.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A52.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A53.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A54.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A41.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A42.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A43.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A44.png">
+<meta property="article:published_time" content="2021-03-23T09:30:28.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.598Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Data Structure">
+<meta property="article:tag" content="B树">
+<meta property="article:tag" content="B+树">
+<meta property="article:tag" content="树">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A51.png">
+
+<link rel="canonical" href="http://example.com/2021/03/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-B%E6%A0%91B+%E6%A0%91/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>数据结构 B树和B+树 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/03/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-B%E6%A0%91B+%E6%A0%91/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          数据结构 B树和B+树
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-03-23 17:30:28" itemprop="dateCreated datePublished" datetime="2021-03-23T17:30:28+08:00">2021-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Data-Structure/" itemprop="url" rel="index"><span itemprop="name">Data Structure</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>介绍了 B 树和 B+ 树的定义及操作，并对比了两者之间的特点。</p>
+<span id="more"></span>
+
+<h1 id="B树"><a href="#B树" class="headerlink" title="B树"></a>B树</h1><p>B 树也称 B- 树，它是一颗多路平衡查找树。二叉树我想大家都不陌生，其实，B 树和后面讲到的 B+ 树也是从最简单的二叉树变换而来的，下面我们来看看 B 树的定义（）。</p>
+<blockquote>
+<p>假设有 m 阶的 B 树，阶数表示了一个节点最多有多少个孩子节点。</p>
+</blockquote>
+<ul>
+<li>每个节点最多有 m-1 个<strong>关键字</strong>（可以存有的键值对）。</li>
+<li>根节点最少可以只有 1 个<strong>关键字</strong>。</li>
+<li>非根节点至少有 m&#x2F;2 个<strong>关键字</strong>。</li>
+<li>每个节点中的关键字都按照从小到大的顺序排列，每个关键字的左子树中的所有关键字都小于它，而右子树中的所有关键字都大于它。</li>
+<li>所有叶子节点都位于同一层，或者说根节点到每个叶子节点的长度都相同。</li>
+<li>每个节点都存有索引和数据，也就是对应的 key 和 value。</li>
+</ul>
+<p>所以，根节点的<strong>关键字</strong>数量范围：<code>1 &lt;= k &lt;= m-1</code>，非根节点的<strong>关键字</strong>数量范围：<code>m/2 &lt;= k &lt;= m-1</code>。</p>
+<p>我们再举个例子来说明一下上面的概念，比如这里有一个5阶的B树，根节点数量范围：1 &lt;&#x3D; k &lt;&#x3D; 4，非根节点数量范围：2 &lt;&#x3D; k &lt;&#x3D; 4。</p>
+<h2 id="B树的插入操作"><a href="#B树的插入操作" class="headerlink" title="B树的插入操作"></a>B树的插入操作</h2><p>插入的时候，我们需要记住一个规则：<strong>判断当前结点 key 的个数是否小于等于 m-1，如果满足，直接插入即可，如果不满足，将节点的中间的 key 将这个节点分为左右两部分，中间的节点放到父节点中即可。</strong></p>
+<p>例子：在 5 阶 B 树中，结点最多有 4 个 key，最少有 2 个 key（注意：下面的节点统一用一个节点表示 key 和 value）。</p>
+<ul>
+<li>插入18，70，50,40</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A51.png"></p>
+<ul>
+<li>插入22</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A52.png"></p>
+<p>插入 22 时，发现这个节点的关键字已经大于 4 了，所以需要进行分裂，分裂的规则在上面已经讲了，分裂之后，如下。</p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A53.png"></p>
+<ul>
+<li>接着插入23，25，39</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A54.png"></p>
+<p>分裂，得到下面的。</p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E6%8F%92%E5%85%A55.png"></p>
+<p>更多的插入的过程就不多介绍了，相信有这个例子你已经知道怎么进行插入操作了。</p>
+<h2 id="B树的删除操作"><a href="#B树的删除操作" class="headerlink" title="B树的删除操作"></a>B树的删除操作</h2><p>B 树的删除操作相对于插入操作是相对复杂一些的，但是，你知道记住几种情况，一样可以很轻松的掌握的。</p>
+<ul>
+<li>现在有一个初始状态是下面这样的B树，然后进行删除操作。</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A41.png"></p>
+<ul>
+<li>删除15，这种情况是删除叶子节点的元素，如果删除之后，节点数还是大于<code>m/2</code>，这种情况只要直接删除即可。</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A42.png"></p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A43.png"></p>
+<ul>
+<li>接着，我们把22删除，这种情况的规则：22是非叶子节点，<strong>对于非叶子节点的删除，我们需要用后继key（元素）覆盖要删除的key，然后在后继key所在的子支中删除该后继key</strong>。对于删除22，需要将后继元素24移到被删除的22所在的节点。</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A44.png"></p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A45.png"></p>
+<p>此时发现26所在的节点只有一个元素，小于2个（m&#x2F;2），这个节点不符合要求，这时候的规则（向兄弟节点借元素）：<strong>如果删除叶子节点，如果删除元素后元素个数少于（m&#x2F;2），并且它的兄弟节点的元素大于（m&#x2F;2），也就是说兄弟节点的元素比最少值m&#x2F;2还多，将先将父节点的元素移到该节点，然后将兄弟节点的元素再移动到父节点</strong>。这样就满足要求了。</p>
+<p>我们看看操作过程就更加明白了。</p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A46.png"></p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A47.png"></p>
+<ul>
+<li>接着删除28，<strong>删除叶子节点</strong>，删除后不满足要求，所以，我们需要考虑向兄弟节点借元素，但是，兄弟节点也没有多的节点（2个），借不了，怎么办呢？如果遇到这种情况，<strong>首先，还是将先将父节点的元素移到该节点，然后，将当前节点及它的兄弟节点中的key合并，形成一个新的节点</strong>。</li>
+</ul>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A48.png"></p>
+<p>移动之后，跟兄弟节点合并。</p>
+<p><img src="/images/DataStructure/B%E6%A0%91%E5%88%A0%E9%99%A49.png"></p>
+<p>删除就只有上面的几种情况，根据不同的情况进行删除即可。</p>
+<h1 id="B-树"><a href="#B-树" class="headerlink" title="B+树"></a>B+树</h1><p>B+ 树其实和 B 树是非常相似的。</p>
+<p><strong>相同点</strong></p>
+<ul>
+<li>根节点至少一个元素</li>
+<li>非根节点元素范围：m&#x2F;2 &lt;&#x3D; k &lt;&#x3D; m-1</li>
+</ul>
+<p><strong>不同点</strong></p>
+<ul>
+<li>B+ 树有两种类型的节点：内部结点（也称索引结点）和叶子结点。内部节点就是非叶子节点，内部节点不存储数据，只存储索引，数据都存储在叶子节点。</li>
+<li>内部结点中的 key 都按照从小到大的顺序排列，对于内部结点中的一个 key，左树中的所有 key 都小于它，右子树中的 key 都大于等于它。叶子结点中的记录也按照 key 的大小排列。</li>
+<li>每个叶子结点都存有相邻叶子结点的指针，叶子结点本身依关键字的大小自小而大顺序链接。</li>
+<li>父节点存有右孩子的第一个元素的索引。</li>
+</ul>
+<p>下面我们看一个 B+ 树的例子，感受感受它吧！</p>
+<p><img src="/images/DataStructure/B+%E6%A0%91.png"></p>
+<h2 id="B-树的插入操作"><a href="#B-树的插入操作" class="headerlink" title="B+树的插入操作"></a>B+树的插入操作</h2><p>对于插入操作很简单，只需要记住一个技巧即可：<strong>当节点元素数量大于 m-1 的时候，按中间元素分裂成左右两部分，中间元素分裂到父节点当做索引存储，但是，本身中间元素还是分裂右边这一部分的</strong>。</p>
+<p>下面以一颗 5 阶 B+ 树的插入过程为例，5 阶 B+ 树的节点最少 2 个元素，最多 4 个元素。</p>
+<ul>
+<li>插入5，10，15，20</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A51.png"></p>
+<ul>
+<li>插入25，此时元素数量大于4个了，分裂</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A52.png"></p>
+<ul>
+<li>接着插入26，30，继续分裂</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A53.png"></p>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E6%8F%92%E5%85%A54.png"></p>
+<p>有了这几个例子，相信插入操作没什么问题了，下面接着看看删除操作。</p>
+<h2 id="B-树的删除操作"><a href="#B-树的删除操作" class="headerlink" title="B+树的删除操作"></a>B+树的删除操作</h2><p>对于删除操作是比B树简单一些的，因为<strong>叶子节点有指针的存在，向兄弟节点借元素时，不需要通过父节点了，而是可以直接通过兄弟节移动即可（前提是兄弟节点的元素大于 m&#x2F;2 ），然后更新父节点的索引；如果兄弟节点的元素不大于 m&#x2F;2（兄弟节点也没有多余的元素），则将当前节点和兄弟节点合并，并且删除父节点中的 key</strong>，下面我们看看具体的实例。</p>
+<ul>
+<li>初始状态</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A41.png"></p>
+<ul>
+<li>删除10，删除后，不满足要求，发现左边兄弟节点有多余的元素，所以去借元素，最后，修改父节点索引</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A42.png"></p>
+<ul>
+<li>删除元素5，发现不满足要求，并且发现左右兄弟节点都没有多余的元素，所以，可以选择和兄弟节点合并，最后修改父节点索引</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A43.png"></p>
+<ul>
+<li>发现父节点索引也不满足条件，所以，需要做跟上面一步一样的操作</li>
+</ul>
+<p><img src="/images/DataStructure/B+%E6%A0%91%E5%88%A0%E9%99%A44.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Data-Structure/" rel="tag"># Data Structure</a>
+              <a href="/tags/B%E6%A0%91/" rel="tag"># B树</a>
+              <a href="/tags/B-%E6%A0%91/" rel="tag"># B+树</a>
+              <a href="/tags/%E6%A0%91/" rel="tag"># 树</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/22/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E7%BA%A2%E9%BB%91%E6%A0%91/" rel="prev" title="数据结构 红黑树">
+      <i class="fa fa-chevron-left"></i> 数据结构 红黑树
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/24/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E4%BA%8C%E5%8F%89%E6%A0%91/" rel="next" title="数据结构 二叉树">
+      数据结构 二叉树 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#B%E6%A0%91"><span class="nav-number">1.</span> <span class="nav-text">B树</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#B%E6%A0%91%E7%9A%84%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C"><span class="nav-number">1.1.</span> <span class="nav-text">B树的插入操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#B%E6%A0%91%E7%9A%84%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C"><span class="nav-number">1.2.</span> <span class="nav-text">B树的删除操作</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#B-%E6%A0%91"><span class="nav-number">2.</span> <span class="nav-text">B+树</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#B-%E6%A0%91%E7%9A%84%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C"><span class="nav-number">2.1.</span> <span class="nav-text">B+树的插入操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#B-%E6%A0%91%E7%9A%84%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C"><span class="nav-number">2.2.</span> <span class="nav-text">B+树的删除操作</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

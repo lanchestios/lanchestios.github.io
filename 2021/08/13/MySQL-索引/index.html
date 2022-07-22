@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="InnoDB 存储引擎支持以下几种常见的索引：B+ 树索引、全文索引、哈希索引。 InnoDB 存储引擎会根据表的使用情况自动为表生成哈希索引，不能人为干预。B+ 树索引是传统意义上的索引。它并不能找到一个给定键值的具体行，它能找到的只是被查找数据行所在的页。然后数据库通过把页读人到内存，再在内存中进行查找，最后得到要查找的数据。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 索引">
+<meta property="og:url" content="http://example.com/2021/08/13/MySQL-%E7%B4%A2%E5%BC%95/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="InnoDB 存储引擎支持以下几种常见的索引：B+ 树索引、全文索引、哈希索引。 InnoDB 存储引擎会根据表的使用情况自动为表生成哈希索引，不能人为干预。B+ 树索引是传统意义上的索引。它并不能找到一个给定键值的具体行，它能找到的只是被查找数据行所在的页。然后数据库通过把页读人到内存，再在内存中进行查找，最后得到要查找的数据。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MySQL/%E8%81%9A%E9%9B%86%E7%B4%A2%E5%BC%95.png">
+<meta property="og:image" content="http://example.com/images/MySQL/%E8%BE%85%E5%8A%A9%E7%B4%A2%E5%BC%95.png">
+<meta property="article:published_time" content="2021-08-13T11:47:25.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.616Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="Index">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MySQL/%E8%81%9A%E9%9B%86%E7%B4%A2%E5%BC%95.png">
+
+<link rel="canonical" href="http://example.com/2021/08/13/MySQL-%E7%B4%A2%E5%BC%95/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>MySQL 索引 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/08/13/MySQL-%E7%B4%A2%E5%BC%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL 索引
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-08-13 19:47:25" itemprop="dateCreated datePublished" datetime="2021-08-13T19:47:25+08:00">2021-08-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>InnoDB 存储引擎支持以下几种常见的索引：B+ 树索引、全文索引、哈希索引。</p>
+<p>InnoDB 存储引擎会根据表的使用情况自动为表生成哈希索引，不能人为干预。B+ 树索引是传统意义上的索引。它并不能找到一个给定键值的具体行，它能找到的只是被查找数据行所在的页。然后数据库通过把页读人到内存，再在内存中进行查找，最后得到要查找的数据。</p>
+<span id="more"></span>
+
+<h1 id="B-树索引"><a href="#B-树索引" class="headerlink" title="B+ 树索引"></a>B+ 树索引</h1><p>在数据库中，B+ 树的高度一般都在 2 ～ 4 层，这也就是说查找某一键值的行记录最多只需要 2 到 4 次 IO。当前一般的机械磁盘每秒至少可以做 100 次 IO，2 ~ 4 次的 IO 意味着查询时间只需 0.02~0.04 秒。</p>
+<p>数据库中的 B+ 树索引可以分为聚集索引（clustered index）和辅助索引（secondary<br>index），但是不管是聚集还是辅助的索引，其内部都是 B+ 树的，即高度平衡的。聚集索引与辅助索引不同的是，聚集索引叶子节点存放的是一整行的信息，非聚集索引叶子结点存放的是索引键值和偏移量。</p>
+<h2 id="聚集索引"><a href="#聚集索引" class="headerlink" title="聚集索引"></a>聚集索引</h2><p>InnoDB 存储引擎表是索引组织表，即表中数据按照主键顺序存放。而聚集索引（clustered index）就是按照每张表的主键构造一棵 B+ 树，同时叶子节点中存放的即为整张表的行记录数据，也将聚集索引的叶子节点称为数据页。聚集索引的这个特性决定了索引组织表中数据也是索引的一部分。同 B+ 树数据结构一样，每个数据页都通过一个双向链表来进行链接。</p>
+<p><img src="/images/MySQL/%E8%81%9A%E9%9B%86%E7%B4%A2%E5%BC%95.png"></p>
+<p>由于实际的数据页只能按照一棵 B+ 树进行排序，因此每张表只能拥有一个聚集索引。在多数情况下，查询优化器倾向于采用聚集索引。因为聚集索引能够在 B+ 树索引的叶子节点上直接找到数据。此外，由于定义了数据的逻辑顺序，聚集索引能够特别快地访问针对范围值的查询。查询优化器能够快速发现某一段范围的数据页需要扫描。</p>
+<h2 id="非聚集索引"><a href="#非聚集索引" class="headerlink" title="非聚集索引"></a>非聚集索引</h2><p>非聚集索引（non-clustered index）也叫辅助索引。叶子节点并不包含行记录的全部数据。叶子节点除了包含键值以外，每个叶子节点中的索引行中还包含了一个书签（bookmark）。该书签用来告诉 InnoDB 存储引擎哪里可以找到与索引相对应的行数据。由于 InnoDB 存储引擎表是索引组织表，因此 InnoDB 存储引擎的非聚集索引的书签就是相应行数据的聚集索引键。</p>
+<p>非聚集索引的存在并不影响数据在聚集索引中的组织，因此每张表上可以有多个非聚集索引。当通过非聚集索引来寻找数据时，InnoDB 存储引擎会遍历非聚集索引并通过叶级别的指针获得指向主键索引的主键，然后再通过主键索引来找到一个完整的行记录。</p>
+<p>对于其他的一些数据库，如 Microsoft SQL Server 数据库，其有一种称为堆表的表类型，即行数据的存储按照插入的顺序存放。这与 MySQL 数据库的 MyISAM 存储引擎有些类似。堆表的特性决定了堆表上的索引都是非聚集的，主键与非主键的区别只是是否唯一且非空（NOT NULL）。因此这时书签是一个行标识符（Row Identifiedr, RID），可以用如“文件号:页号:槽号”的格式来定位实际的行数据。</p>
+<p>有的 Microsoft SQL Server 数据库 DBA 问过我这样的问题，为什么在 Microsoft SQL Server 数据库上还要使用索引组织表？堆表的书签使非聚集查找可以比主键书签方式更快，并且非聚集可能在一张表中存在多个，我们需要对多个非聚集索引进行查找。而且对于非聚集索引的离散读取，索引组织表上的非聚集索引会比堆表上的聚集索引慢一些。</p>
+<p>当然，在一些情况下，使用堆表的确会比索引组织表更快，但是我觉得大部分原因是由于存在 OLAP（On-Line Analytical Processing,在线分析处理）的应用。其次就是前面提到的，表中数据是否需要更新，并且更新是否影响到物理地址的变更。此外另一个不能忽视的是对于排序和范围查找，索引组织表通过 B+ 树的中间节点就可以找到要查找的所有页，然后进行读取，而堆表的特性决定了这对其是不能实现的。最后，非聚集索引的离散读，的确存在上述的情况，但是一般的数据库都通过实现预读（read ahead）技术来避免多次的离散读操作。因此，具体是建堆表还是索引组织表，这取决于应用，不存在哪个更优的问题。这和 InnoDB 存储引擎好还是 MyISAM 存储引擎好这个问题的答案是一样的，It all depends。</p>
+<p><img src="/images/MySQL/%E8%BE%85%E5%8A%A9%E7%B4%A2%E5%BC%95.png"></p>
+<h2 id="Cardinality-值"><a href="#Cardinality-值" class="headerlink" title="Cardinality 值"></a>Cardinality 值</h2><p>对于取值范围很广的字段，使用 B+ 树的索引是非常合适的，即属于高选择性。而像性别这种类型的数据，可能通过索引搜索出来的是数据库 50% 的数据，称为低选择性。</p>
+<p>怎样查看索引是否是高选择性的呢?可以通过 SHOW INDEX 结果中的列 Cardinality 来观察。Cardinality 值非常关键，表示索引中不重复记录数量的预估值。同时需要注意的是，Cardinality 是一个预估值，而不是一个准确值，基本上用户也不可能得到一个准确的值。在实际应用中，Cardinality&#x2F;n_rows_in_table 应尽可能地接近1。如果非常小，那么用户需要考虑是否还有必要创建这个索引。故在访问高选择性属性的字段并从表中取出很少一部分数据时，对这个字段添加 B+ 树索引是非常有必要的。</p>
+<h1 id="单表访问方式"><a href="#单表访问方式" class="headerlink" title="单表访问方式"></a>单表访问方式</h1><ol>
+<li><p>all</p>
+<p>全表扫描，直接扫描全部的聚簇索引。</p>
+</li>
+<li><p>const</p>
+<p>通过主键或唯一二级索引与常数的等值比较定位一条记录。</p>
+</li>
+<li><p>ref &#x2F; ref_or_null</p>
+<p>通过普通二级索引列与常数（或 null）的等值比较扫描少量记录。</p>
+<blockquote>
+<p>  由于普通二级索引并不限制索引列值的唯一性， 所以位于常数扫描区间中的二级索引记录可能有多条，此时使用二级索引执行查询的代价就取决于该扫描区间中的记录条数。如果该扫描区间中的记录较少，则回表操作的代价还是比较低的。</p>
+</blockquote>
+</li>
+<li><p>range</p>
+<p>通过索引进行查询时，对应的扫描区间为若干个单点扫描区间或者范围扫描区间。</p>
+</li>
+<li><p>index</p>
+<p>通过索引进行查询时，需要扫描全部二级索引记录的单表访问方式。</p>
+<p>举例：现有表 single_table 其有联合索引 <code>idx_key( key1, key2, key3 )</code> </p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> key1<span class="token punctuation">,</span> key2<span class="token punctuation">,</span> key3 <span class="token keyword">FROM</span> single_table <span class="token keyword">WHERE</span> key2 <span class="token operator">=</span> <span class="token number">12</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>以下查询过程符合下面两个条件：</p>
+<ul>
+<li>查询 key1, key2, key3，而联合索引又恰好包含这三列</li>
+<li>搜索条件为 key2，包含在索引中，但不是最左</li>
+</ul>
+<p>显然这种搜索对应的扫描区间是 <code>(-INF,+INF)</code>，由于二级索引记录（包含索引列和主键）比聚簇索引（包含用户定义的字段和隐藏列）记录小的多，因此扫描全部内容的成本也低很多，且不需要回表查。</p>
+</li>
+</ol>
+<h1 id="索引的使用"><a href="#索引的使用" class="headerlink" title="索引的使用"></a>索引的使用</h1><h2 id="索引使用时注意事项"><a href="#索引使用时注意事项" class="headerlink" title="索引使用时注意事项"></a>索引使用时注意事项</h2><ol>
+<li>只为用于搜索、排序或分组的列创建索引（缩小扫描范围）</li>
+<li>考虑索引列中不重复值的个数（太多重复值会导致回表查操作次数过多）</li>
+<li>索引列的类型尽量小（缩小索引树所占用的空间，减少加载时的 IO 次数）</li>
+<li>为列前缀建立索引（加快长字符串的查询效率）</li>
+<li>查询时覆盖索引（查询列表只包含索引列，省去回表查的性能损耗）</li>
+</ol>
+<h2 id="索引失效的原因"><a href="#索引失效的原因" class="headerlink" title="索引失效的原因"></a>索引失效的原因</h2><h3 id="优化器不选择使用索引"><a href="#优化器不选择使用索引" class="headerlink" title="优化器不选择使用索引"></a>优化器不选择使用索引</h3><p>MySQL 数据库支持索引提示（INDEX HINT）。在大多数情况下，优化器都会正常而有效的工作，但在比如索引非常多的场景下，优化器选择执行计划本身就是比较耗时的操作，通过 Index Hint 来强制优化器使用某个索引。我们可以通过 USE INDEX 提示优化器使用某索引，也可以通过 FORCE INDEX 强制优化器使用某个索引，避免 MYSQL 的自动优化。提示并不代表优化器一定会接纳，强制会可靠的保证该执行方案的如期进行。</p>
+<blockquote>
+<p>  <strong>优化器为什么不用索引？</strong></p>
+<p>  如果查询语句通过二级索引扫描到的区间内数据占总数据量的比例非常高，因此有大量需要回表查的数据行。由于要读取很多 ID 值并不连续的聚簇索引记录，而且这些聚簇索引记录分布在不同的数据页中，这些数据页的页号也毫无规律，因此会造成大量的随机 I&#x2F;O。因此其效率甚至还低于全表扫描。</p>
+<p>  <strong>优化器什么时候不用索引？</strong></p>
+<p>  查询优化器会事先针对表中的记录计算一些统计数据， 然后再利用这些统计数据或者访问表中的少量记录来计算需要执行回表操作的记录数。如果需要执行回表操作的记录数越多，就越倾向于使用全表扫描，反之则倾向于使用二级索引+回表的方式。</p>
+</blockquote>
+<h3 id="导致索引失效的场景"><a href="#导致索引失效的场景" class="headerlink" title="导致索引失效的场景"></a>导致索引失效的场景</h3><ol>
+<li><strong>对索引使用函数</strong></li>
+</ol>
+<blockquote>
+<p>select id from std upper(name) &#x3D; ‘JIM’;</p>
+</blockquote>
+<ol start="2">
+<li><strong>对索引进行运算</strong></li>
+</ol>
+<blockquote>
+<p>select id from std where id+1&#x3D;10;<br>正确的做法应该是：<br>select id from std where id&#x3D;10-1; </p>
+</blockquote>
+<ol start="3">
+<li><strong>对索引使用&lt;&gt; 、not in 、not exist、!&#x3D;</strong></li>
+</ol>
+<blockquote>
+<p>select id from std where name !&#x3D; ‘jim’;</p>
+</blockquote>
+<ol start="4">
+<li><strong>对索引进行前导模糊查询</strong></li>
+</ol>
+<blockquote>
+<p>select id from std name like ‘%jim’;</p>
+</blockquote>
+<ol start="5">
+<li><strong>隐式转换会导致不走索引</strong></li>
+</ol>
+<blockquote>
+<p>比如：字符串类型索引字段不加引号，select id from std name &#x3D; 100;保持变量类型与字段类型一致</p>
+</blockquote>
+<ol start="6">
+<li><strong>非索引字段的or连接</strong></li>
+</ol>
+<blockquote>
+<p>并不是所有的or都会使索引失效，如果or连接的所有字段都设置了索引，是会走索引的，一旦有一个字段没有索引，就会走全表扫描。</p>
+</blockquote>
+<ol start="7">
+<li><strong>联合索引仅包含复合索引非前置列</strong></li>
+</ol>
+<blockquote>
+<p>联合索引包含 key1，key2，key3 三列，但 SQL 语句没有 key1，根据联合索引的最左匹配原则，不会走联合索引。如：select name from table where key2&#x3D;1 and key3&#x3D;2;</p>
+</blockquote>
+<h2 id="Multi-Range-Read-优化"><a href="#Multi-Range-Read-优化" class="headerlink" title="Multi-Range Read 优化"></a>Multi-Range Read 优化</h2><p>Multi-Range Read 优化的目的就是为了减少磁盘的随机访问，并且将随机访问转化为较为顺序的数据访问，这对于 IO-bound 类型的 SQL 查询语句可带来性能极大的提升。Multi-Range Read 优化可适用于 range，ref，eq_ref 类型的查询。</p>
+<p>对于 InnoDB 和 MyISAM 存储引擎的范围查询和 JOIN 查询操作，MRR 的工作方式如下：</p>
+<ul>
+<li>将查询得到的辅助索引键值存放于一个缓存中，这时缓存中的数据是根据辅助索引键值排序的。</li>
+<li>将缓存中的键值根据 Row ID 进行排序。</li>
+<li>根据 Row ID 的排序顺序来访问实际的数据文件。</li>
+</ul>
+<p>此外，若 InnoDB 存储引擎或者 MyISAM 存储引擎的缓冲池不是足够大，即不能存放下一张表中的所有数据，此时频繁的离散读操作还会导致缓存中的页被替换出缓冲池，然后又不断地被读入缓冲池。若是按照主键顺序进行访问，则可以将此重复行为降为最低。</p>
+<h2 id="Index-Condition-Pushdown（ICP）优化"><a href="#Index-Condition-Pushdown（ICP）优化" class="headerlink" title="Index Condition Pushdown（ICP）优化"></a>Index Condition Pushdown（ICP）优化</h2><p>Index Condition Pushdown（ICP）是一种根据索引进行查询的优化方式。在不支持 ICP 时，当进行索引查询时，首先根据索引来查询记录，然后再根据 Where 条件来过滤记录。在支持 ICP 后，MySQL 数据库会在取出来索引的同时，判断是否可以进行 Where 条件的过滤，也就是将 Where 部分的过滤操作放在了存储引擎层。在某些查询下可以大大减少上层 SQL 层对记录的索取（fetch），从而提高数据库的整体性能。ICP 优化支持 range、ref、eq_ref、ref_or_null 类型的查询。当前支持 InnoDB 和 MyISAM 存储引擎。</p>
+<h2 id="索引合并优化"><a href="#索引合并优化" class="headerlink" title="索引合并优化"></a>索引合并优化</h2><p>索引优化需要区间二级索引记录按照主键排序</p>
+<h3 id="优化前索引查询方式"><a href="#优化前索引查询方式" class="headerlink" title="优化前索引查询方式"></a>优化前索引查询方式</h3><p>以使用索引查询为前提，通过下述 SQL 举例：</p>
+<pre class="line-numbers language-SQL" data-language="SQL"><code class="language-SQL">SELECT * FROM single_table WHERE key1 &#x3D; &#39;a&#39; AND key3 &#x3D; &#39;b&#39;;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>已知表使用 idx_key1 索引执行该查询，此时对应的扫描区间就是 <code>[&#39;a&#39;, &#39;a&#39;]</code>。对于获取到的每条二级索引记录，根据它的 ID 值执行回表操作后获取到完整的用户记录，再判断 <code>key3 = &#39;b&#39;</code> 条件是否成立。</p>
+<p>这里需要注意，扫描区间 <code>[&#39;a&#39;,&#39;a&#39;]</code> 是一个单点扫描区间，也就是说位于该区间中的二级索引记录，其 key1 列的值都为 ‘a’。这也就意味着这些二级索引记录其实是按照主键值进行排序的。</p>
+<h3 id="Intersection-交集-索引合并"><a href="#Intersection-交集-索引合并" class="headerlink" title="Intersection (交集)索引合并"></a>Intersection (交集)索引合并</h3><p>在索引根据主键排序的前提下，使用多个索引查询到的主键进行取交集操作，再执行回表查的优化方式。</p>
+<p>从优化前索引查询方式我们可看出，对多个索引的查询方式要面临多余的回表查操作，我们可以通过对每个索引查询到的主键取交集，筛选掉大多数不符合的条目，后回表查得出结果即可。</p>
+<p>具体查询步骤如下：</p>
+<ol>
+<li>先从 idx_key1 索引的扫描区间 <code>[&#39;a&#39;, &#39;a&#39;]</code> 中取出第一条二级索引记录，该记录的主键值为 1。然后从 idx_key3 索引的扫描区间 <code>[&#39;b&#39;, &#39;b&#39;]</code> 中取出第一条二级索引记录，该记录的主键值为 2。因为 1&lt;2，所以直接把从 idx_key1 索引中取出的那条主键值为 1 的二级索引记录丢弃。</li>
+<li>接着继续从 idx_ key1 索引的扫描区间 <code>[&#39;a&#39;, &#39;a&#39;]</code> 中取出下一条二级索引记录，该记录的主键值为 3。步骤 1 中从 idx_ key3 索引的扫描区间<code>[&#39;b, &#39;b&#39;]</code> 中取出的二级索引记录的主键值为 2。因为 3&gt;2， 所以直接把步骤 1 中从 idx_ key3 索引的扫描区间 <code>[&#39;b&#39;, &#39;b&#39;]</code> 中取出的主键值为 2 的那条二级索引记录丢弃。</li>
+<li>接着继续从 idx_key3 索引的扫描区间 <code>[&#39;b&#39;, &#39;b&#39;]</code> 中取出下一条二级索引记录，该记录的主键值为 3。步骤 2 中从 idx_key1 索引的扫描区间 <code>[&#39;a&#39;, &#39;a&#39;]</code> 中取出的二级索引记录的主键值为 3。因为 3&#x3D;3，也就意味着获取主键交集成功，然后根据该主键值执行回表操作，获取到完整的用户记录后将其发送给客户端。</li>
+<li>接着重复上述步骤，直至查询结束</li>
+</ol>
+<blockquote>
+<p>  <code>SELECT * FROM single_table WHERE key1 = &#39;a&#39; AND id &gt; 9000</code> 也可通过 Intersection 索引合并优化。</p>
+</blockquote>
+<h3 id="Union-并集-索引合并"><a href="#Union-并集-索引合并" class="headerlink" title="Union (并集)索引合并"></a>Union (并集)索引合并</h3><p>与 Intersection (交集)索引合并基本类似，只是支持 or 语法的并集索引合并。</p>
+<h3 id="索引合并失效场景"><a href="#索引合并失效场景" class="headerlink" title="索引合并失效场景"></a>索引合并失效场景</h3><p>索引合并执行的重要条件是二级索引记录按照主键值排序，而二级索引&#x2F;联合索引记录的排序方式是按照 <code>(idx_key1, idx_key2, ...，主键)</code> 的顺序排序，以下方式并不能得到主键顺序的二级索引记录值：</p>
+<ol>
+<li>联合索引 <code>idx_key_part(part1,part2,part3)</code>，如果 WHERE 条件是 <code>part1 = 3</code> 则返回的二级索引记录顺序为按照 part2 排序，不能与其他索引查询条件组成索引合并的优化场景。而如果 WHERE 条件是 <code>part1 = 1 AND part2 = 2 AND part3 = 3</code> 则返回的二级索引记录顺序为按照主键排序，能与其他索引查询条件组成索引合并的优化场景。</li>
+<li>二级索引 idx_key1，如果 WHERE 条件是 <code>idx_key1 &gt; &#39;a&#39;</code>，返回的二级索引记录顺序按照 idx_key 排序，不能与其他索引查询条件组成索引合并的优化场景。而如果 WHERE 条件是 <code>key = 1</code> 则返回的二级索引记录顺序为按照主键排序，能与其他索引查询条件组成索引合并的优化场景。</li>
+</ol>
+<h3 id="Sort-Union-索引合并"><a href="#Sort-Union-索引合并" class="headerlink" title="Sort-Union 索引合并"></a>Sort-Union 索引合并</h3><p>对于 Union 索引合并的适用条件过于苛刻，因此有了 Sort-Union 索引合并，即先将从各个索引中扫描到的记录的主键值进行排序，再按照执行 Union 索引合并的方式进行查询。</p>
+<p>因此，我们可以对以下 SQL 语句使用 Sort-Union 索引合并：</p>
+<pre class="line-numbers language-SQL" data-language="SQL"><code class="language-SQL">SELECT * FROM single_table WHERE key1 &lt; &#39;a&#39; OR key3 &gt; &#39;z&#39;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<h3 id="Sort-Intersection-索引合并"><a href="#Sort-Intersection-索引合并" class="headerlink" title="Sort-Intersection 索引合并"></a>Sort-Intersection 索引合并</h3><p>为啥有 Sort-Union 索引合并，而没有 Sort-Intersection 索引合并呢？是的，在 MySQL 中确实没有 Sort-Intersection 索引合并这一说，不过在 MySQL 的近亲——MariaDB 数据库中实现了 Sort-Intersection 索引合并。</p>
+<p>按照我的理解，Sort-Union 索引合并针对的是“单独根据搜索条件从某个二级索引中获取的记录数比较少”的使用场景，这样即使对这些二级索引记录按照主键值进行排序，成本也不会太高。而 Intersection 索引合并针对的是“单独根据搜索条件从某个二级索引中获取的记录数太多，导致回表成本太大”的使用场景，使用 Intersaction 索引合并后可以明显降低回表成本。但是，如果加入 Sort-Intersection 索引合并，就需要为大量的二级索引记录按照主键值进行排序，这个成本可能比使用单个二级索引执行查询的成本都要高。</p>
+<h2 id="全文检索优化"><a href="#全文检索优化" class="headerlink" title="全文检索优化"></a>全文检索优化</h2><p>全文检索（Full-Text Search）是将存储于数据库中的整本书或整篇文章中的任意内容信息查找出来的技术。它可以根据需要获得全文中有关章、节、段、句、词等信息，也可以进行各种统计和分析。</p>
+<p>在之前的 MySQL 数据库中，InnoDB 存储引擎并不支持全文检索技术。大多数的用户转向 MyISAM 存储引擎，这可能需要进行表的拆分，并将需要进行全文检索的数据存储为 MyISAM 表。这样的确能够解决逻辑业务的需求，但是却丧失了 InnoDB 存储引擎的事务性，而这在生产环境应用中同样是非常关键的。</p>
+<p>从 InnoDB 1.2.x 版本开始，InnoDB 存储引擎开始支持全文检索，其支持 MyISAM 存储引擎的全部功能。InnoDB 采用 full inverted index 的方式。在 InnoDB 存储引擎中，将（Document Id, Position）视为一个“ilist”。因此在全文检索的表中，有两个列，一个是 word 字段，另一个是 ilist 字段，并且在 word 字段上有设有索引。此外，由于 InnoDB 存储引擎在 ilist 字段中存放了 Position 信息，故可以进行 Proximity Search，而 MyISAM 存储引擎不支持该特性。</p>
+<p>正如之前所说的那样，倒排索引需要将 word 存放到一张表中，这个表称为 Auxiliary Table （辅助表）。在 InnoDB 存储引擎中，为了提高全文检索的并行性能，共有 6 张 Auxiliary Table，目前每张表根据 word 的 Latin 编码进行分区。</p>
+<p>Auxiliary Table 是持久的表，存放于磁盘上。然而在 InnoDB 存储引擎的全文索引中，还有另外一个重要的概念 FTS Index Cache（全文检索索引缓存），其用来提高全文检索的性能。</p>
+<p>FTS Index Cache 是一个红黑树结构，其根据（word， ilist）进行排序。这意味着插入的数据已经更新了对应的表，但是对全文索引的更新可能在分词操作后还在 FTS Index Cache 中，Auxiliary Table 可能还没有更新。InnoDB 存储引擎会批量对 Auxiliary Table 进行更新，而不是每次插人后更新一次 Auxiliary Table。当对全文检索进行查询时，Auxiliary Table 首先会将在 FTS Index Cache 中对应的 word 字段合并到 Auxiliary Table 中，然后再进行查询。这种 merge 操作非常类似之前介绍的 Insert Buffer 的功能，不同的是 Insert Buffer 是一个持久的对象，并且其是 B+ 树的结构。然而 FTS Index Cache 的作用又和 Insert Buffer 是类似的，它提高了 InnoDB 存储引擎的性能，并且由于其根据红黑树排序后进行批量插入，其产生的 Auxiliary Table 相对较小。</p>
+<blockquote>
+<p>  需要注意的是 DML 操作并不能删除索引，需要进行额外的删除操作，例如 OPTIMIZE TABLE。</p>
+</blockquote>
+<p>如果想使用全文检索，可以使用 MATCH …. AGAINST …. 语法。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/Index/" rel="tag"># Index</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/12/MySQL-%E8%A1%A8/" rel="prev" title="MySQL 表">
+      <i class="fa fa-chevron-left"></i> MySQL 表
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/17/MySQL-%E9%94%81/" rel="next" title="MySQL 锁">
+      MySQL 锁 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#B-%E6%A0%91%E7%B4%A2%E5%BC%95"><span class="nav-number">1.</span> <span class="nav-text">B+ 树索引</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E9%9B%86%E7%B4%A2%E5%BC%95"><span class="nav-number">1.1.</span> <span class="nav-text">聚集索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%9E%E8%81%9A%E9%9B%86%E7%B4%A2%E5%BC%95"><span class="nav-number">1.2.</span> <span class="nav-text">非聚集索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Cardinality-%E5%80%BC"><span class="nav-number">1.3.</span> <span class="nav-text">Cardinality 值</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%95%E8%A1%A8%E8%AE%BF%E9%97%AE%E6%96%B9%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">单表访问方式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E7%9A%84%E4%BD%BF%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">索引的使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E4%BD%BF%E7%94%A8%E6%97%B6%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="nav-number">3.1.</span> <span class="nav-text">索引使用时注意事项</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E5%A4%B1%E6%95%88%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">3.2.</span> <span class="nav-text">索引失效的原因</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%98%E5%8C%96%E5%99%A8%E4%B8%8D%E9%80%89%E6%8B%A9%E4%BD%BF%E7%94%A8%E7%B4%A2%E5%BC%95"><span class="nav-number">3.2.1.</span> <span class="nav-text">优化器不选择使用索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%BC%E8%87%B4%E7%B4%A2%E5%BC%95%E5%A4%B1%E6%95%88%E7%9A%84%E5%9C%BA%E6%99%AF"><span class="nav-number">3.2.2.</span> <span class="nav-text">导致索引失效的场景</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Multi-Range-Read-%E4%BC%98%E5%8C%96"><span class="nav-number">3.3.</span> <span class="nav-text">Multi-Range Read 优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Index-Condition-Pushdown%EF%BC%88ICP%EF%BC%89%E4%BC%98%E5%8C%96"><span class="nav-number">3.4.</span> <span class="nav-text">Index Condition Pushdown（ICP）优化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6%E4%BC%98%E5%8C%96"><span class="nav-number">3.5.</span> <span class="nav-text">索引合并优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%98%E5%8C%96%E5%89%8D%E7%B4%A2%E5%BC%95%E6%9F%A5%E8%AF%A2%E6%96%B9%E5%BC%8F"><span class="nav-number">3.5.1.</span> <span class="nav-text">优化前索引查询方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Intersection-%E4%BA%A4%E9%9B%86-%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6"><span class="nav-number">3.5.2.</span> <span class="nav-text">Intersection (交集)索引合并</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Union-%E5%B9%B6%E9%9B%86-%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6"><span class="nav-number">3.5.3.</span> <span class="nav-text">Union (并集)索引合并</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6%E5%A4%B1%E6%95%88%E5%9C%BA%E6%99%AF"><span class="nav-number">3.5.4.</span> <span class="nav-text">索引合并失效场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Sort-Union-%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6"><span class="nav-number">3.5.5.</span> <span class="nav-text">Sort-Union 索引合并</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Sort-Intersection-%E7%B4%A2%E5%BC%95%E5%90%88%E5%B9%B6"><span class="nav-number">3.5.6.</span> <span class="nav-text">Sort-Intersection 索引合并</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%A8%E6%96%87%E6%A3%80%E7%B4%A2%E4%BC%98%E5%8C%96"><span class="nav-number">3.6.</span> <span class="nav-text">全文检索优化</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

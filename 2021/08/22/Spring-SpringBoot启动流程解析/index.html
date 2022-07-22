@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Spring Boot 是由 Pivotal 团队提供的全新框架，其设计目的是用来简化新 Spring 应用的初始搭建以及开发过程。该框架使用了特定的方式来进行配置，从而使开发人员不再需要定义样板化的配置。通过这种方式，Spring Boot 致力于在蓬勃发展的快速应用开发领域（rapid application development）成为领导者。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SpringBoot 启动流程解析">
+<meta property="og:url" content="http://example.com/2021/08/22/Spring-SpringBoot%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Spring Boot 是由 Pivotal 团队提供的全新框架，其设计目的是用来简化新 Spring 应用的初始搭建以及开发过程。该框架使用了特定的方式来进行配置，从而使开发人员不再需要定义样板化的配置。通过这种方式，Spring Boot 致力于在蓬勃发展的快速应用开发领域（rapid application development）成为领导者。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Spring/DefaultBootstrapContext.png">
+<meta property="article:published_time" content="2021-08-22T11:55:24.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.545Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Spring">
+<meta property="article:tag" content="SpringBoot">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Spring/DefaultBootstrapContext.png">
+
+<link rel="canonical" href="http://example.com/2021/08/22/Spring-SpringBoot%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>SpringBoot 启动流程解析 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/08/22/Spring-SpringBoot%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          SpringBoot 启动流程解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-08-22 19:55:24" itemprop="dateCreated datePublished" datetime="2021-08-22T19:55:24+08:00">2021-08-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Spring Boot 是由 Pivotal 团队提供的全新框架，其设计目的是用来简化新 Spring 应用的初始搭建以及开发过程。该框架使用了特定的方式来进行配置，从而使开发人员不再需要定义样板化的配置。通过这种方式，Spring Boot 致力于在蓬勃发展的快速应用开发领域（rapid application development）成为领导者。</p>
+<span id="more"></span>
+
+<h1 id="SpringBoot-启动过程"><a href="#SpringBoot-启动过程" class="headerlink" title="SpringBoot 启动过程"></a>SpringBoot 启动过程</h1><p>在建立 SpringBoot 项目时，一般会提供一个 ProjectApplication 类用来启动服务。因此可以将整个过程切分为两步：创建一个 SpringApplication 的启动器、执行它的 run 方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">SpringApplication</span><span class="token punctuation">.</span><span class="token function">run</span><span class="token punctuation">(</span><span class="token class-name">DemoApplication</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">ConfigurableApplicationContext</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> primarySources<span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">SpringApplication</span><span class="token punctuation">(</span>primarySources<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">run</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token class-name">ConfigurableApplicationContext</span> <span class="token function">run</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">StopWatch</span> stopWatch <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">StopWatch</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    stopWatch<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">DefaultBootstrapContext</span> bootstrapContext <span class="token operator">=</span> <span class="token function">createBootstrapContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">ConfigurableApplicationContext</span> context <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+    <span class="token function">configureHeadlessProperty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">SpringApplicationRunListeners</span> listeners <span class="token operator">=</span> <span class="token function">getRunListeners</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    listeners<span class="token punctuation">.</span><span class="token function">starting</span><span class="token punctuation">(</span>bootstrapContext<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>mainApplicationClass<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">ApplicationArguments</span> applicationArguments <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DefaultApplicationArguments</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">ConfigurableEnvironment</span> environment <span class="token operator">=</span> <span class="token function">prepareEnvironment</span><span class="token punctuation">(</span>listeners<span class="token punctuation">,</span> bootstrapContext<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">configureIgnoreBeanInfo</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Banner</span> printedBanner <span class="token operator">=</span> <span class="token function">printBanner</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        context <span class="token operator">=</span> <span class="token function">createApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        context<span class="token punctuation">.</span><span class="token function">setApplicationStartup</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>applicationStartup<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">prepareContext</span><span class="token punctuation">(</span>bootstrapContext<span class="token punctuation">,</span> context<span class="token punctuation">,</span> environment<span class="token punctuation">,</span> listeners<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">,</span> printedBanner<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">refreshContext</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">afterRefresh</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        stopWatch<span class="token punctuation">.</span><span class="token function">stop</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>logStartupInfo<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">new</span> <span class="token class-name">StartupInfoLogger</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>mainApplicationClass<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">logStarted</span><span class="token punctuation">(</span><span class="token function">getApplicationLog</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> stopWatch<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        listeners<span class="token punctuation">.</span><span class="token function">started</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">callRunners</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">handleRunFailure</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> ex<span class="token punctuation">,</span> listeners<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalStateException</span><span class="token punctuation">(</span>ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        listeners<span class="token punctuation">.</span><span class="token function">running</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">handleRunFailure</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> ex<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalStateException</span><span class="token punctuation">(</span>ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> context<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们可以先不关心 SpringApplication 做了什么，先看一下 SpringBoot 的生命周期。</p>
+<h1 id="SpringBoot-生命周期"><a href="#SpringBoot-生命周期" class="headerlink" title="SpringBoot 生命周期"></a>SpringBoot 生命周期</h1><p>我们可以重点关注一下 SpringApplicationRunListeners 类。它将 Spring Application 的生命周期划分为以下几个过程：</p>
+<ul>
+<li>starting（spring.boot.application.starting）</li>
+<li>environment prepared（spring.boot.application.environment-prepared）</li>
+<li>context prepared（spring.boot.application.context-prepared）</li>
+<li>context loaded（spring.boot.application.context-loaded）</li>
+<li>started（spring.boot.application.started）</li>
+<li>running（spring.boot.application.running）</li>
+<li>failed（spring.boot.application.failed）</li>
+</ul>
+<p>对于 Spring Application 的启动，总过程可以被分为两阶段：第一阶段是通过 BootstrapContext 将 Application Context 所需要的扩展环境和扩展组件都加载好；第二阶段是运行 Application Context。</p>
+<p>因此还可以将以上生命周期做更为详细的切分。如下：</p>
+<ul>
+<li>BootstrapContext 启动器加载必要的环境和组件<ul>
+<li>starting（spring.boot.application.starting）</li>
+<li>environment prepared（spring.boot.application.environment-prepared）</li>
+<li>context prepared（spring.boot.application.context-prepared）</li>
+</ul>
+</li>
+<li>Application Context 应用运行提供服务<ul>
+<li>context loaded（spring.boot.application.context-loaded）</li>
+<li>started（spring.boot.application.started）</li>
+<li>running（spring.boot.application.running）</li>
+</ul>
+</li>
+</ul>
+<p>首先，我们需要了解一下 SpringApplicationRunListeners 的作用。以 starting 为例，说明其功能：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">void starting(ConfigurableBootstrapContext bootstrapContext, 
+              Class&lt;?&gt; mainApplicationClass) &#123;
+    &#x2F;&#x2F; 当 APP 到达 starting 状态时（其他状态也是相同的操作），调取 doWithListeners 函数
+    doWithListeners(
+        &quot;spring.boot.application.starting&quot;, 
+        (listener) -&gt; listener.starting(bootstrapContext),
+        (step) -&gt; &#123;
+            if (mainApplicationClass !&#x3D; null) &#123;
+                step.tag(&quot;mainApplicationClass&quot;, mainApplicationClass.getName());
+            &#125;
+        &#125;
+    );
+&#125;
+
+&#x2F;&#x2F; 该方法的生命周期控制（即前处理、执行后处理、结束前处理）由 StartupStep 触发，分为四步：
+&#x2F;&#x2F; 1. 触发 starting 生命周期 listener 调用前事件
+&#x2F;&#x2F; 2. 调用注册的 SpringApplicationRunListener 监听器
+&#x2F;&#x2F; 3. 触发 starting 生命周期 listener 调用后事件
+&#x2F;&#x2F; 4. 触发 starting 生命周期 listener 调用结束事件
+private void doWithListeners(String stepName, 
+                             Consumer&lt;SpringApplicationRunListener&gt; listenerAction, 
+                             Consumer&lt;StartupStep&gt; stepAction) &#123;
+    StartupStep step &#x3D; this.applicationStartup.start(stepName);
+    this.listeners.forEach(listenerAction);
+    if (stepAction !&#x3D; null) &#123;
+        stepAction.accept(step);
+    &#125;
+    step.end();
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>对于启动失败的情况，由于涉及到异常处理等问题，因此与其他生命周期处理方式不同，但是也大同小异。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">void failed(ConfigurableApplicationContext context, Throwable exception) &#123;
+    doWithListeners(&quot;spring.boot.application.failed&quot;,
+                    (listener) -&gt; callFailedListener(listener, context, exception), (step) -&gt; &#123;
+                        step.tag(&quot;exception&quot;, exception.getClass().toString());
+                        step.tag(&quot;message&quot;, exception.getMessage());
+                    &#125;);
+&#125;
+
+private void callFailedListener(SpringApplicationRunListener listener, 
+                                ConfigurableApplicationContext context,
+                                Throwable exception) &#123;
+    try &#123;
+        listener.failed(context, exception);
+    &#125;
+    catch (Throwable ex) &#123;
+        if (exception &#x3D;&#x3D; null) &#123;
+            ReflectionUtils.rethrowRuntimeException(ex);
+        &#125;
+        &#x2F;&#x2F;... ignore some code
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="starting-阶段"><a href="#starting-阶段" class="headerlink" title="starting 阶段"></a>starting 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 刚刚讲过的 SpringApplicationRunListeners，为 SpringBoot 启动提供生命周期的 Listener 机制。</span>
+<span class="token class-name">SpringApplicationRunListeners</span> listeners <span class="token operator">=</span> <span class="token function">getRunListeners</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 创建准备 ApplicationContext 运行环境的 BootstrapContext</span>
+<span class="token comment">// 在 starting 和 environment prepared 生命周期，会被当作入参传入 listener。</span>
+<span class="token class-name">DefaultBootstrapContext</span> bootstrapContext <span class="token operator">=</span> <span class="token function">createBootstrapContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">starting</span><span class="token punctuation">(</span>bootstrapContext<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>mainApplicationClass<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="environment-prepare-阶段"><a href="#environment-prepare-阶段" class="headerlink" title="environment prepare 阶段"></a>environment prepare 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//ApplicationArguments 是 SpringApplication.run(ProjectApplication.class, args) 中对入参 args 的封装</span>
+<span class="token class-name">ApplicationArguments</span> applicationArguments <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DefaultApplicationArguments</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//根据 WebApplicationType 加载对应的环境</span>
+<span class="token class-name">ConfigurableEnvironment</span> environment <span class="token operator">=</span> <span class="token function">getOrCreateEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">configureEnvironment</span><span class="token punctuation">(</span>environment<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">.</span><span class="token function">getSourceArgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">ConfigurationPropertySources</span><span class="token punctuation">.</span><span class="token function">attach</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">environmentPrepared</span><span class="token punctuation">(</span>bootstrapContext<span class="token punctuation">,</span> environment<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="context-prepare-阶段"><a href="#context-prepare-阶段" class="headerlink" title="context prepare 阶段"></a>context prepare 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">DefaultPropertiesPropertySource</span><span class="token punctuation">.</span><span class="token function">moveToEnd</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">Assert</span><span class="token punctuation">.</span><span class="token function">state</span><span class="token punctuation">(</span><span class="token operator">!</span>environment<span class="token punctuation">.</span><span class="token function">containsProperty</span><span class="token punctuation">(</span><span class="token string">"spring.main.environment-prefix"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token string">"Environment prefix cannot be set via properties."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">bindToSpringApplication</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>isCustomEnvironment<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   environment <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EnvironmentConverter</span><span class="token punctuation">(</span><span class="token function">getClassLoader</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">convertEnvironmentIfNecessary</span><span class="token punctuation">(</span>environment<span class="token punctuation">,</span>
+         <span class="token function">deduceEnvironmentClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token class-name">ConfigurationPropertySources</span><span class="token punctuation">.</span><span class="token function">attach</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">configureIgnoreBeanInfo</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">//创建 Context</span>
+<span class="token comment">//根据 APP 的类型会创建如下 Application Context</span>
+<span class="token comment">//SERVLET -> AnnotationConfigServletWebServerApplicationContext</span>
+<span class="token comment">//REACTIVE -> AnnotationConfigReactiveWebServerApplicationContext</span>
+<span class="token comment">//NONE -> AnnotationConfigApplicationContext</span>
+context <span class="token operator">=</span> <span class="token function">createApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//设置生命周期回调</span>
+context<span class="token punctuation">.</span><span class="token function">setApplicationStartup</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>applicationStartup<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//设置环境变量</span>
+context<span class="token punctuation">.</span><span class="token function">setEnvironment</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//后处理</span>
+<span class="token function">postProcessApplicationContext</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">//调用注册的 ApplicationContextInitializer Listener</span>
+<span class="token function">applyInitializers</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">contextPrepared</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+bootstrapContext<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span> <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="context-load-阶段"><a href="#context-load-阶段" class="headerlink" title="context load 阶段"></a>context load 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 把 args 参数当作 Bean 注入到容器中</span>
+<span class="token class-name">ConfigurableListableBeanFactory</span> beanFactory <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getBeanFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+beanFactory<span class="token punctuation">.</span><span class="token function">registerSingleton</span><span class="token punctuation">(</span><span class="token string">"springApplicationArguments"</span><span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>lazyInitialization<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   context<span class="token punctuation">.</span><span class="token function">addBeanFactoryPostProcessor</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">LazyInitializationBeanFactoryPostProcessor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token comment">// Load the sources</span>
+<span class="token class-name">Set</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> sources <span class="token operator">=</span> <span class="token function">getAllSources</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token class-name">Assert</span><span class="token punctuation">.</span><span class="token function">notEmpty</span><span class="token punctuation">(</span>sources<span class="token punctuation">,</span> <span class="token string">"Sources must not be empty"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">load</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> sources<span class="token punctuation">.</span><span class="token function">toArray</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">contextLoaded</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="start-阶段"><a href="#start-阶段" class="headerlink" title="start 阶段"></a>start 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 调用 ApplicationContext 中的 refresh 重新加载应用</span>
+<span class="token function">refreshContext</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 模板方法，供重载实现</span>
+<span class="token function">afterRefresh</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">started</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="running-阶段"><a href="#running-阶段" class="headerlink" title="running 阶段"></a>running 阶段</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 调用 ApplicationRunner 和 CommandLineRunner 接口的实现类</span>
+<span class="token function">callRunners</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+   listeners<span class="token punctuation">.</span><span class="token function">running</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token function">handleRunFailure</span><span class="token punctuation">(</span>context<span class="token punctuation">,</span> ex<span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalStateException</span><span class="token punctuation">(</span>ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="SpringBoot-环境变量加载"><a href="#SpringBoot-环境变量加载" class="headerlink" title="SpringBoot 环境变量加载"></a>SpringBoot 环境变量加载</h1><h2 id="spring-factories-加载"><a href="#spring-factories-加载" class="headerlink" title="spring.factories 加载"></a>spring.factories 加载</h2><p>对于 <code>/META-INF/spring.factories</code> 文件的配置读取，在创建 SpringApplication 类的时候就通过 SpringFactoriesLoader 读取完成了。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">SpringApplication</span><span class="token punctuation">(</span><span class="token class-name">ResourceLoader</span> resourceLoader<span class="token punctuation">,</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> primarySources<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token comment">//.....</span>
+  
+   <span class="token comment">//不知道干什么的</span>
+   <span class="token keyword">this</span><span class="token punctuation">.</span>resourceLoader <span class="token operator">=</span> resourceLoader<span class="token punctuation">;</span>
+   
+   <span class="token comment">//从 spring.factories 文件中加载以下四个注解的实现</span>
+   <span class="token comment">//1. BootstrapRegistryInitializer</span>
+   <span class="token comment">//2. ApplicationContextInitializer</span>
+   <span class="token comment">//3. ApplicationListener</span>
+   <span class="token keyword">this</span><span class="token punctuation">.</span>bootstrapRegistryInitializers <span class="token operator">=</span> <span class="token function">getBootstrapRegistryInitializersFromSpringFactories</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">setInitializers</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">Collection</span><span class="token punctuation">)</span> <span class="token function">getSpringFactoriesInstances</span><span class="token punctuation">(</span><span class="token class-name">ApplicationContextInitializer</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">setListeners</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">Collection</span><span class="token punctuation">)</span> <span class="token function">getSpringFactoriesInstances</span><span class="token punctuation">(</span><span class="token class-name">ApplicationListener</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"deprecation"</span><span class="token punctuation">)</span>
+<span class="token keyword">private</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">BootstrapRegistryInitializer</span><span class="token punctuation">></span></span> <span class="token function">getBootstrapRegistryInitializersFromSpringFactories</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">BootstrapRegistryInitializer</span><span class="token punctuation">></span></span> initializers <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">getSpringFactoriesInstances</span><span class="token punctuation">(</span><span class="token class-name">Bootstrapper</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">stream</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+         <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span>bootstrapper<span class="token punctuation">)</span> <span class="token operator">-></span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">BootstrapRegistryInitializer</span><span class="token punctuation">)</span> bootstrapper<span class="token operator">::</span><span class="token function">initialize</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+         <span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span>initializers<span class="token operator">::</span><span class="token function">add</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   initializers<span class="token punctuation">.</span><span class="token function">addAll</span><span class="token punctuation">(</span><span class="token function">getSpringFactoriesInstances</span><span class="token punctuation">(</span><span class="token class-name">BootstrapRegistryInitializer</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">return</span> initializers<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>但这些加载的配置文件本质上并不能在 Environment 中找到，spring.factories 其作用的定位就是用 KV 的形式记录所有需要加入容器的类。这涉及到了 SpringBoot 的自动配置的原理，会在以后章节详细介绍。</p>
+<h2 id="Web-Application-参数源加载"><a href="#Web-Application-参数源加载" class="headerlink" title="Web Application 参数源加载"></a>Web Application 参数源加载</h2><p>由于涉及到了 Web Container 的加载，因此与使用的 Web Container 类型强相关。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ConfigurableEnvironment</span> <span class="token function">prepareEnvironment</span><span class="token punctuation">(</span><span class="token class-name">SpringApplicationRunListeners</span> listeners<span class="token punctuation">,</span>
+                                                   <span class="token class-name">DefaultBootstrapContext</span> bootstrapContext<span class="token punctuation">,</span> <span class="token class-name">ApplicationArguments</span> applicationArguments<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// Create and configure the environment</span>
+  <span class="token class-name">ConfigurableEnvironment</span> environment <span class="token operator">=</span> <span class="token function">getOrCreateEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">//...</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>因此可以选择如下三种默认的 Web Container Environment。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ConfigurableEnvironment</span> <span class="token function">getOrCreateEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>environment <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>environment<span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">switch</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>webApplicationType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> SERVLET<span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ApplicationServletEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> REACTIVE<span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ApplicationReactiveWebEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">default</span><span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">ApplicationEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>拿 ApplicationServletEnvironment 举例，由于是一个继承初始化过程，我们将继承链上的内容整合在一起进行一个较为宏观的概括介绍。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//AbstractEnvironment</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>propertySources <span class="token operator">=</span> propertySources<span class="token punctuation">;</span>
+<span class="token keyword">this</span><span class="token punctuation">.</span>propertyResolver <span class="token operator">=</span> <span class="token function">createPropertyResolver</span><span class="token punctuation">(</span>propertySources<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">//获取多个 PropertySource</span>
+<span class="token function">customizePropertySources</span><span class="token punctuation">(</span>propertySources<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">customizePropertySources</span><span class="token punctuation">(</span><span class="token class-name">MutablePropertySources</span> propertySources<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// Servlet config init parameters property source</span>
+  propertySources<span class="token punctuation">.</span><span class="token function">addLast</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StubPropertySource</span><span class="token punctuation">(</span><span class="token string">"servletConfigInitParams"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// Servlet context init parameters property source</span>
+  propertySources<span class="token punctuation">.</span><span class="token function">addLast</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">StubPropertySource</span><span class="token punctuation">(</span><span class="token string">"servletContextInitParams"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// JNDI property source</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">JndiLocatorDelegate</span><span class="token punctuation">.</span><span class="token function">isDefaultJndiEnvironmentAvailable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    propertySources<span class="token punctuation">.</span><span class="token function">addLast</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">JndiPropertySource</span><span class="token punctuation">(</span><span class="token string">"jndiProperties"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  
+  propertySources<span class="token punctuation">.</span><span class="token function">addLast</span><span class="token punctuation">(</span>
+    <span class="token comment">// JVM system properties property source, Invoke System.getProperties()</span>
+    <span class="token keyword">new</span> <span class="token class-name">PropertiesPropertySource</span><span class="token punctuation">(</span><span class="token string">"systemProperties"</span><span class="token punctuation">,</span> <span class="token function">getSystemProperties</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  propertySources<span class="token punctuation">.</span><span class="token function">addLast</span><span class="token punctuation">(</span>
+    <span class="token comment">// System environment property source, Invoke System.getenv()</span>
+    <span class="token keyword">new</span> <span class="token class-name">SystemEnvironmentPropertySource</span><span class="token punctuation">(</span><span class="token string">"systemEnvironment"</span><span class="token punctuation">,</span> <span class="token function">getSystemEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="Command-Line-参数加载"><a href="#Command-Line-参数加载" class="headerlink" title="Command Line 参数加载"></a>Command Line 参数加载</h2><p>对于 Spring Application 运行时入参，SpringBoot 将其封装到 ApplicationArguments 的默认实现类中。其后会在 environment prepare 阶段注入环境变量，在 context prepare 阶段当作 Bean 注入 Container。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;ApplicationArguments 是 SpringApplication.run(ProjectApplication.class, args) 中对入参 args 的封装
+ApplicationArguments applicationArguments &#x3D; new DefaultApplicationArguments(args);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p><strong>environment prepare 阶段注入环境变量</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ConfigurableEnvironment</span> <span class="token function">prepareEnvironment</span><span class="token punctuation">(</span><span class="token class-name">SpringApplicationRunListeners</span> listeners<span class="token punctuation">,</span>
+                                                   <span class="token class-name">DefaultBootstrapContext</span> bootstrapContext<span class="token punctuation">,</span> <span class="token class-name">ApplicationArguments</span> applicationArguments<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">//...</span>
+  <span class="token function">configureEnvironment</span><span class="token punctuation">(</span>environment<span class="token punctuation">,</span> applicationArguments<span class="token punctuation">.</span><span class="token function">getSourceArgs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">configureEnvironment</span><span class="token punctuation">(</span><span class="token class-name">ConfigurableEnvironment</span> environment<span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>addConversionService<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    environment<span class="token punctuation">.</span><span class="token function">setConversionService</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ApplicationConversionService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token function">configurePropertySources</span><span class="token punctuation">(</span>environment<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token function">configureProfiles</span><span class="token punctuation">(</span>environment<span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">configurePropertySources</span><span class="token punctuation">(</span><span class="token class-name">ConfigurableEnvironment</span> environment<span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  <span class="token class-name">MutablePropertySources</span> sources <span class="token operator">=</span> environment<span class="token punctuation">.</span><span class="token function">getPropertySources</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token class-name">CollectionUtils</span><span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultProperties<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">DefaultPropertiesPropertySource</span><span class="token punctuation">.</span><span class="token function">addOrMerge</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>defaultProperties<span class="token punctuation">,</span> sources<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+  <span class="token comment">// 可以看到 CommandLine Args通过 SimpleCommandLinePropertySource 解析到 Environment</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>addCommandLineProperties <span class="token operator">&amp;&amp;</span> args<span class="token punctuation">.</span>length <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">String</span> name <span class="token operator">=</span> <span class="token class-name">CommandLinePropertySource</span><span class="token punctuation">.</span>COMMAND_LINE_PROPERTY_SOURCE_NAME<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>sources<span class="token punctuation">.</span><span class="token function">contains</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token class-name">PropertySource</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> source <span class="token operator">=</span> sources<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token class-name">CompositePropertySource</span> composite <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CompositePropertySource</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      composite<span class="token punctuation">.</span><span class="token function">addPropertySource</span><span class="token punctuation">(</span>
+        <span class="token keyword">new</span> <span class="token class-name">SimpleCommandLinePropertySource</span><span class="token punctuation">(</span><span class="token string">"springApplicationCommandLineArgs"</span><span class="token punctuation">,</span> args<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      composite<span class="token punctuation">.</span><span class="token function">addPropertySource</span><span class="token punctuation">(</span>source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      sources<span class="token punctuation">.</span><span class="token function">replace</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> composite<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+      sources<span class="token punctuation">.</span><span class="token function">addFirst</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SimpleCommandLinePropertySource</span><span class="token punctuation">(</span>args<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>context prepare 阶段当作 Bean 注入 Container</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// Add boot specific singleton beans</span>
+<span class="token class-name">ConfigurableListableBeanFactory</span> beanFactory <span class="token operator">=</span> context<span class="token punctuation">.</span><span class="token function">getBeanFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+beanFactory<span class="token punctuation">.</span><span class="token function">registerSingleton</span><span class="token punctuation">(</span><span class="token string">"springApplicationArguments"</span><span class="token punctuation">,</span> applicationArguments<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span>printedBanner <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+  beanFactory<span class="token punctuation">.</span><span class="token function">registerSingleton</span><span class="token punctuation">(</span><span class="token string">"springBootBanner"</span><span class="token punctuation">,</span> printedBanner<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="SpringBoot-Context-加载"><a href="#SpringBoot-Context-加载" class="headerlink" title="SpringBoot Context 加载"></a>SpringBoot Context 加载</h1><p>从 SpringBoot 的生命周期可知，环境变量是在 context prepare 阶段加载的。</p>
+<h2 id="Application-Context-加载"><a href="#Application-Context-加载" class="headerlink" title="Application Context 加载"></a>Application Context 加载</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">ConfigurableApplicationContext</span> context <span class="token operator">=</span> <span class="token function">createApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 注入 APP 生命周期事件处理器</span>
+context<span class="token punctuation">.</span><span class="token function">setApplicationStartup</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>applicationStartup<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 注入 Environment 环境配置</span>
+context<span class="token punctuation">.</span><span class="token function">setEnvironment</span><span class="token punctuation">(</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 注入 ResourceLoader、ClassLoader、ConversionService 组件</span>
+<span class="token function">postProcessApplicationContext</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token function">applyInitializers</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+listeners<span class="token punctuation">.</span><span class="token function">contextPrepared</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+bootstrapContext<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们主要关注一下 Application Context 到底加载了哪些组件？</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ApplicationContextFactory</span> applicationContextFactory <span class="token operator">=</span> <span class="token punctuation">(</span>webApplicationType<span class="token punctuation">)</span> <span class="token operator">-></span> <span class="token punctuation">&#123;</span>
+  <span class="token keyword">switch</span> <span class="token punctuation">(</span>webApplicationType<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">case</span> SERVLET<span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">AnnotationConfigServletWebServerApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">case</span> REACTIVE<span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">AnnotationConfigReactiveWebServerApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">default</span><span class="token operator">:</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">AnnotationConfigApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token keyword">protected</span> <span class="token class-name">ConfigurableApplicationContext</span> <span class="token function">createApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>applicationContextFactory<span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>webApplicationType<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>可以看到根据不同的应用类型，加载了不同的 Application Context。其涉及到的 Application Context 层次与职责，会在以后章节详细介绍。</p>
+<h2 id="Bootstrap-Context-加载"><a href="#Bootstrap-Context-加载" class="headerlink" title="Bootstrap Context 加载"></a>Bootstrap Context 加载</h2><p>DefaultBootstrapContext 是 ConfigurableBootstrapContext 的默认实现类，而 ConfigurableBootstrapContext 整合了 BootstrapContext 和 BootstrapRegistry 两个接口。BootstrapContext 可以在 starting、environment prepared 和 context prepared 期间使用，Can be used to register instances that may be expensive to create, or need to be shared before the ApplicationContext is available。而 BootstrapRegistry 提供了对 instances 的注册功能以及对 BootstrapContext 关闭时的回调方法。</p>
+<img src="/images/Spring/DefaultBootstrapContext.png" alt="DefaultBootstrapContext" style="zoom:50%;" />
+
+<p>BootstrapContext 在 SpringBoot 的生命周期中一直被 SpringApplicationRunListeners 当作入参传入其 starting 和 environmentPrepared 方法，方便在 ApplicationContext 未 prepared 之前共享内容。</p>
+<h1 id="SpringBoot-BeanDefinition-加载"><a href="#SpringBoot-BeanDefinition-加载" class="headerlink" title="SpringBoot BeanDefinition 加载"></a>SpringBoot BeanDefinition 加载</h1><p>从 SpringBoot 的生命周期可知，在 context load 阶段调用的 load 方法创建了一个 BeanDefinitionLoader 用来注册 ProjectApplication 的 BeanDefinition。我们可以看到，SpringBoot 将 BeanDefinition 的加载完全委托给 BeanDefinitionLoader 进行处理。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">BeanDefinitionLoader(BeanDefinitionRegistry registry, Object... sources) &#123;
+   this.sources &#x3D; sources;
+   this.annotatedReader &#x3D; new AnnotatedBeanDefinitionReader(registry);
+   this.xmlReader &#x3D; (XML_ENABLED ? new XmlBeanDefinitionReader(registry) : null);
+   this.groovyReader &#x3D; (isGroovyPresent() ? new GroovyBeanDefinitionReader(registry) : null);
+   this.scanner &#x3D; new ClassPathBeanDefinitionScanner(registry);
+   this.scanner.addExcludeFilter(new ClassExcludeFilter(sources));
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由 BeanDefinitionLoader 的定义来说，可以看到其可以解析 Annotation、XML、Groovy 等形式的 BeanDefinition。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">load</span><span class="token punctuation">(</span><span class="token class-name">ApplicationContext</span> context<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">[</span><span class="token punctuation">]</span> sources<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token class-name">BeanDefinitionLoader</span> loader <span class="token operator">=</span> <span class="token function">createBeanDefinitionLoader</span><span class="token punctuation">(</span><span class="token function">getBeanDefinitionRegistry</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">,</span> sources<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>beanNameGenerator <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      loader<span class="token punctuation">.</span><span class="token function">setBeanNameGenerator</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>beanNameGenerator<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>resourceLoader <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      loader<span class="token punctuation">.</span><span class="token function">setResourceLoader</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>resourceLoader<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>environment <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      loader<span class="token punctuation">.</span><span class="token function">setEnvironment</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>environment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   loader<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>我们可以看到，可以有四种方式加载我们的 PrimarySource：Class、Resource、Package、CharSequence。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">void</span> <span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Object</span> source <span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>sources<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">load</span><span class="token punctuation">(</span>source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">load</span><span class="token punctuation">(</span><span class="token class-name">Object</span> source<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>source <span class="token keyword">instanceof</span> <span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span><span class="token punctuation">)</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>source <span class="token keyword">instanceof</span> <span class="token class-name">Resource</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">Resource</span><span class="token punctuation">)</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>source <span class="token keyword">instanceof</span> <span class="token class-name">Package</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">Package</span><span class="token punctuation">)</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span>source <span class="token keyword">instanceof</span> <span class="token class-name">CharSequence</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">load</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token class-name">CharSequence</span><span class="token punctuation">)</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"Invalid source type "</span> <span class="token operator">+</span> source<span class="token punctuation">.</span><span class="token function">getClass</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>以通过 Class 方式加载为例，在逻辑判断之后，委托 AnnotatedBeanDefinitionReader 注册 Bean。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">private void load(Class&lt;?&gt; source) &#123;
+   if (isGroovyPresent() &amp;&amp; GroovyBeanDefinitionSource.class.isAssignableFrom(source)) &#123;
+      &#x2F;&#x2F; Any GroovyLoaders added in beans&#123;&#125; DSL can contribute beans here
+      GroovyBeanDefinitionSource loader &#x3D; BeanUtils.instantiateClass(source, GroovyBeanDefinitionSource.class);
+      ((GroovyBeanDefinitionReader) this.groovyReader).beans(loader.getBeans());
+   &#125;
+   if (isEligible(source)) &#123;
+      this.annotatedReader.register(source);
+   &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>由于涉及到注册 Bean 相关内容，关于注册器的相关层级及职责在后面章节会介绍。</p>
+<h1 id="SpringBoot-运行过程"><a href="#SpringBoot-运行过程" class="headerlink" title="SpringBoot 运行过程"></a>SpringBoot 运行过程</h1><p>从 SpringBoot 的生命周期可知，在 start 阶段调用了 ApplicationContext 的 refresh 方法，可以说是同 BeanDefinition 的加载一样，直接委托给 ApplicationContext 执行。而且预留了 afterRefresh 模板方法等待子类重载实现。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 调用 ApplicationContext 中的 refresh 重新加载应用
+refreshContext(context);
+&#x2F;&#x2F; 模板方法，供重载实现
+afterRefresh(context, applicationArguments);
+
+listeners.started(context);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>refreshContext 定义</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">refreshContext</span><span class="token punctuation">(</span><span class="token class-name">ConfigurableApplicationContext</span> context<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>registerShutdownHook<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        shutdownHook<span class="token punctuation">.</span><span class="token function">registerApplicationContext</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">refresh</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">refresh</span><span class="token punctuation">(</span><span class="token class-name">ConfigurableApplicationContext</span> applicationContext<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    applicationContext<span class="token punctuation">.</span><span class="token function">refresh</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>afterRefresh 定义</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">afterRefresh</span><span class="token punctuation">(</span><span class="token class-name">ConfigurableApplicationContext</span> context<span class="token punctuation">,</span> <span class="token class-name">ApplicationArguments</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>这部分涉及到了 ApplicationContext 的原理，会在以后章节详细介绍。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+              <a href="/tags/SpringBoot/" rel="tag"># SpringBoot</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/17/MySQL-%E9%94%81/" rel="prev" title="MySQL 锁">
+      <i class="fa fa-chevron-left"></i> MySQL 锁
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/30/Spring-ApplicationContext%E5%B1%82%E6%AC%A1%E5%8F%8A%E8%81%8C%E8%B4%A3%E8%A7%A3%E6%9E%90/" rel="next" title="SpringBoot ApplicationContext 层次及职责解析">
+      SpringBoot ApplicationContext 层次及职责解析 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-%E5%90%AF%E5%8A%A8%E8%BF%87%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">SpringBoot 启动过程</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F"><span class="nav-number">2.</span> <span class="nav-text">SpringBoot 生命周期</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#starting-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.1.</span> <span class="nav-text">starting 阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#environment-prepare-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.2.</span> <span class="nav-text">environment prepare 阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#context-prepare-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.3.</span> <span class="nav-text">context prepare 阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#context-load-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.4.</span> <span class="nav-text">context load 阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#start-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.5.</span> <span class="nav-text">start 阶段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#running-%E9%98%B6%E6%AE%B5"><span class="nav-number">2.6.</span> <span class="nav-text">running 阶段</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E5%8A%A0%E8%BD%BD"><span class="nav-number">3.</span> <span class="nav-text">SpringBoot 环境变量加载</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#spring-factories-%E5%8A%A0%E8%BD%BD"><span class="nav-number">3.1.</span> <span class="nav-text">spring.factories 加载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Web-Application-%E5%8F%82%E6%95%B0%E6%BA%90%E5%8A%A0%E8%BD%BD"><span class="nav-number">3.2.</span> <span class="nav-text">Web Application 参数源加载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Command-Line-%E5%8F%82%E6%95%B0%E5%8A%A0%E8%BD%BD"><span class="nav-number">3.3.</span> <span class="nav-text">Command Line 参数加载</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-Context-%E5%8A%A0%E8%BD%BD"><span class="nav-number">4.</span> <span class="nav-text">SpringBoot Context 加载</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Application-Context-%E5%8A%A0%E8%BD%BD"><span class="nav-number">4.1.</span> <span class="nav-text">Application Context 加载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Bootstrap-Context-%E5%8A%A0%E8%BD%BD"><span class="nav-number">4.2.</span> <span class="nav-text">Bootstrap Context 加载</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-BeanDefinition-%E5%8A%A0%E8%BD%BD"><span class="nav-number">5.</span> <span class="nav-text">SpringBoot BeanDefinition 加载</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringBoot-%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B"><span class="nav-number">6.</span> <span class="nav-text">SpringBoot 运行过程</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

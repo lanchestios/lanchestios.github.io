@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="由于异常并不会给功能带来实质性的提升，因此在业务代码中会经常忽略它的重要性。但需要注明的是，通过妥善的异常处理开发出更高质量的软件。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 异常处理方案">
+<meta property="og:url" content="http://example.com/2021/07/07/SE-%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86%E6%96%B9%E6%A1%88/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="由于异常并不会给功能带来实质性的提升，因此在业务代码中会经常忽略它的重要性。但需要注明的是，通过妥善的异常处理开发出更高质量的软件。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/JDK/%E5%BC%82%E5%B8%B8%E7%9A%84%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png">
+<meta property="og:image" content="http://example.com/images/JDK/%E5%9F%BA%E4%BA%8E%E7%8A%B6%E6%80%81%E7%9A%84%E5%90%91%E5%90%8E%E6%81%A2%E5%A4%8D%E7%A4%BA%E4%BE%8B.png">
+<meta property="og:image" content="http://example.com/images/JDK/N%E7%89%88%E6%9C%AC%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1.png">
+<meta property="og:image" content="http://example.com/images/JDK/%E6%81%A2%E5%A4%8D%E5%8C%BA%E5%9D%97.png">
+<meta property="og:image" content="http://example.com/images/JDK/%E5%BC%BA%E5%81%A5%E5%BA%A6%E7%AD%89%E7%BA%A7%E7%9A%84%E5%8D%87%E7%BA%A7%E5%92%8C%E9%99%8D%E7%BA%A7.png">
+<meta property="article:published_time" content="2021-07-06T16:15:21.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.549Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="异常处理">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/JDK/%E5%BC%82%E5%B8%B8%E7%9A%84%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png">
+
+<link rel="canonical" href="http://example.com/2021/07/07/SE-%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86%E6%96%B9%E6%A1%88/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 异常处理方案 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/07/07/SE-%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86%E6%96%B9%E6%A1%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 异常处理方案
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-07-07 00:15:21" itemprop="dateCreated datePublished" datetime="2021-07-07T00:15:21+08:00">2021-07-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>由于异常并不会给功能带来实质性的提升，因此在业务代码中会经常忽略它的重要性。但需要注明的是，通过妥善的异常处理开发出更高质量的软件。</p>
+<span id="more"></span>
+
+<h1 id="异常"><a href="#异常" class="headerlink" title="异常"></a>异常</h1><p>异常主要有着通知的作用，在发生异常后，可进行异常报警、错误重试、故障恢复等操作。</p>
+<h2 id="影响软件强健度的因素"><a href="#影响软件强健度的因素" class="headerlink" title="影响软件强健度的因素"></a>影响软件强健度的因素</h2><p>影响软件强健度的因素有四种：fault（缺陷）、error（错误）、failure（失效）、exception（异常）。</p>
+<p><img src="/images/JDK/%E5%BC%82%E5%B8%B8%E7%9A%84%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png"></p>
+<h3 id="fault"><a href="#fault" class="headerlink" title="fault"></a>fault</h3><p>fault（缺陷）是假设或是经过判断之后所确定导致错误（error）发生的原因。</p>
+<p>其依据存在时间长短可分为以下三类：</p>
+<ul>
+<li>瞬时缺陷（transient fault）</li>
+<li>间歇缺陷（intermittent fault）</li>
+<li>永久缺陷（permanent fault）</li>
+</ul>
+<p>其依据产生原因可分为以下两类：</p>
+<ul>
+<li>设计缺陷（design fault）：软件开发过程中的固有的问题。</li>
+<li>组件缺陷（component fault）：组件因物理设备导致或组件间交互所产生的问题。</li>
+</ul>
+<h3 id="failure"><a href="#failure" class="headerlink" title="failure"></a>failure</h3><p>当一个软件组件（function、method、service）所提供的服务与其功能规格（functional specification）相符，可以称组件提供了正确的服务（corrent service）。如果组件偏离了正确服务，我们称之为服务失败（service failure）。</p>
+<h3 id="exception"><a href="#exception" class="headerlink" title="exception"></a>exception</h3><p>异常（exception）是程序语言中表达错误与失败的一种概念。</p>
+<h2 id="流程的切分"><a href="#流程的切分" class="headerlink" title="流程的切分"></a>流程的切分</h2><h3 id="服务间边界"><a href="#服务间边界" class="headerlink" title="服务间边界"></a>服务间边界</h3><p>服务间通过 RPC、HTTP 等方式进行交互，调用失败时，不需要了解其具体含义上的异常信息，只需要知道三类信息：调用服务是否存活、传入参数合法性、调用服务正确性。</p>
+<h3 id="模块（或功能）间边界及函数间边界"><a href="#模块（或功能）间边界及函数间边界" class="headerlink" title="模块（或功能）间边界及函数间边界"></a>模块（或功能）间边界及函数间边界</h3><p>微服务中的模块与函数其实本质上是相同的，目的是为了抽象出一个层次化的业务异常结构。但又是相区别的，模块的层次化异常结构与安全网更高层，也就是更偏近于业务侧。例如：将交易模块的整体异常捕获并转化为业务异常信息。而函数的层次化异常结构与安全网更底层。例如：将参数错误、计算错误、SQL错误等封装为通用的异常实例。</p>
+<p>总的来说，模块间边界更业务化、更细化，函数间边界更底层化、通用化。</p>
+<h1 id="异常处理等级"><a href="#异常处理等级" class="headerlink" title="异常处理等级"></a>异常处理等级</h1><p>异常处理随着处理能力的不同被分为四个等级，并且可以通过升级和降级来解决现实中遇到的问题。</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>等级0</th>
+<th>等级1</th>
+<th>等级2</th>
+<th>等级3</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>名称</td>
+<td>未定义（Undefined）</td>
+<td>错误报告（Error-reporting）</td>
+<td>状态恢复（State-recovery）</td>
+<td>行为恢复（Behavior-recovery）</td>
+</tr>
+<tr>
+<td>服务</td>
+<td>隐式或显式失败</td>
+<td>显式失败</td>
+<td>显式失败</td>
+<td>持续提供</td>
+</tr>
+<tr>
+<td>状态</td>
+<td>未知或不正确</td>
+<td>未知或不正确</td>
+<td>正确</td>
+<td>正确</td>
+</tr>
+<tr>
+<td>生命周期</td>
+<td>终止或继续</td>
+<td>终止</td>
+<td>继续</td>
+<td>继续</td>
+</tr>
+<tr>
+<td>如何达成</td>
+<td>NA</td>
+<td>1. 传递所有未被处理的异常<br />2. 在主程序中报告所有的异常</td>
+<td>1. 错误处理（error handling）<br />2. 资源清理（cleanup）</td>
+<td>1. 缺陷处理（fault handling）<br />2. 重试（retry，and&#x2F;or）<br />3. 设计多样性（design diversity），功能多样性（functional diversity），数据多样性（data diversity），时序多样性（temporal diversity）</td>
+</tr>
+<tr>
+<td>别名</td>
+<td>NA</td>
+<td>快速失败（failing-fast）</td>
+<td>弱容错（weakly tolerant）</td>
+<td>强容错（strongly tolerant）</td>
+</tr>
+</tbody></table>
+<h2 id="等级1：错误报告"><a href="#等级1：错误报告" class="headerlink" title="等级1：错误报告"></a>等级1：错误报告</h2><p>错误报告（error-reporting），是指函数不捕捉异常，将所有发生的异常传递到它的调用者（向上传递）。</p>
+<h3 id="建立安全网"><a href="#建立安全网" class="headerlink" title="建立安全网"></a>建立安全网</h3><p>在各模块边界通过统一使用一个 try 语句建立安全网，可以捕获所有异常以避免程序异常终止。此外，还可以将异常转换为更易理解的异常信息并写入日志文件。</p>
+<h2 id="等级2：状态恢复"><a href="#等级2：状态恢复" class="headerlink" title="等级2：状态恢复"></a>等级2：状态恢复</h2><p>与错误报告不同的是，状态恢复要求当错误发生后，服务必须保证系统仍然处于正确状态。由于整个系统的状态还是正确的，因此，当异常发生之后，系统仍然可以继续执行。</p>
+<p>要想达到状态恢复的状态级别，需要多做两件事。首先是错误处理（error handling），让系统恢复到正确的状态，例如事务回滚。其次是释放资源（cleanup），将之前用到的内存、磁盘等资源正确的释放。状态恢复又称为“弱容错”（weakly tolerant）。</p>
+<p>错误处理关注系统内部的状态，而资源清理强调“外部资源（操作系统或执行环境）”的清理，避免资源泄漏，连接池用尽等情况。</p>
+<h3 id="错误处理（向后恢复）"><a href="#错误处理（向后恢复）" class="headerlink" title="错误处理（向后恢复）"></a>错误处理（向后恢复）</h3><p>错误处理的目的在于移除错误造成的不正确状态，将系统恢复到一个没有错误的状态（error-free state）。向后恢复（backward recovery）是指当错误发生的时候，将系统恢复至错误发生之前所保留的状态，所以称为“向后恢复”（也可以称为回滚）。</p>
+<p>向后恢复是假设系统发生错误之前处在正确状态，这个假设需要成立，否则保留这个状态就没有意义了。向后恢复需借助不会被系统失败所影响的稳定存储装置（stable storage，例如硬盘）来保留状态。我们在异常处理中所说的错误处理就是指采用硬盘。</p>
+<p>依据其实现方法不同，又可以细分为以下两种。</p>
+<ul>
+<li>基于状态的（state-based）：存储一个完整的正确状态，待错误发生之后丢弃整个错误状态，以所存储的正确状态来取代。例如检查点（check pointing）、 快照（snapshot）和时光机（time machine）等都属于这一类。</li>
+<li>基于操作的（operation-based）：不采用存储完整正确状态的方式，改以存储改变状态的事件或是操作。当错误发生之后，利用这些存储下来的状态改变记录，反向取消原本的操作以达到状态复原的效果。例如审计轨迹（audit trail）和日志记录（logging）等。</li>
+</ul>
+<p><strong>基于状态的向后恢复</strong></p>
+<p>读取文件时建立恢复点（check pointing），当执行失败后，回退到恢复点重试。</p>
+<p><img src="/images/JDK/%E5%9F%BA%E4%BA%8E%E7%8A%B6%E6%80%81%E7%9A%84%E5%90%91%E5%90%8E%E6%81%A2%E5%A4%8D%E7%A4%BA%E4%BE%8B.png"></p>
+<p><strong>基于操作的向后恢复</strong></p>
+<p>以操作为基础的向后恢复方法，是采取撤销（undo）原本操作的方式来还原系统的状态。举个例子，假设某在线游戏被黑客入侵，有些玩家的宝物被盗，此时系统处在一个不正确的状态。在这种情况下，由于整个在线游戏世界一直在改变，系统并没有存在一个合适的检查<br>点（正确状态的备份）可以用来执行状态还原。如果系统平常针对宝物买卖的交易与玩家状态改变都有妥善记录在日志文件中，则可以利用日志文件的数据来反向回推出每一位受害玩家的正确状态。要用这种方法来还原状态，系统必须记录足够的额外信息。</p>
+<p>常见的方式有使用冗余数据与冗余函数来达成状态还原。以在线游戏为例，每一笔宝物事务数据或是玩家的状态改变，都必须要写入到日志文件（冗余资料），日后才可以利用这个日志文件来恢复数据。</p>
+<p>另一个常见的程序设计技巧则是套用 Command 设计模式，将每一个操作包装成一个独立的类别， 在此类中提供 do 和 undo（冗余函数）两个动作相反的函数，如此便可通过 undo 函数来执行状态还原。</p>
+<p><strong>向后恢复的限制</strong></p>
+<ol>
+<li>耗费资源：记录的操作日志或是快照都会消耗计算机的计算资源、时间和存储空间。</li>
+<li>系统暂停：其次，在保存与还原系统状态的当下，向后恢复方法可能会要求系统暂时停止（halt）运作、降低系统的服务等级或是拉长系统的响应时间。最后，在分布式系统或是采用嵌套向后恢复的应用中，当一个函数或是进程还原到之前的状态，便可能会引发骨牌效应，触发其他函数或是进程的向后恢复动作。</li>
+</ol>
+<h3 id="资源清理"><a href="#资源清理" class="headerlink" title="资源清理"></a>资源清理</h3><p>由操作系统或是执行环境（例如 JVM）所管理的外部资源，像是内存、硬盘空间和数据库连接，一般来说都是有限的共享资源。如果使用完毕的资源迟迟没有归还，最后还是会导致资源耗尽，系统无法运作。</p>
+<p>一般的资源清理涉及到两方面内容：内存管理、资源释放。</p>
+<h2 id="等级3：行为恢复"><a href="#等级3：行为恢复" class="headerlink" title="等级3：行为恢复"></a>等级3：行为恢复</h2><p>行为恢复要求当错误发生后，服务仍然是正确的，系统仍然可以正常运行。</p>
+<p>要达到强健度等级 3 的阶段，除了要做到强健度等级 2 的错误处理（error handling）和资源清理（cleanup）之外，还需要“想其他方法来达成原本的任务”。为了不让下次执行再度失败，需要先启动缺陷处理（fault handling）以排除造成失败的原因。造成错误的缺陷排除之后，便可套用重试（retry）与设计多样性（design diversity）、功能多样性（functional diversity）、数据多样性（data diversity）、时序多样性（temporal diversity）等设计技巧，尝试继续提供服务。行为恢复又称为“强容错”（strongly tolerant）。</p>
+<h3 id="重试"><a href="#重试" class="headerlink" title="重试"></a>重试</h3><p>成功执行缺陷之后，只要在新的系统配置之下重试原本的操作（此时，原本操作的实现方式可能已经改变，例如采用备用组件取代原本失效的组件），系统应该就可以提供正确的服务。</p>
+<p>重试的结果能否成功，有很大的程度受到缺陷处理的重新配置所影响。针对瞬时缺陷或是间歇缺陷，重新配置的实现结果有可能并不需要改变任何系统配置，仅通过重试原本实现（retry with the pirmary）即可。但如果是永久缺陷或是想要彻底解决间歇缺陷，只是重试原本的实现显然是行不通的。因此，重新配置阶段便必须要使用替换的组件或是新的执行路径来取代有缺陷的组件。此时的重试就称为“重试替代方案”（retry with alternative）。</p>
+<p>制作与执行替代方案的技巧，可以分成以下四大类。</p>
+<p><strong>设计多样性（design diversity）</strong></p>
+<p>将同一份规格交给不同团队设计与实现出多个功能相同的版本。设计多样性在软件容错设计中是一种很常见的作法，常见的方式有 N 版本程序设计（N-Version Programming, NVP）与恢复区块（recovery block）。</p>
+<p>N 版本程序设计，即在同一时间一个函数的多个版本同时执行，其执行结果交由决策器来判断，最后选出一个正确的结果。虽然这三个实现版本有一个存在着缺陷（很可能是设计缺陷），但因为采用设计多样性的容错策略，这个缺陷并没有对系统服务造成影响。N 版本程序设计的结构如下图所示。</p>
+<p><img src="/images/JDK/N%E7%89%88%E6%9C%AC%E7%A8%8B%E5%BA%8F%E8%AE%BE%E8%AE%A1.png"></p>
+<p>恢复区块，即首先产生检查点，接着执行主要方案。如果主要方案执行过程中没有发生异常，且其结果通过验收测试，则代表主要方案执行成功，丢弃检查点之后便可正常离开恢复区块。反之，若执行主要方案发生异常或其执行结果没有通过验收测试，则使用检查点来恢复系统状态。接着判断是否有替代方案可供选择，而且尚未超过执行期限（例如最多执行三种不同替代方案或是运行时间不能超过30秒）。如果条件都成立，则重新执行替代方案，若不成立则代表恢复区块失效，丢出代表失败的异常。恢复区块的结构如下图所示。</p>
+<p><img src="/images/JDK/%E6%81%A2%E5%A4%8D%E5%8C%BA%E5%9D%97.png"></p>
+<p>因为设计多样性的成本实在太高了（尤其是 N 版本程序设计），因此在异常处理领域，实际上很少有机会需要采用这个策略来达到强健度等级 3。</p>
+<p>比较接近一点的作法则是用函数策略来达到强健度等级 3。比较接近一点的作法则是用函数<br>来仿真恢复区块的结构，针对已知可能会失效且重要性较高的函数，提供一种或多种实现方式的替代方案。但不像容错设计所要求的设计多样性，需要由不同团队来设计与实现个别版本，在异常处理的领域，替代方案通常由同一个团队设计与实现。</p>
+<p><strong>功能多样性（functional diversity）</strong></p>
+<p>广义来说，功能多样性也属于设计多样性的一种，不同之处在于功能多样性是采用不同的输入与不同的设计、实现方式来达到相同的功能（设计多样性则是采用相同的输入，不同的设计、实现）。功能多样性又称为“多才多艺的系统”（resourceful system），这种系统可能<br>需要具备人工智能的能力，也就是系统必须知道如何通过不同的方式来完成相同的目标。例如，假设乡民们使用一个具备功能多样性的高铁订票函数来预订过年期间从台北到高雄的来<br>回车票。这个函数发现直达车票已经被订完了，但是它有能力用分段的方式，先订从台北到台中，然后再订台中到高雄的车票。针对相同的目标（台北到高雄），具有多种功能可以完成此目标。</p>
+<p>在异常处理的领域，除非针对已知且非常重要的功能，否则不太会套用这么繁重的功能。</p>
+<p><strong>数据多样性（data diversity）</strong></p>
+<p>函数执行失败有时是因为输入的参数有问题，在这种情况下提供多份不同的函数实现可能也无济于事。因此，如果可以提供不同的数据，也有可能可以达到强健度等级 3。例如，用户输入的字体或是颜色数据错误，系统就自动选用默认的一.组数据作为显示之用，让系统可以运行下去。</p>
+<p><strong>时序多样性（temporal diversity）</strong></p>
+<p>系统也可能因为性能或是时序的问题而导致函数执行失败，此时只要调整一下函数执行的<br>时间点，就有可能解决问题。例如，假设有一个保安监控系统采用轮询（polling）的方式，每隔60秒询问一次客户家中的传感器是否正常。刚开始的时候，客户只有 100 人，系统每次轮询都会得到正确的结果。但随着生意越做越大，同时间要监控的客户量增加到 1000 人。因为客户数量增加，导致每次询问的失败比例也增加，不是发生超时（timeout）。就是因为系统负载太重而无法在排定的时间点启动轮询。这时候，如果系统调整了轮询间隔（polling interval），就有可能降低轮询失败的几率。</p>
+<h3 id="缺陷处理（向前恢复）"><a href="#缺陷处理（向前恢复）" class="headerlink" title="缺陷处理（向前恢复）"></a>缺陷处理（向前恢复）</h3><p>系统失败的原因是因为程序的执行触发了某个缺陷（fault）而导致错误（error）, 最后形成系统失败（failure）。强健度等级 2 修正了错误状态，但是如果没有进一步的把系统中的缺陷给排除，系统继续执行下去，还是有很高的机会再度触发同一个缺陷，结果最后还是形成<br>系统失败。缺陷处理就是探讨如何排除缺陷的方法。</p>
+<p>严格来讲，它比较偏向容错处理的领域，但是在某些特定的状况之下，异常处理还是可以应用缺陷处理的技巧来提升系统的强健度。依据 Avizienis 等人的分类，缺陷处理包含以下四个操作。</p>
+<ul>
+<li>诊断（diagnosis）：鉴定与记录错误发生的原因，包含错误发生的位置与种类。</li>
+<li>隔离（isolation）：将失败的组件从系统中隔离，以防止后续的操作继续使用这个失败的组件。</li>
+<li>重新配置（reconfiguration）：如果系统有冗余或是备用的组件，则将系统重新配置以便使用这些冗余或备用组件。或是重新指派工作，让没有发生问题的组件来取代被隔离的组件。</li>
+<li>重新初始化（reinitialization)）：确认重新配置之后的系统可运作之后，重新设置系统以便采用这个新的配置。</li>
+</ul>
+<p>具备缺陷处理的系统需要有足够的知识与资源，才能够诊断与隔离缺陷，进而做到自我调适（重新配置与重新初始化）。</p>
+<p>向前恢复（forward recovery）是状态恢复的一种方式，但因为它让系统“向前”恢复到一个没有错误的状态，也等于说没有发生 failure，因此达到强健度等级 3。</p>
+<p>刚刚介绍过的 N 版本程序设计其实就是一种向前恢复加上设计多样性（design diversity）的容错技巧”。因为有多个版本同时执行（可能在一台计算机上，也有可能在不同的计算机上），所以即使有任何一个版本发生 error，整个系统还是可以（向前）回到一个没有错误的状态。</p>
+<p>另一种向前恢复的作法需要搭配日志文件，经常应用在数据库系统当中。假设乡民们在一个月前执行了一次数据库备份，一个月后的某一天，因为不明原因数据库文件突然损坏，幸好数据库的事务日志文件还存在。因此你利用备份文件，先将数据库状态恢复到一个月前的状态，再利用事务日志文件，让数据库的状态（向前）来到系统刚刚损坏之前的正确状态。</p>
+<p>有些数据库针对实时事务提供向前恢复，当事务进行时会将所需的数据先搬移到内存中，等待事务完成之后，再将事务历史记录写入硬盘中，最后才把内存中的数据写入数据库。如果事务历史记录已经成功写入硬盘，但是内存中的数据尚未写入数据库，此时如果数据库<br>系统当机，待下次启动之后，数据库便会参考事务历史记录的数据，自动将数据库的内容向前恢复到正确状态。</p>
+<h2 id="升级和降级"><a href="#升级和降级" class="headerlink" title="升级和降级"></a>升级和降级</h2><p><img src="/images/JDK/%E5%BC%BA%E5%81%A5%E5%BA%A6%E7%AD%89%E7%BA%A7%E7%9A%84%E5%8D%87%E7%BA%A7%E5%92%8C%E9%99%8D%E7%BA%A7.png"></p>
+<h1 id="异常的设计"><a href="#异常的设计" class="headerlink" title="异常的设计"></a>异常的设计</h1><h2 id="命名规则讨论"><a href="#命名规则讨论" class="headerlink" title="命名规则讨论"></a>命名规则讨论</h2><p>Wirfs-Brock 认为异常类的命名应当<strong>遵循以“哪里出了问题”命名</strong>。就如同 JDK 正在做的一样，IllegalArgumentException 等异常大多是根据该规则而产生。</p>
+<p>但业务中会产生的大量异常，如果一一为其创建实例显然不太现实。业务异常通过<strong>遵循以“谁丢出异常”命名</strong>则可以很好的完成异常层次结构的构建。例如：使用 TransactionException 来代替所有交易异常。可以大范围的缩减异常类的创建。</p>
+<h2 id="将低层异常转成高层所理解的异常"><a href="#将低层异常转成高层所理解的异常" class="headerlink" title="将低层异常转成高层所理解的异常"></a>将低层异常转成高层所理解的异常</h2><p>需要了解的是，我们以一个树形的继承关系来管理全部的 Throwable。如果我们现在有一个方法 <code>getText()</code>，当我们底层实现使用数据库来获取用到的数据，该方法应抛出 SQLException；如果使用文件来获取，该方法应抛出 IOException。但无论其以任何底层实现去获取数据，它都应该抛出一个自定义异常 TextManipulationException，而不是 SQLException 或其他。这样做的好处是不论该方法如何修改，都不会影响到丢出异常的类型，而且有助于上层调用者的异常处理设计。而这种聚合底层异常转为高层异常的行为叫做：同构型异常（homogeneous exception）。下面是示例：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">orign:
+情况1: void getText() throws IOException, SQLException;
+情况2: void getText() throws IOException;
+情况3: void getText() throws SQLException;
+good result:
+void getText() throws TextManipulationException;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>同构型异常可以缓解因为使用已查异常（checked exception）所造成的函数接口改变的问题。因为一个函数只声明一个或少量同构型异常，所以可以避免函数将实现细节所遭遇的异常直接声明在接口上往外传递，也有助于实践“将低层异常转成高层所理解的异常”这条规则。</p>
+<h1 id="使用异常的误区"><a href="#使用异常的误区" class="headerlink" title="使用异常的误区"></a>使用异常的误区</h1><h2 id="使用异常当作判断条件"><a href="#使用异常当作判断条件" class="headerlink" title="使用异常当作判断条件"></a>使用异常当作判断条件</h2><p>将异常当作判断条件是一个非常常见的现象，以把字符串解析为正整数为例有以下三种“经典”写法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+  * 异常判断法
+  * @param str 正整数字符串
+  * @return 解析错误返回 -1
+  */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">parseInt</span><span class="token punctuation">(</span><span class="token class-name">String</span> str<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">Integer</span><span class="token punctuation">.</span><span class="token function">parseInt</span><span class="token punctuation">(</span>str<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">NumberFormatException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token comment">/**
+  * 正则判断法
+  * @param str 正整数字符串
+  * @return 解析错误返回 -1
+  */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">parseInt</span><span class="token punctuation">(</span><span class="token class-name">String</span> str<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>str<span class="token punctuation">.</span><span class="token function">matches</span><span class="token punctuation">(</span><span class="token string">"^[1-9]\\d*$"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token class-name">Integer</span><span class="token punctuation">.</span><span class="token function">parseInt</span><span class="token punctuation">(</span>str<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">/**
+  * 简单判断法
+  * @param str 正整数字符串
+  * @return 解析错误返回 -1
+  */</span>
+<span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">parseInt</span><span class="token punctuation">(</span><span class="token class-name">String</span> str<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> str<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token class-name">Character</span><span class="token punctuation">.</span><span class="token function">isDigit</span><span class="token punctuation">(</span>str<span class="token punctuation">.</span><span class="token function">charAt</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>    
+    <span class="token keyword">return</span> <span class="token class-name">Integer</span><span class="token punctuation">.</span><span class="token function">parseInt</span><span class="token punctuation">(</span>str<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>性能测试</strong></p>
+<p>我们通过生成的 10000000 个 1000000 以内的随机正整数作为正例，数字结尾带字母作为反例来测试这三个函数的性能。</p>
+<table>
+<thead>
+<tr>
+<th>测试用例</th>
+<th>全部反例</th>
+<th>一半反例</th>
+<th>全部正例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>异常判断法</td>
+<td>5237</td>
+<td>1396</td>
+<td>268</td>
+</tr>
+<tr>
+<td>正则判断法</td>
+<td>5247</td>
+<td>1589</td>
+<td>7183</td>
+</tr>
+<tr>
+<td>简单判断法</td>
+<td>261</td>
+<td>161</td>
+<td>342</td>
+</tr>
+</tbody></table>
+<p>我们可以看到，无论在什么情况下，正则匹配的性能永远是最低的。而我们需要讨论的是异常判断法和简单判断法，在全部是反例的情况下，异常逻辑的性能是非常低的，而简单判断法的性能更加稳定。对于偶发性的反例场景，反倒异常判断法是更好的做法。因为结合上面所讲，可以抛出异常来提示调用者关注这个问题。</p>
+<h1 id="异常与-JVM-关系"><a href="#异常与-JVM-关系" class="headerlink" title="异常与 JVM 关系"></a>异常与 JVM 关系</h1><h2 id="耗时测试"><a href="#耗时测试" class="headerlink" title="耗时测试"></a>耗时测试</h2><p>我们对建立 Object 对象、建立 Exception 对象、try-catch 新建且抛出的 Exception 对象三个行为做了测试统计，建立对象耗时 575817ms，建立异常对象耗时 9589080ms，建立、抛出并接住异常对象耗时 47394475ms。</p>
+<p>从测试数据可以看出，建立一个异常对象，是建立一个普通 Object 耗时的 20 倍，而 try-catch 一个异常对象，所花费时间大约是建立异常对象的 4 倍。那我们来看看占用时间的“大头”：抛出、接住异常，系统到底做了什么事情？</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public void catchException() &#123;  
+    try &#123;  
+        throw new Exception();  
+    &#125; catch (Exception e) &#123;  
+    &#125;  
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="字节码的运作过程"><a href="#字节码的运作过程" class="headerlink" title="字节码的运作过程"></a>字节码的运作过程</h2><p>使用<code>javap -verbose</code>命令输出它的字节码，结果如下：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">public void catchException();  
+  Code:  
+   Stack=2, Locals=2, Args_size=1  
+   0:   new     #58; //class java/lang/Exception  
+   3:   dup  
+   4:   invokespecial   #60; //Method java/lang/Exception."&lt;init>":()V  
+   7:   athrow  
+   8:   astore_1  
+   9:   return  
+  Exception table:  
+   from   to  target type  
+     0     8     8   Class java/lang/Exception  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>偏移地址为 0 的 new 指令</strong>：该指令首先会在常量池找到第 58 项常量，此常量现在为 CONSTANT_Class_info 型的符号引用，类解析阶段被翻译为 <code>java.lang.Exception</code> 类的直接引用，接着虚拟机会在 Java 堆中开辟相应大小的实例空间，并将此空间的引用压入操作栈的栈顶。</p>
+<p><strong>偏移地址为 3 的 dup 指令</strong>：该指令就简单的把栈顶的值复制了一份，重新压入栈顶，这时候操作栈中有 2 份刚刚 new 出来的 exception 对象的引用。</p>
+<p><strong>偏移地址为 4 的 invokespecial 指令</strong>：该指令将第一个 exception 对象引用出栈，以它为接收者调用了 Excepiton 类的实例构造器，这句执行完后栈顶还剩下一份 exception 对象的引用。简单的来说这 3 条字节码只是执行了 <code>new Exception()</code> 这句 Java 代码应该做的事情，和创建任何一个 Java 对象没有任何区别。这一部分耗费的时间在上面分析过，创建一个异常对象只占创建、抛出并接住异常的 20% 时间。</p>
+<p><strong>偏移地址为 7 的 athrow 指令</strong>：该指令运作过程大致是以下几步：</p>
+<ol>
+<li><p>检查栈顶异常对象类型，必须是一个 reference 类型的值，且是 <code>java.lang.Throwable</code> 的子类（虚拟机规范中要求如果遇到 null 则当作 NPE 异常使用）</p>
+<p>在加载时仅作类型验证，即只检查是不是 null，是否为 referance 类型。而是否为 Throwable 的子类一般在类验证阶段的数据流分析中做，或者索性不做靠编译器保证了，编译时写到 Code 属性的 StackMapTable 中。</p>
+</li>
+<li><p>暂时把异常对象的引用出栈</p>
+</li>
+<li><p>搜索异常表，寻找匹配的异常 Handler</p>
+<ul>
+<li>如果找到合适的 Handler，重新初始化 PC 寄存器指针指向此异常 Handler 的第一个指令的偏移地址。接着把当前栈帧的操作栈清空，再把刚刚出栈的异常对象引用重新入栈。</li>
+<li>如果找不到合适的 Handler，只好把当前方法的 VM 栈帧出栈，然后对出栈方法的调用者（也就是当前 VM 栈顶的方法）再做一次异常 Handler 检索，直到找到一个可用的为止。</li>
+<li>如果 VM 栈的栈帧抛光了都没有找到期望的 Handler，这条线程就只好被迫终止。</li>
+</ul>
+</li>
+</ol>
+<p><strong>偏移地址为 8 的 astore_1 指令</strong>：该指令作用是把栈顶的值放到第一个 slot 的局部变量表中，刚才说过如果出现异常后，虚拟机找到了 Handler，会把那个出栈的异常引用重新入栈。因此这句 astore_1 实现的目的就是让 catch 块中的代码能访问到 <code>catch (Exception e)</code> 所定义的那个“e”，又顺便提一句，局部变量表从 0 开始，第 0 个 Slot 放的是方法接收者的引用，也就是使用 this 关键能访问的那个对象。</p>
+<p><strong>偏移地址为 9 的 return 指令</strong>：该指令是 void 方法的返回指令。</p>
+<blockquote>
+<p><strong>异常表</strong></p>
+<p>异常表，在运行期一般会实现在栈帧当中</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">Exception table: 
+ from  to target  type 
+    0   8      8  Class java/lang/Exception <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>上面的异常表只有一个 Handler 记录，它指明了从偏移地址 0 开始（包含0），到偏移地址 8 结束（不包含 8），如果出现了 <code>java.lang.Exception</code> 类型的异常，那么就把 PC 寄存器指针转到 8 开始继续执行。</p>
+<p>顺便说一下，对于 Java 语言中的关键字 catch 和 finally，虚拟机中并没有特殊的字节码指令去支持它们，都是通过编译器生成字节码片段以及不同的异常处理器来实现。</p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/" rel="tag"># 异常处理</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/06/20/RocketMQ-%E5%8E%9F%E7%90%86%E5%8F%8A%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/" rel="prev" title="RocketMQ 原理及应用场景">
+      <i class="fa fa-chevron-left"></i> RocketMQ 原理及应用场景
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/07/12/Middleware-Hibernate/" rel="next" title="Middleware Hibernate">
+      Middleware Hibernate <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8"><span class="nav-number">1.</span> <span class="nav-text">异常</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BD%B1%E5%93%8D%E8%BD%AF%E4%BB%B6%E5%BC%BA%E5%81%A5%E5%BA%A6%E7%9A%84%E5%9B%A0%E7%B4%A0"><span class="nav-number">1.1.</span> <span class="nav-text">影响软件强健度的因素</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#fault"><span class="nav-number">1.1.1.</span> <span class="nav-text">fault</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#failure"><span class="nav-number">1.1.2.</span> <span class="nav-text">failure</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#exception"><span class="nav-number">1.1.3.</span> <span class="nav-text">exception</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%81%E7%A8%8B%E7%9A%84%E5%88%87%E5%88%86"><span class="nav-number">1.2.</span> <span class="nav-text">流程的切分</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E9%97%B4%E8%BE%B9%E7%95%8C"><span class="nav-number">1.2.1.</span> <span class="nav-text">服务间边界</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A8%A1%E5%9D%97%EF%BC%88%E6%88%96%E5%8A%9F%E8%83%BD%EF%BC%89%E9%97%B4%E8%BE%B9%E7%95%8C%E5%8F%8A%E5%87%BD%E6%95%B0%E9%97%B4%E8%BE%B9%E7%95%8C"><span class="nav-number">1.2.2.</span> <span class="nav-text">模块（或功能）间边界及函数间边界</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86%E7%AD%89%E7%BA%A7"><span class="nav-number">2.</span> <span class="nav-text">异常处理等级</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AD%89%E7%BA%A71%EF%BC%9A%E9%94%99%E8%AF%AF%E6%8A%A5%E5%91%8A"><span class="nav-number">2.1.</span> <span class="nav-text">等级1：错误报告</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%BA%E7%AB%8B%E5%AE%89%E5%85%A8%E7%BD%91"><span class="nav-number">2.1.1.</span> <span class="nav-text">建立安全网</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AD%89%E7%BA%A72%EF%BC%9A%E7%8A%B6%E6%80%81%E6%81%A2%E5%A4%8D"><span class="nav-number">2.2.</span> <span class="nav-text">等级2：状态恢复</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%EF%BC%88%E5%90%91%E5%90%8E%E6%81%A2%E5%A4%8D%EF%BC%89"><span class="nav-number">2.2.1.</span> <span class="nav-text">错误处理（向后恢复）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B5%84%E6%BA%90%E6%B8%85%E7%90%86"><span class="nav-number">2.2.2.</span> <span class="nav-text">资源清理</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AD%89%E7%BA%A73%EF%BC%9A%E8%A1%8C%E4%B8%BA%E6%81%A2%E5%A4%8D"><span class="nav-number">2.3.</span> <span class="nav-text">等级3：行为恢复</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%87%8D%E8%AF%95"><span class="nav-number">2.3.1.</span> <span class="nav-text">重试</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%BA%E9%99%B7%E5%A4%84%E7%90%86%EF%BC%88%E5%90%91%E5%89%8D%E6%81%A2%E5%A4%8D%EF%BC%89"><span class="nav-number">2.3.2.</span> <span class="nav-text">缺陷处理（向前恢复）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%87%E7%BA%A7%E5%92%8C%E9%99%8D%E7%BA%A7"><span class="nav-number">2.4.</span> <span class="nav-text">升级和降级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8%E7%9A%84%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.</span> <span class="nav-text">异常的设计</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%91%BD%E5%90%8D%E8%A7%84%E5%88%99%E8%AE%A8%E8%AE%BA"><span class="nav-number">3.1.</span> <span class="nav-text">命名规则讨论</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86%E4%BD%8E%E5%B1%82%E5%BC%82%E5%B8%B8%E8%BD%AC%E6%88%90%E9%AB%98%E5%B1%82%E6%89%80%E7%90%86%E8%A7%A3%E7%9A%84%E5%BC%82%E5%B8%B8"><span class="nav-number">3.2.</span> <span class="nav-text">将低层异常转成高层所理解的异常</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%BC%82%E5%B8%B8%E7%9A%84%E8%AF%AF%E5%8C%BA"><span class="nav-number">4.</span> <span class="nav-text">使用异常的误区</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%BC%82%E5%B8%B8%E5%BD%93%E4%BD%9C%E5%88%A4%E6%96%AD%E6%9D%A1%E4%BB%B6"><span class="nav-number">4.1.</span> <span class="nav-text">使用异常当作判断条件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8%E4%B8%8E-JVM-%E5%85%B3%E7%B3%BB"><span class="nav-number">5.</span> <span class="nav-text">异常与 JVM 关系</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%80%97%E6%97%B6%E6%B5%8B%E8%AF%95"><span class="nav-number">5.1.</span> <span class="nav-text">耗时测试</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%97%E8%8A%82%E7%A0%81%E7%9A%84%E8%BF%90%E4%BD%9C%E8%BF%87%E7%A8%8B"><span class="nav-number">5.2.</span> <span class="nav-text">字节码的运作过程</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

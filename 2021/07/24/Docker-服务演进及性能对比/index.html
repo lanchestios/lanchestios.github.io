@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="随着计算机的兴起，应用从单体架构、分离式架构逐渐演变为现在的微服务架构。而在应用的部署也从单物理机部署、VM（Virtual Machine）部署演变为 Docker 部署，逐步云原生化。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker 服务演进及性能对比">
+<meta property="og:url" content="http://example.com/2021/07/24/Docker-%E6%9C%8D%E5%8A%A1%E6%BC%94%E8%BF%9B%E5%8F%8A%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="随着计算机的兴起，应用从单体架构、分离式架构逐渐演变为现在的微服务架构。而在应用的部署也从单物理机部署、VM（Virtual Machine）部署演变为 Docker 部署，逐步云原生化。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MicroServices/VM%E5%92%8CDocker%E7%BB%93%E6%9E%84%E5%AF%B9%E6%AF%94.png">
+<meta property="og:image" content="http://example.com/images/MicroServices/DockerContainer抽象.png">
+<meta property="og:image" content="http://example.com/images/MicroServices/NativeDockerKVM%E8%AE%A1%E7%AE%97%E8%83%BD%E5%8A%9B%E5%AF%B9%E6%AF%94.png">
+<meta property="og:image" content="http://example.com/images/MicroServices/Docker%E4%B8%8E%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E6%A8%A1%E5%9E%8B.png">
+<meta property="og:image" content="http://example.com/images/MicroServices/%E5%8D%95%E5%85%AB%E6%A0%B8CPU%E4%B8%8E%E5%8F%8C%E5%85%AB%E6%A0%B8CPU%E5%86%85%E5%AD%98%E5%B8%A6%E5%AE%BD%E6%B5%8B%E8%AF%95.png">
+<meta property="og:image" content="http://example.com/images/MicroServices/%E5%8D%95%E5%85%AB%E6%A0%B8CPU%E4%B8%8E%E5%8F%8C%E5%85%AB%E6%A0%B8CPU%E9%9A%8F%E6%9C%BA%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E6%B5%8B%E8%AF%95.png">
+<meta property="article:published_time" content="2021-07-24T04:27:12.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.614Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Docker">
+<meta property="article:tag" content="VM">
+<meta property="article:tag" content="Native">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MicroServices/VM%E5%92%8CDocker%E7%BB%93%E6%9E%84%E5%AF%B9%E6%AF%94.png">
+
+<link rel="canonical" href="http://example.com/2021/07/24/Docker-%E6%9C%8D%E5%8A%A1%E6%BC%94%E8%BF%9B%E5%8F%8A%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Docker 服务演进及性能对比 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/07/24/Docker-%E6%9C%8D%E5%8A%A1%E6%BC%94%E8%BF%9B%E5%8F%8A%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Docker 服务演进及性能对比
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-07-24 12:27:12" itemprop="dateCreated datePublished" datetime="2021-07-24T12:27:12+08:00">2021-07-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Docker/" itemprop="url" rel="index"><span itemprop="name">Docker</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>随着计算机的兴起，应用从单体架构、分离式架构逐渐演变为现在的微服务架构。而在应用的部署也从单物理机部署、VM（Virtual Machine）部署演变为 Docker 部署，逐步云原生化。</p>
+<span id="more"></span>
+
+<h1 id="物理机、VM、Docker-的演进"><a href="#物理机、VM、Docker-的演进" class="headerlink" title="物理机、VM、Docker 的演进"></a>物理机、VM、Docker 的演进</h1><h2 id="物理机到-VM-的演进"><a href="#物理机到-VM-的演进" class="headerlink" title="物理机到 VM 的演进"></a>物理机到 VM 的演进</h2><p>在物理机上部署计算机应用时，往往会将多个应用部署到同一台物理机上。这种部署方式所暴露的最大问题就是应用<strong>集中部署，没有资源隔离</strong>。一旦某个应用导致服务器崩溃，该主机的所有服务全部不能正常使用，这是大多数系统所不能接受的。</p>
+<p><strong>虚拟机（VM，Virtual Machine）解决了资源调配的问题</strong>。物理资源的虚拟化技术通过 Hypervisor 层抽象底层基础设施资源，提供相互隔离的虚拟机，通过统一配置、统一管理、计算资源的可运维性以及资源利用率，可以在一台物理机上同时运行多台虚拟主机，让硬件资源的利用效率得到有效的提升。同时，虚拟机提供客户机操作系统，客户机的变化不会影响宿主机，这样能够提供可控的测试环境，更能够屏蔽底层硬件甚至基础软件的差异性，使应用广泛兼容。然而，<strong>虚拟化技术不可避免地会出现计算、I&#x2F;O、 网络性能损失</strong>，究其本质是因为多了一层软件，毕竟要运行一个完整的客户机操作系统。</p>
+<h2 id="VM-到-Docker-的演进"><a href="#VM-到-Docker-的演进" class="headerlink" title="VM 到 Docker 的演进"></a>VM 到 Docker 的演进</h2><p><strong>容器（Container）解决的核心问题是应用开发、测试和部署的问题。</strong>传统 VM 需要在宿主机操作系统上通过 Hypervisor 对硬件资源进行虚拟化并在其上是多个完整的 OS，而 Docker 直接使用宿主机操作系统调度硬件资源，所以在资源利用率上 Docker 远超传统 VM。另外，传统 VM 的创建速度在容器面前不值一提，因为容器是利用宿主机的系统内核创建的，可以在几秒内大量创建，两者具有数量级上的差距。然而凡事都具有两面性，容器巨大性能优势的对立面是对安全和隔离问题的一系列妥协。</p>
+<p><img src="/images/MicroServices/VM%E5%92%8CDocker%E7%BB%93%E6%9E%84%E5%AF%B9%E6%AF%94.png"></p>
+<p>Docker 通过容器虚拟化、共享内核，能够把应用需要的运行环境、缓存环境、数据库环境等封装起来，以最简单的方式支持应用运行，轻装上阵，性能更佳。Docker 镜像特性则让这种方式更加简单易行。当然，因为共享内核，容器隔离性没有虚拟机那么好。通过 Docker 的特性，以容器化封装为基础，企业就可以很好地实现容器云（向云而生的架构）平台，包括但不限于微服务架构、DevOps，让开发团队可以从运维工作中解脱，集中精力在应用的快速上线、快速迭代方面。</p>
+<img src="/images/MicroServices/DockerContainer抽象.png" style="zoom:50%;" />
+
+<h2 id="VM-与-Docker-的虚拟化区别"><a href="#VM-与-Docker-的虚拟化区别" class="headerlink" title="VM 与 Docker 的虚拟化区别"></a>VM 与 Docker 的虚拟化区别</h2><p>Hypervisor 虚拟化内存的方法是，创建一个 Shadow Page Table。正常的情况下，一个 Page Table 可以用来实现从虚拟内存到物理内存的翻译。在虚拟化的情况下，由于所谓的物理内存仍然是虚拟的，因此 Shadow Page Table 就要做到：虚拟内存-&gt;虚拟的物理内存-&gt;真正的物理内存。</p>
+<p>Hypervisor 虚拟化 I&#x2F;O 设备的方法是，当 Hypervisor 接到 Page Fault，并发现实际上虚拟的物理内存地址对应的是一个 I&#x2F;O 设备，Hypervisor 就用软件模拟这个设备的工作情况，并返回。比如当 CPU 想要写磁盘时，Hypervisor 就把相应的数据写到一个 Host OS 的文件上，这个文件实际上就模拟了虚拟的磁盘。</p>
+<p>对比虚拟机实现资源和环境隔离的方案，Docker 就显得简练很多。根据 Docker 布道师 Jerome Petazzoni 的说法，Docker&#x3D;LXC+AUFS，其中 LXC 负责资源管理，AUFS 负责镜像管理。而 LXC 又包括 CGroup、Namespace、chroot 等组件，并通过 CGroup 进行资源管理。Docker 并没有和虚拟机一样利用一个完全独立的 Guest OS 实现环境隔离，它利用的是目前 Linux 内核本身支持的容器方式实现资源和环境隔离。与虚拟化技术相比，这样既不需要指令级模拟，也不需要即时编译。容器可以在核心 CPU 本地运行指令，而不需要任何专门的解释机制，也避免了准虛拟化（paravirtualization）和系统调用替换中的复杂性。容器在提供隔离的同时，还通过共享资源节省开销，这意味着容器比传统虚拟化技术的开销要小得多。</p>
+<h1 id="Docker-与虚拟机计算效率比较"><a href="#Docker-与虚拟机计算效率比较" class="headerlink" title="Docker 与虚拟机计算效率比较"></a>Docker 与虚拟机计算效率比较</h1><p>从原理的角度推测，Docker 应当在 CPU 和内存的利用效率上比虚拟机高。根据 IBM Research 《An Updated Performance Comparison of Virtual Machines and Linux Containers》给出的数据进行分析。</p>
+<p><img src="/images/MicroServices/NativeDockerKVM%E8%AE%A1%E7%AE%97%E8%83%BD%E5%8A%9B%E5%AF%B9%E6%AF%94.png"></p>
+<p>图中从左往右分别是物理机、Docker 和虚拟机的计算能力数据。可见 Docker 相对于物理机其计算能力几乎没有损耗，而虚拟机对比物理机则有着非常明显的损耗。虚拟机的计算能力损耗在 50% 左右。</p>
+<p>为什么会有这么大的性能损耗呢？一方面是因为虚拟机增加了一层虚拟硬件层，运行在虚拟机上的应用程序在进行数值计算时是运行在 Hypervisor 虚拟的 CPU 上的；另外一方面是由于计算程序本身的特性导致的差异。虚拟机虚拟的 CPU 架构不同于实际 CPU 架构，数值计算程序一般针对特定的 CPU 架构有一定的优化措施，虚拟化使这些措施作废，甚至起到反效果。比如对于本次实验的平台，实际的 CPU 架构是 2 块物理 CPU，每块 CPU 拥有 16 个核，共 32 个核，采用的是 NUMA 架构；而虚拟机则将 CPU 虚拟化成一块拥有 32 个核的 CPU。这就导致了计算程序在进行计算时无法根据实际的 CPU 架构进行优化，大大减低了计算效率。</p>
+<h1 id="Docker-与虚拟机内存访问效率比较"><a href="#Docker-与虚拟机内存访问效率比较" class="headerlink" title="Docker 与虚拟机内存访问效率比较"></a>Docker 与虚拟机内存访问效率比较</h1><p>内存访问效率的比较相对比较复杂一点，主要是内存访问有多种场景：</p>
+<blockquote>
+<ol>
+<li>大批量的，连续地址块的内存数据读写。这种测试环境下得到的性能数据是内存带宽，性能瓶颈主要在内存芯片的性能上；</li>
+<li>随机内存访问性能。这种测试环境下的性能数据主要与内存带宽、Cache 的命中率和虚拟地址与物理地址转换的效率等因素有关。</li>
+</ol>
+</blockquote>
+<p>以下将主要针对这两种内存访问场景进行分析。在分析之前先概要说明一下 Docker 和虚拟机的内存访问模型差异。下图是 Docker 与虚拟机内存访问模型：</p>
+<p><img src="/images/MicroServices/Docker%E4%B8%8E%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E6%A8%A1%E5%9E%8B.png"></p>
+<p>可见在应用程序内存访问上，虚拟机的应用程序要进行 2 次的虚拟内存到物理内存的映射，读写内存的代价比 Docker 的应用程序高。</p>
+<p>下图是大批量、连续地址块内存读取场景下测试数据，即内存带宽数据。左图是程序运行在一块 CPU（即 8 核）上的数据，右图是程序运行在 2 块 CPU（即 16 核）上的数据。单位均为 GB&#x2F;s。</p>
+<p><img src="/images/MicroServices/%E5%8D%95%E5%85%AB%E6%A0%B8CPU%E4%B8%8E%E5%8F%8C%E5%85%AB%E6%A0%B8CPU%E5%86%85%E5%AD%98%E5%B8%A6%E5%AE%BD%E6%B5%8B%E8%AF%95.png"></p>
+<p>从图中数据可以看出，在内存带宽性能上 Docker 与虚拟机的性能差异并不大。这是因为在内存带宽测试中，读写的内存地址是连续的，大批量的，内核对这种操作会进行优化（数据预存取）。因此虚拟内存到物理内存的映射次数比较少，性能瓶颈主要在物理内存的读写速度上，因此这种情况 Docker 和虚拟机的测试性能差别不大。</p>
+<p>内存带宽测试中 Docker 与虚拟机内存访问性能差异不大的原因是由于内存带宽测试中需要进行虚拟地址到物理地址的映射次数比较少。根据这个假设，我们推测，当进行随机内存访问测试时这两者的性能差距将会变大，因为随机内存访问测试中需要进行虚拟内存地址到物理内存地址的映射次数将会变多。结果如下图所示。</p>
+<p><img src="/images/MicroServices/%E5%8D%95%E5%85%AB%E6%A0%B8CPU%E4%B8%8E%E5%8F%8C%E5%85%AB%E6%A0%B8CPU%E9%9A%8F%E6%9C%BA%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E6%B5%8B%E8%AF%95.png"></p>
+<p>左图是程序运行在一个 CPU上的数据，右图是程序运行在 2 块 CPU 上的数据。单位均是 Giga Updates per Second。从左图可以看出，确实如我们所预测的，在随机内存访问性能上容器与虚拟机的性能差距变得比较明显，容器的内存访问性能明显比虚拟机优秀；但出乎我们意料的是在 2 块 CPU 上运行测试程序时容器与虚拟机的随机内存访问性能的差距却又变的不明显。</p>
+<p>针对这个现象，IBM 的论文给出了一个合理解释。这是因为当有 2 块 CPU 同时对内存进行访问时，内存读写的控制将会变得比较复杂，因为两块 CPU 可能同时读写同一个地址的数据，需要对内存数据进行一些同步操作，从而导致内存读写性能的损耗。这种损耗即使对于物理机也是存在的，可以看出右图的内存访问性能数据是低于左图的。2 块 CPU 对内存读写性能的损耗影响是非常大的，这个损耗占据的比例远大于虚拟机和 Docker 由于内存访问模型的不同产生的差异，因此在右图中 Docker 与虚拟机的随机内存访问性能上我们看不出明显差异。</p>
+<h1 id="Docker-与虚拟机启动时间及资源耗费比较"><a href="#Docker-与虚拟机启动时间及资源耗费比较" class="headerlink" title="Docker 与虚拟机启动时间及资源耗费比较"></a>Docker 与虚拟机启动时间及资源耗费比较</h1><p>上面两个小节主要从运行在 Docker 里的程序和运行在虚拟机里的程序进行性能比较。事实上，Docker 之所以如此受到开发者关注的另外一个重要原因是启动 Docker 的系统代价比启动一台虚拟机的代价要低得多：无论从启动时间还是从启动资源耗费角度来说。Docker 直接利用宿主机的系统内核，避免了虚拟机启动时所需的系统引导时间和操作系统运行的资源消耗。利用 Docker 能在几秒钟之内启动大量的容器，这是虚拟机无法办到的。快速启动、低系统资源消耗的优点使 Docker 在弹性云平台和自动运维系统方面有着很好的应用前景。</p>
+<h1 id="Docker-的劣势"><a href="#Docker-的劣势" class="headerlink" title="Docker 的劣势"></a>Docker 的劣势</h1><p>前面的内容主要论述 Docker 相对于虚拟机的优势，但 Docker 也不是完美的系统。相对于虚拟机，Docker 还存在着以下几个缺点：</p>
+<ol>
+<li>资源隔离方面不如虚拟机。Docker 是利用 CGroup 实现资源限制的，只能限制资源消耗的最大值，而不能隔绝其他程序占用自己的资源。</li>
+<li>安全性问题。Docker 目前并不能分辨具体执行指令的用户，只要一个用户拥有执行 docker 的权限，那么他就可以对 Docker 的容器进行所有操作，不管该容器是否是由该用户创建。比如 A 和 B 都拥有执行 Docker 的权限，由于 Docker 的 Server 端并不会具体判断 Docker Client 是由哪个用户发起的，A 可以删除 B 创建的容器，存在一定的安全风险。</li>
+<li>Docker 目前还在版本的快速更新中，细节功能调整比较大。一些核心模块依赖于高版本内核，存在版本兼容问题。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Docker/" rel="tag"># Docker</a>
+              <a href="/tags/VM/" rel="tag"># VM</a>
+              <a href="/tags/Native/" rel="tag"># Native</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/07/19/Docker-%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C/" rel="prev" title="Docker 命令手册">
+      <i class="fa fa-chevron-left"></i> Docker 命令手册
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/05/MySQL-InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E/" rel="next" title="MySQL InnoDB存储引擎">
+      MySQL InnoDB存储引擎 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E6%9C%BA%E3%80%81VM%E3%80%81Docker-%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-number">1.</span> <span class="nav-text">物理机、VM、Docker 的演进</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E6%9C%BA%E5%88%B0-VM-%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-number">1.1.</span> <span class="nav-text">物理机到 VM 的演进</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VM-%E5%88%B0-Docker-%E7%9A%84%E6%BC%94%E8%BF%9B"><span class="nav-number">1.2.</span> <span class="nav-text">VM 到 Docker 的演进</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#VM-%E4%B8%8E-Docker-%E7%9A%84%E8%99%9A%E6%8B%9F%E5%8C%96%E5%8C%BA%E5%88%AB"><span class="nav-number">1.3.</span> <span class="nav-text">VM 与 Docker 的虚拟化区别</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Docker-%E4%B8%8E%E8%99%9A%E6%8B%9F%E6%9C%BA%E8%AE%A1%E7%AE%97%E6%95%88%E7%8E%87%E6%AF%94%E8%BE%83"><span class="nav-number">2.</span> <span class="nav-text">Docker 与虚拟机计算效率比较</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Docker-%E4%B8%8E%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%86%85%E5%AD%98%E8%AE%BF%E9%97%AE%E6%95%88%E7%8E%87%E6%AF%94%E8%BE%83"><span class="nav-number">3.</span> <span class="nav-text">Docker 与虚拟机内存访问效率比较</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Docker-%E4%B8%8E%E8%99%9A%E6%8B%9F%E6%9C%BA%E5%90%AF%E5%8A%A8%E6%97%B6%E9%97%B4%E5%8F%8A%E8%B5%84%E6%BA%90%E8%80%97%E8%B4%B9%E6%AF%94%E8%BE%83"><span class="nav-number">4.</span> <span class="nav-text">Docker 与虚拟机启动时间及资源耗费比较</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Docker-%E7%9A%84%E5%8A%A3%E5%8A%BF"><span class="nav-number">5.</span> <span class="nav-text">Docker 的劣势</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="简易描述了秒杀系统的设计思路。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 秒杀系统设计方案">
+<meta property="og:url" content="http://example.com/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="简易描述了秒杀系统的设计思路。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/直筒型业务模型.png">
+<meta property="og:image" content="http://example.com/images/SE/漏斗型业务模型.png">
+<meta property="og:image" content="http://example.com/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%94%A8%E6%88%B7%E4%BD%93%E9%AA%8C%E6%B5%81%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E5%85%A8%E9%93%BE%E8%B7%AF%E8%B0%83%E7%94%A8.jpg">
+<meta property="og:image" content="http://example.com/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%94%A8%E6%88%B7%E4%BD%93%E9%AA%8C%E6%B5%81%E7%A8%8B.jpg">
+<meta property="article:published_time" content="2021-09-03T08:15:21.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.576Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="秒杀系统">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/直筒型业务模型.png">
+
+<link rel="canonical" href="http://example.com/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 秒杀系统设计方案 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 秒杀系统设计方案
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-09-03 16:15:21" itemprop="dateCreated datePublished" datetime="2021-09-03T16:15:21+08:00">2021-09-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>简易描述了秒杀系统的设计思路。</p>
+ <span id="more"></span>
+
+<h1 id="方案背景"><a href="#方案背景" class="headerlink" title="方案背景"></a>方案背景</h1><h2 id="秒杀的业务场景"><a href="#秒杀的业务场景" class="headerlink" title="秒杀的业务场景"></a>秒杀的业务场景</h2><p>库存固定且少量，所有人会在集中的时间读写这些数据，系统在短时间内会接收到大量的请求。另外比较重要的点是，秒杀系统在售卖时不可超卖。</p>
+<h2 id="系统需要解决的主要问题"><a href="#系统需要解决的主要问题" class="headerlink" title="系统需要解决的主要问题"></a>系统需要解决的主要问题</h2><ol>
+<li>友好的用户体验（用户不接受破窗体验，如系统超时、404 等）</li>
+<li>瞬时高并发流量的挑战（木桶短板理论，系统的瓶颈往往都在 DB）</li>
+<li>竞争的资源有限（数据库锁等冲突严重）</li>
+<li>正确的交易状态（竞争状态下不发生超卖、重买等问题）</li>
+</ol>
+<h1 id="业务模型分类"><a href="#业务模型分类" class="headerlink" title="业务模型分类"></a>业务模型分类</h1><h2 id="直筒型业务模型"><a href="#直筒型业务模型" class="headerlink" title="直筒型业务模型"></a>直筒型业务模型</h2><p>直筒型业务模型指的是用户请求 1:1 透传到 Database 中。</p>
+<img src="/images/SE/直筒型业务模型.png" style="zoom: 67%;" />
+
+<h2 id="漏斗型业务模型"><a href="#漏斗型业务模型" class="headerlink" title="漏斗型业务模型"></a>漏斗型业务模型</h2><p>漏斗型业务模型指的是用户的请求从 Client 到 Persistent Layer 层层递减，递减的数量级根据业务来定。</p>
+<img src="/images/SE/漏斗型业务模型.png" style="zoom: 67%;" />
+
+<p>这个模型也揭示了高并发系统的基础：</p>
+<ul>
+<li>前端保护后端</li>
+<li>及早发现，及早拒绝</li>
+<li>Fast Fail</li>
+</ul>
+<p>因此我们也可以推断出相应的系统优化策略：</p>
+<ul>
+<li>将请求尽力拦截在上游</li>
+<li>充分利用缓存解决高并发下的读取功能</li>
+<li>批量入库提高物理机瓶颈（REDIS 缓存请求队列与 MYSQL 批量入库结合）</li>
+<li>热点隔离<ul>
+<li>业务隔离（如 12306 分时段售票，将热点数据分散处理，降低系统负载压力）</li>
+<li>系统隔离（实现系统的软硬件隔离）</li>
+<li>数据隔离（启用单独的 Cache、DB 存放热点数据）</li>
+</ul>
+</li>
+</ul>
+<p>可以由上至下四个部分对上述高并发系统基础进行具体实现：</p>
+<p><strong>产品策略</strong></p>
+<ul>
+<li>轻重逻辑分离：以秒杀为例，将交易和支付逻辑分离<ul>
+<li>交易是比较轻的操作，成功扣减库存即算作成功</li>
+<li>支付是比较重的操作，需要涉及到事务操作</li>
+</ul>
+</li>
+<li>用户分流：以整点秒杀活动为例，在 1 分钟内，陆续对用户放开入口，将所有用户请求打散在 60s 内，请求就可以降一个数量级</li>
+<li>页面简化：在秒杀开始的时候，需要简化页面展示，该时刻只保留和秒杀相关的功能。例如，秒杀开始的时候，页面可以不展示推荐的商品。</li>
+</ul>
+<p><strong>客户端</strong></p>
+<ul>
+<li>重试策略：如果用户秒杀失败后频繁重试，会加剧后端的雪崩。根据后端返回码的约定，有两种重试思路。<ul>
+<li>不允许重试错误：不允许重试。同时 UI 和文案需要提示。</li>
+<li>可重试错误：需要策略重试，例如二进制退避法。同时 UI 和文案需要提示。</li>
+</ul>
+</li>
+<li>UI 和文案：秒杀开始前后，用户的所有异常都需要有精心设计的 UI 和文案提示。<ul>
+<li>例如：<code>[当前活动太火爆，请稍后再重试]</code>、<code>[你的货物堵在路上，请稍后查看]</code> 等</li>
+</ul>
+</li>
+<li>前端随机丢弃请求：它可以作为降级方案，当用户流量远远大于系统容量时，人工下发随机丢弃标记，用户本地客户端开始随机丢弃请求。</li>
+</ul>
+<p><strong>接入层</strong></p>
+<ul>
+<li>所有请求需要鉴权，校验合法身份<ul>
+<li>如果是长链接的服务，鉴权粒度可以在 session 级别。</li>
+<li>如果是短链接业务，需要应对这种高并发流量，例如 Cache 等。</li>
+</ul>
+</li>
+<li>根据后端系统容量，需要一个全局的限流功能，通常有两种做法：<ul>
+<li>设置好 N 后，动态获取机器部署情况 M，然后下发单机限流值 N&#x2F;M。要求请求均匀访问，部署机器统一。</li>
+<li>维护全局 Key，以时间戳建 Key。 有热 Key问题，可以通过增加更细粒度的 Key 或者定时更新 Key 的方法。</li>
+</ul>
+</li>
+<li>对于单用户&#x2F;单 IP 需要频控，主要是防黑产和恶意用户（可能会用到令牌桶等功能）。</li>
+<li>如果秒杀是有条件的，例如需要完成任务解锁资格，对于获得资格的步骤，可以进行安全扫描，识别出黑产和恶意用户。</li>
+</ul>
+<p><strong>逻辑层</strong></p>
+<ul>
+<li>逻辑层首先应该进入校验逻辑，例如参数的合法性，是否有资格,如果失败的用户，快速返回，避免请求洞穿到db。</li>
+<li>异步补单，对于已经扣除秒杀资格的用户，如果发货失败后，通常的两种做法是：<ul>
+<li>事务回滚：回滚本次操作，提示用户重试。这个代价特别大，而且用户重试和前面的重试策略结合的话，用户体验也不大流畅。</li>
+<li>异步重做：记录本次用户的 log, 提示用户 <code>[稍后查看，正在发货中]</code>，后台在峰值过后，启动异步补单。需要服务支持幂等。</li>
+</ul>
+</li>
+<li>对于发货的库存，需要处理热 Key。通常的做法是，维护多个 Key，每个用户固定去某个查询库存。对于大量抢红包的场景，可以提前分配。</li>
+</ul>
+<p><strong>存储层</strong></p>
+<p>对于业务模型而言，对于 DB 的要求需要保证几个原则：</p>
+<ul>
+<li>可靠性<ul>
+<li>主备：主备能互相切换，一般要求在同城跨机房。</li>
+<li>异地容灾：当地异常，数据能恢复，异地能选主。</li>
+<li>数据需要持久化到磁盘，或者更冷的设备。</li>
+</ul>
+</li>
+<li>一致性<ul>
+<li>对于秒杀而言，需要严格的一致性，一般要求主备严格的一致。</li>
+</ul>
+</li>
+</ul>
+<h1 id="方案实践（微视集卡瓜分红包）"><a href="#方案实践（微视集卡瓜分红包）" class="headerlink" title="方案实践（微视集卡瓜分红包）"></a>方案实践（微视集卡瓜分红包）</h1><p>微视集卡瓜分红包系统，用户体验流程如下：</p>
+<p><img src="/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%94%A8%E6%88%B7%E4%BD%93%E9%AA%8C%E6%B5%81%E7%A8%8B.png"></p>
+<h2 id="架构图"><a href="#架构图" class="headerlink" title="架构图"></a>架构图</h2><p><img src="/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%B3%BB%E7%BB%9F%E6%9E%B6%E6%9E%84.png"></p>
+<h2 id="瓜分降级预案"><a href="#瓜分降级预案" class="headerlink" title="瓜分降级预案"></a>瓜分降级预案</h2><p>为了做好瓜分时刻的高并发，对整个系统需要保证两个重要的事情：</p>
+<ul>
+<li>全链路梳理，包括调用链的合理性和时延设置</li>
+<li>降级服务预案分析，提升系统的鲁棒性</li>
+</ul>
+<p>如下图所示，是针对瓜分全链路调用分析如下图，需要特别说明的几点：</p>
+<p><img src="/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E5%85%A8%E9%93%BE%E8%B7%AF%E8%B0%83%E7%94%A8.jpg"></p>
+<ul>
+<li>时延很重要，需要全链路分析。不但可以提高吞吐量，而且可以快速暴露系统的瓶颈。</li>
+<li>峰值时刻，补单逻辑需要关闭，避免加剧雪崩。</li>
+</ul>
+<p>降级预案大概如下：</p>
+<ul>
+<li><p>一级预案，瓜分时刻前后 5 分钟自动进入：</p>
+</li>
+<li><ul>
+<li>入口处 1 分钟内陆续放开入口倒计时，未登录用户不弹入口</li>
+<li>主会场排队，以进入主会场 100w QPS 为例，超过了进入排队，由接入层频控控制</li>
+<li>拉取资格接口排队，拉取资格接口 100w QPS，超过了进入排队，由接入层频控控制</li>
+<li>抢红包排队，抢红包 100w QPS，超过了进入排队，由接入层频控控制</li>
+<li>红包到账排队，如果资格扣除成功，现金发放失败，进入排队，24 小时内到账。异步补单</li>
+<li>入口处调用后端非关键 rpc：ParticipateStatus，手动关闭</li>
+<li>异步补单逻辑关闭。</li>
+</ul>
+</li>
+<li><p>二级预案，后端随机丢请求，接入层频控失效或者下游服务过载，手动开启</p>
+</li>
+<li><p>三级预案，前端随机丢请求，后端服务过载或者宕机进入，手动开启</p>
+</li>
+</ul>
+<h2 id="用户体验流程"><a href="#用户体验流程" class="headerlink" title="用户体验流程"></a>用户体验流程</h2><p><img src="/images/SE/%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%E7%B3%BB%E7%BB%9F%E7%94%A8%E6%88%B7%E4%BD%93%E9%AA%8C%E6%B5%81%E7%A8%8B.jpg"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F/" rel="tag"># 秒杀系统</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/09/02/Spring-SpringMVC%E5%88%9B%E5%BB%BA%E5%8F%8A%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B%E8%A7%A3%E6%9E%90/" rel="prev" title="SpringMVC 创建及请求处理过程解析">
+      <i class="fa fa-chevron-left"></i> SpringMVC 创建及请求处理过程解析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/09/06/Spring-SpringMVC%E7%BB%84%E4%BB%B6%E8%A7%A3%E6%9E%90/" rel="next" title="SpringMVC 组件解析">
+      SpringMVC 组件解析 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%96%B9%E6%A1%88%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">方案背景</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A7%92%E6%9D%80%E7%9A%84%E4%B8%9A%E5%8A%A1%E5%9C%BA%E6%99%AF"><span class="nav-number">1.1.</span> <span class="nav-text">秒杀的业务场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E9%9C%80%E8%A6%81%E8%A7%A3%E5%86%B3%E7%9A%84%E4%B8%BB%E8%A6%81%E9%97%AE%E9%A2%98"><span class="nav-number">1.2.</span> <span class="nav-text">系统需要解决的主要问题</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%A8%A1%E5%9E%8B%E5%88%86%E7%B1%BB"><span class="nav-number">2.</span> <span class="nav-text">业务模型分类</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B4%E7%AD%92%E5%9E%8B%E4%B8%9A%E5%8A%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.1.</span> <span class="nav-text">直筒型业务模型</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BC%8F%E6%96%97%E5%9E%8B%E4%B8%9A%E5%8A%A1%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.2.</span> <span class="nav-text">漏斗型业务模型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%96%B9%E6%A1%88%E5%AE%9E%E8%B7%B5%EF%BC%88%E5%BE%AE%E8%A7%86%E9%9B%86%E5%8D%A1%E7%93%9C%E5%88%86%E7%BA%A2%E5%8C%85%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">方案实践（微视集卡瓜分红包）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84%E5%9B%BE"><span class="nav-number">3.1.</span> <span class="nav-text">架构图</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%93%9C%E5%88%86%E9%99%8D%E7%BA%A7%E9%A2%84%E6%A1%88"><span class="nav-number">3.2.</span> <span class="nav-text">瓜分降级预案</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%A8%E6%88%B7%E4%BD%93%E9%AA%8C%E6%B5%81%E7%A8%8B"><span class="nav-number">3.3.</span> <span class="nav-text">用户体验流程</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

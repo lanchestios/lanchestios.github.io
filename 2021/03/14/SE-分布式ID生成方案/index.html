@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="分布式ID生成方案">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分布式系统 分布式ID生成方案">
+<meta property="og:url" content="http://example.com/2021/03/14/SE-%E5%88%86%E5%B8%83%E5%BC%8FID%E7%94%9F%E6%88%90%E6%96%B9%E6%A1%88/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="分布式ID生成方案">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/snowflake-sequence-number.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/Segment%E5%8F%8CBuffer%E4%BC%98%E5%8C%96.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/DB%E4%B8%80%E4%B8%BB%E4%B8%A4%E4%BB%8E%E5%AE%B9%E7%81%BE.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/Zookeeper-Snowflake.png">
+<meta property="og:image" content="http://example.com/images/DistributedSystem/Zookeeper%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/SE/ringbuffer.png">
+<meta property="article:published_time" content="2021-03-13T16:45:14.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.594Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="Distributed System">
+<meta property="article:tag" content="snowflake">
+<meta property="article:tag" content="segment">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/DistributedSystem/snowflake-sequence-number.png">
+
+<link rel="canonical" href="http://example.com/2021/03/14/SE-%E5%88%86%E5%B8%83%E5%BC%8FID%E7%94%9F%E6%88%90%E6%96%B9%E6%A1%88/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>分布式系统 分布式ID生成方案 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/03/14/SE-%E5%88%86%E5%B8%83%E5%BC%8FID%E7%94%9F%E6%88%90%E6%96%B9%E6%A1%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          分布式系统 分布式ID生成方案
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-03-14 00:45:14" itemprop="dateCreated datePublished" datetime="2021-03-14T00:45:14+08:00">2021-03-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>分布式ID生成方案</p>
+<span id="more"></span>
+
+<h1 id="业务系统的需求"><a href="#业务系统的需求" class="headerlink" title="业务系统的需求"></a>业务系统的需求</h1><h2 id="当前业务要求"><a href="#当前业务要求" class="headerlink" title="当前业务要求"></a>当前业务要求</h2><p><strong>业务系统对 ID 号码的要求</strong></p>
+<ol>
+<li>全局唯一性</li>
+<li>趋势递增：在 MySQL InnoDB 引擎中使用的是聚集索引，由于多数 RDBMS 使用 B-tree 的数据结构来存储索引数据，在主键的选择上面我们应该尽量使用有序的主键保证写入性能</li>
+<li>单调递增：保证下一个 ID 一定大于上一个 ID，例如事务版本号、IM 聊天中的增量消息、排序等特殊需求</li>
+<li>信息安全：如果 ID 是连续的，恶意用户的扒取工作就非常容易做了，直接按照顺序下载指定 URL 即可；如果是订单号就更危险了，竞争对手可以直接知道我们一天的单量。所以在一些应用场景下，会需要 ID 无规则、不规则。</li>
+</ol>
+<p>上述123对应三类不同的场景，3和4需求还是互斥的，无法使用同一个方案满足。</p>
+<p><strong>业务系统对 ID 号生成系统的可用性要求</strong>：</p>
+<ol>
+<li>平均延迟和 TP999（Top Percentile 99.9%） 延迟都要尽可能低</li>
+<li>可用性5个9</li>
+<li>高 QPS</li>
+</ol>
+<h2 id="不用UUID的原因"><a href="#不用UUID的原因" class="headerlink" title="不用UUID的原因"></a>不用UUID的原因</h2><p>UUID（Universally Unique Identifier）的标准型式包含 32 个 16 进制数字，以连字号分为五段，形式为 8-4-4-4-12 的 36 个字符，示例：550e8400-e29b-41d4-a716-446655440000，到目前为止业界一共有5种方式生成UUID，详情见 IETF 发布的 UUID 规范：《<a target="_blank" rel="noopener" href="https://links.jianshu.com/go?to=http://www.ietf.org/rfc/rfc4122.txt">A Universally Unique IDentifier (UUID) URN Namespace</a>》。</p>
+<p><strong>使用 UUID 的优势</strong></p>
+<p>性能非常高：本地生成，没有网络消耗。</p>
+<p><strong>使用 UUID 的缺陷</strong></p>
+<ol>
+<li><p>不易于存储：UUID 太长，16 字节 128 位，通常以36长度的字符串表示，很多场景不适用；</p>
+</li>
+<li><p>信息不安全：基于MAC地址生成UUID的算法可能会造成MAC地址泄露，这个漏洞曾被用于寻找梅丽莎病毒的制作者位置。</p>
+</li>
+<li><p>ID作为主键时在特定的环境会存在一些问题，比如做DB主键的场景下，UUID就非常不适用：</p>
+<p>① MySQL官方有明确的建议主键要尽量越短越好，36个字符长度的UUID不符合要求：</p>
+</li>
+</ol>
+<blockquote>
+<p>All indexes other than the clustered index are known as secondary indexes. In InnoDB, each record in a secondary index contains the primary key columns for the row, as well as the columns specified for the secondary index. InnoDB uses this primary key value to search for the row in the clustered index.<em><strong>If the primary key is long, the secondary indexes use more space, so it is advantageous to have a short primary key</strong></em>.</p>
+</blockquote>
+<p>​		② 对MySQL索引不利：如果作为数据库主键，在InnoDB引擎下，UUID的无序性可能会引起数据位置		频繁变动，严重影响性能。</p>
+<p>总之，UUID 有很多合适的应用场景，但对于有些业务系统来说，UUID 显然不是最佳选择。</p>
+<h2 id="不用数据库的自增ID的原因"><a href="#不用数据库的自增ID的原因" class="headerlink" title="不用数据库的自增ID的原因"></a>不用数据库的自增ID的原因</h2><p><strong>使用DB自增ID的优势</strong></p>
+<ol>
+<li>非常简单，利用现有数据库系统的功能实现，成本小，有DBA专业维护</li>
+<li>ID号单调自增，可以实现一些对ID有特殊要求的业务。</li>
+</ol>
+<p><strong>使用DB自增ID的缺陷</strong></p>
+<ol>
+<li>强依赖DB，当DB异常时整个系统不可用，属于致命问题。配置主从复制可以尽可能的增加可用性，但是数据一致性在特殊情况下难以保证。主从切换时的不一致可能会导致重复发号；</li>
+<li>ID发号性能瓶颈限制在单台MySQL的读写性能。</li>
+</ol>
+<p>对于MySQL性能问题，可用如下方案解决：在分布式系统中可以多部署几台机器，每台机器设置不同的初始值，且步长和机器数相等。比如有两台机器。设置步长step为2，TicketServer1的初始值为1（1，3，5，7，9，11…）、TicketServer2的初始值为2（2，4，6，8，10…）。这是Flickr团队在2010年撰文介绍的一种主键生成策略（详见：《<a target="_blank" rel="noopener" href="https://links.jianshu.com/go?to=http://code.flickr.net/2010/02/08/ticket-servers-distributed-unique-primary-keys-on-the-cheap/">Ticket Servers: Distributed Unique Primary Keys on the Cheap</a>》）。如下所示，为了实现上述方案分别设置两台机器对应的参数，TicketServer1从1开始发号，TicketServer2从2开始发号，两台机器每次发号之后都递增2。</p>
+<p>假设要部署N台机器，步长需设置为N，每台的初始值依次为0,1,2…N-1那么整个架构就变成了如下图所示：</p>
+<p>![](&#x2F;images&#x2F;DistributedSystem&#x2F;Ticket Servers.png)</p>
+<p>这种架构有显而易见的缺点：</p>
+<ol>
+<li>系统水平扩展比较困难：比如定义好了步长和机器台数之后，如果要添加机器该怎么做？假设现在只有一台机器发号是1,2,3,4,5（步长是1），这个时候需要扩容机器一台。可以这样做：把第二台机器的初始值设置得比第一台超过很多，比如14（假设在扩容时间之内第一台不可能发到14），同时设置步长为2，那么这台机器下发的号码都是14以后的偶数。然后摘掉第一台，把ID值保留为奇数，比如7，然后修改第一台的步长为2。让它符合我们定义的号段标准，对于这个例子来说就是让第一台以后只能产生奇数。扩容方案看起来复杂吗？貌似还好，现在想象一下如果我们线上有100台机器，这个时候要扩容该怎么做？简直是噩梦。所以系统水平扩展方案复杂难以实现</li>
+<li>ID没有了单调递增的特性：只能趋势递增，这个缺点对于一般业务需求不是很重要，可以容忍</li>
+<li>数据库压力还是很大：每次获取ID都得读写一次数据库，只能靠堆机器来提高性能。</li>
+</ol>
+<h1 id="Twitter-Snowflake方案"><a href="#Twitter-Snowflake方案" class="headerlink" title="Twitter-Snowflake方案"></a>Twitter-Snowflake方案</h1><blockquote>
+<p>全局唯一、局部有序</p>
+</blockquote>
+<h2 id="前置知识"><a href="#前置知识" class="headerlink" title="前置知识"></a>前置知识</h2><p><strong>整型表示</strong></p>
+<p>在 Java 标准中明确定义了整数数据类型需要采用补码表示和存储。表示方法如下：</p>
+<p>Binary to Unsigned 二进制数转无符号数</p>
+<blockquote>
+<p>  w 代表二进制位数，其最高位，也就是 w-1 所在的位置可以被解释为负权（negative weight）</p>
+</blockquote>
+<p>$$<br>B2U_w(\vec{x})&#x3D;\sum^{w-1}_{i&#x3D;0}x_i2^i<br>$$</p>
+<p>Binary to Sign-Magnitude 二进制数转原码<br>$$<br>B2S_w(\vec{x})&#x3D;(-1)^{x_{w-1}}  \sum^{w-2}<em>{i&#x3D;0}x_i2^i<br>$$<br>Binary to Ones’ Complement 二进制转反码<br>$$<br>B2O_w(\vec{x})&#x3D;-x</em>{w-1}(2^{w-1}-1)+\sum^{w-2}<em>{i&#x3D;0}x_i2^i<br>$$<br>Binary to Two’s-Complement 二进制数转补码<br>$$<br>B2T_w(\vec{x})&#x3D;-x</em>{w-1}2^{w-1}+\sum^{w-2}_{i&#x3D;0}x_i2^i<br>$$<br><strong>模</strong></p>
+<p>“模”是指一个计量系统的计数范围。表示 n 位的计算机计量范围是 0~2^n，模 &#x3D; 2^n。任何有模的计量器都可化减法为加法。</p>
+<p>关键概念：原码 + 补码 &#x3D; 模</p>
+<p>假设当前时针指向8点，而准确时间是6点，调整时间可有以下两种拨法</p>
+<ol>
+<li>一种是倒拨2小时，即<code>8 - 2 = 6</code></li>
+<li>另一种是顺拨10小时，<code>8 + 10 = 12 + 6 = 6</code>，即<code>8 - 2 = 8 + 10 = 8 + 12 - 2 (mod 12)</code></li>
+</ol>
+<p>公式的一般表示<br>$$<br>a-b&#x3D;a+(-b+mod)&#x3D;a+(mod-b)<br>$$</p>
+<h2 id="算法原理"><a href="#算法原理" class="headerlink" title="算法原理"></a>算法原理</h2><p>snowflake 是 Twitter 开源的分布式ID生成算法，结果是一个 long 型的 ID。</p>
+<p><img src="/images/DistributedSystem/snowflake-sequence-number.png"></p>
+<p>这种方案大致来说是一种以划分命名空间（UUID 也算，由于比较常见，所以单独分析）来生成 ID 的一种算法，这种方案把 64bit 分别划分成多段。其核心思想是：使用 41bit 作为毫秒数，10bit 作为机器的 ID，12bit 作为毫秒内的流水号，最后还有一个符号位，永远是0（一般 ID 不会出现负数的情况）。</p>
+<p>由于整个结构是64位，所以我们在Java中可以使用Long来进行存储。 该算法实现基本就是二进制操作,单机每秒内理论上最多可以生成1024*(2^12)，也就是 409.6 万个 ID (1024 X 4096 &#x3D; 4194304)</p>
+<blockquote>
+<p> 0 - 0000000000 0000000000 0000000000 0000000000 0 - 00000 - 00000 - 000000000000 </p>
+<ul>
+<li><strong>1位标识</strong>，由于 Long 基本类型在 Java 中是带符号的，最高位是符号位，正数是0，负数是1，所以 id 一般是正数，最高位是0</li>
+<li>**41位时间截(毫秒级)**，注意，41位 时间截不是存储当前时间的时间截，而是存储时间截的差值（当前时间截 - 开始时间截) 得到的值，这里的的开始时间截，一般是我们的 ID 生成器开始使用的时间，由我们程序来指定的。41位 的时间截，可以使用 69年，年T &#x3D; (1L &lt;&lt; 41) &#x2F; (1000L * 60 * 60 * 24 * 365) &#x3D; 69</li>
+<li><strong>10位的数据机器位</strong>，可以部署在 1024个 节点，包括 5位 datacenterId 和 5位 workerId。10-bit 机器可以分别表示 1024台 机器。如果我们对 IDC 划分有需求，还可以将 10-bit 分 5-bit 给IDC，分 5-bit 给工作机器。这样就可以表示 32 个 IDC，每个 IDC 下可以有 32 台机器，可以根据自身需求定义。</li>
+<li><strong>12位序列</strong>，毫秒内的计数，12位 的计数顺序号支持每个节点每毫秒(同一机器，同一时间截)产生 4096个 ID序号。12个 自增序列号可以表示 2^12个 ID，理论上 snowflake 方案的 QPS 约为 409.6w&#x2F;s，这种分配方式可以保证在任何一个 IDC 的任何一台机器在任意毫秒内生成的 ID 都是不同的。</li>
+</ul>
+</blockquote>
+<p><strong>优点</strong>：</p>
+<p>整体上按照时间自增排序，并且整个分布式系统内不会产生ID碰撞(由数据中心ID和机器ID作区分)，并且效率较高，经测试，SnowFlake每秒能够产生26万ID左右。</p>
+<blockquote>
+<ul>
+<li>毫秒数在高位，自增序列在低位，整个ID都是趋势递增的。</li>
+<li>不依赖数据库等第三方系统，以服务的方式部署，稳定性更高，生成ID的性能也是非常高的。</li>
+<li>可以根据自身业务特性分配bit位，非常灵活。</li>
+</ul>
+</blockquote>
+<p><strong>缺点</strong>：</p>
+<blockquote>
+<ul>
+<li><strong>强依赖机器时钟</strong>，如果机器上时钟回拨，会导致发号重复或者服务会处于不可用状态。</li>
+<li>针对此，美团做出了改进：<a target="_blank" rel="noopener" href="https://github.com/Meituan-Dianping/Leaf">https://github.com/Meituan-Dianping/Leaf</a></li>
+</ul>
+</blockquote>
+<h2 id="算法实现"><a href="#算法实现" class="headerlink" title="算法实现"></a>算法实现</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">package</span> <span class="token namespace">org<span class="token punctuation">.</span>tarot<span class="token punctuation">.</span>leaf</span><span class="token punctuation">;</span>
+
+<span class="token comment">/**
+ * @package: org.tarot.leaf
+ * @author: 王子豪
+ * @date: 2020/12/16 20:28
+ * @description: 基于Twitter开源的分布式ID生成算法 Snowflake
+ * Long型数据 64bit 各位分布
+ * 1bit    弃用（符号位）
+ * 41bit   时间戳差值
+ * 10bit   数据中心-机器ID
+ * 12bit   序列号
+ * 移位算法 ~(-1 &lt;&lt; bit) 算出bit位的最大正数 即五位数最大值为31
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">SnowflakeIDGenerator</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//开始时间截 (2020-12-01)</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> twepoch <span class="token operator">=</span> <span class="token number">1606752000000L</span><span class="token punctuation">;</span>
+    <span class="token comment">// 数据中心id所占的位数</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> dataCenterIdBits <span class="token operator">=</span> <span class="token number">5L</span><span class="token punctuation">;</span>
+    <span class="token comment">// 机器id所占的位数</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> workerIdBits <span class="token operator">=</span> <span class="token number">5L</span><span class="token punctuation">;</span>
+    <span class="token comment">// 序列在id中占的位数</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> sequenceBits <span class="token operator">=</span> <span class="token number">12L</span><span class="token punctuation">;</span>
+    <span class="token comment">// 支持的最大数据标识id</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> maxDataCenterId <span class="token operator">=</span> <span class="token operator">~</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1L</span> <span class="token operator">&lt;&lt;</span> dataCenterIdBits<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 支持的最大机器id</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> maxWorkerId <span class="token operator">=</span> <span class="token operator">~</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1L</span> <span class="token operator">&lt;&lt;</span> workerIdBits<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 生成序列的掩码，这里为4095 (0b111111111111=0xfff=4095)</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> sequenceMask <span class="token operator">=</span> <span class="token operator">~</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1L</span> <span class="token operator">&lt;&lt;</span> sequenceBits<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 机器ID向左移12位(12)</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> workerIdShift <span class="token operator">=</span> sequenceBits<span class="token punctuation">;</span>
+    <span class="token comment">// 数据中心id向左移17位(12+5)</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> dataCenterIdShift <span class="token operator">=</span> sequenceBits <span class="token operator">+</span> workerIdBits<span class="token punctuation">;</span>
+    <span class="token comment">// 时间截向左移22位(12+5+5)</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span> timestampLeftShift <span class="token operator">=</span> sequenceBits <span class="token operator">+</span> workerIdBits <span class="token operator">+</span> dataCenterIdBits<span class="token punctuation">;</span>
+    <span class="token comment">//数据中心ID(0~31)</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> dataCenterId<span class="token punctuation">;</span>
+    <span class="token comment">//工作机器ID(0~31)</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> workerId<span class="token punctuation">;</span>
+    <span class="token comment">//毫秒内序列(0~4095)</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> sequence <span class="token operator">=</span> <span class="token number">0L</span><span class="token punctuation">;</span>
+    <span class="token comment">//上次生成ID的时间截</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> lastTimestamp <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1L</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token class-name">SnowflakeIDGenerator</span><span class="token punctuation">(</span><span class="token keyword">long</span> dataCenterId<span class="token punctuation">,</span> <span class="token keyword">long</span> workerId<span class="token punctuation">,</span> <span class="token keyword">long</span> sequence<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>dataCenterId <span class="token operator">></span> maxDataCenterId <span class="token operator">||</span> dataCenterId <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"Snowflake dataCenterId is out of bounds"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>workerId <span class="token operator">></span> maxWorkerId <span class="token operator">||</span> workerId <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"Snowflake workerId is out of bounds"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>dataCenterId <span class="token operator">=</span> dataCenterId<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>workerId <span class="token operator">=</span> workerId<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>sequence <span class="token operator">=</span> sequence <span class="token operator">%</span> sequenceMask<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     * 获取下一个ID
+     */</span>
+    <span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">long</span> timestamp <span class="token operator">=</span> <span class="token function">timeGen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">//如果当前时间戳小于上次时间戳，时间戳处理出现异常</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>timestamp <span class="token operator">&lt;</span> lastTimestamp<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span>err<span class="token punctuation">.</span><span class="token function">printf</span><span class="token punctuation">(</span><span class="token string">"Clock is moving backwards. Rejecting requests until %d"</span><span class="token punctuation">,</span> lastTimestamp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token string">"Clock is moving backwards. Refusing to generate id for %d milliseconds"</span><span class="token punctuation">,</span> lastTimestamp <span class="token operator">-</span> timestamp<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">//如果当前时间戳等于上次时间戳，同一毫秒内，递增序列号，否则清零重新开始</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>timestamp <span class="token operator">==</span> lastTimestamp<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">//在sequence递增一后，如果超过最大值1，则会为0</span>
+            <span class="token comment">//127 &amp; 127 = 127 ; 128 &amp; 127 = 0 ; 129 &amp; 127 = 1</span>
+            sequence <span class="token operator">=</span> <span class="token punctuation">(</span>sequence <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> sequenceMask<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>sequence <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                timestamp <span class="token operator">=</span> <span class="token function">tilNextMills</span><span class="token punctuation">(</span>lastTimestamp<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            sequence <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">//刷新上次时间戳值</span>
+        lastTimestamp <span class="token operator">=</span> timestamp<span class="token punctuation">;</span>
+
+        <span class="token keyword">return</span> <span class="token punctuation">(</span>timestamp<span class="token operator">-</span>twepoch<span class="token punctuation">)</span> <span class="token operator">&lt;&lt;</span> timestampLeftShift
+                <span class="token operator">|</span> dataCenterId <span class="token operator">&lt;&lt;</span> dataCenterIdBits
+                <span class="token operator">|</span> workerId <span class="token operator">&lt;&lt;</span> workerIdBits
+                <span class="token operator">|</span> sequence<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     * 取到下一个时间戳
+     * @param lastTimestamp 上一次生成ID的时间戳
+     * @return 新的时间戳
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> <span class="token function">tilNextMills</span><span class="token punctuation">(</span><span class="token keyword">long</span> lastTimestamp<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">long</span> timestamp <span class="token operator">=</span> <span class="token function">timeGen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>timestamp <span class="token operator">&lt;=</span> lastTimestamp<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            timestamp <span class="token operator">=</span> <span class="token function">timeGen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> timestamp<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">/**
+     * 获取系统时间戳
+     * @return 13位时间戳(ms)
+     */</span>
+    <span class="token keyword">private</span> <span class="token keyword">long</span> <span class="token function">timeGen</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="算法的优缺点"><a href="#算法的优缺点" class="headerlink" title="算法的优缺点"></a>算法的优缺点</h2><p>► 优点：</p>
+<ol>
+<li>毫秒数在高位，自增序列在低位，整个ID都是趋势递增的</li>
+<li>不依赖数据库等第三方系统，以服务的方式部署，稳定性更高，生成ID的性能也是非常高的</li>
+<li>可以根据自身业务特性分配bit位，非常灵活</li>
+</ol>
+<p>► 缺点：</p>
+<p>强依赖机器时钟，如果机器上时钟回拨，会导致发号重复或者服务会处于不可用状态。</p>
+<p>► 应用举例——Mongdb的objectID：</p>
+<p>MongoDB官方文档 <a target="_blank" rel="noopener" href="https://links.jianshu.com/go?to=https://docs.mongodb.com/manual/reference/method/ObjectId/%23description">ObjectID</a> 可以算作是和snowflake类似方法，通过“时间+机器码+pid+inc”共12个字节，通过4+3+2+3的方式最终标识成一个24长度的十六进制字符。</p>
+<h1 id="Leaf-Segment方案"><a href="#Leaf-Segment方案" class="headerlink" title="Leaf-Segment方案"></a>Leaf-Segment方案</h1><blockquote>
+<p>全局唯一，全局有序</p>
+</blockquote>
+<h2 id="算法原理-1"><a href="#算法原理-1" class="headerlink" title="算法原理"></a>算法原理</h2><p>在数据库自增ID方案的基础上的改进策略。</p>
+<p>美团的Leaf-segment对数据库自增ID方案做了如下改变：</p>
+<ol>
+<li>原方案每次获取ID都得读写一次数据库，造成数据库压力大。改为利用 proxy server 批量获取，每次获取一个 segment（step 决定大小）号段的值。用完之后再去数据库获取新的号段，可以大大的减轻数据库的压力</li>
+<li>各个业务不同的发号需求用 biz_tag 字段来区分，每个 biz-tag 的ID获取相互隔离，互不影响。如果以后有性能需求需要对数据库扩容，不需要上述描述的复杂的扩容操作，只需要对 biz_tag 分库分表就行。</li>
+</ol>
+<h2 id="数据库设计"><a href="#数据库设计" class="headerlink" title="数据库设计"></a>数据库设计</h2><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Null</th>
+<th>Key</th>
+<th>Default</th>
+<th>Extra</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>biz_tag</td>
+<td>varchar(128)</td>
+<td>NO</td>
+<td>PRI</td>
+<td></td>
+<td>用来区分业务</td>
+</tr>
+<tr>
+<td>max_id</td>
+<td>bigint(20)</td>
+<td>NO</td>
+<td></td>
+<td>1</td>
+<td>表示该biz_tag目前所被分配的ID号段的最大值</td>
+</tr>
+<tr>
+<td>step</td>
+<td>int(11)</td>
+<td>NO</td>
+<td></td>
+<td>NULL</td>
+<td>表示每次分配的号段长度</td>
+</tr>
+<tr>
+<td>desc</td>
+<td>varchar(256)</td>
+<td>YES</td>
+<td></td>
+<td>NULL</td>
+<td></td>
+</tr>
+<tr>
+<td>update_time</td>
+<td>timestamp</td>
+<td>NO</td>
+<td></td>
+<td>CURRENT_TIMESTAMP</td>
+<td>on update CURRENT_TIMESTAMP</td>
+</tr>
+</tbody></table>
+<p>原来获取 ID 每次都需要写数据库，现在只需要把 step 设置得足够大，比如1000。那么只有当1000个号被消耗完了之后才会去重新读写一次数据库。</p>
+<p>读写数据库的频率从 1 减小到了 1&#x2F;step，大致架构如下图所示：</p>
+<p>![](&#x2F;images&#x2F;DistributedSystem&#x2F;Segment Servers.png)</p>
+<h2 id="算法优缺点"><a href="#算法优缺点" class="headerlink" title="算法优缺点"></a>算法优缺点</h2><p>► 优点：</p>
+<ol>
+<li>Leaf 服务可以很方便的线性扩展，性能完全能够支撑大多数业务场景</li>
+<li>ID 号码是趋势递增的8byte的64位数字，满足上述数据库存储的主键要求</li>
+<li>容灾性高：Leaf 服务内部有号段缓存，即使 DB 宕机，短时间内 Leaf 仍能正常对外提供服务</li>
+<li>可以自定义 max_id 的大小，非常方便业务从原有的 ID 方式上迁移过来</li>
+</ol>
+<p>► 缺点：</p>
+<ol>
+<li>ID 号码不够随机，能够泄露发号数量的信息，不太安全</li>
+<li>TP999 数据波动大，当号段使用完之后还是会 hang 在更新数据库的 I&#x2F;O 上，TP999 数据会出现偶尔的尖刺</li>
+<li>DB 宕机会造成整个系统不可用</li>
+</ol>
+<h2 id="双Buffer优化（解决Segment-TP波动大）"><a href="#双Buffer优化（解决Segment-TP波动大）" class="headerlink" title="双Buffer优化（解决Segment TP波动大）"></a>双Buffer优化（解决Segment TP波动大）</h2><p>Leaf 取号段的时机是在号段消耗完的时候进行的，也就意味着号段临界点的 ID 下发时间取决于下一次从 DB 取回号段的时间，并且在这期间进来的请求也会因为DB号段没有取回来，导致线程阻塞。如果请求DB的网络和DB的性能稳定，这种情况对系统的影响是不大的，但是假如取DB的时候网络发生抖动，或者DB发生慢查询就会导致整个系统的响应时间变慢。</p>
+<p>为此，我们希望 DB 取号段的过程能够做到无阻塞，不需要在 DB 取号段的时候阻塞请求线程，即当号段消费到某个点时就异步的把下一个号段加载到内存中。而不需要等到号段用尽的时候才去更新号段。这样做就可以很大程度上的降低系统的 TP999 指标。</p>
+<p>详细实现如下图所示：</p>
+<p><img src="/images/DistributedSystem/Segment%E5%8F%8CBuffer%E4%BC%98%E5%8C%96.png"></p>
+<p>采用双 Buffer 的方式，Leaf 服务内部有两个号段缓存区 Segment。当前号段已下发10%时，如果下一个号段未更新，则另启一个更新线程去更新下一个号段。当前号段全部下发完后，如果下个号段准备好了则切换到下个号段为当前 Segment 接着下发，循环往复。</p>
+<p>主要特性如下：</p>
+<p>1）每个 biz-tag 都有消费速度监控，通常推荐 Segment 长度设置为服务高峰期发号 QPS 的 600 倍（10分钟），这样即使 DB 宕机，Leaf 仍能持续发号 10-20 分钟不受影响；</p>
+<p>2）每次请求来临时都会判断下个号段的状态，从而更新此号段，所以偶尔的网络抖动不会影响下个号段的更新。</p>
+<h2 id="高可用容灾（解决Segment-DB宕机系统不可用）"><a href="#高可用容灾（解决Segment-DB宕机系统不可用）" class="headerlink" title="高可用容灾（解决Segment DB宕机系统不可用）"></a>高可用容灾（解决Segment DB宕机系统不可用）</h2><p>采用一主两从的方式，同时分机房部署，Master 和 Slave 之间采用<a target="_blank" rel="noopener" href="https://links.jianshu.com/go?to=https://dev.mysql.com/doc/refman/5.5/en/replication-semisync.html">半同步方式</a>同步数据。同时使用公司 Atlas 数据库中间件（已开源，改名为 DBProxy）做主从切换。</p>
+<p>当然这种方案在一些情况会退化成异步模式，甚至在非常极端情况下仍然会造成数据不一致的情况，但是出现的概率非常小。如果你的系统要保证100%的数据强一致，可以选择使用“类 Paxos 算法”实现的强一致 MySQL 方案，如 MySQL 5.7 前段时间刚刚GA的<a target="_blank" rel="noopener" href="https://dev.mysql.com/doc/refman/5.7/en/group-replication.html">MySQL 5.7 Reference Manual :: 17 Group Replication</a>。但是运维成本和精力都会相应的增加，根据实际情况选型即可。</p>
+<p><img src="/images/DistributedSystem/DB%E4%B8%80%E4%B8%BB%E4%B8%A4%E4%BB%8E%E5%AE%B9%E7%81%BE.png"></p>
+<p>同时 Leaf 服务分 IDC 部署，内部的服务化框架是“MTthrift RPC”。服务调用的时候，根据负载均衡算法会优先调用同机房的Leaf服务。在该IDC内Leaf服务不可用的时候才会选择其他机房的Leaf服务。同时服务治理平台 OCTO 还提供了针对服务的过载保护、一键截流、动态流量分配等对服务的保护措施。</p>
+<p>不过，Leaf-Segment 方案虽好，但必竟不适用于所有场景。</p>
+<p>Leaf-Segment 方案可以生成趋势递增的ID，同时 ID 号是可计算的，但不适用于订单 ID 生成场景。比如竞争对手在两天中午12点分别下单，通过订单id号相减就能大致计算出公司一天的订单量，这个是不能忍受的。面对这一问题，美团技术团队实现了 Leaf-Snowflake 这个方案。</p>
+<h1 id="Leaf-Snowflake方案"><a href="#Leaf-Snowflake方案" class="headerlink" title="Leaf-Snowflake方案"></a>Leaf-Snowflake方案</h1><blockquote>
+<p>全局唯一、局部有序</p>
+</blockquote>
+<h2 id="基本原理"><a href="#基本原理" class="headerlink" title="基本原理"></a>基本原理</h2><p>严格来说，Leaf-Snowflake 方案是 Twitter Snowflake 改进版，它完全沿用 Snowflake 方案的 bit 位设计。</p>
+<p>对于 workerID 的分配，当服务集群数量较小的情况下，完全可以手动配置。Leaf 服务规模较大，动手配置成本太高。所以使用 Zookeeper 持久顺序节点的特性自动对 Snowflake 节点配置 workerID。</p>
+<p>Leaf-snowflake 是按照下面几个步骤启动的：</p>
+<ol>
+<li>启动 Leaf-snowflake 服务，连接 Zookeeper，在 leaf_forever 父节点下检查自己是否已经注册过（是否有该顺序子节点）</li>
+<li>如果有注册过直接取回自己的 workerID（zk顺序节点生成的int类型ID号），启动服务</li>
+<li>如果没有注册过，就在该父节点下面创建一个持久顺序节点，创建成功后取回顺序号当做自己的workerID号，启动服务。</li>
+</ol>
+<p><img src="/images/DistributedSystem/Zookeeper-Snowflake.png"></p>
+<h2 id="弱依赖ZooKeeper"><a href="#弱依赖ZooKeeper" class="headerlink" title="弱依赖ZooKeeper"></a>弱依赖ZooKeeper</h2><p>除了每次会去 ZK 拿数据以外，也会在本机文件系统上缓存一个 workerID 文件。当 ZooKeeper 出现问题，恰好机器出现问题需要重启时，能保证服务能够正常启动。这样做到了对三方组件的弱依赖。一定程度上提高了 SLA。</p>
+<h2 id="解决时钟问题"><a href="#解决时钟问题" class="headerlink" title="解决时钟问题"></a>解决时钟问题</h2><p>因为这种方案依赖时间，如果机器的时钟发生了回拨，那么就会有可能生成重复的ID号，需要解决时钟回退的问题。 </p>
+<p><img src="/images/DistributedSystem/Zookeeper%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B.png"></p>
+<p><strong>服务启动流程</strong></p>
+<ol>
+<li>服务启动时首先检查自己是否写过ZooKeeper leaf_forever节点</li>
+<li>若写过，则用自身系统时间与 leaf_forever&#x2F;${self} 节点记录时间做比较，若小于 leaf_forever&#x2F;${self} 时间则认为机器时间发生了大步长回拨，服务启动失败并报警</li>
+<li>若未写过，证明是新服务节点，直接创建持久节点 leaf_forever&#x2F;${self} 并写入自身系统时间，接下来综合对比其余 Leaf 节点的系统时间来判断自身系统时间是否准确，具体做法是取 leaf_temporary 下的所有临时节点(所有运行中的 Leaf-snowflake 节点)的服务 IP：Port，然后通过 RPC 请求得到所有节点的系统时间，计算 sum(time)&#x2F;nodeSize</li>
+<li>若<code>abs(系统时间 - sum(time) / nodeSize) &lt; 阈值</code>，认为当前系统时间准确，正常启动服务，同时写临时节点 leaf_temporary&#x2F;${self} 维持租约</li>
+<li>否则认为本机系统时间发生大步长偏移，启动失败并报警</li>
+<li>每隔一段时间(3s)上报自身系统时间写入 leaf_forever&#x2F;${self}</li>
+</ol>
+<p>由于强依赖时钟，对时间的要求比较敏感，在机器工作时 NTP 同步也会造成秒级别的回退，建议可以直接关闭 NTP 同步。要么在时钟回拨的时候直接不提供服务直接返回 ERROR_CODE，等时钟追上即可。或者做一层重试，然后上报报警系统，更或者是发现有时钟回拨之后自动摘除本身节点并报警。</p>
+<p>实现代码如下：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">if (timestamp &lt; lastTimestamp) &#123;
+    long offset &#x3D; lastTimestamp - timestamp;
+    if (offset &lt;&#x3D; 5) &#123;
+        try &#123;
+            wait(offset &lt;&lt; 1);
+            timestamp &#x3D; timeGen();
+            if (timestamp &lt; lastTimestamp) &#123;
+                return new Result(-1, Status.EXCEPTION);
+            &#125;
+        &#125; catch (InterruptedException e) &#123;
+            LOGGER.error(&quot;wait interrupted&quot;);
+            return new Result(-2, Status.EXCEPTION);
+        &#125;
+    &#125; else &#123;
+        return new Result(-3, Status.EXCEPTION);
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>从上线情况来看，在2017年闰秒出现那一次出现过部分机器回拨，由于 Leaf-snowflake 的策略保证，成功避免了对业务造成的影响。目前Leaf的性能在4C8G的机器上QPS能压测到近5w&#x2F;s，TP999 1ms，已经能够满足大部分的业务的需求。每天提供亿数量级的调用量。</p>
+<p>PS：网上已有人按照文章中Leaf-snowflake方案做了一个开源版本，项目地址：<a target="_blank" rel="noopener" href="https://links.jianshu.com/go?to=https://github.com/weizhenyi/leaf-snowflake">https://github.com/weizhenyi/leaf-snowflake</a>。作者宣称的测试情况，TPS：1W+&#x2F;sec，单机190秒生成了200W无重复，单调递增的long型整数ID。</p>
+<h2 id="UidGenerator-的-RingBuffer-优化方案"><a href="#UidGenerator-的-RingBuffer-优化方案" class="headerlink" title="UidGenerator 的 RingBuffer 优化方案"></a>UidGenerator 的 RingBuffer 优化方案</h2><h3 id="CachedUidGenerator"><a href="#CachedUidGenerator" class="headerlink" title="CachedUidGenerator"></a>CachedUidGenerator</h3><p>CachedUidGenerator 的核心利用了 RingBuffer，它本质上是一个数组，数组中每个项被称为 slot。CachedUidGenerator 设计了两个 RingBuffer，一个保存唯一 ID，一个保存 flag。RingBuffer 的尺寸是 2^n，n 必须是正整数。</p>
+<p><strong>以下是 CachedUidGenerator 中的 RingBuffer 原理示意图：</strong></p>
+<p><img src="/images/SE/ringbuffer.png"></p>
+<blockquote>
+<p><strong>扩展知识：什么是RingBuffer？</strong></p>
+<p>Ring Buffer的概念，其实来自于Linux内核（Maybe），是为解决某些特殊情况下的竞争问题提供了一种免锁的方法。这种特殊的情况就是当生产者和消费者都只有一个，而在其它情况下使用它也是必须要加锁的。</p>
+<p>环形缓冲区通常有一个读指针和一个写指针。读指针指向环形缓冲区中可读的数据，写指针指向环形缓冲区中可写的缓冲区。通过移动读指针和写指针就可以实现缓冲区的数据读取和写入。在通常情况下，环形缓冲区的读用户仅仅会影响读指针，而写用户仅仅会影响写指针。如果仅仅有一个读用户和一个写用户，那么不需要添加互斥保护机制就可以保证数据的正确性。如果有多个读写用户访问环形缓冲区，那么必须添加互斥保护机制来确保多个用户互斥访问环形缓冲区。</p>
+<p>更多说明见 <a target="_blank" rel="noopener" href="https://github.com/baidu/uid-generator/blob/master/README.zh_cn.md">github uid-generator</a></p>
+</blockquote>
+<p>这样的好处是不用实时计算 ID 号，提高吞吐量。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/Distributed-System/" rel="tag"># Distributed System</a>
+              <a href="/tags/snowflake/" rel="tag"># snowflake</a>
+              <a href="/tags/segment/" rel="tag"># segment</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/12/Unix-ZeroCopy/" rel="prev" title="Unix Zero Copy">
+      <i class="fa fa-chevron-left"></i> Unix Zero Copy
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/17/ZooKeeper-%E5%AE%A2%E6%88%B7%E7%AB%AF%E4%B8%8E%E4%BC%9A%E8%AF%9D/" rel="next" title="ZooKeeper 客户端与会话">
+      ZooKeeper 客户端与会话 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E7%B3%BB%E7%BB%9F%E7%9A%84%E9%9C%80%E6%B1%82"><span class="nav-number">1.</span> <span class="nav-text">业务系统的需求</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BD%93%E5%89%8D%E4%B8%9A%E5%8A%A1%E8%A6%81%E6%B1%82"><span class="nav-number">1.1.</span> <span class="nav-text">当前业务要求</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E7%94%A8UUID%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.2.</span> <span class="nav-text">不用UUID的原因</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%8D%E7%94%A8%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E8%87%AA%E5%A2%9EID%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">1.3.</span> <span class="nav-text">不用数据库的自增ID的原因</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Twitter-Snowflake%E6%96%B9%E6%A1%88"><span class="nav-number">2.</span> <span class="nav-text">Twitter-Snowflake方案</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E7%9F%A5%E8%AF%86"><span class="nav-number">2.1.</span> <span class="nav-text">前置知识</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86"><span class="nav-number">2.2.</span> <span class="nav-text">算法原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E6%B3%95%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.3.</span> <span class="nav-text">算法实现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E6%B3%95%E7%9A%84%E4%BC%98%E7%BC%BA%E7%82%B9"><span class="nav-number">2.4.</span> <span class="nav-text">算法的优缺点</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Leaf-Segment%E6%96%B9%E6%A1%88"><span class="nav-number">3.</span> <span class="nav-text">Leaf-Segment方案</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E6%B3%95%E5%8E%9F%E7%90%86-1"><span class="nav-number">3.1.</span> <span class="nav-text">算法原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.2.</span> <span class="nav-text">数据库设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%97%E6%B3%95%E4%BC%98%E7%BC%BA%E7%82%B9"><span class="nav-number">3.3.</span> <span class="nav-text">算法优缺点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8CBuffer%E4%BC%98%E5%8C%96%EF%BC%88%E8%A7%A3%E5%86%B3Segment-TP%E6%B3%A2%E5%8A%A8%E5%A4%A7%EF%BC%89"><span class="nav-number">3.4.</span> <span class="nav-text">双Buffer优化（解决Segment TP波动大）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%AB%98%E5%8F%AF%E7%94%A8%E5%AE%B9%E7%81%BE%EF%BC%88%E8%A7%A3%E5%86%B3Segment-DB%E5%AE%95%E6%9C%BA%E7%B3%BB%E7%BB%9F%E4%B8%8D%E5%8F%AF%E7%94%A8%EF%BC%89"><span class="nav-number">3.5.</span> <span class="nav-text">高可用容灾（解决Segment DB宕机系统不可用）</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Leaf-Snowflake%E6%96%B9%E6%A1%88"><span class="nav-number">4.</span> <span class="nav-text">Leaf-Snowflake方案</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86"><span class="nav-number">4.1.</span> <span class="nav-text">基本原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%B1%E4%BE%9D%E8%B5%96ZooKeeper"><span class="nav-number">4.2.</span> <span class="nav-text">弱依赖ZooKeeper</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E6%97%B6%E9%92%9F%E9%97%AE%E9%A2%98"><span class="nav-number">4.3.</span> <span class="nav-text">解决时钟问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#UidGenerator-%E7%9A%84-RingBuffer-%E4%BC%98%E5%8C%96%E6%96%B9%E6%A1%88"><span class="nav-number">4.4.</span> <span class="nav-text">UidGenerator 的 RingBuffer 优化方案</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#CachedUidGenerator"><span class="nav-number">4.4.1.</span> <span class="nav-text">CachedUidGenerator</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

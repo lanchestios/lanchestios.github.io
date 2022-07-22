@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="红黑树也是二叉查找树，我们知道，二叉查找树这一数据结构并不难，而红黑树之所以难是难在它是自平衡的二叉查找树，在进行插入和删除等可能会破坏树的平衡的操作时，需要重新自处理达到平衡状态。过程可以通过红黑树在线演示观看。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="数据结构 红黑树">
+<meta property="og:url" content="http://example.com/2021/03/22/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E7%BA%A2%E9%BB%91%E6%A0%91/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="红黑树也是二叉查找树，我们知道，二叉查找树这一数据结构并不难，而红黑树之所以难是难在它是自平衡的二叉查找树，在进行插入和删除等可能会破坏树的平衡的操作时，需要重新自处理达到平衡状态。过程可以通过红黑树在线演示观看。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%8F%AB%E6%B3%95.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%B7%A6%E6%97%8B.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%8F%B3%E6%97%8B.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%8C%85%E5%90%AB%E4%B8%80%E4%B8%AA%E7%BA%A2%E9%BB%91%E8%8A%82%E7%82%B9%E7%9A%84%E7%BA%A2%E9%BB%91%E6%A0%91.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E4%BA%8C%E5%8F%89%E6%A0%91%E6%9F%A5%E6%89%BE%E6%B5%81%E7%A8%8B%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E4%BD%8D%E7%BD%AE%E6%9F%A5%E6%89%BE.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E5%8F%AB%E6%B3%95.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF41.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF42.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF421.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF422.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF431.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF432.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%90%8E%E7%BB%A7%E8%8A%82%E7%82%B9.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E6%8D%A2%E4%BD%8D%E6%80%9D%E8%B7%AF.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E4%BA%8C%E5%8F%89%E6%A0%91%E5%88%A0%E9%99%A4%E7%BB%93%E7%82%B9%E6%83%85%E6%99%AF%E5%85%B3%E7%B3%BB%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%AB%E6%B3%95%E7%BA%A6%E5%AE%9A.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A2211.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22121.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22122.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22123.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A2221.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22221.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22222.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22223.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E8%BF%87%E7%A8%8BQ.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E8%BF%87%E7%A8%8BA.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8BQ.png">
+<meta property="og:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8BA.png">
+<meta property="article:published_time" content="2021-03-22T09:35:28.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.626Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Data Structure">
+<meta property="article:tag" content="树">
+<meta property="article:tag" content="红黑树">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E7%BB%93%E6%9E%84.png">
+
+<link rel="canonical" href="http://example.com/2021/03/22/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E7%BA%A2%E9%BB%91%E6%A0%91/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>数据结构 红黑树 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/03/22/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E7%BA%A2%E9%BB%91%E6%A0%91/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          数据结构 红黑树
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-03-22 17:35:28" itemprop="dateCreated datePublished" datetime="2021-03-22T17:35:28+08:00">2021-03-22</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Data-Structure/" itemprop="url" rel="index"><span itemprop="name">Data Structure</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>红黑树也是二叉查找树，我们知道，二叉查找树这一数据结构并不难，而红黑树之所以难是难在它是自平衡的二叉查找树，在进行插入和删除等可能会破坏树的平衡的操作时，需要重新自处理达到平衡状态。过程可以通过<a target="_blank" rel="noopener" href="https://rbtree.phpisfuture.com/">红黑树在线演示</a>观看。</p>
+<span id="more"></span>
+
+<h1 id="红黑树定义和性质"><a href="#红黑树定义和性质" class="headerlink" title="红黑树定义和性质"></a>红黑树定义和性质</h1><p>红黑树是一种含有红黑结点并能自平衡的二叉查找树。它必须满足下面性质：</p>
+<ul>
+<li>性质1：每个节点要么是黑色，要么是红色。</li>
+<li>性质2：根节点是黑色。</li>
+<li>性质3：每个叶子节点（NIL）是黑色。</li>
+<li>性质4：每个红色结点的两个子结点一定都是黑色。</li>
+<li><strong>性质5：任意一结点到每个叶子结点的路径都包含数量相同的黑结点。</strong></li>
+</ul>
+<p>从性质5又可以推出：</p>
+<ul>
+<li>性质5.1：如果一个结点存在黑子结点，那么该结点肯定有两个子结点</li>
+</ul>
+<p>下图就是一颗简单的红黑树。其中 NIL 为叶子结点（下图中的红色结点 H 和 M 同样存在叶子子结点），并且它是黑色的。(值得提醒注意的是，在 Java 中，叶子结点是为 NULL 的结点。)</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E7%BB%93%E6%9E%84.png"></p>
+<p>红黑树并不是一个完美平衡二叉查找树，从上图可以看到，根结点 P 的左子树显然比右子树高，但左子树和右子树的黑结点的层数是相等的，也即任意一个结点到到每个叶子结点的路径都包含数量相同的黑结点（性质 5）。所以我们叫红黑树这种平衡为<strong>黑色完美平衡</strong>。</p>
+<p>介绍到此，为了后面讲解不至于混淆，我们还需要来约定下红黑树一些结点的叫法，如下图所示。</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%8F%AB%E6%B3%95.png"></p>
+<p>我们把正在处理（遍历）的结点叫做当前结点，如上图中的 D，它的父亲叫做父结点，它的父亲的另外一个子结点叫做兄弟结点，父亲的父亲叫做祖父结点。</p>
+<p>前面讲到红黑树能自平衡，它靠的是什么？三种操作：左旋、右旋和变色。</p>
+<ul>
+<li><strong>左旋</strong>：以某个结点作为支点（旋转结点），其右子结点变为旋转结点的父结点，右子结点的左子结点变为旋转结点的右子结点，左子结点保持不变。</li>
+<li><strong>右旋</strong>：以某个结点作为支点（旋转结点），其左子结点变为旋转结点的父结点，左子结点的右子结点变为旋转结点的左子结点，右子结点保持不变。</li>
+<li><strong>变色</strong>：结点的颜色由红变黑或由黑变红。</li>
+</ul>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%B7%A6%E6%97%8B.png"></p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%8F%B3%E6%97%8B.png"></p>
+<p>上面所说的旋转结点也即旋转的支点，即图中的 P 结点。<br> 我们先忽略颜色，可以看到旋转操作不会影响旋转结点的父结点，父结点以上的结构还是保持不变的。<br> <strong>左旋</strong>只影响旋转结点和其<strong>右子树</strong>的结构，把右子树的结点往左子树挪了。<br> <strong>右旋</strong>只影响旋转结点和其<strong>左子树</strong>的结构，把左子树的结点往右子树挪了。</p>
+<p>所以旋转操作是<strong>局部</strong>的。另外可以看出旋转能保持红黑树平衡的一些端详了：当一边子树的结点少了，那么向另外一边子树“借”一些结点；当一边子树的结点多了，那么向另外一边子树“租”一些结点。</p>
+<blockquote>
+<p>思考题1：黑结点可以同时包含一个红子结点和一个黑子结点吗？（可以）</p>
+<p><img src="/images/DataStructure/%E5%8C%85%E5%90%AB%E4%B8%80%E4%B8%AA%E7%BA%A2%E9%BB%91%E8%8A%82%E7%82%B9%E7%9A%84%E7%BA%A2%E9%BB%91%E6%A0%91.png"></p>
+</blockquote>
+<h1 id="红黑树查找"><a href="#红黑树查找" class="headerlink" title="红黑树查找"></a>红黑树查找</h1><p>因为红黑树是一颗二叉平衡树，并且查找不会破坏树的平衡，所以查找跟二叉平衡树的查找无异：</p>
+<ol>
+<li>从根结点开始查找，把根结点设置为当前结点；</li>
+<li>若当前结点为空，返回 null；</li>
+<li>若当前结点不为空，用当前结点的 key 跟查找 key 作比较；</li>
+<li>若当前结点 key 等于查找 key，那么该 key 就是查找目标，返回当前结点；</li>
+<li>若当前结点 key 大于查找 key，把当前结点的左子结点设置为当前结点，重复步骤 2；</li>
+<li>若当前结点 key 小于查找 key，把当前结点的右子结点设置为当前结点，重复步骤 2；</li>
+</ol>
+<p><img src="/images/DataStructure/%E4%BA%8C%E5%8F%89%E6%A0%91%E6%9F%A5%E6%89%BE%E6%B5%81%E7%A8%8B%E5%9B%BE.png"></p>
+<p>正由于红黑树总保持黑色完美平衡，所以它的查找最坏时间复杂度为 O(2lgN)，也即整颗树刚好红黑相隔的时候。能有这么好的查找效率得益于红黑树自平衡的特性。</p>
+<h1 id="红黑树插入"><a href="#红黑树插入" class="headerlink" title="红黑树插入"></a>红黑树插入</h1><p>插入操作包括两部分工作：一查找插入的位置；二插入后自平衡。</p>
+<h2 id="查找插入位置"><a href="#查找插入位置" class="headerlink" title="查找插入位置"></a>查找插入位置</h2><p>查找插入的父结点很简单，跟查找操作区别不大：</p>
+<ol>
+<li>从根结点开始查找；</li>
+<li>若根结点为空，那么插入结点作为根结点，结束。</li>
+<li>若根结点不为空，那么把根结点作为当前结点；</li>
+<li>若当前结点为 null，返回当前结点的父结点，结束。</li>
+<li>若当前结点 key 等于查找 key，那么该 key 所在结点就是插入结点，更新结点的值，结束。</li>
+<li>若当前结点 key 大于查找 key，把当前结点的左子结点设置为当前结点，重复步骤4；</li>
+<li>若当前结点 key 小于查找 key，把当前结点的右子结点设置为当前结点，重复步骤4；</li>
+</ol>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E4%BD%8D%E7%BD%AE%E6%9F%A5%E6%89%BE.png"></p>
+<p>插入位置已经找到，把插入结点放到正确的位置就可以啦，但插入结点是应该是什么颜色呢？答案是<strong>红色</strong>。理由很简单，红色在父结点（如果存在）为黑色结点时，红黑树的黑色平衡没被破坏，不需要做自平衡操作。但如果插入结点是黑色，那么插入位置所在的子树黑色结点总是多1，必须做自平衡。</p>
+<h2 id="插入后自平衡"><a href="#插入后自平衡" class="headerlink" title="插入后自平衡"></a>插入后自平衡</h2><p>所有插入情景如下图所示。</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF.png"></p>
+<p>根据二叉树的性质，<strong>除了情景2，所有插入操作都是在叶子结点进行的</strong>。这点应该不难理解，因为查找插入位置时，我们就是在找子结点为空的父结点的。</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E5%8F%AB%E6%B3%95.png"></p>
+<h3 id="插入情景1：红黑树为空树"><a href="#插入情景1：红黑树为空树" class="headerlink" title="插入情景1：红黑树为空树"></a>插入情景1：红黑树为空树</h3><p>最简单的一种情景，直接把插入结点作为根结点就行，但注意，根据红黑树性质 2：根节点是黑色。还需要把插入结点设为黑色。</p>
+<blockquote>
+<p>处理：把插入结点作为根结点，并把结点设置为黑色。</p>
+</blockquote>
+<h3 id="插入情景2：插入结点的Key已存在"><a href="#插入情景2：插入结点的Key已存在" class="headerlink" title="插入情景2：插入结点的Key已存在"></a>插入情景2：插入结点的Key已存在</h3><p>插入结点的 Key 已存在，既然红黑树总保持平衡，在插入前红黑树已经是平衡的，那么把插入结点设置为将要替代结点的颜色，再把结点的值更新就完成插入。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>把 I 设为当前结点的颜色</li>
+<li>更新当前结点的值为插入结点的值</li>
+</ul>
+</blockquote>
+<h3 id="插入情景3：插入结点的父结点为黑结点"><a href="#插入情景3：插入结点的父结点为黑结点" class="headerlink" title="插入情景3：插入结点的父结点为黑结点"></a>插入情景3：插入结点的父结点为黑结点</h3><p>由于插入的结点是红色的，并不会影响红黑树的平衡，直接插入即可，无需做自平衡。</p>
+<blockquote>
+<p>处理：直接插入。</p>
+</blockquote>
+<h3 id="插入情景4：插入结点的父结点为红结点"><a href="#插入情景4：插入结点的父结点为红结点" class="headerlink" title="插入情景4：插入结点的父结点为红结点"></a>插入情景4：插入结点的父结点为红结点</h3><p>再次回想下红黑树的性质2：根结点是黑色。<strong>如果插入的父结点为红结点，那么该父结点不可能为根结点，所以插入结点总是存在祖父结点</strong>。这点很重要，因为后续的旋转操作肯定需要祖父结点的参与。</p>
+<p>情景 4 又分为很多子情景，下面将进入重点部分。</p>
+<h4 id="插入情景4-1：叔叔结点存在并且为红结点"><a href="#插入情景4-1：叔叔结点存在并且为红结点" class="headerlink" title="插入情景4.1：叔叔结点存在并且为红结点"></a>插入情景4.1：叔叔结点存在并且为红结点</h4><p> 从红黑树性质 4 可以知道，祖父结点肯定为黑结点，因为不可以同时存在两个相连的红结点。那么此时该插入子树的红黑层数的情况是：黑红红。显然最简单的处理方式是把其改为：红黑红。如下图所示。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>将 P 和 S 设置为黑色</li>
+<li>将 PP 设置为红色</li>
+<li>把 PP 设置为当前插入结点</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF41.png"></p>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF42.png"></p>
+<p>可以看到，我们把 PP 结点设为红色了，如果 PP 的父结点是黑色，那么无需再做任何处理；但如果 PP 的父结点是红色，根据性质 4，此时红黑树已不平衡了，所以还需要把 PP 当作新的插入结点，继续做插入操作自平衡处理，直到平衡为止。</p>
+<p>试想下 PP 刚好为根结点时，那么根据性质 2，我们必须把 PP 重新设为黑色，那么树的红黑结构变为：黑黑红。换句话说，从根结点到叶子结点的路径中，黑色结点增加了。<strong>这也是唯一一种会增加红黑树黑色结点层数的插入情景</strong>。</p>
+<p>我们还可以总结出另外一个经验：<strong>红黑树的生长是自底向上的</strong>。这点不同于普通的二叉查找树，普通的二叉查找树的生长是自顶向下的。</p>
+<h4 id="插入情景4-2：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的左子结点"><a href="#插入情景4-2：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的左子结点" class="headerlink" title="插入情景4.2：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的左子结点"></a>插入情景4.2：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的左子结点</h4><p> 单纯从插入前来看，也即不算情景 4.1 自底向上处理时的情况，叔叔结点非红即为叶子结点（Nil）。因为如果叔叔结点为黑结点，而父结点为红结点，那么叔叔结点所在的子树的黑色结点就比父结点所在子树的多了，这不满足红黑树的性质 5。后续情景同样如此，不再多做说明了。</p>
+<p>前文说了，需要旋转操作时，肯定一边子树的结点多了或少了，需要租或借给另一边。插入显然是多的情况，那么把多的结点租给另一边子树就可以了。</p>
+<h5 id="插入情景4-2-1：插入结点是其父结点的左子结点"><a href="#插入情景4-2-1：插入结点是其父结点的左子结点" class="headerlink" title="插入情景4.2.1：插入结点是其父结点的左子结点"></a>插入情景4.2.1：插入结点是其父结点的左子结点</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 P 设为黑色</li>
+<li>将 PP 设为红色</li>
+<li>对 PP 进行右旋</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF421.png"></p>
+<p>咦，可以把 P 设为红色，I 和 PP 设为黑色吗？答案是可以！看过《算法：第4版》的同学可能知道，书中讲解的就是把 P 设为红色，I 和 PP 设为黑色。但把 P 设为红色，显然又会出现情景 4.1的情况，需要自底向上处理，做多了无谓的操作，既然能自己消化就不要麻烦祖辈们啦～</p>
+<h5 id="插入情景4-2-2：插入结点是其父结点的右子结点"><a href="#插入情景4-2-2：插入结点是其父结点的右子结点" class="headerlink" title="插入情景4.2.2：插入结点是其父结点的右子结点"></a>插入情景4.2.2：插入结点是其父结点的右子结点</h5><p>这种情景显然可以转换为情景 4.2.1，如下图所示，不做过多说明了。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>对 P 进行左旋</li>
+<li>把 P 设置为插入结点，得到情景4.2.1</li>
+<li>进行情景 4.2.1 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF422.png"></p>
+<h4 id="插入情景4-3：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的右子结点"><a href="#插入情景4-3：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的右子结点" class="headerlink" title="插入情景4.3：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的右子结点"></a><strong>插入情景4.3：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的右子结点</strong></h4><p>该情景对应情景4.2，只是方向反转，不做过多说明了，直接看图。</p>
+<h5 id="插入情景4-3-1：插入结点是其父结点的右子结点"><a href="#插入情景4-3-1：插入结点是其父结点的右子结点" class="headerlink" title="插入情景4.3.1：插入结点是其父结点的右子结点"></a>插入情景4.3.1：插入结点是其父结点的右子结点</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 P 设为黑色</li>
+<li>将 PP 设为红色</li>
+<li>对 PP 进行左旋</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF431.png"></p>
+<h5 id="插入情景4-3-2：插入结点是其父结点的左子结点"><a href="#插入情景4-3-2：插入结点是其父结点的左子结点" class="headerlink" title="插入情景4.3.2：插入结点是其父结点的左子结点"></a>插入情景4.3.2：插入结点是其父结点的左子结点</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>对 P 进行右旋</li>
+<li>把 P 设置为插入结点，得到情景 4.3.1</li>
+<li>进行情景 4.3.1 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF432.png"></p>
+<h1 id="红黑树删除"><a href="#红黑树删除" class="headerlink" title="红黑树删除"></a>红黑树删除</h1><p>红黑树的删除操作也包括两部分工作：一查找目标结点；而删除后自平衡。查找目标结点显然可以复用查找操作，当不存在目标结点时，忽略本次操作；当存在目标结点时，删除后就得做自平衡处理了。删除了结点后我们还需要找结点来替代删除结点的位置，不然子树跟父辈结点断开了，除非删除结点刚好没子结点，那么就不需要替代。</p>
+<p>二叉树删除结点找替代结点有 3 种情景：</p>
+<ul>
+<li>情景1：若删除结点无子结点，直接删除</li>
+<li>情景2：若删除结点只有一个子结点，用子结点替换删除结点</li>
+<li>情景3：若删除结点有两个子结点，用后继结点（大于删除结点的最小结点）替换删除结点</li>
+</ul>
+<p>补充说明下，情景 3 的后继结点是大于删除结点的最小结点，也是删除结点的右子树种最左结点。那么可以拿前继结点（删除结点的左子树最右结点）替代吗？可以的。但习惯上大多都是拿后继结点来替代，后文的讲解也是用后继结点来替代。另外告诉大家一种找前继和后继结点的直观的方法（不知为何没人提过，大家都知道？）：<strong>把二叉树所有结点投射在 X 轴上，所有结点都是从左到右排好序的，所有目标结点的前后结点就是对应前继和后继结点</strong>。如下图所示。</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%90%8E%E7%BB%A7%E8%8A%82%E7%82%B9.png"></p>
+<p>接下来，讲一个重要的思路：<strong>删除结点被替代后，在不考虑结点的键值的情况下，对于树来说，可以认为删除的是替代结点！</strong>在不看键值对的情况下，下图的红黑树最终结果是删除了 Q 所在位置的结点！这种思路非常重要，大大简化了后文讲解红黑树删除的情景！</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E6%8D%A2%E4%BD%8D%E6%80%9D%E8%B7%AF.png"></p>
+<p>基于此，上面所说的 3 种二叉树的删除情景可以相互转换并且最终都是转换为情景 1！</p>
+<ul>
+<li>情景2：删除结点用其唯一的子结点替换，子结点替换为删除结点后，可以认为删除的是子结点，若子结点又有两个子结点，那么相当于转换为情景3，一直自顶向下转换，总是能转换为情景1。（对于红黑树来说，根据性质5.1，只存在一个子结点的结点肯定在树末了）</li>
+<li>情景3：删除结点用后继结点（肯定不存在左结点），如果后继结点有右子结点，那么相当于转换为情景2，否则转为为情景1。</li>
+</ul>
+<p>二叉树删除结点情景关系图如下图所示。</p>
+<p><img src="/images/DataStructure/%E4%BA%8C%E5%8F%89%E6%A0%91%E5%88%A0%E9%99%A4%E7%BB%93%E7%82%B9%E6%83%85%E6%99%AF%E5%85%B3%E7%B3%BB%E5%9B%BE.png"></p>
+<p>综上所述，<strong>删除操作删除的结点可以看作删除替代结点，而替代结点最后总是在树末。</strong>有了这结论，我们讨论的删除红黑树的情景就少了很多，因为我们只考虑删除树末结点的情景了。</p>
+<p>同样的，我们也是先来总体看下删除操作的所有情景，如下图所示。</p>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF.png"></p>
+<p>哈哈，是的，即使简化了还是有 9 种情景！但跟插入操作一样，存在左右对称的情景，只是方向变了，没有本质区别。同样的，我们还是来约定下，如下图所示。</p>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%AB%E6%B3%95%E7%BA%A6%E5%AE%9A.png"></p>
+<p>上图的字母并不代表结点 Key 的大小。R 表示替代结点，P 表示替代结点的父结点，S 表示替代结点的兄弟结点，SL 表示兄弟结点的左子结点，SR 表示兄弟结点的右子结点。灰色结点表示它可以是红色也可以是黑色。</p>
+<p>值得特别提醒的是，<strong>R是即将被替换到删除结点的位置的替代结点，在删除前，它还在原来所在位置参与树的子平衡，平衡后再替换到删除结点的位置，才算删除完成。</strong></p>
+<h2 id="删除情景1：替换结点是红色结点"><a href="#删除情景1：替换结点是红色结点" class="headerlink" title="删除情景1：替换结点是红色结点"></a>删除情景1：替换结点是红色结点</h2><p>我们把替换结点换到了删除结点的位置时，由于替换结点是红色，删除也了不会影响红黑树的平衡，只要把替换结点的颜色设为删除的结点的颜色即可重新平衡。</p>
+<blockquote>
+<p>处理：颜色变为删除结点的颜色</p>
+</blockquote>
+<h2 id="删除情景2：替换结点是黑结点"><a href="#删除情景2：替换结点是黑结点" class="headerlink" title="删除情景2：替换结点是黑结点"></a>删除情景2：替换结点是黑结点</h2><p>当替换结点是黑色时，我们就不得不进行自平衡处理了。我们必须还得考虑替换结点是其父结点的左子结点还是右子结点，来做不同的旋转操作，使树重新平衡。</p>
+<h3 id="删除情景2-1：替换结点是其父结点的左子结点"><a href="#删除情景2-1：替换结点是其父结点的左子结点" class="headerlink" title="删除情景2.1：替换结点是其父结点的左子结点"></a>删除情景2.1：替换结点是其父结点的左子结点</h3><h4 id="删除情景2-1-1：替换结点的兄弟结点是红结点"><a href="#删除情景2-1-1：替换结点的兄弟结点是红结点" class="headerlink" title="删除情景2.1.1：替换结点的兄弟结点是红结点"></a>删除情景2.1.1：替换结点的兄弟结点是红结点</h4><p>若兄弟结点是红结点，那么根据性质4，兄弟结点的父结点和子结点肯定为黑色，不会有其他子情景，我们按图21处理，得到删除情景2.1.2.3（后续讲解，这里先记住，此时R仍然是替代结点，它的新的兄弟结点SL和兄弟结点的子结点都是黑色）。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为黑色</li>
+<li>将 P 设为红色</li>
+<li>对 P 进行左旋，得到情景 2.1.2.3</li>
+<li>进行情景 2.1.2.3 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A2211.png"></p>
+<h4 id="删除情景2-1-2：替换结点的兄弟结点是黑结点"><a href="#删除情景2-1-2：替换结点的兄弟结点是黑结点" class="headerlink" title="删除情景2.1.2：替换结点的兄弟结点是黑结点"></a>删除情景2.1.2：替换结点的兄弟结点是黑结点</h4><p>当兄弟结点为黑时，其父结点和子结点的具体颜色也无法确定（如果也不考虑自底向上的情况，子结点非红即为叶子结点 Nil，Nil 结点为黑结点），此时又得考虑多种子情景。</p>
+<h5 id="删除情景2-1-2-1：替换结点的兄弟结点的右子结点是红结点，左子结点任意颜色"><a href="#删除情景2-1-2-1：替换结点的兄弟结点的右子结点是红结点，左子结点任意颜色" class="headerlink" title="删除情景2.1.2.1：替换结点的兄弟结点的右子结点是红结点，左子结点任意颜色"></a>删除情景2.1.2.1：替换结点的兄弟结点的右子结点是红结点，左子结点任意颜色</h5><p>即将删除的左子树的一个黑色结点，显然左子树的黑色结点少1了，然而右子树又又红色结点，那么我们直接向右子树“借”个红结点来补充黑结点就好啦，此时肯定需要用旋转处理了。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 的颜色设为 P 的颜色</li>
+<li>将 P 设为黑色</li>
+<li>将 SR 设为黑色</li>
+<li>对 P 进行左旋</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22121.png"></p>
+<p>平衡后的图怎么不满足红黑树的性质？前文提醒过，R 是即将替换的，它还参与树的自平衡，平衡后再替换到删除结点的位置，所以 R 最终可以看作是删除的。另外图 2.1.2.1 是考虑到第一次替换和自底向上处理的情况，如果只考虑第一次替换的情况，根据红黑树性质，SL 肯定是红色或为 Nil，所以最终结果树是平衡的。如果是自底向上处理的情况，同样，每棵子树都保持平衡状态，最终整棵树肯定是平衡的。后续的情景同理，不做过多说明了。</p>
+<h5 id="删除情景2-1-2-2：替换结点的兄弟结点的右子结点为黑结点，左子结点为红结点"><a href="#删除情景2-1-2-2：替换结点的兄弟结点的右子结点为黑结点，左子结点为红结点" class="headerlink" title="删除情景2.1.2.2：替换结点的兄弟结点的右子结点为黑结点，左子结点为红结点"></a>删除情景2.1.2.2：替换结点的兄弟结点的右子结点为黑结点，左子结点为红结点</h5><p>兄弟结点所在的子树有红结点，我们总是可以向兄弟子树借个红结点过来，显然该情景可以转换为情景 2.1.2.1。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为红色</li>
+<li>将 SL 设为黑色</li>
+<li>对 S 进行右旋，得到情景 2.1.2.1</li>
+<li>进行情景 2.1.2.1 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22122.png"></p>
+<h5 id="删除情景2-1-2-3：替换结点的兄弟结点的子结点都为黑结点"><a href="#删除情景2-1-2-3：替换结点的兄弟结点的子结点都为黑结点" class="headerlink" title="删除情景2.1.2.3：替换结点的兄弟结点的子结点都为黑结点"></a>删除情景2.1.2.3：替换结点的兄弟结点的子结点都为黑结点</h5><p> 好了，此次兄弟子树都没红结点“借”了，兄弟帮忙不了，找父母呗，这种情景我们把兄弟结点设为红色，再把父结点当作替代结点，自底向上处理，去找父结点的兄弟结点去“借”。但为什么需要把兄弟结点设为红色呢？显然是为了在P所在的子树中保证平衡（R即将删除，少了一个黑色结点，子树也需要少一个），后续的平衡工作交给父辈们考虑了，还是那句，当每棵子树都保持平衡时，最终整棵总是平衡的。</p>
+<blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为红色</li>
+<li>把 P 作为新的替换结点</li>
+<li>重新进行删除结点情景处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22123.png"></p>
+<h3 id="删除情景2-2：替换结点是其父结点的右子结点"><a href="#删除情景2-2：替换结点是其父结点的右子结点" class="headerlink" title="删除情景2.2：替换结点是其父结点的右子结点"></a>删除情景2.2：替换结点是其父结点的右子结点</h3><p> 好啦，右边的操作也是方向相反，不做过多说明了，相信理解了删除情景2.1后，肯定可以理解2.2。</p>
+<h4 id="删除情景2-2-1：替换结点的兄弟结点是红结点"><a href="#删除情景2-2-1：替换结点的兄弟结点是红结点" class="headerlink" title="删除情景2.2.1：替换结点的兄弟结点是红结点"></a>删除情景2.2.1：替换结点的兄弟结点是红结点</h4><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为黑色</li>
+<li>将 P 设为红色</li>
+<li>对 P 进行右旋，得到情景 2.2.2.3</li>
+<li>进行情景 2.2.2.3 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A2221.png"></p>
+<h4 id="删除情景2-2-2：替换结点的兄弟结点是黑结点"><a href="#删除情景2-2-2：替换结点的兄弟结点是黑结点" class="headerlink" title="删除情景2.2.2：替换结点的兄弟结点是黑结点"></a>删除情景2.2.2：替换结点的兄弟结点是黑结点</h4><h5 id="删除情景2-2-2-1：替换结点的兄弟结点的左子结点是红结点，右子结点任意颜色"><a href="#删除情景2-2-2-1：替换结点的兄弟结点的左子结点是红结点，右子结点任意颜色" class="headerlink" title="删除情景2.2.2.1：替换结点的兄弟结点的左子结点是红结点，右子结点任意颜色"></a>删除情景2.2.2.1：替换结点的兄弟结点的左子结点是红结点，右子结点任意颜色</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 的颜色设为 P 的颜色</li>
+<li>将 P 设为黑色</li>
+<li>将 SL 设为黑色</li>
+<li>对 P 进行右旋</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22221.png"></p>
+<h5 id="删除情景2-2-2-2：替换结点的兄弟结点的左子结点为黑结点，右子结点为红结点"><a href="#删除情景2-2-2-2：替换结点的兄弟结点的左子结点为黑结点，右子结点为红结点" class="headerlink" title="删除情景2.2.2.2：替换结点的兄弟结点的左子结点为黑结点，右子结点为红结点"></a>删除情景2.2.2.2：替换结点的兄弟结点的左子结点为黑结点，右子结点为红结点</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为红色</li>
+<li>将 SR 设为黑色</li>
+<li>对 S 进行左旋，得到情景 2.2.2.1</li>
+<li>进行情景 2.2.2.1 的处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22222.png"></p>
+<h5 id="删除情景2-2-2-3：替换结点的兄弟结点的子结点都为黑结点"><a href="#删除情景2-2-2-3：替换结点的兄弟结点的子结点都为黑结点" class="headerlink" title="删除情景2.2.2.3：替换结点的兄弟结点的子结点都为黑结点"></a>删除情景2.2.2.3：替换结点的兄弟结点的子结点都为黑结点</h5><blockquote>
+<p>处理：</p>
+<ul>
+<li>将 S 设为红色</li>
+<li>把 P 作为新的替换结点</li>
+<li>重新进行删除结点情景处理</li>
+</ul>
+</blockquote>
+<p><img src="/images/DataStructure/%E5%88%A0%E9%99%A4%E6%83%85%E5%BD%A22223.png"></p>
+<p>综上，红黑树删除后自平衡的处理可以总结为：</p>
+<ol>
+<li>自己能搞定的自消化（情景 1）</li>
+<li>自己不能搞定的叫兄弟帮忙（除了情景 1、情景 2.1.2.3 和情景 2.2.2.3）</li>
+<li>兄弟都帮忙不了的，通过父母，找远方亲戚（情景 2.1.2.3 和情景 2.2.2.3）</li>
+</ol>
+<h1 id="红黑树插入删除过程示例"><a href="#红黑树插入删除过程示例" class="headerlink" title="红黑树插入删除过程示例"></a>红黑树插入删除过程示例</h1><h2 id="插入自平衡过程处理"><a href="#插入自平衡过程处理" class="headerlink" title="插入自平衡过程处理"></a>插入自平衡过程处理</h2><blockquote>
+<p>Question：</p>
+</blockquote>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E8%BF%87%E7%A8%8BQ.png"></p>
+<blockquote>
+<p>Answer：</p>
+</blockquote>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E8%BF%87%E7%A8%8BA.png"></p>
+<h2 id="删除自平衡过程处理"><a href="#删除自平衡过程处理" class="headerlink" title="删除自平衡过程处理"></a>删除自平衡过程处理</h2><blockquote>
+<p>Question：</p>
+</blockquote>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8BQ.png"></p>
+<blockquote>
+<p>Answer：</p>
+</blockquote>
+<p><img src="/images/DataStructure/%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8BA.png"></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Data-Structure/" rel="tag"># Data Structure</a>
+              <a href="/tags/%E6%A0%91/" rel="tag"># 树</a>
+              <a href="/tags/%E7%BA%A2%E9%BB%91%E6%A0%91/" rel="tag"># 红黑树</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/03/22/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F-%E8%B7%9F%E8%B8%AA%E7%B3%BB%E7%BB%9FDapper/" rel="prev" title="分布式系统 跟踪系统 Dapper">
+      <i class="fa fa-chevron-left"></i> 分布式系统 跟踪系统 Dapper
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/03/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-B%E6%A0%91B+%E6%A0%91/" rel="next" title="数据结构 B树和B+树">
+      数据结构 B树和B+树 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E5%AE%9A%E4%B9%89%E5%92%8C%E6%80%A7%E8%B4%A8"><span class="nav-number">1.</span> <span class="nav-text">红黑树定义和性质</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E6%9F%A5%E6%89%BE"><span class="nav-number">2.</span> <span class="nav-text">红黑树查找</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5"><span class="nav-number">3.</span> <span class="nav-text">红黑树插入</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E6%89%BE%E6%8F%92%E5%85%A5%E4%BD%8D%E7%BD%AE"><span class="nav-number">3.1.</span> <span class="nav-text">查找插入位置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E5%90%8E%E8%87%AA%E5%B9%B3%E8%A1%A1"><span class="nav-number">3.2.</span> <span class="nav-text">插入后自平衡</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF1%EF%BC%9A%E7%BA%A2%E9%BB%91%E6%A0%91%E4%B8%BA%E7%A9%BA%E6%A0%91"><span class="nav-number">3.2.1.</span> <span class="nav-text">插入情景1：红黑树为空树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF2%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E7%9A%84Key%E5%B7%B2%E5%AD%98%E5%9C%A8"><span class="nav-number">3.2.2.</span> <span class="nav-text">插入情景2：插入结点的Key已存在</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF3%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E7%9A%84%E7%88%B6%E7%BB%93%E7%82%B9%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.3.</span> <span class="nav-text">插入情景3：插入结点的父结点为黑结点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E7%9A%84%E7%88%B6%E7%BB%93%E7%82%B9%E4%B8%BA%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.</span> <span class="nav-text">插入情景4：插入结点的父结点为红结点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-1%EF%BC%9A%E5%8F%94%E5%8F%94%E7%BB%93%E7%82%B9%E5%AD%98%E5%9C%A8%E5%B9%B6%E4%B8%94%E4%B8%BA%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.1.</span> <span class="nav-text">插入情景4.1：叔叔结点存在并且为红结点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-2%EF%BC%9A%E5%8F%94%E5%8F%94%E7%BB%93%E7%82%B9%E4%B8%8D%E5%AD%98%E5%9C%A8%E6%88%96%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9%EF%BC%8C%E5%B9%B6%E4%B8%94%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E7%9A%84%E7%88%B6%E4%BA%B2%E7%BB%93%E7%82%B9%E6%98%AF%E7%A5%96%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.2.</span> <span class="nav-text">插入情景4.2：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的左子结点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-2-1%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.2.1.</span> <span class="nav-text">插入情景4.2.1：插入结点是其父结点的左子结点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-2-2%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.2.2.</span> <span class="nav-text">插入情景4.2.2：插入结点是其父结点的右子结点</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-3%EF%BC%9A%E5%8F%94%E5%8F%94%E7%BB%93%E7%82%B9%E4%B8%8D%E5%AD%98%E5%9C%A8%E6%88%96%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9%EF%BC%8C%E5%B9%B6%E4%B8%94%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E7%9A%84%E7%88%B6%E4%BA%B2%E7%BB%93%E7%82%B9%E6%98%AF%E7%A5%96%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.3.</span> <span class="nav-text">插入情景4.3：叔叔结点不存在或为黑结点，并且插入结点的父亲结点是祖父结点的右子结点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-3-1%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.3.1.</span> <span class="nav-text">插入情景4.3.1：插入结点是其父结点的右子结点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E6%83%85%E6%99%AF4-3-2%EF%BC%9A%E6%8F%92%E5%85%A5%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">3.2.4.3.2.</span> <span class="nav-text">插入情景4.3.2：插入结点是其父结点的左子结点</span></a></li></ol></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E5%88%A0%E9%99%A4"><span class="nav-number">4.</span> <span class="nav-text">红黑树删除</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E6%98%AF%E7%BA%A2%E8%89%B2%E7%BB%93%E7%82%B9"><span class="nav-number">4.1.</span> <span class="nav-text">删除情景1：替换结点是红色结点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E6%98%AF%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.</span> <span class="nav-text">删除情景2：替换结点是黑结点</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.1.</span> <span class="nav-text">删除情景2.1：替换结点是其父结点的左子结点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1-1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E6%98%AF%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.1.1.</span> <span class="nav-text">删除情景2.1.1：替换结点的兄弟结点是红结点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1-2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E6%98%AF%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.1.2.</span> <span class="nav-text">删除情景2.1.2：替换结点的兄弟结点是黑结点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1-2-1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9%E6%98%AF%E7%BA%A2%E7%BB%93%E7%82%B9%EF%BC%8C%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9%E4%BB%BB%E6%84%8F%E9%A2%9C%E8%89%B2"><span class="nav-number">4.2.1.2.1.</span> <span class="nav-text">删除情景2.1.2.1：替换结点的兄弟结点的右子结点是红结点，左子结点任意颜色</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1-2-2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9%EF%BC%8C%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9%E4%B8%BA%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.1.2.2.</span> <span class="nav-text">删除情景2.1.2.2：替换结点的兄弟结点的右子结点为黑结点，左子结点为红结点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-1-2-3%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%AD%90%E7%BB%93%E7%82%B9%E9%83%BD%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.1.2.3.</span> <span class="nav-text">删除情景2.1.2.3：替换结点的兄弟结点的子结点都为黑结点</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E6%98%AF%E5%85%B6%E7%88%B6%E7%BB%93%E7%82%B9%E7%9A%84%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.2.</span> <span class="nav-text">删除情景2.2：替换结点是其父结点的右子结点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2-1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E6%98%AF%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.2.1.</span> <span class="nav-text">删除情景2.2.1：替换结点的兄弟结点是红结点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2-2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E6%98%AF%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.2.2.</span> <span class="nav-text">删除情景2.2.2：替换结点的兄弟结点是黑结点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2-2-1%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9%E6%98%AF%E7%BA%A2%E7%BB%93%E7%82%B9%EF%BC%8C%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9%E4%BB%BB%E6%84%8F%E9%A2%9C%E8%89%B2"><span class="nav-number">4.2.2.2.1.</span> <span class="nav-text">删除情景2.2.2.1：替换结点的兄弟结点的左子结点是红结点，右子结点任意颜色</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2-2-2%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%B7%A6%E5%AD%90%E7%BB%93%E7%82%B9%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9%EF%BC%8C%E5%8F%B3%E5%AD%90%E7%BB%93%E7%82%B9%E4%B8%BA%E7%BA%A2%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.2.2.2.</span> <span class="nav-text">删除情景2.2.2.2：替换结点的兄弟结点的左子结点为黑结点，右子结点为红结点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E6%83%85%E6%99%AF2-2-2-3%EF%BC%9A%E6%9B%BF%E6%8D%A2%E7%BB%93%E7%82%B9%E7%9A%84%E5%85%84%E5%BC%9F%E7%BB%93%E7%82%B9%E7%9A%84%E5%AD%90%E7%BB%93%E7%82%B9%E9%83%BD%E4%B8%BA%E9%BB%91%E7%BB%93%E7%82%B9"><span class="nav-number">4.2.2.2.3.</span> <span class="nav-text">删除情景2.2.2.3：替换结点的兄弟结点的子结点都为黑结点</span></a></li></ol></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E6%8F%92%E5%85%A5%E5%88%A0%E9%99%A4%E8%BF%87%E7%A8%8B%E7%A4%BA%E4%BE%8B"><span class="nav-number">5.</span> <span class="nav-text">红黑树插入删除过程示例</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8F%92%E5%85%A5%E8%87%AA%E5%B9%B3%E8%A1%A1%E8%BF%87%E7%A8%8B%E5%A4%84%E7%90%86"><span class="nav-number">5.1.</span> <span class="nav-text">插入自平衡过程处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E8%87%AA%E5%B9%B3%E8%A1%A1%E8%BF%87%E7%A8%8B%E5%A4%84%E7%90%86"><span class="nav-number">5.2.</span> <span class="nav-text">删除自平衡过程处理</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

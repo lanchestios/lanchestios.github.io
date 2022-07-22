@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Netty 内存池优化原理">
+<meta property="og:url" content="http://example.com/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Netty/MemoryMap.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/Netty/Subpage.png">
+<meta property="og:image" content="http://example.com/images/Netty/ChunkList.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ChunkListGroup.png">
+<meta property="article:published_time" content="2021-01-13T03:00:00.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.546Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="Memory Pool">
+<meta property="article:tag" content="PoolChunk">
+<meta property="article:tag" content="PoolSubPage">
+<meta property="article:tag" content="PoolChunkList">
+<meta property="article:tag" content="PoolArena">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Netty/MemoryMap.png">
+
+<link rel="canonical" href="http://example.com/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Netty 内存池优化原理 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Netty 内存池优化原理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-01-13 11:00:00" itemprop="dateCreated datePublished" datetime="2021-01-13T11:00:00+08:00">2021-01-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。</p>
+<span id="more"></span>
+
+<h1 id="PoolChunk内存分配"><a href="#PoolChunk内存分配" class="headerlink" title="PoolChunk内存分配"></a>PoolChunk内存分配</h1><h2 id="模拟内存数据结构"><a href="#模拟内存数据结构" class="headerlink" title="模拟内存数据结构"></a>模拟内存数据结构</h2><p>为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;memoryMap初始化
+memoryMap &#x3D; new byte[maxSubpageAllocs &lt;&lt; 1];
+depthMap &#x3D; new byte[memoryMap.length];
+int memoryMapIndex &#x3D; 1;
+for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down the tree one level at a time
+    int depth &#x3D; 1 &lt;&lt; d;
+    for (int p &#x3D; 0; p &lt; depth; ++ p) &#123;
+        &#x2F;&#x2F; in each level traverse left to right and set value to the depth of subtree
+        memoryMap[memoryMapIndex] &#x3D; (byte) d;
+        depthMap[memoryMapIndex] &#x3D; (byte) d;
+        memoryMapIndex ++;
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下图是 MemoryMap 的抽象表示</p>
+<p><img src="/images/Netty/MemoryMap.png"></p>
+<p>PoolChunk 默认由 2048 个 Page 组成，一个 Page 默认大小为 8k，图中树节点的值为在数组 memoryMap 的下标。</p>
+<h2 id="分配内存"><a href="#分配内存" class="headerlink" title="分配内存"></a>分配内存</h2><p><strong>向PoolChunk分配内存</strong></p>
+<p>PoolChunk 内部会保证每次分配内存大小为<code>8K*(2^n)</code>，为了分配一个大小为<code>chunkSize/(2^k)</code>的节点，需要在深度为 k 的层从左开始匹配节点，下面是申请内存的大概流程：</p>
+<ol>
+<li>如果需要分配大小 8k 的内存，则只需要在第11层，找到一个可用节点即可</li>
+<li>如果需要分配大小 16k 的内存，则只需要在第10层，找到一个可用节点即可</li>
+<li>如果节点 1024 存在一个已经被分配的子节点 2048，则该节点不能被分配，如需要分配大小 16k 的内存，这个时候节点 2048 已被分配，节点 2049 未被分配，就不能直接分配节点 1024，因为该节点目前只剩下 8k 内存。</li>
+</ol>
+<p>需要说明的是，寻找合适内存的行为是基于深度优先算法的，但是对子节点的选取上是采用的随机选取，而不是常用的依次遍历。</p>
+<p><strong>申请后更新节点层级</strong></p>
+<p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png"></p>
+<h2 id="释放内存"><a href="#释放内存" class="headerlink" title="释放内存"></a>释放内存</h2><p>也就是释放相应资源并且根据申请内存过程的原理对节点及其父节点值进行更新。</p>
+<h2 id="对节点状态的维护"><a href="#对节点状态的维护" class="headerlink" title="对节点状态的维护"></a>对节点状态的维护</h2><p>无论是 Chunk 还是 Page，都通过状态位来标识内存是否可用，不同之处是 Chunk 通过在二叉树上对节点进行标识实现，Page 是通过维护块的使用状态标识来实现。</p>
+<h1 id="PoolSubPage内存分配"><a href="#PoolSubPage内存分配" class="headerlink" title="PoolSubPage内存分配"></a>PoolSubPage内存分配</h1><p>在 PoolChunk 中支持分配一块大于 pageSize 的内存，但在实际应用中，存在很多分配小内存的情况，如果也占用一个 page，明显很浪费。针对这种情况，Netty 提供了 PoolSubpage 把 PoolChunk 的一个 page 节点 8k 内存划分成更小的内存段，通过对每个内存段的标记与清理标记进行内存的分配与释放。</p>
+<p><img src="/images/Netty/Subpage.png"></p>
+<p>Page 中存储区域的使用状态通过一个 long 数组来维护，数组中每个 long 的每一位表示一个块存储区域的占用情况：0 表示未占用，1 表示以占用。对于一个 4 字节的 Page 来说，如果这个 Page 用来分配 1 个字节的存储区域，那么 long 数组中就只有一个 long 类型的元素，这个数值的低 4 位用来指示各个存储区域的占用情况。对于一个 128 字节的 Page 来说，如果这个 Page 也是用来分配 1 个字节的存储区域，那么 long 数组中就会包含 2 个元素，总共 128 位，每一位代表一个区域的占用情况。</p>
+<h2 id="申请Subpage空间"><a href="#申请Subpage空间" class="headerlink" title="申请Subpage空间"></a>申请Subpage空间</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// 当前page在chunk中的id</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> memoryMapIdx<span class="token punctuation">;</span> 
+    <span class="token comment">// 当前page在chunk.memory的偏移量</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> runOffset<span class="token punctuation">;</span>    
+    <span class="token comment">// page大小</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> pageSize<span class="token punctuation">;</span>
+    <span class="token comment">//通过对每一个二进制位的标记来修改一段内存的占用状态</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">long</span><span class="token punctuation">[</span><span class="token punctuation">]</span> bitmap<span class="token punctuation">;</span> 
+    
+    <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> prev<span class="token punctuation">;</span>     
+    <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> next<span class="token punctuation">;</span>
+
+    <span class="token keyword">boolean</span> doNotDestroy<span class="token punctuation">;</span>    
+    <span class="token comment">// 该page切分后每一段的大小</span>
+    <span class="token keyword">int</span> elemSize<span class="token punctuation">;</span>   
+    <span class="token comment">// 该page包含的段数量</span>
+    <span class="token keyword">private</span> <span class="token keyword">int</span> maxNumElems<span class="token punctuation">;</span>        
+    <span class="token keyword">private</span> <span class="token keyword">int</span> bitmapLength<span class="token punctuation">;</span>
+    <span class="token comment">// 下一个可用的位置</span>
+    <span class="token keyword">private</span> <span class="token keyword">int</span> nextAvail<span class="token punctuation">;</span>
+    <span class="token comment">// 可用的段数量</span>
+    <span class="token keyword">private</span> <span class="token keyword">int</span> numAvail<span class="token punctuation">;</span>       
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>假设目前需要申请大小为4096的内存：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//PoolChunk</span>
+<span class="token keyword">long</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token keyword">int</span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> firstVal <span class="token operator">=</span> memoryMap<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>normCapacity <span class="token operator">&amp;</span> subpageOverflowMask<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// >= pageSize</span>
+        <span class="token keyword">return</span> <span class="token function">allocateRun</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> firstVal<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">allocateSubpage</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> firstVal<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>因为<code>4096&lt;pageSize(8192)</code>，所以采用 allocateSubpage 进行内存分配，具体实现如下：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">long</span> <span class="token function">allocateSubpage</span><span class="token punctuation">(</span><span class="token keyword">int</span> normCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> curIdx<span class="token punctuation">,</span> <span class="token keyword">int</span> val<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> state <span class="token operator">=</span> val <span class="token operator">&amp;</span> <span class="token number">3</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>state <span class="token operator">==</span> ST_BRANCH<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> nextIdx <span class="token operator">=</span> curIdx <span class="token operator">&lt;&lt;</span> <span class="token number">1</span> <span class="token operator">^</span> <span class="token function">nextRandom</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">long</span> res <span class="token operator">=</span> <span class="token function">branchSubpage</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> nextIdx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>res <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> res<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">return</span> <span class="token function">branchSubpage</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> nextIdx <span class="token operator">^</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>state <span class="token operator">==</span> ST_UNUSED<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">allocateSubpageSimple</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> curIdx<span class="token punctuation">,</span> val<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>state <span class="token operator">==</span> ST_ALLOCATED_SUBPAGE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> subpage <span class="token operator">=</span> subpages<span class="token punctuation">[</span><span class="token function">subpageIdx</span><span class="token punctuation">(</span>curIdx<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">int</span> elemSize <span class="token operator">=</span> subpage<span class="token punctuation">.</span>elemSize<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>normCapacity <span class="token operator">!=</span> elemSize<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">return</span> subpage<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="Subpage的初始化"><a href="#Subpage的初始化" class="headerlink" title="Subpage的初始化"></a>Subpage的初始化</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//memoryMapIdx 当前page在chunk中的id</span>
+<span class="token comment">//runOffset 当前page在chunk.memory的偏移量</span>
+<span class="token comment">//pageSize page大小</span>
+<span class="token comment">//elemSize page切分后的elem大小</span>
+<span class="token class-name">PoolSubpage</span><span class="token punctuation">(</span><span class="token class-name">PoolChunk</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> chunk<span class="token punctuation">,</span> <span class="token keyword">int</span> memoryMapIdx<span class="token punctuation">,</span> <span class="token keyword">int</span> runOffset<span class="token punctuation">,</span> <span class="token keyword">int</span> pageSize<span class="token punctuation">,</span> <span class="token keyword">int</span> elemSize<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>chunk <span class="token operator">=</span> chunk<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>memoryMapIdx <span class="token operator">=</span> memoryMapIdx<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>runOffset <span class="token operator">=</span> runOffset<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>pageSize <span class="token operator">=</span> pageSize<span class="token punctuation">;</span>
+    <span class="token comment">//默认初始化bitmap长度为8</span>
+    <span class="token comment">//其中分配内存大小都是处理过的，最小为16，说明一个page可以分成 8192/16 = 512 个内存段，</span>
+    <span class="token comment">//一个long有64位，可以描述64个内存段，这样只需要 512/64 = 8 个long就可以描述全部内存段了</span>
+    bitmap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token keyword">long</span><span class="token punctuation">[</span>pageSize <span class="token operator">>>></span> <span class="token number">10</span><span class="token punctuation">]</span><span class="token punctuation">;</span> <span class="token comment">// pageSize / 16 / 64</span>
+    <span class="token comment">//init根据当前需要分配的内存大小，确定需要多少个bitmap元素</span>
+    <span class="token function">init</span><span class="token punctuation">(</span>elemSize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token keyword">int</span> elemSize<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    doNotDestroy <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>elemSize <span class="token operator">=</span> elemSize<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>elemSize <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        maxNumElems <span class="token operator">=</span> numAvail <span class="token operator">=</span> pageSize <span class="token operator">/</span> elemSize<span class="token punctuation">;</span>
+        nextAvail <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token comment">//结合上面所述的理论</span>
+        <span class="token comment">//通过 maxNumElems / 64 计算出需要多少个 long 来容纳内存块数量</span>
+        bitmapLength <span class="token operator">=</span> maxNumElems <span class="token operator">>>></span> <span class="token number">6</span><span class="token punctuation">;</span>
+        <span class="token comment">//计算值低于64的情况,一个long就可以容纳</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>maxNumElems <span class="token operator">&amp;</span> <span class="token number">63</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            bitmapLength <span class="token operator">++</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> bitmapLength<span class="token punctuation">;</span> i <span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            bitmap<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token function">addToPool</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>下面通过分布申请 4096 和 32 大小的内存，说明如何确定 bitmapLength 的值：</p>
+<ol>
+<li>比如，当前申请大小 4096 的内存，maxNumElems 和 numAvail 为2，说明一个 page 被拆分成 2 个内存段，2 &gt;&gt;&gt; 6 &#x3D; 0，且 2 &amp; 63 ！&#x3D; 0，所以 bitmapLength 为 1，说明只需要一个 long 就可以描述 2 个内存段状态。</li>
+<li>如果当前申请大小32的内存，maxNumElems 和 numAvail 为 256，说明一个 page 被拆分成 256 个内存段， 256 &gt;&gt;&gt; 6 &#x3D; 4，说明需要 4 个 long 描述 256 个内存段状态。</li>
+</ol>
+<h2 id="内存分配"><a href="#内存分配" class="headerlink" title="内存分配"></a>内存分配</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">long</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>elemSize <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token function">toHandle</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>numAvail <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">||</span> <span class="token operator">!</span>doNotDestroy<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token comment">//找到下一个可分配的坐标</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> bitmapIdx <span class="token operator">=</span> nextAvail<span class="token punctuation">;</span>
+    <span class="token comment">//确定 bitmap 的索引</span>
+    <span class="token keyword">int</span> q <span class="token operator">=</span> bitmapIdx <span class="token operator">>>></span> <span class="token number">6</span><span class="token punctuation">;</span>
+    <span class="token comment">//将超出64的那一部分二进制数抹掉,得到一个小于64的数r</span>
+    <span class="token keyword">int</span> r <span class="token operator">=</span> bitmapIdx <span class="token operator">&amp;</span> <span class="token number">63</span><span class="token punctuation">;</span>
+    <span class="token keyword">assert</span> <span class="token punctuation">(</span>bitmap<span class="token punctuation">[</span>q<span class="token punctuation">]</span> <span class="token operator">>>></span> r <span class="token operator">&amp;</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token comment">//将对应位置q设置为1</span>
+    bitmap<span class="token punctuation">[</span>q<span class="token punctuation">]</span> <span class="token operator">|=</span> <span class="token number">1L</span> <span class="token operator">&lt;&lt;</span> r<span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">--</span> numAvail <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">removeFromPool</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        nextAvail <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//更新当前page中下一个可分配内存段</span>
+        nextAvail <span class="token operator">=</span> <span class="token function">findNextAvailable</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token function">toHandle</span><span class="token punctuation">(</span>bitmapIdx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">findNextAvailable</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">int</span> newNextAvail <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    loop<span class="token operator">:</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> bitmapLength<span class="token punctuation">;</span> i <span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">long</span> bits <span class="token operator">=</span> bitmap<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token comment">//~bits != 0 说明这个long所描述的64个内存段还有未分配的</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">~</span>bits <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> <span class="token number">64</span><span class="token punctuation">;</span> j <span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">//遍历bits每一位，找到可用的一位</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>bits <span class="token operator">&amp;</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    newNextAvail <span class="token operator">=</span> i <span class="token operator">&lt;&lt;</span> <span class="token number">6</span> <span class="token operator">|</span> j<span class="token punctuation">;</span>
+                    <span class="token keyword">break</span> loop<span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+                bits <span class="token operator">>>>=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>newNextAvail <span class="token operator">&lt;</span> maxNumElems<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> newNextAvail<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="PoolChunkList内存管理"><a href="#PoolChunkList内存管理" class="headerlink" title="PoolChunkList内存管理"></a>PoolChunkList内存管理</h1><p>PoolChunkList 负责管理多个 chunk 的生命周期，在此基础上对内存分配进行进一步的优化。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">PoolChunkList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">implements</span> <span class="token class-name">PoolChunkListMetric</span> <span class="token punctuation">&#123;</span>
+    
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">PoolArena</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> arena<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">PoolChunkList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> nextList<span class="token punctuation">;</span>
+    <span class="token class-name">PoolChunkList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> prevList<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> minUsage<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> maxUsage<span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token class-name">PoolChunk</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> head<span class="token punctuation">;</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>每个 PoolChunkList 实例维护了一个 PoolChunk 链表，自身也形成一个链表，为何要这么实现？</p>
+<p><img src="/images/Netty/ChunkList.png"></p>
+<p>随着 chunk 中 page 的不断分配和释放，会导致很多碎片内存段，大大增加了之后分配一段连续内存的失败率，针对这种情况，可以把内存使用率超过 maxUsage 的 chunk 移动到下一个 PoolChunkList 链表</p>
+<pre class="line-numbers language-csharp" data-language="csharp"><code class="language-csharp"><span class="token return-type class-name">boolean</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token class-name">PooledByteBuf<span class="token punctuation">&lt;</span>T<span class="token punctuation">></span></span> buf<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">int</span></span> reqCapacity<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">int</span></span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>head <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">PoolChunk<span class="token punctuation">&lt;</span>T<span class="token punctuation">></span></span> cur <span class="token operator">=</span> head<span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name"><span class="token keyword">long</span></span> handle <span class="token operator">=</span> cur<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>handle <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            cur <span class="token operator">=</span> cur<span class="token punctuation">.</span>next<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>cur <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            cur<span class="token punctuation">.</span><span class="token function">initBuf</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> handle<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>cur<span class="token punctuation">.</span><span class="token function">usage</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">>=</span> maxUsage<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">remove</span><span class="token punctuation">(</span>cur<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                nextList<span class="token punctuation">.</span><span class="token keyword">add</span><span class="token punctuation">(</span>cur<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>但是，随着 chunk 中内存的释放，其内存使用率也会随着下降，当下降到 minUsage 时，该 chunk 会移动到前一个列表中</p>
+<pre class="line-numbers language-csharp" data-language="csharp"><code class="language-csharp"><span class="token return-type class-name"><span class="token keyword">void</span></span> <span class="token function">free</span><span class="token punctuation">(</span><span class="token class-name">PoolChunk<span class="token punctuation">&lt;</span>T<span class="token punctuation">></span></span> chunk<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">long</span></span> handle<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    chunk<span class="token punctuation">.</span><span class="token function">free</span><span class="token punctuation">(</span>handle<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>chunk<span class="token punctuation">.</span><span class="token function">usage</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> minUsage<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">remove</span><span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>prevList <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token return-type class-name">assert</span> chunk<span class="token punctuation">.</span><span class="token function">usage</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">;</span>
+            arena<span class="token punctuation">.</span><span class="token function">destroyChunk</span><span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            prevList<span class="token punctuation">.</span><span class="token keyword">add</span><span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>从 poolChunkList 的实现可以看出，每个 chunkList 的都有一个上下限：minUsage 和 maxUsage，两个相邻的 chunkList，前一个的 maxUsage 和后一个的 minUsage 必须有一段交叉值进行缓冲，否则会出现某个 chunk 的 usage 处于临界值，而导致不停的在两个 chunk 间移动。</p>
+<p>所以 chunk 的生命周期不会固定在某个 chunkList 中，随着内存的分配和释放，根据当前的内存使用率，在 chunkList 链表中前后移动。</p>
+<h1 id="PoolArena内存管理"><a href="#PoolArena内存管理" class="headerlink" title="PoolArena内存管理"></a>PoolArena内存管理</h1><p>Arena 本身是指一块区域，在内存管理中，Memory Arena 是指内存中的一大块连续的区域，PoolArena 就是 Netty 内存池实现类。</p>
+<p>为了集中管理内存的分配和释放，同时提高分配和释放内存时候的性能，很多框架和应用都会通过预先申请一大块内存，然后通过提供相应的分配和释放接口来使用内存。这样一来，对内存的管理就被集中到几个类或者函数中，由于不再频繁使用系统调用来申请和释放内存，应用或者系统的性能也会大大提高。在这种设计思路下，预先申请的那一大块内存就被称为 Memory Arena。</p>
+<p>不同的框架，Memory Arena 的实现不同，Netty 的 PoolArena 是由多个 Chunk 组成的大块内存区域，而每个 Chunk 则由一个或者多个 Page 组成，因此，对内存的组织和管理也就主要集中在如何管理和组织 Chunk 和 Page 了。</p>
+<p>应用层的内存分配主要通过如下实现，但最终还是委托给 PoolArena 实现。</p>
+<pre class="line-numbers language-css" data-language="css"><code class="language-css">PooledByteBufAllocator.DEFAULT.<span class="token function">directBuffer</span><span class="token punctuation">(</span>128<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>由于 Netty 通常应用于高并发系统，不可避免的有多线程进行同时内存分配，可能会极大的影响内存分配的效率，为了缓解线程竞争，可以通过创建多个 PoolArena 细化锁的粒度，提高并发执行的效率。</p>
+<h2 id="PoolArena-的内部结构"><a href="#PoolArena-的内部结构" class="headerlink" title="PoolArena 的内部结构"></a>PoolArena 的内部结构</h2><p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png"></p>
+<p>poolArena提供了两种方式进行内存分配</p>
+<ol>
+<li><p>PoolSubpage用于分配小于8k的内存</p>
+<ul>
+<li><p>tinySubpagePools</p>
+<p>  用于分配小于512字节的内存，默认长度为32，因为内存分配最小为16，每次增加16，直到512，区间[16，512)一共有32个不同值</p>
+</li>
+<li><p>smallSubpagePools</p>
+<p>  用于分配大于等于512字节的内存，默认长度为4</p>
+</li>
+</ul>
+</li>
+<li><p>poolChunkList用于分配大于8k的内存</p>
+</li>
+</ol>
+<p><img src="/images/Netty/ChunkListGroup.png"></p>
+<blockquote>
+<p><strong>注意</strong></p>
+<ol>
+<li><p>qInit 前置节点为自己，且 minUsage&#x3D;Integer.MIN_VALUE，意味着一个初分配的 chunk，在最开始的内存分配过程中(内存使用率&lt;25%)，即使完全释放也不会被回收，会始终保留在内存中</p>
+</li>
+<li><p>q000没有前置节点，当一个chunk进入到q000列表，如果其内存被完全释放，则不再保留在内存中，其分配的内存被完全回收</p>
+</li>
+</ol>
+</blockquote>
+<h2 id="poolArena内存分配"><a href="#poolArena内存分配" class="headerlink" title="poolArena内存分配"></a>poolArena内存分配</h2><p>默认先尝试从 poolThreadCache 中分配内存，PoolThreadCache 利用 ThreadLocal 的特性，消除了多线程竞争，提高内存分配效率；首次分配时，poolThreadCache 中并没有可用内存进行分配，当上一次分配的内存使用完并释放时，会将其加入到 poolThreadCache 中，提供该线程下次申请时使用。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token class-name">PoolThreadCache</span> cache<span class="token punctuation">,</span> <span class="token class-name">PooledByteBuf</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> buf<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token keyword">int</span> reqCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> normCapacity <span class="token operator">=</span> <span class="token function">normalizeCapacity</span><span class="token punctuation">(</span>reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>normCapacity <span class="token operator">&amp;</span> subpageOverflowMask<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// capacity &lt; pageSize</span>
+        <span class="token keyword">int</span> tableIdx<span class="token punctuation">;</span>
+        <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span><span class="token punctuation">[</span><span class="token punctuation">]</span> table<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>normCapacity <span class="token operator">&amp;</span> <span class="token number">0xFFFFFE00</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token comment">// &lt; 512</span>
+            tableIdx <span class="token operator">=</span> normCapacity <span class="token operator">>>></span> <span class="token number">4</span><span class="token punctuation">;</span>
+            table <span class="token operator">=</span> tinySubpagePools<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            tableIdx <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+            <span class="token keyword">int</span> i <span class="token operator">=</span> normCapacity <span class="token operator">>>></span> <span class="token number">10</span><span class="token punctuation">;</span>
+            <span class="token keyword">while</span> <span class="token punctuation">(</span>i <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                i <span class="token operator">>>>=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+                tableIdx <span class="token operator">++</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            table <span class="token operator">=</span> smallSubpagePools<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">synchronized</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">final</span> <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> head <span class="token operator">=</span> table<span class="token punctuation">[</span>tableIdx<span class="token punctuation">]</span><span class="token punctuation">;</span>
+            <span class="token keyword">final</span> <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> s <span class="token operator">=</span> head<span class="token punctuation">.</span>next<span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>s <span class="token operator">!=</span> head<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">assert</span> s<span class="token punctuation">.</span>doNotDestroy <span class="token operator">&amp;&amp;</span> s<span class="token punctuation">.</span>elemSize <span class="token operator">==</span> normCapacity<span class="token punctuation">;</span>
+                <span class="token keyword">long</span> handle <span class="token operator">=</span> s<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">assert</span> handle <span class="token operator">>=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+                s<span class="token punctuation">.</span>chunk<span class="token punctuation">.</span><span class="token function">initBufWithSubpage</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> handle<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>normCapacity <span class="token operator">></span> chunkSize<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token function">allocateHuge</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token function">allocateNormal</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>allocateNormal实现</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">synchronized</span> <span class="token keyword">void</span> <span class="token function">allocateNormal</span><span class="token punctuation">(</span><span class="token class-name">PooledByteBuf</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> buf<span class="token punctuation">,</span> <span class="token keyword">int</span> reqCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>q050<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span> q025<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span>
+        q000<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span> qInit<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span>
+        q075<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span> q100<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// Add a new chunk.</span>
+    <span class="token class-name">PoolChunk</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> c <span class="token operator">=</span> <span class="token function">newChunk</span><span class="token punctuation">(</span>pageSize<span class="token punctuation">,</span> maxOrder<span class="token punctuation">,</span> pageShifts<span class="token punctuation">,</span> chunkSize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">long</span> handle <span class="token operator">=</span> c<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">assert</span> handle <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">;</span>
+    c<span class="token punctuation">.</span><span class="token function">initBuf</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> handle<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    qInit<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>第一次进行内存分配时，chunkList 没有 chunk 可以分配内存，需通过方法 newChunk 新建一个 chunk 进行内存分配，并添加到 qInit 列表中。如果分配如 512 字节的小内存，除了创建 chunk，还有创建 subpage， PoolSubpage 在初始化之后，会添加到 smallSubpagePools 中，其实并不是直接插入到数组，而是添加到 head 的 next 节点。下次再有分配 512 字节的需求时，直接从 smallSubpagePools 获取对应的 subpage 进行分配。</p>
+<p><strong>分配内存时，为什么不从内存使用率较低的q000开始？</strong></p>
+<p>当应用在实际运行过程中，碰到访问高峰，这时需要分配的内存是平时的好几倍，当然也需要创建好几倍的 chunk，如果先从 q000 开始，这些在高峰期创建的 chunk 被回收的概率会大大降低，延缓了内存的回收进度，造成内存使用的浪费。</p>
+<p>而 q050 保存的是内存利用率 50%~100% 的 chunk，应该是个折中的选择！这样大部分情况下，chunk 的利用率都会保持在一个较高水平，提高整个应用的内存利用率；qInit 的 chunk 利用率低，但不会被回收；q075 和 q100 由于内存利用率太高，导致内存分配的成功率大大降低，因此放到最后。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/Memory-Pool/" rel="tag"># Memory Pool</a>
+              <a href="/tags/PoolChunk/" rel="tag"># PoolChunk</a>
+              <a href="/tags/PoolSubPage/" rel="tag"># PoolSubPage</a>
+              <a href="/tags/PoolChunkList/" rel="tag"># PoolChunkList</a>
+              <a href="/tags/PoolArena/" rel="tag"># PoolArena</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/" rel="prev" title="Netty ByteBuf及相关辅助类">
+      <i class="fa fa-chevron-left"></i> Netty ByteBuf及相关辅助类
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/13/Netty-Channel%E5%92%8CUnsafe/" rel="next" title="Netty Channel和Unsafe">
+      Netty Channel和Unsafe <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolChunk%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">1.</span> <span class="nav-text">PoolChunk内存分配</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E6%8B%9F%E5%86%85%E5%AD%98%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">模拟内存数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E9%85%8D%E5%86%85%E5%AD%98"><span class="nav-number">1.2.</span> <span class="nav-text">分配内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E5%86%85%E5%AD%98"><span class="nav-number">1.3.</span> <span class="nav-text">释放内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E8%8A%82%E7%82%B9%E7%8A%B6%E6%80%81%E7%9A%84%E7%BB%B4%E6%8A%A4"><span class="nav-number">1.4.</span> <span class="nav-text">对节点状态的维护</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolSubPage%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">2.</span> <span class="nav-text">PoolSubPage内存分配</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%B3%E8%AF%B7Subpage%E7%A9%BA%E9%97%B4"><span class="nav-number">2.1.</span> <span class="nav-text">申请Subpage空间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Subpage%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">2.2.</span> <span class="nav-text">Subpage的初始化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">2.3.</span> <span class="nav-text">内存分配</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolChunkList%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86"><span class="nav-number">3.</span> <span class="nav-text">PoolChunkList内存管理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#PoolArena%E5%86%85%E5%AD%98%E7%AE%A1%E7%90%86"><span class="nav-number">4.</span> <span class="nav-text">PoolArena内存管理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#PoolArena-%E7%9A%84%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.</span> <span class="nav-text">PoolArena 的内部结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#poolArena%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D"><span class="nav-number">4.2.</span> <span class="nav-text">poolArena内存分配</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

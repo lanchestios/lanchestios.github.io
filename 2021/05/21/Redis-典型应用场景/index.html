@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Redis 的诸如消息队列、分布式锁等典型应用场景介绍。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 典型应用场景">
+<meta property="og:url" content="http://example.com/2021/05/21/Redis-%E5%85%B8%E5%9E%8B%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Redis 的诸如消息队列、分布式锁等典型应用场景介绍。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Redis/发布订阅.png">
+<meta property="og:image" content="http://example.com/images/Redis/RedisStream.png">
+<meta property="article:published_time" content="2021-05-21T02:10:00.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.563Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="MQ">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Redis/发布订阅.png">
+
+<link rel="canonical" href="http://example.com/2021/05/21/Redis-%E5%85%B8%E5%9E%8B%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Redis 典型应用场景 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/05/21/Redis-%E5%85%B8%E5%9E%8B%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 典型应用场景
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-05-21 10:10:00" itemprop="dateCreated datePublished" datetime="2021-05-21T10:10:00+08:00">2021-05-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index"><span itemprop="name">Redis</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Redis 的诸如消息队列、分布式锁等典型应用场景介绍。</p>
+<span id="more"></span>
+
+<h1 id="消息队列"><a href="#消息队列" class="headerlink" title="消息队列"></a>消息队列</h1><blockquote>
+<p><strong>消息队列</strong> 是指利用 <strong>高效可靠</strong> 的 <strong>消息传递机制</strong> 进行与平台无关的 <strong>数据交流</strong>，并基于<strong>数据通信</strong>来进行分布式系统的集成。通过提供 <strong>消息传递</strong> 和 <strong>消息排队</strong> 模型，它可以在 <strong>分布式环境</strong> 下提供 <strong>应用解耦</strong>、<strong>弹性伸缩</strong>、<strong>冗余存储</strong>、<strong>流量削峰</strong>、<strong>异步通信</strong>、<strong>数据同步</strong> 等等功能。</p>
+</blockquote>
+<h2 id="点对点消息队列"><a href="#点对点消息队列" class="headerlink" title="点对点消息队列"></a>点对点消息队列</h2><p>Redis 列表实现多种 PUSH 和 POP 操作。所以常用来做异步队列使用。将需要延后处理的任务结构体序列化成字符串塞进 Redis 的列表，另一个线程从这个列表中轮询数据进行处理。</p>
+<h3 id="简单消息队列"><a href="#简单消息队列" class="headerlink" title="简单消息队列"></a>简单消息队列</h3><p>通过 <code>LPUSH &amp; RPOP</code> 或者 <code>RPUSH &amp; LPOP</code> 的方式，可以构建简单的消息队列。但会存在一个性能风险点，就是消费者如果想要及时的处理数据，就要在程序中写个类似 <code>while(true)</code> 这样的逻辑，不停的去调用 <code>LPOP</code> 或 <code>RPOP</code> 命令，这就会给消费者程序带来些不必要的性能损失。</p>
+<h3 id="即时消费队列"><a href="#即时消费队列" class="headerlink" title="即时消费队列"></a>即时消费队列</h3><p>为了解决简单消息队列的问题，Redis 还提供了 <code>LPUSH &amp; BRPOP</code> 和 <code>RPUSH &amp; BLPOP</code> 这种阻塞式读取队列，客户端在没有读到队列数据时，自动阻塞，直到有新的数据写入队列，再开始读取新数据。这种方式就节省了不必要的 CPU 开销。但要注意，过多的阻塞命令可能会导致这些命令将客户端线程池占满，使其他命令无法发送。</p>
+<p>但依旧会有一个问题：因为 Redis 单线程的特点，在即时消费数据时，同一个消息会不会同时被多个 <code>consumer</code> 消费掉，但是需要我们考虑消费不成功的情况。List 队列中的消息一经发送出去，便从队列里删除。如果由于网络原因消费者没有收到消息，或者消费者在处理这条消息的过程中崩溃了，就再也无法还原出这条消息。究其原因，就是缺少消息确认机制。</p>
+<h3 id="确认消费队列"><a href="#确认消费队列" class="headerlink" title="确认消费队列"></a>确认消费队列</h3><p>为了保证消息的可靠性，消息队列都会有完善的消息确认机制（Acknowledge），即消费者向队列报告消息已收到或已处理的机制。 <code>RPOPLPUSH</code>、<code>BRPOPLPUSH</code> 从一个 List 中获取消息的同时把这条消息复制到另一个 List 里（可以当做备份），而且这个过程是原子的。这样就可以在业务流程安全结束后，再删除队列元素，实现消息确认机制。</p>
+<h3 id="延时消息队列"><a href="#延时消息队列" class="headerlink" title="延时消息队列"></a>延时消息队列</h3><p>当然，还有更特殊的场景，可以通过 ZSET 来实现延时消息队列，原理就是将消息加到 ZSET 结构后，将要被消费的时间戳设置为对应的 score 即可，只要业务数据不会是重复数据就 OK。</p>
+<h2 id="订阅与发布消息队列"><a href="#订阅与发布消息队列" class="headerlink" title="订阅与发布消息队列"></a>订阅与发布消息队列</h2><p>“发布&#x2F;订阅”模式同样可以实现进程间的消息传递，其原理如下:”发布&#x2F;订阅”模式包含两种角色，分别是发布者和订阅者。订阅者可以订阅一个或者多个频道(channel)，而发布者可以向指定的频道(channel)发送消息，所有订阅此频道的订阅者都会收到此消息。</p>
+<p>Redis 通过 <code>PUBLISH</code> 、 <code>SUBSCRIBE</code> 等命令实现了订阅与发布模式， 这个功能提供两种信息机制， 分别是订阅&#x2F;发布到频道和订阅&#x2F;发布到模式。</p>
+<img src="/images/Redis/发布订阅.png" style="zoom:67%;" />
+
+<h2 id="Stream-消息队列"><a href="#Stream-消息队列" class="headerlink" title="Stream 消息队列"></a>Stream 消息队列</h2><p>Redis 发布订阅（PUB &#x2F; SUB）有个缺点就是消息无法持久化，如果出现网络断开、Redis 宕机等，消息就会被丢弃。而且也没有 ACK 机制来保证数据的可靠性，假设一个消费者都没有，那消息就直接被丢弃了。简单来说，发布订阅（PUB &#x2F; SUB）可以分发消息，但无法记录历史消息。</p>
+<p>Redis 5.0 版本新增了一个更强大的数据结构 —— Stream。</p>
+<p><img src="/images/Redis/RedisStream.png"></p>
+<p>它就像是个仅追加内容的消息链表，把所有加入的消息都串起来，每个消息都有一个唯一的 ID 和对应的内容。而且消息是持久化的。它提供了消息的持久化和主备复制功能，可以让任何客户端访问任何时刻的数据，并且能记住每一个客户端的访问位置，还能保证消息不丢失。</p>
+<p>当然也会有一些其他的问题，例如：宕机可能造成的 AOF 指令丢失、重新选举造成的数据缺失等问题。</p>
+<h1 id="分布式锁"><a href="#分布式锁" class="headerlink" title="分布式锁"></a>分布式锁</h1><p>分布式锁的目的其实很简单，就是为了保证多台服务器在执行某一段代码时保证只有一台服务器执行。</p>
+<h2 id="Redis-单节点分布式锁"><a href="#Redis-单节点分布式锁" class="headerlink" title="Redis 单节点分布式锁"></a>Redis 单节点分布式锁</h2><p>命令 <code>SET resource-name anystring NX EX max-lock-time</code> 是一种用 Redis 来实现锁机制的简单方法。</p>
+<p>如果上述命令返回<code>OK</code>，那么客户端就可以获得锁（如果上述命令返回 Nil，那么客户端可以在一段时间之后重新尝试），并且可以通过<code>DEL</code>命令来释放锁。客户端加锁之后，如果没有主动释放，会在过期时间之后自动释放。</p>
+<p>可以通过如下优化使得上面的锁系统变得更加鲁棒：</p>
+<ul>
+<li>不要设置固定的字符串，而是设置为随机的大字符串，可以称为 token。</li>
+<li>通过脚步删除指定锁的 key，而不是<code>DEL</code>命令。</li>
+</ul>
+<p>但是这种方式仍然会有一些问题：</p>
+<ul>
+<li><strong>锁被提前释放</strong>。假如线程 A 在加锁和释放锁之间的逻辑执行的时间过长（或者线程 A 执行过程中被堵塞），以至于超出了锁的过期时间后进行了释放，但线程 A 在临界区的逻辑还没有执行完，那么这时候线程 B 就可以提前重新获取这把锁，导致临界区代码不能严格的串行执行。</li>
+<li><strong>锁被误删</strong>。假如以上情形中的线程 A 执行完后，它并不知道此时的锁持有者是线程 B，线程 A 会继续执行 DEL 指令来释放锁，如果线程 B 在临界区的逻辑还没有执行完，线程 A 实际上释放了线程 B 的锁。</li>
+</ul>
+<p>为了避免以上情况，建议不要在执行时间过长的场景中使用 Redis 分布式锁，同时一个比较安全的做法是在执行 DEL 释放锁之前对锁进行判断，验证当前锁的持有者是否是自己。当然，最好使用 Lua 脚本使得一系列动作原子性地执行。</p>
+<p>解锁脚本的一个例子将类似于以下：</p>
+<pre class="line-numbers language-lua" data-language="lua"><code class="language-lua"><span class="token keyword">if</span> redis<span class="token punctuation">.</span><span class="token function">call</span><span class="token punctuation">(</span><span class="token string">"get"</span><span class="token punctuation">,</span>KEYS<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> ARGV<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span>
+<span class="token keyword">then</span>
+    <span class="token keyword">return</span> redis<span class="token punctuation">.</span><span class="token function">call</span><span class="token punctuation">(</span><span class="token string">"del"</span><span class="token punctuation">,</span>KEYS<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">else</span>
+    <span class="token keyword">return</span> <span class="token number">0</span>
+<span class="token keyword">end</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p><strong>补充</strong>：</p>
+<p>这并不是一个完美的方案，只是相对完全一点，因为它并没有完全解决当前线程执行超时锁被提前释放后，其它线程乘虚而入的问题。</p>
+<p>怎么能解决锁被提前释放这个问题呢？</p>
+<p>可以利用锁的可重入特性，让获得锁的线程开启一个定时器的守护线程，每 expireTime &#x2F; 3 执行一次，去检查该线程的锁是否存在，如果存在则对锁的过期时间重新设置为 expireTime，即利用守护线程对锁进行“续命”，防止锁由于过期提前释放。</p>
+<p>当然业务要实现这个守护进程的逻辑还是比较复杂的，可能还会出现一些未知的问题。</p>
+<p>目前互联网公司在生产环境用的比较广泛的开源框架 Redisson 很好地解决了这个问题，非常的简便易用，且支持 Redis 单实例、Redis M-S、Redis Sentinel、Redis Cluster 等多种部署架构。</p>
+</blockquote>
+<h2 id="Redis-多节点分布式锁"><a href="#Redis-多节点分布式锁" class="headerlink" title="Redis 多节点分布式锁"></a>Redis 多节点分布式锁</h2><p>基于 Redis 单机实现的分布式锁其实都存在一个问题，就是加锁时只作用在一个 Redis 节点上，即使 Redis 通过 Sentinel 保证了高可用，但由于 Redis 的复制是异步的，Master 节点获取到锁后在未完成数据同步的情况下发生故障转移（此时故障转移的节点无该锁的 Key），此时其他客户端上的线程可以不合期望地获取到锁，毫无疑问会丧失锁的安全性。</p>
+<p>正因为如此，在Redis的分布式环境中，Redis 的作者 antirez 提供了RedLock 的算法来实现一个分布式锁。</p>
+<h3 id="RedLock-算法概述"><a href="#RedLock-算法概述" class="headerlink" title="RedLock 算法概述"></a>RedLock 算法概述</h3><p>假设有 N（N&gt;&#x3D;5）个 Redis 节点，这些节点完全互相独立，不存在主从复制或者其他集群协调机制，确保在这 N 个节点上使用与在 Redis 单实例下相同的方法获取和释放锁。</p>
+<p>获取锁的过程，客户端应执行如下操作：</p>
+<ul>
+<li>获取当前 Unix 时间，以毫秒为单位。</li>
+<li>按顺序依次尝试从 5 个实例使用相同的 key 和具有唯一性的 value（例如 UUID）获取锁。当向 Redis 请求获取锁时，客户端应该设置一个网络连接和响应超时时间，这个超时时间应该小于锁的失效时间。例如锁自动失效时间为 10 秒，则超时时间应该在 5-50 毫秒之间。这样可以避免服务器端 Redis 已经挂掉的情况下，客户端还在一直等待响应结果。如果服务器端没有在规定时间内响应，客户端应该尽快尝试去另外一个 Redis 实例请求获取锁。</li>
+<li>客户端使用当前时间减去开始获取锁时间（步骤 1 记录的时间）就得到获取锁使用的时间。当且仅当从大多数（N&#x2F;2+1，这里是 3 个节点）的 Redis 节点都取到锁，并且使用的时间小于锁失效时间时，锁才算获取成功。</li>
+<li>如果取到了锁，key 的真正有效时间等于有效时间减去获取锁所使用的时间（步骤 3 计算的结果）。</li>
+<li>如果因为某些原因，获取锁失败（没有在至少 N&#x2F;2+1 个 Redis 实例取到锁或者取锁时间已经超过了有效时间），客户端应该在所有的 Redis 实例上进行解锁（使用 Redis Lua 脚本）。</li>
+</ul>
+<p>释放锁的过程相对比较简单：客户端向所有 Redis 节点发起释放锁的操作，包括加锁失败的节点，也需要执行释放锁的操作，antirez在算法描述中特别强调这一点，这是为什么呢？</p>
+<p>原因是可能存在某个节点加锁成功后返回客户端的响应包丢失了，这种情况在异步通信模型中是有可能发生的：客户端向服务器通信是正常的，但反方向却是有问题的。虽然对客户端而言，由于响应超时导致加锁失败，但是对 Redis 节点而言，SET指令执行成功，意味着加锁成功。因此，释放锁的时候，客户端也应该对当时获取锁失败的那些 Redis 节点同样发起请求。</p>
+<p>除此之外，为了避免 Redis 节点发生崩溃重启后造成锁丢失，从而影响锁的安全性，antirez 还提出了延时重启的概念，即一个节点崩溃后不要立即重启，而是等待一段时间后再进行重启，这段时间应该大于锁的有效时间。</p>
+<h3 id="Redission实现"><a href="#Redission实现" class="headerlink" title="Redission实现"></a>Redission实现</h3><ul>
+<li>Non-Fair Lock</li>
+<li>Fair Lock</li>
+<li>MultiLock</li>
+<li>ReadWriteLock</li>
+<li>RedLock</li>
+</ul>
+<h1 id="布隆过滤器"><a href="#布隆过滤器" class="headerlink" title="布隆过滤器"></a>布隆过滤器</h1>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+              <a href="/tags/MQ/" rel="tag"># MQ</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/05/20/Redis-%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C/" rel="prev" title="Redis 命令手册">
+      <i class="fa fa-chevron-left"></i> Redis 命令手册
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/06/20/RocketMQ-%E5%8E%9F%E7%90%86%E5%8F%8A%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF/" rel="next" title="RocketMQ 原理及应用场景">
+      RocketMQ 原理及应用场景 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.</span> <span class="nav-text">消息队列</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%82%B9%E5%AF%B9%E7%82%B9%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.1.</span> <span class="nav-text">点对点消息队列</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.1.1.</span> <span class="nav-text">简单消息队列</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%B3%E6%97%B6%E6%B6%88%E8%B4%B9%E9%98%9F%E5%88%97"><span class="nav-number">1.1.2.</span> <span class="nav-text">即时消费队列</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A1%AE%E8%AE%A4%E6%B6%88%E8%B4%B9%E9%98%9F%E5%88%97"><span class="nav-number">1.1.3.</span> <span class="nav-text">确认消费队列</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%B6%E6%97%B6%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.1.4.</span> <span class="nav-text">延时消息队列</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A2%E9%98%85%E4%B8%8E%E5%8F%91%E5%B8%83%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.2.</span> <span class="nav-text">订阅与发布消息队列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Stream-%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97"><span class="nav-number">1.3.</span> <span class="nav-text">Stream 消息队列</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81"><span class="nav-number">2.</span> <span class="nav-text">分布式锁</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-%E5%8D%95%E8%8A%82%E7%82%B9%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81"><span class="nav-number">2.1.</span> <span class="nav-text">Redis 单节点分布式锁</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-%E5%A4%9A%E8%8A%82%E7%82%B9%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81"><span class="nav-number">2.2.</span> <span class="nav-text">Redis 多节点分布式锁</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RedLock-%E7%AE%97%E6%B3%95%E6%A6%82%E8%BF%B0"><span class="nav-number">2.2.1.</span> <span class="nav-text">RedLock 算法概述</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redission%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.2.2.</span> <span class="nav-text">Redission实现</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%B8%83%E9%9A%86%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">布隆过滤器</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="ByteBuf 是对 JDK 提供的 java.nio.ByteBuffer 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Netty ByteBuf及相关辅助类">
+<meta property="og:url" content="http://example.com/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="ByteBuf 是对 JDK 提供的 java.nio.ByteBuffer 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png">
+<meta property="article:published_time" content="2021-01-12T10:28:05.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.582Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Netty">
+<meta property="article:tag" content="ByteBuf">
+<meta property="article:tag" content="AbstractByteBuf">
+<meta property="article:tag" content="AbstractReferenceCountedBuf">
+<meta property="article:tag" content="UnpooledByteBuf">
+<meta property="article:tag" content="PooledByteBuf">
+<meta property="article:tag" content="ByteBuf辅助类">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+
+<link rel="canonical" href="http://example.com/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Netty ByteBuf及相关辅助类 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/01/12/Netty-ByteBuf%E5%8F%8A%E7%9B%B8%E5%85%B3%E8%BE%85%E5%8A%A9%E7%B1%BB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Netty ByteBuf及相关辅助类
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-01-12 18:28:05" itemprop="dateCreated datePublished" datetime="2021-01-12T18:28:05+08:00">2021-01-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Netty/" itemprop="url" rel="index"><span itemprop="name">Netty</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>ByteBuf 是对 JDK 提供的 <code>java.nio.ByteBuffer</code> 的进一步封装，提供了许多更加方便使用的功能，封装了操作 ByteBuffer 的复杂度。本文介绍 ByteBuf 的工作原理以及其部分实现类的源码分析，并对一些 ByteBuf 的辅助类也进行了简要介绍。</p>
+<span id="more"></span>
+
+<h1 id="ByteBuf功能说明"><a href="#ByteBuf功能说明" class="headerlink" title="ByteBuf功能说明"></a>ByteBuf功能说明</h1><p>在处理数据传输过程中，需要用到 JDK NIO 类库提供的<code>java.nio.Buffer</code>，它的实现如下图</p>
+<p><img src="/images/Netty/Buffer%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p>但对于 NIO 编程来说，ByteBuffer完全可以满足处理数据的需要，但是由于NIO编程的复杂性， ByteBuffer 也有其局限性，它的主要缺点如下：</p>
+<ol>
+<li>ByteBuffer 长度固定，一旦分配完成，它的容量不能动态扩展和收缩，当需要编码的 POJO 对象大于 ByteBuffer 的容量时，会发生索引越界异常</li>
+<li>ByteBuffer 只有一个标识位置的指针 position，读写的时候需要手工调用 flip 和 rewind 等，使用者必须小心谨慎地处理这些 API，否则很容易导致程序处理失败</li>
+<li>ByteBuffer 的 APl 功能有限，一些高级和实用的特性它不支持，需要使用者自己编程实现</li>
+</ol>
+<p>因此，Netty 提供了自己的 ByteBuffer 实现 —— ByteBuf</p>
+<h2 id="ByteBuf工作原理"><a href="#ByteBuf工作原理" class="headerlink" title="ByteBuf工作原理"></a>ByteBuf工作原理</h2><h3 id="Sequential-Access-Indexing"><a href="#Sequential-Access-Indexing" class="headerlink" title="Sequential Access Indexing"></a>Sequential Access Indexing</h3><p><strong>Segment</strong></p>
+<p>ByteBuf provides two pointer variables to support sequential read and write operations. The two pointers segment a buffer into three areas.</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">+-------------------+------------------+------------------+
+| discardable bytes |  readable bytes  |  writable bytes  |
+|                   |     (CONTENT)    |                  |
++-------------------+------------------+------------------+
+|                   |                  |                  |
+0      &lt;=      readerIndex   &lt;=   writerIndex    &lt;=    capacity<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>Reclaim unused area</strong></p>
+<p>The point is the management of discardable bytes. The read bytes can be discarded by calling discardReadBytes to reclaim unused area as depicted by the following diagram</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">BEFORE discardReadBytes()
+
+              +-------------------+------------------+------------------+
+              | discardable bytes |  readable bytes  |  writable bytes  |
+              +-------------------+------------------+------------------+
+              |                   |                  |                  |
+              0      &lt;=      readerIndex   &lt;=   writerIndex    &lt;=    capacity
+
+AFTER discardReadBytes()
+
+              +------------------+--------------------------------------+
+              |  readable bytes  |    writable bytes (got more space)   |
+              +------------------+--------------------------------------+
+              |                  |                                      |
+         readerIndex (0) &lt;= writerIndex (decreased)        &lt;=        capacity<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>Please note that there is no guarantee about the content of writable bytes after calling discardReadBytes.  The writable bytes will not be moved in most cases and could even be filled with completely different data depending on the underlying buffer implementation.</p>
+<p>For the special touch (Particularly necessary to point out that), calling <code>discardReadBytes()</code> can give rise to memory duplication which affect application performance. So you must balance the advantage and disadvantage before use.</p>
+<p><strong>Clearing the buffer indexes</strong></p>
+<p>Note: This operation doesn’t clear the buffer content but just change the two pointers’ position. </p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">BEFORE clear()
+
+              +-------------------+------------------+------------------+
+              | discardable bytes |  readable bytes  |  writable bytes  |
+              +-------------------+------------------+------------------+
+              |                   |                  |                  |
+              0      &lt;=      readerIndex   &lt;=   writerIndex    &lt;=    capacity
+
+
+AFTER clear()
+
+              +---------------------------------------------------------+
+              |             writable bytes (got more space)             |
+              +---------------------------------------------------------+
+              |                                                         |
+              0 = readerIndex = writerIndex            &lt;=            capacity<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>Search operations</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//return the index of the first occurrence if found between readerIndex and writerIndex </span>
+<span class="token keyword">int</span> <span class="token function">bytesBefore</span><span class="token punctuation">(</span><span class="token keyword">int</span> index<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">,</span> <span class="token keyword">byte</span> value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">//return the index of the first occurrence if found in buffer</span>
+<span class="token keyword">int</span> <span class="token function">indexOf</span><span class="token punctuation">(</span><span class="token keyword">int</span> fromIndex<span class="token punctuation">,</span> <span class="token keyword">int</span> toIndex<span class="token punctuation">,</span> <span class="token keyword">byte</span> value<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>Mark and reset</strong></p>
+<p>For a ByteBuf, there are two marker indexes in it. One is for storing readerIndex and the other is for storing writerIndex. You can reposition current readerIndex or writerIndex to the marked by calling reset. </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">ByteBuf</span> <span class="token function">markReaderIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">ByteBuf</span> <span class="token function">resetReaderIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">ByteBuf</span> <span class="token function">markWriterIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">ByteBuf</span> <span class="token function">resetWriterIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>Derived buffers</strong></p>
+<p>You can create a view of an existing buffer by calling either <code>duplicate()</code>, <code>slice()</code> or <code>slice(int, int)</code>. A derived buffer will have an independent readerIndex, writerIndex and marker indexes, while it shares other internal data representation, just like a NIO buffer does.</p>
+<p>In case a completely fresh copy of an existing buffer is required, please call copy() method instead.</p>
+<p><strong>Conversion to existing JDK types</strong></p>
+<p>You can convert ByteBuf to array or ByteBuffer. It is better to check the existence of the corresponding type by calling <code>hasArray</code> or <code>nioBufferCount</code> if you determine to do it. </p>
+<p><strong>I&#x2F;O Streams</strong></p>
+<p>You can process I&#x2F;O streams by refering it to ByteBufInputStream and ByteBufOutputStream </p>
+<h3 id="Increase-capacity-dynamically"><a href="#Increase-capacity-dynamically" class="headerlink" title="Increase capacity dynamically"></a>Increase capacity dynamically</h3><p>Netty encapsulate the operation of writing which is supported by java.nio package. Before executing base implementation of writing operation, it always check the capacity of current buffer and extend it if necessary.</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">ensureWritable</span><span class="token punctuation">(</span><span class="token keyword">int</span> minWritableBytes<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>minWritableBytes <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span>
+                <span class="token string">"minWritableBytes: %d (expected: >= 0)"</span><span class="token punctuation">,</span> minWritableBytes<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>minWritableBytes <span class="token operator">&lt;=</span> <span class="token function">writableBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>minWritableBytes <span class="token operator">></span> maxCapacity <span class="token operator">-</span> writerIndex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IndexOutOfBoundsException</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span>
+                <span class="token string">"writerIndex(%d) + minWritableBytes(%d) exceeds maxCapacity(%d): %s"</span><span class="token punctuation">,</span>
+                writerIndex<span class="token punctuation">,</span> minWritableBytes<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// Normalize the current capacity to the power of 2.</span>
+    <span class="token keyword">int</span> newCapacity <span class="token operator">=</span> <span class="token function">calculateNewCapacity</span><span class="token punctuation">(</span>writerIndex <span class="token operator">+</span> minWritableBytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Adjust to the new capacity.</span>
+    <span class="token function">capacity</span><span class="token punctuation">(</span>newCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="ByteBuf源码分析"><a href="#ByteBuf源码分析" class="headerlink" title="ByteBuf源码分析"></a>ByteBuf源码分析</h1><h2 id="ByteBuf主要类继承关系"><a href="#ByteBuf主要类继承关系" class="headerlink" title="ByteBuf主要类继承关系"></a>ByteBuf主要类继承关系</h2><p><img src="/images/Netty/ByteBuf%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p>从内存分配的角度看，ByteBuf 可以分为两类。</p>
+<ol>
+<li>堆内存（ HeapByteBuf ）字节缓冲区：特点是内存的分配和回收速度快，可以被JVM自动回收；缺点就是如果进行 Socket 的 I&#x2F;O读写，需要额外做一次内存复制，将堆内存对应的缓冲区复制到内核 Channel 中，性能会有一定程度的下降。<strong>一般在后端业务消息的编解码模块</strong></li>
+<li>直接内存（ DirectByteBuf ）字节缓冲区：非堆内存，它在堆外进行内存分配，相比于堆内存，它的分配和回收速度会慢一些，但是将它写入或者从 SocketChannel 中读取时，由于少了一次内存复制，速度比堆内存快。<strong>一般在通信线程的读写缓冲区使用</strong></li>
+</ol>
+<p>从内存回收角度看， ByteBuf 也分为两类：基于对象池的 ByteBuf 和普通 ByteBuf。</p>
+<p>两者的主要区别就是基于对象池的 ByteBuf 可以重用 ByteBuf 对象，它自己维护了一个内存池，可以循环利用创建的 ByteBuf，提升内存的使用效率，降低由于高负载导致的频繁 GC。测试表明使用内存池后的 Netty 在高负载、大并发的冲击下内存和 GC 更加平稳。</p>
+<h2 id="AbstractByteBuf源码分析"><a href="#AbstractByteBuf源码分析" class="headerlink" title="AbstractByteBuf源码分析"></a>AbstractByteBuf源码分析</h2><p><strong>成员变量</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">ResourceLeakDetector</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ByteBuf</span><span class="token punctuation">></span></span> leakDetector <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ResourceLeakDetector</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ByteBuf</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token class-name">ByteBuf</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">//读写标记和记号</span>
+<span class="token keyword">int</span> readerIndex<span class="token punctuation">;</span>
+<span class="token keyword">private</span> <span class="token keyword">int</span> writerIndex<span class="token punctuation">;</span>
+<span class="token keyword">private</span> <span class="token keyword">int</span> markedReaderIndex<span class="token punctuation">;</span>
+<span class="token keyword">private</span> <span class="token keyword">int</span> markedWriterIndex<span class="token punctuation">;</span>
+<span class="token comment">//最大容量</span>
+<span class="token keyword">private</span> <span class="token keyword">int</span> maxCapacity<span class="token punctuation">;</span>
+
+<span class="token keyword">private</span> <span class="token class-name">SwappedByteBuf</span> swappedBuf<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在这里没有定义 ByteBuf 缓冲区实现是因为当下还并不清楚子类是基于堆内存还是直接内存。但无论子类如何实现 ByteBuf，他们的功能都是相同的，公共化的功能由父类实现，差异化的功能由子类实现。</p>
+<h3 id="读操作簇"><a href="#读操作簇" class="headerlink" title="读操作簇"></a>读操作簇</h3><p>以下是涉及到的读操作：</p>
+<p>readByte、readBoolean、readUnsignedByte、readShort、readUnsignedShort、readMedium、readUnsignedMedium、readInt、readUnsignedInt、readLong、readChar、readFloat、readDouble、readBytes、readSlice</p>
+<p>他们涉及到了各个类型，但读取流程是相同的。以 readBytes 为例</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">readBytes</span><span class="token punctuation">(</span><span class="token class-name">ByteBuf</span> dst<span class="token punctuation">,</span> <span class="token keyword">int</span> dstIndex<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//对缓冲区的可用空间进行校验</span>
+    <span class="token function">checkReadableBytes</span><span class="token punctuation">(</span>length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//从当前的读索引开始，复制length个字节到目标byte数组中</span>
+    <span class="token comment">//由于不同的子类复制操作的技术实现细节不同，因此该方法由子类实现</span>
+    <span class="token function">getBytes</span><span class="token punctuation">(</span>readerIndex<span class="token punctuation">,</span> dst<span class="token punctuation">,</span> dstIndex<span class="token punctuation">,</span> length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//读取成功索引递增</span>
+    readerIndex <span class="token operator">+=</span> length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="写操作簇"><a href="#写操作簇" class="headerlink" title="写操作簇"></a>写操作簇</h3><p>以下是涉及到的写操作：</p>
+<p>writeBoolean、writeByte、writeShort、writeMedium、writeInt、writeLong、writeChar、writeFloat、writeDouble、writeBytes、writeZero</p>
+<p>他们涉及到了各个类型，但读取流程是相同的。以 writeBytes 为例</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">writeBytes</span><span class="token punctuation">(</span><span class="token class-name">ByteBuf</span> src<span class="token punctuation">,</span> <span class="token keyword">int</span> srcIndex<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//对缓冲区的可用空间进行校验，空间不足时最多可以动态扩展到最大可写字节数</span>
+    <span class="token function">ensureWritable</span><span class="token punctuation">(</span>length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">setBytes</span><span class="token punctuation">(</span>writerIndex<span class="token punctuation">,</span> src<span class="token punctuation">,</span> srcIndex<span class="token punctuation">,</span> length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    writerIndex <span class="token operator">+=</span> length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">ensureWritable</span><span class="token punctuation">(</span><span class="token keyword">int</span> minWritableBytes<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//省略对边界条件的校验判断代码</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+        
+    <span class="token comment">// Normalize the current capacity to the power of 2.</span>
+    <span class="token keyword">int</span> newCapacity <span class="token operator">=</span> <span class="token function">calculateNewCapacity</span><span class="token punctuation">(</span>writerIndex <span class="token operator">+</span> minWritableBytes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Adjust to the new capacity.</span>
+    <span class="token function">capacity</span><span class="token punctuation">(</span>newCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>对于 ByteBuffer 的一个最大的缺点就是一旦完成分配之后不能动态调整其容量。</p>
+<p>由于很多场景下我们无法预先判断需要编码和解码的 POJO 对象长度，因此只能根据经验数据给个估计值。如果这个值偏大，就会导致内存的浪费；如果这个值偏小，遇到大消息编码的时候就会发生缓冲区溢出异常使用者需要自己捕获这个异常，并重新计算缓冲区的大小，将原来的内容复制到新的缓冲区中，然后重置指针。</p>
+<p>这种处理策略对用户非常不友好，而且稍有不慎，就会引入新的问题。Netty 的 ByteBuf 可以动态扩展，为了保证安全性，允许使用者指定最大的容量，在容量范围内，可以先分配个较小的初始容量，后面不够用再动态扩展，这样可以达到功能和性能的最优组合。</p>
+<p>接下来看一下计算方式</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">calculateNewCapacity</span><span class="token punctuation">(</span><span class="token keyword">int</span> minNewCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> maxCapacity <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>maxCapacity<span class="token punctuation">;</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> threshold <span class="token operator">=</span> <span class="token number">1048576</span> <span class="token operator">*</span> <span class="token number">4</span><span class="token punctuation">;</span> <span class="token comment">// 4 MiB page</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>minNewCapacity <span class="token operator">==</span> threshold<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> threshold<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// If over threshold, do not double but just increase by threshold.</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>minNewCapacity <span class="token operator">></span> threshold<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> newCapacity <span class="token operator">=</span> minNewCapacity <span class="token operator">/</span> threshold <span class="token operator">*</span> threshold<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>newCapacity <span class="token operator">></span> maxCapacity <span class="token operator">-</span> threshold<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            newCapacity <span class="token operator">=</span> maxCapacity<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            newCapacity <span class="token operator">+=</span> threshold<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">return</span> newCapacity<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token comment">// Not over threshold. Double up to 4 MiB, starting from 64.</span>
+    <span class="token keyword">int</span> newCapacity <span class="token operator">=</span> <span class="token number">64</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>newCapacity <span class="token operator">&lt;</span> minNewCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        newCapacity <span class="token operator">&lt;&lt;=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token class-name">Math</span><span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span>newCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>如果扩容后的新容量小于阈值，则以 64 为计数进行倍增，直到倍增后的结果大于或等于需要的容量值。</p>
+<p>采用倍增或者步进算法的原因如下：如果以 minNewCapacity 作为目标容量，则本次扩容后的可写字节数刚好够本次写入使用。写入完成后，它的可写字节数会变为0，下次做写入操作的时候，需要再次动态扩张。这样就会形成第一次动态扩张后，每次写入操作都会进行动态扩张，由于动态扩张需要进行内存复制，频繁的内存复制会导致性能下降。</p>
+<p>采用先倍增后步进的原因如下：当内存比较小的情况下，倍增操作并不会带来太多的内存浪费，例如 64字节 –&gt; 128字节 –&gt; 256字节，这样的内存扩张方式对于大多数应用系统是可以接受的。但是，当内存增长到一定阈值后，再进行倍增就可能会带来额外的内存浪费，例如 10MB，采用倍增后变为 20MB。但很有可能系统只需要 12MB，则扩张到 20MB 后会带来 8MB 的内存浪费。由于每个客户端连接都可能维护自己独立的接收和发送缓冲区，这样随着客户读的线性增长，内存浪费也会成比例地增加，因此，达到某个阈值后就需要以步进的方式对内存进行平滑的扩张。</p>
+<p>这个阈值是个经验值，不同的应用场景，这个值可能不同，此处， ByteBuf 取值为4MB。</p>
+<p>重新计算完动态扩张后的目标容量后，需要重新创建个新的缓冲区，将原缓冲区的内容复制到新创建的 ByteBuf 中，最后设置读写索引和 mark 标签等。由于不同的子类会对应不同的复制操作，所以该方法依然是个抽象方法，由子类负责实现。</p>
+<h3 id="操作索引"><a href="#操作索引" class="headerlink" title="操作索引"></a>操作索引</h3><p>直接设置索引值即可，如同使用 setter 方法</p>
+<h3 id="重用缓冲区"><a href="#重用缓冲区" class="headerlink" title="重用缓冲区"></a>重用缓冲区</h3><p>将可读数据拷贝到缓冲区起始位置，并根据 Sequential Access Indexing 介绍的原理来计算指针位置和标记位置</p>
+<h3 id="Skip-Bytes"><a href="#Skip-Bytes" class="headerlink" title="Skip Bytes"></a>Skip Bytes</h3><p>后移读指针</p>
+<h2 id="AbstractReferenceCountedBuf源码分析"><a href="#AbstractReferenceCountedBuf源码分析" class="headerlink" title="AbstractReferenceCountedBuf源码分析"></a>AbstractReferenceCountedBuf源码分析</h2><p>从类的名字就可以看出该类主要是对引用进行计数，类似于JVM内存回收的对象引用计数器，用于跟踪对象的分配和销毁，做自动内存回收。</p>
+<p><strong>成员变量</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//原子操作对成员变量进行更新，以实现线程安全，消除锁</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">AtomicIntegerFieldUpdater</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">AbstractReferenceCountedByteBuf</span><span class="token punctuation">></span></span> refCntUpdater <span class="token operator">=</span>
+        <span class="token class-name">AtomicIntegerFieldUpdater</span><span class="token punctuation">.</span><span class="token function">newUpdater</span><span class="token punctuation">(</span><span class="token class-name">AbstractReferenceCountedByteBuf</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token string">"refCnt"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">//用于标识refcnt字段在AbstractReferenceCountedByteBuf中的内存地址</span>
+<span class="token comment">//该内存地址的获取是JDK实现强相关的，如果使用SUN的JDK，它通过sun.misc.Unsafe的objectFieldoffset</span>
+<span class="token comment">//接口来获得，ByteBuf的实现子类UnpooledUnsafeDirectBuf和PooledUnsafeDirectByteBuf</span>
+<span class="token comment">//会使用到这个偏移量。</span>
+<span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">long</span> REFCNT_FIELD_OFFSET<span class="token punctuation">;</span>
+
+<span class="token keyword">static</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">long</span> refCntFieldOffset <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">PlatformDependent</span><span class="token punctuation">.</span><span class="token function">hasUnsafe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            refCntFieldOffset <span class="token operator">=</span> <span class="token class-name">PlatformDependent</span><span class="token punctuation">.</span><span class="token function">objectFieldOffset</span><span class="token punctuation">(</span>
+                    <span class="token class-name">AbstractReferenceCountedByteBuf</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">.</span><span class="token function">getDeclaredField</span><span class="token punctuation">(</span><span class="token string">"refCnt"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> t<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">// Ignored</span>
+    <span class="token punctuation">&#125;</span>
+
+    REFCNT_FIELD_OFFSET <span class="token operator">=</span> refCntFieldOffset<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">//跟踪对象的引用次数</span>
+<span class="token annotation punctuation">@SuppressWarnings</span><span class="token punctuation">(</span><span class="token string">"FieldMayBeFinal"</span><span class="token punctuation">)</span>
+<span class="token keyword">private</span> <span class="token keyword">volatile</span> <span class="token keyword">int</span> refCnt <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="对象引用计数器"><a href="#对象引用计数器" class="headerlink" title="对象引用计数器"></a>对象引用计数器</h3><p>每调用一次 retain 方法，引用计数器就会加一，由于可能存在多线程并发调用的场景，所以它的累加操作必须是线程安全的</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//调用方法引用计数器加一</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">retain</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> refCnt <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>refCnt<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>refCnt <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalReferenceCountException</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>refCnt <span class="token operator">==</span> <span class="token class-name">Integer</span><span class="token punctuation">.</span>MAX_VALUE<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalReferenceCountException</span><span class="token punctuation">(</span><span class="token class-name">Integer</span><span class="token punctuation">.</span>MAX_VALUE<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>refCntUpdater<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> refCnt<span class="token punctuation">,</span> refCnt <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">break</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>通过自旋对引用计数器进行加一操作，由于引用计数器的初始值为1，如果申请和释放操作能够保证正确使用，则它的最小值为1。当被释放和被申请的次数相等时，就调用回收方法回收当前的 ByteBuf 对象。如果为0，说明对象被意外、错误地引用，抛出 IllegalReferenceCountException。如果引用计数器达到整型数的最大值，抛出引用越界的异常 IllegalReferenceCountException。最后通过 compareAndSet 进行原子更新，它会使用自己获取的值跟期望值进行对比。如果其间已经被其他线程修改了，则比对失败，进行自旋，重新获取引用计数器的值再次比对；如果比对成功则对其加一。</p>
+<p>与 retain 方法类似，release 方法也是在一个自旋循环里面进行判断和更新的。需要注意的是：当<code>refCnt==1</code>时意味着申请和释放相等，说明对象引用已经不可达，该对象需要被释放和垃圾回收掉，则通过调用 deallocate 方法来释放 ByteBuf 对象。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//调用方法引用计数器减一</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">boolean</span> <span class="token function">release</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">int</span> refCnt <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>refCnt<span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>refCnt <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalReferenceCountException</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>refCntUpdater<span class="token punctuation">.</span><span class="token function">compareAndSet</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> refCnt<span class="token punctuation">,</span> refCnt <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>refCnt <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">deallocate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="UnpooledHeapByteBuf源码分析"><a href="#UnpooledHeapByteBuf源码分析" class="headerlink" title="UnpooledHeapByteBuf源码分析"></a>UnpooledHeapByteBuf源码分析</h2><p>UnpooledHeapByteBuf 是基于堆内存进行内存分配的字节缓冲区，它没有基于对象池技术实现，这就意味着每次IO的读写都会创建一个新的 UnpooledHeapByteBuf，频繁进行大块内存的分配和回收对性能会造成一定影响，但是相比于堆外内存的申请和释放，它的成本还是会低一些相比于 PooledHeapByteBuf，UnpooledHeapByteBuf 的实现原理更加简单，也不容易出现内存管理方面的问题，因此在满足性能的情况下，推荐使用 UnpooledHeapByteBuf。</p>
+<p><strong>成员变量</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//聚合了一个ByteBufAllocator，用于UnpooledHeapByteBuf的内存分配</span>
+<span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ByteBufAllocator</span> alloc<span class="token punctuation">;</span>
+<span class="token comment">//定义了一个byte数组作为缓冲区 -- ByteBuffer底层同样是byte数组实现缓冲区</span>
+<span class="token keyword">private</span> <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> array<span class="token punctuation">;</span>
+<span class="token comment">//定义了一个ByteBuffer类型的tmpNioBuf变量用于实现NettyByteBuf到JDK NIO ByteBuffer的转换。</span>
+<span class="token keyword">private</span> <span class="token class-name">ByteBuffer</span> tmpNioBuf<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="动态扩展缓冲区"><a href="#动态扩展缓冲区" class="headerlink" title="动态扩展缓冲区"></a>动态扩展缓冲区</h3><p>在介绍 AbstractByteBuf 的时候，ByteBuf 在最大容量范围内能够实现自动扩张，下面我们一起看下缓冲区的自动扩展在子类 UnpooledHeapByteBuf 中的实现。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">capacity</span><span class="token punctuation">(</span><span class="token keyword">int</span> newCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//对新容量进行合法性校验</span>
+    <span class="token function">ensureAccessible</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>newCapacity <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token operator">||</span> newCapacity <span class="token operator">></span> <span class="token function">maxCapacity</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"newCapacity: "</span> <span class="token operator">+</span> newCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">int</span> oldCapacity <span class="token operator">=</span> array<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token comment">//判断是否需要动态扩展</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>newCapacity <span class="token operator">></span> oldCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> newArray <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token keyword">byte</span><span class="token punctuation">[</span>newCapacity<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">arraycopy</span><span class="token punctuation">(</span>array<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> newArray<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> array<span class="token punctuation">.</span>length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token function">setArray</span><span class="token punctuation">(</span>newArray<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>newCapacity <span class="token operator">&lt;</span> oldCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//创建新数组</span>
+        <span class="token keyword">byte</span><span class="token punctuation">[</span><span class="token punctuation">]</span> newArray <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token keyword">byte</span><span class="token punctuation">[</span>newCapacity<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token keyword">int</span> readerIndex <span class="token operator">=</span> <span class="token function">readerIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>readerIndex <span class="token operator">&lt;</span> newCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">int</span> writerIndex <span class="token operator">=</span> <span class="token function">writerIndex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>writerIndex <span class="token operator">></span> newCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token function">writerIndex</span><span class="token punctuation">(</span>writerIndex <span class="token operator">=</span> newCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">arraycopy</span><span class="token punctuation">(</span>array<span class="token punctuation">,</span> readerIndex<span class="token punctuation">,</span> newArray<span class="token punctuation">,</span> readerIndex<span class="token punctuation">,</span> writerIndex <span class="token operator">-</span> readerIndex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token function">setIndex</span><span class="token punctuation">(</span>newCapacity<span class="token punctuation">,</span> newCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+        <span class="token comment">//替换旧数组</span>
+        <span class="token function">setArray</span><span class="token punctuation">(</span>newArray<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<blockquote>
+<p>需要指出的是， ByteBuf 以 set 和 get 开头读写缓冲区的方法并不会修改读写索引。</p>
+</blockquote>
+<h3 id="转换成-JDK-ByteBuffer"><a href="#转换成-JDK-ByteBuffer" class="headerlink" title="转换成 JDK ByteBuffer"></a>转换成 JDK ByteBuffer</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuffer</span> <span class="token function">nioBuffer</span><span class="token punctuation">(</span><span class="token keyword">int</span> index<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//参数合法性校验</span>
+    <span class="token function">ensureAccessible</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//wrap将数组引用包装为ByteBuf，无论哪一方修改都会同步到另一方</span>
+    <span class="token comment">//slice创建当前ByteBuf的视图：数据共享、索引初始化（防止同时操作ByteBuf造成的游标混乱）</span>
+    <span class="token keyword">return</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>array<span class="token punctuation">,</span> index<span class="token punctuation">,</span> length<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="PooledByteBuf-源码分析"><a href="#PooledByteBuf-源码分析" class="headerlink" title="PooledByteBuf 源码分析"></a>PooledByteBuf 源码分析</h2><p>PooledByteBuf 基于内存池实现，与 UnPooledDirectByteBuf 的唯一不同就是缓冲区的分配是销毁策略不同，其他功能都是等同的，也就是说，两者唯一的不同就是内存分配策略不同。</p>
+<blockquote>
+<p>详细内容请阅读 《Netty 内存池优化原理》</p>
+</blockquote>
+<h2 id="PooledDirectByteBuf源码分析"><a href="#PooledDirectByteBuf源码分析" class="headerlink" title="PooledDirectByteBuf源码分析"></a>PooledDirectByteBuf源码分析</h2><h3 id="创建字节缓冲区"><a href="#创建字节缓冲区" class="headerlink" title="创建字节缓冲区"></a>创建字节缓冲区</h3><p>实例由于采用内存池实现，所以新创建 PooledDirectByteBuf 对象时不能直接 new 一个实例，而是从内存池中获取，然后设置引用计数器的值。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token class-name">PooledDirectByteBuf</span> <span class="token function">newInstance</span><span class="token punctuation">(</span><span class="token keyword">int</span> maxCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">PooledDirectByteBuf</span> buf <span class="token operator">=</span> RECYCLER<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    buf<span class="token punctuation">.</span><span class="token function">setRefCnt</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    buf<span class="token punctuation">.</span><span class="token function">maxCapacity</span><span class="token punctuation">(</span>maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> buf<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>直接从内存池<code>Recycler&lt;PooledDirectByteBuf&gt;</code>中获取<code>PooledDirectByteBuf</code>对象，然后设置它的引用计数器为1，设置缓冲区最大容量后返回。</p>
+<h3 id="复制新的字节缓冲区实例"><a href="#复制新的字节缓冲区实例" class="headerlink" title="复制新的字节缓冲区实例"></a>复制新的字节缓冲区实例</h3><p>复制一个新的独立的 PooledDirectByteBuf 实例</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">copy</span><span class="token punctuation">(</span><span class="token keyword">int</span> index<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//参数合法性校验</span>
+    <span class="token function">checkIndex</span><span class="token punctuation">(</span>index<span class="token punctuation">,</span> length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">ByteBuf</span> copy <span class="token operator">=</span> <span class="token function">alloc</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">directBuffer</span><span class="token punctuation">(</span>length<span class="token punctuation">,</span> <span class="token function">maxCapacity</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    copy<span class="token punctuation">.</span><span class="token function">writeBytes</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> index<span class="token punctuation">,</span> length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> copy<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>首先对索引和长度进行合法性校验，通过之后调用 PooledByteBufAllocator 分配一个新的 ByteBuf，由于 PooledByteBufAllocator 没有实现 directBuffer 方法，所以最终会调用到 AbstractByteBufAllocator 的 directBuffer 方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token class-name">ByteBuf</span> <span class="token function">directBuffer</span><span class="token punctuation">(</span><span class="token keyword">int</span> initialCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> maxCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>initialCapacity <span class="token operator">==</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> maxCapacity <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> emptyBuf<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+    <span class="token function">validate</span><span class="token punctuation">(</span>initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token function">newDirectBuffer</span><span class="token punctuation">(</span>initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>newDirectBuffer 方法对于不同的子类有不同的实现策略，如果是基于内存池的分配器，它会从内存池中获取可用的 ByteBuf，如果是非池，则直接创建新的 ByteBuf。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//基于内存池的缓冲区分配</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">protected</span> <span class="token class-name">ByteBuf</span> <span class="token function">newDirectBuffer</span><span class="token punctuation">(</span><span class="token keyword">int</span> initialCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> maxCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">PoolThreadCache</span> cache <span class="token operator">=</span> threadCache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token class-name">PoolArena</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">></span></span> directArena <span class="token operator">=</span> cache<span class="token punctuation">.</span>directArena<span class="token punctuation">;</span>
+
+    <span class="token class-name">ByteBuf</span> buf<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>directArena <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        buf <span class="token operator">=</span> directArena<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>cache<span class="token punctuation">,</span> initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">PlatformDependent</span><span class="token punctuation">.</span><span class="token function">hasUnsafe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            buf <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">UnpooledUnsafeDirectByteBuf</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            buf <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">UnpooledDirectByteBuf</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token function">toLeakAwareBuffer</span><span class="token punctuation">(</span>buf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//非内存池实现直接创建新的缓冲区</span>
+<span class="token annotation punctuation">@Override</span>
+<span class="token keyword">protected</span> <span class="token class-name">ByteBuf</span> <span class="token function">newDirectBuffer</span><span class="token punctuation">(</span><span class="token keyword">int</span> initialCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> maxCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token class-name">ByteBuf</span> buf<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token class-name">PlatformDependent</span><span class="token punctuation">.</span><span class="token function">hasUnsafe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        buf <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">UnpooledUnsafeDirectByteBuf</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+        buf <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">UnpooledDirectByteBuf</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> initialCapacity<span class="token punctuation">,</span> maxCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">return</span> <span class="token function">toLeakAwareBuffer</span><span class="token punctuation">(</span>buf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="ByteBuf辅助类介绍"><a href="#ByteBuf辅助类介绍" class="headerlink" title="ByteBuf辅助类介绍"></a>ByteBuf辅助类介绍</h2><h3 id="ByteBufHolder"><a href="#ByteBufHolder" class="headerlink" title="ByteBufHolder"></a>ByteBufHolder</h3><p>ByteBufHolder 是 ByteBuf 的容器，在 Netty 中，它非常有用。例如 HTTP 协议的请求消息和应答消息都可以携带消息体，这个消息体在 NIO ByteBuffer 中就是个 ByteBuffer 对象，在 Netty 中就是 ByteBuf 对象。由于不同的协议消息体可以包含不同的协议字段和功能，因此，需要对 ByteBuf 进行包装和抽象，不同的子类可以有不同的实现。</p>
+<p>为了满足这些定制化的需求，Netty 抽象出了 ByteBufHolder 对象，它包含了一个 ByteBuf，另外还提供了一些其他实用的方法，使用者继承 ByteBufHolder 接口后可以按需封装自己的实现。</p>
+<p>下图是相关类库的继承关系（部分）</p>
+<p><img src="/images/Netty/ByteBufHolder%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<h3 id="ByteBufAllocator"><a href="#ByteBufAllocator" class="headerlink" title="ByteBufAllocator"></a>ByteBufAllocator</h3><p>ByteBufAllocator 是字节缓冲区分配器，按照 Netty 的缓冲区实现不同，共有两种不同的分配器：基于内存池的字节缓冲区分配器和普通的字节缓冲区分配器。</p>
+<p>下图为ByteBufAllocator的继承关系</p>
+<p><img src="/images/Netty/ByteBufAllocator%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p>下图为ByteBufAllocator主要API</p>
+<p><img src="/images/Netty/ByteBufAllocator%E4%B8%BB%E8%A6%81API.png"></p>
+<h3 id="CompositeByteBuf"><a href="#CompositeByteBuf" class="headerlink" title="CompositeByteBuf"></a>CompositeByteBuf</h3><p>CompositeByteBuf 允许将多个 ByteBuf 的实例组装到一起，形成一个统一的视图，有点类似于数据库将多个表的字段组装到一起统一用视图展示。</p>
+<p>CompositeByteBuf在一些场景下非常有用，例如某个协议 POJO 对象包含两部分；消息头和消息体，它们都是 ByteBuf 对象。当需要对消息进行编码的时候需要进行整合，如果使用 JDK 的默认能力，有以下两种方式</p>
+<ol>
+<li>将某个 ByteBuffer 复制到另一个 ByteBuffer 中，或者创建一个新的 ByteBuffer 将两者复制到新建的 ByteBuffer 中</li>
+<li>通过 List 或数组等容器，将消息头和消息体放到容器中进行统一维护和处理</li>
+</ol>
+<p>上面的做法非常别扭，实际上我们遇到的问题跟数据库中视图解决的问题一致——缓冲区有多个，但是需要统一展示和处理，必须有存放它们的统一容器。为了解决这个问题，Netty 提供了 CompositeByteBuf</p>
+<p>下面粗浅的介绍一下原理</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">CompositeByteBuf</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractReferenceCountedByteBuf</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ResourceLeak</span> leak<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ByteBufAllocator</span> alloc<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">boolean</span> direct<span class="token punctuation">;</span>
+    <span class="token comment">//定义了一个Component类型的集合，实际上Component就是ByteBuf的包装实现类</span>
+    <span class="token comment">//Component包装了ByteBuf对象，维护了在集合中的位置偏移量信息等</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Component</span><span class="token punctuation">></span></span> components <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ArrayList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Component</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">int</span> maxNumComponents<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">ByteBuffer</span> FULL_BYTEBUFFER <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">)</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">position</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">private</span> <span class="token keyword">boolean</span> freed<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">Component</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">final</span> <span class="token class-name">ByteBuf</span> buf<span class="token punctuation">;</span>
+    <span class="token keyword">final</span> <span class="token keyword">int</span> length<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> offset<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> endOffset<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>新增Component</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">CompositeByteBuf</span> <span class="token function">addComponent</span><span class="token punctuation">(</span><span class="token class-name">ByteBuf</span> buffer<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">addComponent0</span><span class="token punctuation">(</span>components<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> buffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">consolidateIfNeeded</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>删除Component（需要更新各个Component的索引偏移量）</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">CompositeByteBuf</span> <span class="token function">removeComponent</span><span class="token punctuation">(</span><span class="token keyword">int</span> cIndex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token function">checkComponentIndex</span><span class="token punctuation">(</span>cIndex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    components<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>cIndex<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">freeIfNecessary</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">updateComponentOffsets</span><span class="token punctuation">(</span>cIndex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h3 id="ByteBufUtil"><a href="#ByteBufUtil" class="headerlink" title="ByteBufUtil"></a>ByteBufUtil</h3><p>ByteBufUtil 是一个非常有用的工具类，它提供了一系列静态方法用于操作 ByteBuf 对象。</p>
+<p>其中方法包括：hexDump、hashCode、equals、compare、indexOf、swapShort、swapMedium、swapInt、swapLong、readBytes、encodeString、decodeString</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;对需要编码的字符串src按照指定的字符集charset进行编码
+&#x2F;&#x2F;利用指定的ByteBufAllocator生成一个新的ByteBuf；
+ByteBuf encodeString(ByteBufAllocator alloc, CharBuffer src, Charset charset);
+&#x2F;&#x2F;使用指定的ByteBuffer和charset进行对ByteBuffer进行解码，获取解码后的字符串
+String decodeString(ByteBuffer src, Charset charset);
+&#x2F;&#x2F;将参数ByteBuf的内容以十六进制字符串的方式打印出来
+&#x2F;&#x2F;用于输出日志或者打印码流，方便问题定位，提升系统的可维护性。
+String hexDump(ByteBuf buffer);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Netty/" rel="tag"># Netty</a>
+              <a href="/tags/ByteBuf/" rel="tag"># ByteBuf</a>
+              <a href="/tags/AbstractByteBuf/" rel="tag"># AbstractByteBuf</a>
+              <a href="/tags/AbstractReferenceCountedBuf/" rel="tag"># AbstractReferenceCountedBuf</a>
+              <a href="/tags/UnpooledByteBuf/" rel="tag"># UnpooledByteBuf</a>
+              <a href="/tags/PooledByteBuf/" rel="tag"># PooledByteBuf</a>
+              <a href="/tags/ByteBuf%E8%BE%85%E5%8A%A9%E7%B1%BB/" rel="tag"># ByteBuf辅助类</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/01/11/Netty-Future%E5%92%8CPromise/" rel="prev" title="Netty Future-Listener机制">
+      <i class="fa fa-chevron-left"></i> Netty Future-Listener机制
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/01/13/Netty-%E5%86%85%E5%AD%98%E6%B1%A0%E4%BC%98%E5%8C%96%E5%8E%9F%E7%90%86/" rel="next" title="Netty 内存池优化原理">
+      Netty 内存池优化原理 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#ByteBuf%E5%8A%9F%E8%83%BD%E8%AF%B4%E6%98%8E"><span class="nav-number">1.</span> <span class="nav-text">ByteBuf功能说明</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ByteBuf%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">ByteBuf工作原理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Sequential-Access-Indexing"><span class="nav-number">1.1.1.</span> <span class="nav-text">Sequential Access Indexing</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Increase-capacity-dynamically"><span class="nav-number">1.1.2.</span> <span class="nav-text">Increase capacity dynamically</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ByteBuf%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">ByteBuf源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ByteBuf%E4%B8%BB%E8%A6%81%E7%B1%BB%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB"><span class="nav-number">2.1.</span> <span class="nav-text">ByteBuf主要类继承关系</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AbstractByteBuf%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.2.</span> <span class="nav-text">AbstractByteBuf源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%BB%E6%93%8D%E4%BD%9C%E7%B0%87"><span class="nav-number">2.2.1.</span> <span class="nav-text">读操作簇</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%99%E6%93%8D%E4%BD%9C%E7%B0%87"><span class="nav-number">2.2.2.</span> <span class="nav-text">写操作簇</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%93%8D%E4%BD%9C%E7%B4%A2%E5%BC%95"><span class="nav-number">2.2.3.</span> <span class="nav-text">操作索引</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%87%8D%E7%94%A8%E7%BC%93%E5%86%B2%E5%8C%BA"><span class="nav-number">2.2.4.</span> <span class="nav-text">重用缓冲区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Skip-Bytes"><span class="nav-number">2.2.5.</span> <span class="nav-text">Skip Bytes</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#AbstractReferenceCountedBuf%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.3.</span> <span class="nav-text">AbstractReferenceCountedBuf源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%B9%E8%B1%A1%E5%BC%95%E7%94%A8%E8%AE%A1%E6%95%B0%E5%99%A8"><span class="nav-number">2.3.1.</span> <span class="nav-text">对象引用计数器</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#UnpooledHeapByteBuf%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.4.</span> <span class="nav-text">UnpooledHeapByteBuf源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8A%A8%E6%80%81%E6%89%A9%E5%B1%95%E7%BC%93%E5%86%B2%E5%8C%BA"><span class="nav-number">2.4.1.</span> <span class="nav-text">动态扩展缓冲区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E6%8D%A2%E6%88%90-JDK-ByteBuffer"><span class="nav-number">2.4.2.</span> <span class="nav-text">转换成 JDK ByteBuffer</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PooledByteBuf-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.5.</span> <span class="nav-text">PooledByteBuf 源码分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PooledDirectByteBuf%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.6.</span> <span class="nav-text">PooledDirectByteBuf源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E5%AD%97%E8%8A%82%E7%BC%93%E5%86%B2%E5%8C%BA"><span class="nav-number">2.6.1.</span> <span class="nav-text">创建字节缓冲区</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%8D%E5%88%B6%E6%96%B0%E7%9A%84%E5%AD%97%E8%8A%82%E7%BC%93%E5%86%B2%E5%8C%BA%E5%AE%9E%E4%BE%8B"><span class="nav-number">2.6.2.</span> <span class="nav-text">复制新的字节缓冲区实例</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ByteBuf%E8%BE%85%E5%8A%A9%E7%B1%BB%E4%BB%8B%E7%BB%8D"><span class="nav-number">2.7.</span> <span class="nav-text">ByteBuf辅助类介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#ByteBufHolder"><span class="nav-number">2.7.1.</span> <span class="nav-text">ByteBufHolder</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ByteBufAllocator"><span class="nav-number">2.7.2.</span> <span class="nav-text">ByteBufAllocator</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CompositeByteBuf"><span class="nav-number">2.7.3.</span> <span class="nav-text">CompositeByteBuf</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ByteBufUtil"><span class="nav-number">2.7.4.</span> <span class="nav-text">ByteBufUtil</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

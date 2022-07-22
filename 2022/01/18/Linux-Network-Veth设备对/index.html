@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Veth Peer 是成对出现的一种虚拟网络设备接口，一端连着网络协议栈，一端彼此相连。由于它的这个特性，常常被用于构建虚拟网络拓扑。例如连接两个不同的网络命名空间（netns），连接 docker 容器，连接网桥（Bridge）等，其中一个很常见的案例就是 OpenStack Neutron 底层用它来构建非常复杂的网络拓扑。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux Network Veth Peer">
+<meta property="og:url" content="http://example.com/2022/01/18/Linux-Network-Veth%E8%AE%BE%E5%A4%87%E5%AF%B9/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Veth Peer 是成对出现的一种虚拟网络设备接口，一端连着网络协议栈，一端彼此相连。由于它的这个特性，常常被用于构建虚拟网络拓扑。例如连接两个不同的网络命名空间（netns），连接 docker 容器，连接网桥（Bridge）等，其中一个很常见的案例就是 OpenStack Neutron 底层用它来构建非常复杂的网络拓扑。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-01-18T04:17:10.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.609Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Linux">
+<meta property="article:tag" content="Linux Network">
+<meta property="article:tag" content="Veth Peer">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2022/01/18/Linux-Network-Veth%E8%AE%BE%E5%A4%87%E5%AF%B9/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Linux Network Veth Peer | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/01/18/Linux-Network-Veth%E8%AE%BE%E5%A4%87%E5%AF%B9/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux Network Veth Peer
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2022-01-18 12:17:10" itemprop="dateCreated datePublished" datetime="2022-01-18T12:17:10+08:00">2022-01-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Veth Peer 是成对出现的一种虚拟网络设备接口，一端连着网络协议栈，一端彼此相连。由于它的这个特性，常常被用于构建虚拟网络拓扑。例如连接两个不同的网络命名空间（netns），连接 docker 容器，连接网桥（Bridge）等，其中一个很常见的案例就是 OpenStack Neutron 底层用它来构建非常复杂的网络拓扑。</p>
+<span id="more"></span>
+
+<h1 id="深入理解-Veth"><a href="#深入理解-Veth" class="headerlink" title="深入理解 Veth"></a>深入理解 Veth</h1><blockquote>
+<p>  基本信息简介</p>
+<p>  本机 IP：172.20.88.202&#x2F;20（物理网卡 eth0）<br>  网关 IP：172.20.80.1</p>
+<p>  Veth0 IP：172.20.80.101&#x2F;20<br>  Veth1 IP：172.20.80.102&#x2F;20</p>
+</blockquote>
+<p>注意内核中的一些 ARP 相关配置导致 Veth Peer 不返回 ARP 应答包，解决方法如下：</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/accept_local
+<span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/accept_local
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/all/rp_filter
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/rp_filter
+<span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/rp_filter<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="只给一个veth设备配置IP"><a href="#只给一个veth设备配置IP" class="headerlink" title="只给一个veth设备配置IP"></a>只给一个veth设备配置IP</h2><pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> veth0 <span class="token builtin class-name">type</span> veth peer name veth1
+$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.20</span>.80.101/20 dev veth0
+$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth0 up
+$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth1 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>这里不给 veth1 设备配置 IP 的原因就是想看看在 veth1 没有IP的情况下，veth0 收到协议栈的数据后会不会转发给 veth1。</p>
+<p>ping 一下 eth0，由于 veth1 还没配置 IP，所以肯定不通。</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I veth1 <span class="token number">172.20</span>.88.216
+ping: Warning: <span class="token builtin class-name">source</span> address might be selected on device other than: veth1
+PING <span class="token number">172.20</span>.88.216 <span class="token punctuation">(</span><span class="token number">172.20</span>.88.216<span class="token punctuation">)</span> from <span class="token number">172.20</span>.88.216 veth1: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+
+--- <span class="token number">172.20</span>.88.216 <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="给两个veth设备都配置IP"><a href="#给两个veth设备都配置IP" class="headerlink" title="给两个veth设备都配置IP"></a>给两个veth设备都配置IP</h2><p>给 veth1 也配置上 IP</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.20</span>.80.102/20 dev veth1<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I veth1 <span class="token number">172.20</span>.88.216
+PING <span class="token number">172.20</span>.88.216 <span class="token punctuation">(</span><span class="token number">172.20</span>.88.216<span class="token punctuation">)</span> from <span class="token number">172.20</span>.80.102 veth1: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
+<span class="token number">64</span> bytes from <span class="token number">172.20</span>.88.216: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">64</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">0.055</span> ms
+
+--- <span class="token number">172.20</span>.88.216 <span class="token function">ping</span> statistics ---
+<span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
+rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">0.055</span>/0.055/0.055/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>再来看看抓包情况，我们在veth0和veth1上都看到了ICMP echo的请求包，但为什么没有应答包呢？上面不是显示ping进程已经成功收到了应答包吗？</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ tcpdump -eni veth0
+listening on veth0, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">22</span>:39:30.814690 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype IPv4 <span class="token punctuation">(</span>0x0800<span class="token punctuation">)</span>, length <span class="token number">98</span>: <span class="token number">172.20</span>.80.102 <span class="token operator">></span> <span class="token number">172.20</span>.88.216: ICMP <span class="token builtin class-name">echo</span> request, <span class="token function">id</span> <span class="token number">845</span>, <span class="token function">seq</span> <span class="token number">1</span>, length <span class="token number">64</span>
+<span class="token number">22</span>:39:35.848014 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Request who-has <span class="token number">172.20</span>.88.216 tell <span class="token number">172.20</span>.80.102, length <span class="token number">28</span>
+<span class="token number">22</span>:39:35.848079 <span class="token number">66</span>:0d:24:5a:ca:32 <span class="token operator">></span> <span class="token number">96</span>:4b:d4:18:76:4b, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">172.20</span>.88.216 is-at <span class="token number">66</span>:0d:24:5a:ca:32, length <span class="token number">28</span>
+
+
+$ tcpdump -eni veth1
+listening on veth1, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">22</span>:34:58.119853 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype IPv4 <span class="token punctuation">(</span>0x0800<span class="token punctuation">)</span>, length <span class="token number">98</span>: <span class="token number">172.20</span>.80.102 <span class="token operator">></span> <span class="token number">172.20</span>.88.216: ICMP <span class="token builtin class-name">echo</span> request, <span class="token function">id</span> <span class="token number">811</span>, <span class="token function">seq</span> <span class="token number">1</span>, length <span class="token number">64</span>
+<span class="token number">22</span>:35:03.127900 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Request who-has <span class="token number">172.20</span>.88.216 tell <span class="token number">172.20</span>.80.102, length <span class="token number">28</span>
+<span class="token number">22</span>:35:03.128021 <span class="token number">66</span>:0d:24:5a:ca:32 <span class="token operator">></span> <span class="token number">96</span>:4b:d4:18:76:4b, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">172.20</span>.88.216 is-at <span class="token number">66</span>:0d:24:5a:ca:32, length <span class="token number">28</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>看看数据包的流程就明白了：</p>
+<ol>
+<li>ping 进程构造 ICMP echo 请求包，并通过 socket 发给协议栈</li>
+<li>由于 ping 程序指定了走 veth1，并且本地 ARP 缓存里面已经有了相关记录，所以不用再发送 ARP 出去，协议栈就直接将该数据包交给了 veth1</li>
+<li>由于 veth1 的另一端连的是 veth0，所以 ICMP echo 请求包就转发给了 veth0</li>
+<li>veth0 收到 ICMP echo 请求包后，转交给另一端的协议栈</li>
+<li>协议栈一看自己的设备列表，发现本地有 172.20.88.216 这个IP，于是构造 ICMP echo 应答包，准备返回</li>
+<li>协议栈查看自己的路由表，发现回给 192.168.2.11 的数据包应该走lo口，于是将应答包交给 lo 设备</li>
+<li>lo 接到协议栈的应答包后，啥都没干，转手又把数据包还给了协议栈（相当于协议栈通过发送流程把数据包给 lo，然后 lo 再将数据包交给协议栈的接收流程）</li>
+<li>协议栈收到应答包后，发现有 socket 需要该包，于是交给了相应的 socket</li>
+<li>这个 socket 正好是 ping 进程创建的 socket，于是 ping 进程收到了应答包</li>
+</ol>
+<p>抓一下 lo 设备上的数据，发现应答包确实是从 lo 口回来的：</p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ tcpdump -eni lo
+listening on lo, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
+<span class="token number">22</span>:43:29.539583 00:00:00:00:00:00 <span class="token operator">></span> 00:00:00:00:00:00, ethertype IPv4 <span class="token punctuation">(</span>0x0800<span class="token punctuation">)</span>, length <span class="token number">98</span>: <span class="token number">172.20</span>.88.216 <span class="token operator">></span> <span class="token number">172.20</span>.80.102: ICMP <span class="token builtin class-name">echo</span> reply, <span class="token function">id</span> <span class="token number">913</span>, <span class="token function">seq</span> <span class="token number">1</span>, length <span class="token number">64</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux/" rel="tag"># Linux</a>
+              <a href="/tags/Linux-Network/" rel="tag"># Linux Network</a>
+              <a href="/tags/Veth-Peer/" rel="tag"># Veth Peer</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/01/13/Linux-Network-Package%E6%95%B0%E6%8D%AE%E5%8C%85/" rel="prev" title="Linux Network Package传输">
+      <i class="fa fa-chevron-left"></i> Linux Network Package传输
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/01/19/Linux-Network-Bridge%E7%BD%91%E6%A1%A5/" rel="next" title="Linux Network Bridge">
+      Linux Network Bridge <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3-Veth"><span class="nav-number">1.</span> <span class="nav-text">深入理解 Veth</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AA%E7%BB%99%E4%B8%80%E4%B8%AAveth%E8%AE%BE%E5%A4%87%E9%85%8D%E7%BD%AEIP"><span class="nav-number">1.1.</span> <span class="nav-text">只给一个veth设备配置IP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%99%E4%B8%A4%E4%B8%AAveth%E8%AE%BE%E5%A4%87%E9%83%BD%E9%85%8D%E7%BD%AEIP"><span class="nav-number">1.2.</span> <span class="nav-text">给两个veth设备都配置IP</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

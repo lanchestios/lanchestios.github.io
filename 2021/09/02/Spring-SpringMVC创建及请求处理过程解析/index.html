@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="通过策略接口，Spring 框架是高度可配置的，而且包含多种视图技术，例如 JavaServer Pages（JSP）技术、Velocity、Tiles、iText 和 POI。Spring MVC 框架并不知道使用的视图，所以不会强迫开发者只使用 JSP 技术。Spring MVC 分离了控制器、模型对象、过滤器以及处理程序对象的角色，这种分离让它们更容易进行定制。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SpringMVC 创建及请求处理过程解析">
+<meta property="og:url" content="http://example.com/2021/09/02/Spring-SpringMVC%E5%88%9B%E5%BB%BA%E5%8F%8A%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="通过策略接口，Spring 框架是高度可配置的，而且包含多种视图技术，例如 JavaServer Pages（JSP）技术、Velocity、Tiles、iText 和 POI。Spring MVC 框架并不知道使用的视图，所以不会强迫开发者只使用 JSP 技术。Spring MVC 分离了控制器、模型对象、过滤器以及处理程序对象的角色，这种分离让它们更容易进行定制。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Spring/Servlet继承关系.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/SpringMVC%E6%A0%B8%E5%BF%83Servlet%E7%BB%A7%E6%89%BF%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/Spring/NamespaceHandler%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="article:published_time" content="2021-09-02T04:00:00.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.631Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Spring">
+<meta property="article:tag" content="SpringMVC">
+<meta property="article:tag" content="Servlet">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Spring/Servlet继承关系.png">
+
+<link rel="canonical" href="http://example.com/2021/09/02/Spring-SpringMVC%E5%88%9B%E5%BB%BA%E5%8F%8A%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B%E8%A7%A3%E6%9E%90/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>SpringMVC 创建及请求处理过程解析 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/02/Spring-SpringMVC%E5%88%9B%E5%BB%BA%E5%8F%8A%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          SpringMVC 创建及请求处理过程解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-09-02 12:00:00" itemprop="dateCreated datePublished" datetime="2021-09-02T12:00:00+08:00">2021-09-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>通过策略接口，Spring 框架是高度可配置的，而且包含多种视图技术，例如 JavaServer Pages（JSP）技术、Velocity、Tiles、iText 和 POI。Spring MVC 框架并不知道使用的视图，所以不会强迫开发者只使用 JSP 技术。Spring MVC 分离了控制器、模型对象、过滤器以及处理程序对象的角色，这种分离让它们更容易进行定制。</p>
+<span id="more"></span>
+
+<h1 id="servlet-api-接口规范"><a href="#servlet-api-接口规范" class="headerlink" title="servlet-api 接口规范"></a>servlet-api 接口规范</h1><p>Servlet 是 Server + Applet 的缩写，表示一个服务器应用。下图为 Servlet 在 <code>servlet-api</code> 的继承关系。</p>
+<img src="/images/Spring/Servlet继承关系.png" style="zoom: 50%;" />
+
+<h2 id="Servlet-接口"><a href="#Servlet-接口" class="headerlink" title="Servlet 接口"></a>Servlet 接口</h2><h3 id="接口定义"><a href="#接口定义" class="headerlink" title="接口定义"></a>接口定义</h3><p>Servlet 接口定义了 <code>initialize a servlet</code>、<code>service requests</code>、<code>remove a servlet from the server</code> 三项内容，它们管理着整个 Servlet 的 <code>life-cycle</code>：</p>
+<ul>
+<li>The servlet is constructed, then initialized with the <code>init</code> method.</li>
+<li>Any calls from clients to the <code>service</code> method are handled.</li>
+<li>The servlet is taken out of service, then destroyed with the <code>destroy</code> method, then garbage collected and finalized.</li>
+</ul>
+<p>除了 <code>life-cycle</code> 方法，还提供了获取 startup 信息的 <code>getServletConfig</code> 方法，以及返回 Servlet 自身基本信息的 getServletInfo 方法。</p>
+<h3 id="与-web-xml-配置关联"><a href="#与-web-xml-配置关联" class="headerlink" title="与 web.xml 配置关联"></a>与 web.xml 配置关联</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token class-name">ServletConfig</span> config<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ServletException</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p><code>init()</code> 方法被调用时会接收到一个 ServletConfig 类型的参数，是容器传进去的。在 web.xml 中定义 Servlet 时通过 init-param 标签配置的参数就是通过 ServletConfig 来保存的。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>web-app</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>display-name</span><span class="token punctuation">></span></span>Application Context<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>display-name</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>context-param</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>param-name</span><span class="token punctuation">></span></span>contextConfigLocation<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>param-name</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>param-value</span><span class="token punctuation">></span></span>application-context.xml<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>param-value</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>context-param</span><span class="token punctuation">></span></span>
+	<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>servlet</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>servlet-name</span><span class="token punctuation">></span></span>DispatcherServlet<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>servlet-name</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>servlet-class</span><span class="token punctuation">></span></span>org.springframework.web.servlet.DispatcherServlet<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>servlet-class</span><span class="token punctuation">></span></span>
+        <span class="token comment">&lt;!--
+        在配置Servlet的时候可以设置contextConfigLocation参数来指定SpringMVC配置文件的位置，
+        如果不指定就默认使用WEB-INF/[ServletName]-servlet.xml文件.
+        --></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>init-param</span><span class="token punctuation">></span></span>
+            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>param-name</span><span class="token punctuation">></span></span>contextConfigLocation<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>param-name</span><span class="token punctuation">></span></span>
+            <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>param-value</span><span class="token punctuation">></span></span>classpath:application-servlet.xml<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>param-value</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>init-param</span><span class="token punctuation">></span></span>
+        <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>load-on-startup</span><span class="token punctuation">></span></span>1<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>load-on-startup</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>servlet</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>web-app</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>init()</code> 方法在容器启动时被容器调用（当 load-on-startup 设置为负数或者不设置时会在 Servlet 第一次用到时才被调用），只会调用一次。</p>
+<p>Tomcat 中 Servlet 的 init 方法是在 <code>org.apache.catalina.core.StandardWrapper</code> 的 <code>initServlet()</code> 方法中调用的，ServletConfig 传入的是 StandardWrapper（里面封装着 Servlet）自身的门面类 StandardWrapperFacade。其实这个也很容易理解，Servlet 是通过 xml 文件配置的，在解析 xml 时就会把配置参数给设置进去，这样 StandardWrapper 本身就包含配置项了，当然，并不是 StandardWrapper 的所有内容都是 Config 相关的，所以就用了其门面 Facade 类。下面是 ServletConfig 接口的定义:</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ServletConfig</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">//获取Servlet名称，web.xml中&lt;servlet-name>配置</span>
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">getServletName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//返回ServletContext，即返回应用本身</span>
+    <span class="token keyword">public</span> <span class="token class-name">ServletContext</span> <span class="token function">getServletContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">//获取配置项，获取web.xml中&lt;init-param>参数</span>
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">getInitParameter</span><span class="token punctuation">(</span><span class="token class-name">String</span> name<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">public</span> <span class="token class-name">Enumeration</span> <span class="token function">getInitParameterNames</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>ServletContext 其实就是 Tomcat 中 Context 的门面类 ApplicationContextFacade（具体代码参考 StandardContext）的 getServletContext 方法。一个 ServletContext 包含多个 Servlet，因为 ServletContext 代表应用（Application）本身，那么 ServletContext 里边设置的参数就可以被当前应用的所有 Servlet 共享了。</p>
+<p>其实，除了 Servlet 级和 Context 级还有更高的一级，也就是 Tomcat 抽象层级的 Host 级。在 ServletContext 接口中的 <code>getContext(String uripath)</code>，它可以根据路径获取到同一个站点下的别的应用的 ServletContext！当然由于安全的原因，一般会返回 null，如果想使用需要进行一些设置。</p>
+<h2 id="GenericServlet-抽象类"><a href="#GenericServlet-抽象类" class="headerlink" title="GenericServlet 抽象类"></a>GenericServlet 抽象类</h2><p>GenericServlet 是 Servlet 的抽象类，也实现了 ServletConfig 接口，可以直接调用获取配置信息。它也提供了 <code>init()</code> 的模版方法，这种方式可以在实现中不再关心 Config 的输入以及重载时的 <code>super.init(config)</code>。</p>
+<h2 id="HttpServlet-实现类"><a href="#HttpServlet-实现类" class="headerlink" title="HttpServlet 实现类"></a>HttpServlet 实现类</h2><p>HttpServlet 是用 HTTP 协议实现的 Servlet 基类，Spring MVC 的 DispatcherServlet 就是继承 HttpServlet。其主要实现了 service 方法来通过 HTTP Method 路由至相关的处理方法。</p>
+<h1 id="SpringMVC-创建过程"><a href="#SpringMVC-创建过程" class="headerlink" title="SpringMVC 创建过程"></a>SpringMVC 创建过程</h1><p><img src="/images/Tomcat/SpringMVC%E6%A0%B8%E5%BF%83Servlet%E7%BB%A7%E6%89%BF%E7%BB%93%E6%9E%84.png"></p>
+<p>HttpServletBean、FrameworkServlet 以及 DispatcherServlet 直接实现三个接口：EnvironmentCapable、EnvironmentAware 和 ApplicationContextAware。Aware 接口可以通过 set 方法将对应的资源注入 Bean 中。Capable 接口可以通过 get 方法在 Bean 中获取对应的资源。</p>
+<p>实际上在 HttpServletBean 中 Environment 使用的是 StandardServletEnvironment（在 createEnvironment 方法中创建），这里确实封装 ServletContext，同时还封装了 ServletConfig、JndiProperty、系统环境变量和系统属性，这些都封装到了其 propertySources 属性下。</p>
+<h2 id="HttpServletBean"><a href="#HttpServletBean" class="headerlink" title="HttpServletBean"></a>HttpServletBean</h2><p>从 Servlet 中可知，HttpServletBean 的初始化入口方法应该是 init 方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ServletException</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">//将Servlet中配置的参数封装到pvs变量中，requiredProperties为必需参数，如果没配置将报异常</span>
+   <span class="token class-name">PropertyValues</span> pvs <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ServletConfigPropertyValues</span><span class="token punctuation">(</span><span class="token function">getServletConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>requiredProperties<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>pvs<span class="token punctuation">.</span><span class="token function">isEmpty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+       <span class="token class-name">BeanWrapper</span> bw <span class="token operator">=</span> <span class="token class-name">PropertyAccessorFactory</span><span class="token punctuation">.</span><span class="token function">forBeanPropertyAccess</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+       <span class="token class-name">ResourceLoader</span> resourceLoader <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ServletContextResourceLoader</span><span class="token punctuation">(</span><span class="token function">getServletContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+       bw<span class="token punctuation">.</span><span class="token function">registerCustomEditor</span><span class="token punctuation">(</span><span class="token class-name">Resource</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">ResourceEditor</span><span class="token punctuation">(</span>resourceLoader<span class="token punctuation">,</span> <span class="token function">getEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+       <span class="token comment">//模板方法，可以在子类调用，做一些初始化工作。bw就是代表DispatcherServlet</span>
+       <span class="token function">initBeanWrapper</span><span class="token punctuation">(</span>bw<span class="token punctuation">)</span><span class="token punctuation">;</span>
+       <span class="token comment">//将配置的初始化值（如contextConfigLocation)设置到DispatcherServlet</span>
+       bw<span class="token punctuation">.</span><span class="token function">setPropertyValues</span><span class="token punctuation">(</span>pvs<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+
+   <span class="token comment">//模板方法，子类初始化的入口方法</span>
+   <span class="token function">initServletBean</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在 HttpServletBean 的 init 中，首先将 Servlet 中配置的参数使用 BeanWrapper 设置到 DispatcherServlet 的相关属性，然后调用模板方法 initServletBean，子类就通过这个方法初始化。</p>
+<h2 id="FrameworkServlet"><a href="#FrameworkServlet" class="headerlink" title="FrameworkServlet"></a>FrameworkServlet</h2><p>从 HttpServletBean 中可知，FrameworkServlet 的初始化入口方法应该是 initServletBean。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">initServletBean</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">ServletException</span> <span class="token punctuation">&#123;</span>
+      <span class="token comment">//初始化 WebApplicationContext</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>webApplicationContext <span class="token operator">=</span> <span class="token function">initWebApplicationContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token comment">//模板方法，初始化FrameworkServlet，子类并未使用</span>
+      <span class="token function">initFrameworkServlet</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><strong>在设置WebApplicationContext时会根据情况调用onRefresh方法</strong></p>
+<p>第一种方法是在构造方法中已经传递 webApplicationContext 参数，这时只需要对其进行一些设置即可。这种方法主要用于 Servlet3.0 以后的环境中，Servlet3.0 之后可以在程序中使用 ServletContext.addServlet 方式注册 Servlet，这时就可以在新建 FrameworkServlet 和其子类的时候通过构成方法传递已经准备好的 webApplicationContext。</p>
+<p>第二种方法是 webApplicationContext 已经在 ServletContext 中了。这时只需要在配置 Servlet <code>&lt;init-param&gt;</code> 的时候将 ServletContext 中的 webApplicationContext 的 name 配置到 contextAttribute 属性就可以了。</p>
+<p>第三种方法是在前面两种方式都无效的情况下自己创建一个。正常情况下就是使用的这种方式。创建过程在 createWebApplicationContext 方法中，createWebApplicationContext 内部又调用了 configureAndRefreshWebApplicationContext 方法。</p>
+<p>当使用第三种方法初始化时已经 refresh，不需要再调用 onRefresh。同样在第一种方式中也调用了 configureAndRefreshWebApplicationContext 方法，也 refresh 过，所以只有使用第二种方式初始化 webApplicationContext 的时候才会在这里调用 onRefresh 方法。不过不管用哪种方式调用，onRefresh 最终肯定会而且只会调用一次，而且 DispatcherServlet 正是通过重写这个模板方法来实现初始化的。</p>
+<h2 id="DispatcherServlet"><a href="#DispatcherServlet" class="headerlink" title="DispatcherServlet"></a>DispatcherServlet</h2><p>onRefresh 方法是 DispatcherServlet 的入口方法。onRefresh 中简单地调用了 initStrategies，在 initStrategies 中调用了其 9 大组件的初始化方法：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">onRefresh</span><span class="token punctuation">(</span><span class="token class-name">ApplicationContext</span> context<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token function">initStrategies</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">initStrategies</span><span class="token punctuation">(</span><span class="token class-name">ApplicationContext</span> context<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+   <span class="token function">initMultipartResolver</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initLocaleResolver</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initThemeResolver</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initHandlerMappings</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initHandlerAdapters</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initHandlerExceptionResolvers</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initRequestToViewNameTranslator</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initViewResolvers</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token function">initFlashMapManager</span><span class="token punctuation">(</span>context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>可能有读者不理解为什么要这么写，为什么不将 initStrategies 的具体实现直接写到 onRefresh 中呢？initStrategies 方法不是多余的吗？其实这主要是分层的原因，onRefresh 是用来刷新容器的，initStrategies 用来初始化一些策略组件。如果把 initStrategies 里面的代码直接写到 onRefresh 里面，对于程序的运行也没有影响，不过这样一来，如果在 onRefresh 中想再添加别的功能，就会没有将其单独写一个方法出来逻辑清晰，不过这并不是最重要的，更重要的是，如果在别的地方也需要调用 initStrategies 方法（如需要修改一些策略后进行热部署），但 initStrategies 没独立出来，就只能调用 onRefresh，那样在 onRefresh 增加了新功能的时候就麻烦了。另外单独将 initStrategies 写出来还可以被子类覆盖，使用新的模式进行初始化。</p>
+<p>初始化方式分两步：首先通过 context.getBean 在容器里面按注册时的名称或类型进行查找，所以在 SpringMVC 的配置文件中只需要配置相应类型的组件，容器就可以自动找到。如果找不到就调用 getDefaultStrategy 按照类型获取默认的组件。需要注意的是，这里的 context 指的是 FrameworkServlet 中创建的 WebApplicationContext，而不是 ServletContext。</p>
+<h2 id="XML-配置解析原理"><a href="#XML-配置解析原理" class="headerlink" title="XML 配置解析原理"></a>XML 配置解析原理</h2><p>在 Spring 的 XML 文件中通过命名空间配置的标签是怎么解析的？对于一个具体的命名空间，Spring 是怎么找到解析它的类的呢？其实在 Spring 中是把解析标签的类都放到了相应的 META-INF 目录下的 spring.handlers 文件中。</p>
+<p>解析配置的接口是 <code>org.springframework.beans.factory.xmI.NamespaceHandler</code>，它的继承结构如下</p>
+<p><img src="/images/Spring/NamespaceHandler%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p>NamespaceHandler 里一共定义了三个方法：init、parse 和 decorate。init 是用来初始化自己的；parse 用于将配置的标签转换成 spring 所需要的 BeanDefinition；decorate 用于对所在的 BeanDefinition 进行一些修改。</p>
+<p>NamespaceHandler 的实现类主要有三个：NamespaceHandlerSupport、SimpleConstructorNamespaceHandler、SimplePropertyNamespaceHandler。其中 NamespaceHandlerSupport 是 NamespaceHandler 的默认实现，SimpleConstructorNamespaceHandler 用于统一对通过 <code>c:</code> 配置的构造方法进行解析，SimplePropertyNamespaceHandler 用于统一对通过 <code>p:</code> 配置的参数进行解析。</p>
+<p>NamespaceHandlerSupport 并没有做具体的解析工作，而是定义了三个处理器 parsers、decorators、attributeDecorators，分别用于处理解析工作、处理标签类型、处理属性类型的装饰。接口的 parse 和 decorate 方法的执行方式是先找到相应的处理器，然后进行处理。具体的处理器由子类实现，然后注册到 NamespaceHandlerSupport 上面。所以要定义一个命名空间的解析器，只需要在 init 中定义相应的 parsers、decorators、attributeDecorators 并注册到 NamespaceHandlerSupport 上面。</p>
+<h1 id="SpringMVC-处理请求"><a href="#SpringMVC-处理请求" class="headerlink" title="SpringMVC 处理请求"></a>SpringMVC 处理请求</h1><p>SpringMVC 处理请求的过程中用到两个 Servlet：</p>
+<ul>
+<li>FrameworkServlet：将不同类型的请求合并到 processRequest 方法统一处理，其主要处理过程如下<ul>
+<li>将当前请求的 LocalContext 和 ServletRequestAttribute 在处理请求前设置到了 LocaleContextHolder 和 RequestContextHolder，并在请求处理完成后恢复。</li>
+<li>调用了 doService 模版方法具体处理请求。</li>
+<li>请求处理完成后发布 ServletRequestHandledEvent 消息。</li>
+</ul>
+</li>
+<li>DispatcherServlet：doService 给 request 设置属性并将请求交给 doDispatch 方法具体处理</li>
+</ul>
+<h2 id="HttpServletBean-1"><a href="#HttpServletBean-1" class="headerlink" title="HttpServletBean"></a>HttpServletBean</h2><p>HttpServletBean 主要参与了创建工作，并没有涉及请求的处理。</p>
+<h2 id="FrameworkServlet-1"><a href="#FrameworkServlet-1" class="headerlink" title="FrameworkServlet"></a>FrameworkServlet</h2><p>Servlet 的处理过程：首先是从 Servlet 接口的 service 方法开始，然后在 HttpServlet 的 service 方法中根据请求的类型不同将请求路由到了 doGet、doHead、doPost、doPut、doDelete、doOptions 和 doTrace 七个方法，并且做了 doHead、doOptions 和 doTrace 的默认实现。其中 doHead 调用 doGet，然后返回只有 header 没有 body 的 response。</p>
+<p>在 FrameworkServlet 中重写了 service、doGet、doPost、doPut、doDelete、doOptions、doTrace 方法（除了doHead 的所有处理请求的方法）。在 service 方法中增加了对 PATCH 类型请求的处理，其他类型的请求直接交给了父类进行处理 doOptions 和 doTrace 方法可以通过设置 dispatchOptionsRequest 和 dispatchTraceRequest 参数决定是自己处理还是交给父类处理（默认都是交给父类处理，doOptions 会在父类的处理结果中增加 PATCH 类型）；doGet、doPost、doPut 和 doDelete 都是自己处理。所有需要自己处理的请求都交给了processRequest方法进行统一处理。</p>
+<p>我们发现这里所做的事情跟 HttpServlet 里将不同类型的请求路由到不同方法进行处理的思路正好相反，这里又将所有的请求合并到了 processRequest 方法。当然并不是说 SpringMVC 中就不对 request 的类型进行分类，而全部执行相同的操作了，恰恰相反，Spring MVC 中对不同类型请求的支持非常好，不过它是通过另外一种方式进行处理的，它将不同类型的请求用不同的 Handler 进行处理，后面再详细分析。</p>
+<p>可能有的读者会想，直接覆盖了 service 不是就可以了吗？HttpServlet 是在 service 方法中将请求路由到不同的方法的，如果在 service 中不再调用 <code>super.service()</code>，而是直接将请求交给 processRequest 处理不是更简单吗？从现在的结构来看确实如此，不过那么做其实存在着一些问题。比如，我们为了某种特殊需求需要在 Post 请求处理前对 request 做一些处理，这时可能会新建一个继承自 DispatcherServlet 的类，然后覆盖 doPost 方法，在里面先对 request 做处理，然后再调用 <code>super.doPost()</code>，但是父类根本就没调用 doPost，所以这时候就会出问题了。虽然<br>这个问题的解决方法也很简单，但是按正常的逻辑，调用 doPost 应该可以完成才合理，而且一般情况下开发者并不需要对 Spring MVC 内部的结构非常了解，所以 Spring MVC 的这种做法虽然看起来有点笨拙但是是必要的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">processRequest</span><span class="token punctuation">(</span><span class="token class-name">HttpServletRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">HttpServletResponse</span> response<span class="token punctuation">)</span>
+      <span class="token keyword">throws</span> <span class="token class-name">ServletException</span><span class="token punctuation">,</span> <span class="token class-name">IOException</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token keyword">long</span> startTime <span class="token operator">=</span> <span class="token class-name">System</span><span class="token punctuation">.</span><span class="token function">currentTimeMillis</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token class-name">Throwable</span> failureCause <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+
+   <span class="token comment">//获取LocaleContextHolder中原来保存的LocaleContext</span>
+   <span class="token class-name">LocaleContext</span> previousLocaleContext <span class="token operator">=</span> <span class="token class-name">LocaleContextHolder</span><span class="token punctuation">.</span><span class="token function">getLocaleContext</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">//获取当前请求的LocaleContext</span>
+   <span class="token class-name">LocaleContext</span> localeContext <span class="token operator">=</span> <span class="token function">buildLocaleContext</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">//获取RequestContextHolder中原来保存的RequestAttributes</span>
+   <span class="token class-name">RequestAttributes</span> previousAttributes <span class="token operator">=</span> <span class="token class-name">RequestContextHolder</span><span class="token punctuation">.</span><span class="token function">getRequestAttributes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">//获取当前请求的ServletRequestAttributes</span>
+   <span class="token class-name">ServletRequestAttributes</span> requestAttributes <span class="token operator">=</span> <span class="token function">buildRequestAttributes</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> response<span class="token punctuation">,</span> previousAttributes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token class-name">WebAsyncManager</span> asyncManager <span class="token operator">=</span> <span class="token class-name">WebAsyncUtils</span><span class="token punctuation">.</span><span class="token function">getAsyncManager</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   asyncManager<span class="token punctuation">.</span><span class="token function">registerCallableInterceptor</span><span class="token punctuation">(</span><span class="token class-name">FrameworkServlet</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">RequestBindingInterceptor</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">//将当前请求的LocaleContext和ServletRequestAttributes设置到LocaleContextHolder</span>
+   <span class="token function">initContextHolders</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> localeContext<span class="token punctuation">,</span> requestAttributes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+   <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+      <span class="token comment">//实际请求请求入口</span>
+      <span class="token function">doService</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">ServletException</span> <span class="token operator">|</span> <span class="token class-name">IOException</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      failureCause <span class="token operator">=</span> ex<span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> ex<span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Throwable</span> ex<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+      failureCause <span class="token operator">=</span> ex<span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">NestedServletException</span><span class="token punctuation">(</span><span class="token string">"Request processing failed"</span><span class="token punctuation">,</span> ex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+   <span class="token comment">//在方法最后的finally中调用resetContextHolders方法将原来的LocaleContext和RequestAttributes</span>
+   <span class="token comment">//又恢复了。这是因为在Sevlet外面可能还有别的操作，如Filter(Spring-MVC自己的HandlerInterceptor</span>
+   <span class="token comment">//是在doService内部的)等，为了不影响那些操作，所以需要进行恢复。</span>
+
+   <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+      <span class="token function">resetContextHolders</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> previousLocaleContext<span class="token punctuation">,</span> previousAttributes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>requestAttributes <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+         requestAttributes<span class="token punctuation">.</span><span class="token function">requestCompleted</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">&#125;</span>
+      <span class="token function">logResult</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> response<span class="token punctuation">,</span> failureCause<span class="token punctuation">,</span> asyncManager<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token function">publishRequestHandledEvent</span><span class="token punctuation">(</span>request<span class="token punctuation">,</span> response<span class="token punctuation">,</span> startTime<span class="token punctuation">,</span> failureCause<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>processRequest 方法中的核心语句是 <code>doService(request，response)</code>，这是一个模板方法，在 DispatcherServlet 中具体实现。在 doService 前后还做了一些事情（也就是大家熟悉的装饰模式）：首先获取了 LocaleContextHolder 和 RequestContextHolder 中原来保存的 LocaleContext 和 RequestAttributes 并设置到 previousLocaleContext 和 previousAttributes 临时属性，然后调用 buildLocaleContext 和 buildRequestAttributes 方法获取到当前请求的 LocaleContext 和 RequestAttributes，并通过 initContextHolders 方法将它们设置到 LocaleContextHolder 和 RequestContextHolder 中（处理完请求后再恢复到原来的值），接着使用 request 拿到异步处理管理器并设置了拦截器，做完这些后执行了 doService 方法，执行完后，最后（finally 中）通过 resetContextHolders 方法将原来的 previousLocaleContext 和 previousAttributes 恢复到 LocaleContextHolder 和 RequestContextHolder 中，并调用 publishRequestHandledEvent 方法发布了一个 ServletRequestHandledEvent 类型的消息。</p>
+<p>当 publishEvents 设置为 true 时，请求处理结束后就会发出这个消息，无论请求处理成功与否都会发布。publishEvents 可以在 <code>web.xml</code> 文件中配置 Spring MVC 的 Servlet 时配置，默认为 true。通过以下方法便可以简单的监听日志。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Component</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ServletRequestHandledEventListener</span> <span class="token keyword">implements</span> <span class="token class-name">ApplicationListener</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ServletRequestHandledEvent</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">onApplicationEvent</span><span class="token punctuation">(</span><span class="token class-name">ServletRequestHandledEvent</span> event<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//do something</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>总结一下 processRequest 方法，在 processRequest 里面主要的处理逻辑交给了 doService，这是一个模板方法，在子类具体实现，另外就是对使用当前 request 获取到的 LocaleConext 和 RequestAttributes 进行了保存，以及处理完之后的恢复，在最后发布了 ServletRequestHandledEvent 事件。</p>
+<h2 id="DispatcherServlet-1"><a href="#DispatcherServlet-1" class="headerlink" title="DispatcherServlet"></a>DispatcherServlet</h2><h3 id="处理请求"><a href="#处理请求" class="headerlink" title="处理请求"></a>处理请求</h3><p>DispatcherServlet 是 Spring MVC 最核心的类，整个处理过程的顶层设计都在这里面。DispatcherServlet 执行处理的入口方法是 doService，而 doService 则将具体的处理交给了 doDispatch。</p>
+<p>doDispatch 中最核心的代码只要 4 句，</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doDispatch</span><span class="token punctuation">(</span><span class="token class-name">HttpServletRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">HttpServletResponse</span> response<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+
+  <span class="token comment">// Determine handler for the current request.</span>
+  <span class="token comment">// 根据 request 找到 handler</span>
+  mappedHandler <span class="token operator">=</span> <span class="token function">getHandler</span><span class="token punctuation">(</span>processedRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// Determine handler adapter for the current request.</span>
+  <span class="token comment">// 根据 handler 找到对应的 HandlerAdapter</span>
+  <span class="token class-name">HandlerAdapter</span> ha <span class="token operator">=</span> <span class="token function">getHandlerAdapter</span><span class="token punctuation">(</span>mappedHandler<span class="token punctuation">.</span><span class="token function">getHandler</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// Actually invoke the handler.</span>
+  <span class="token comment">// 用 HandlerAdapter 处理 Handler</span>
+  mv <span class="token operator">=</span> ha<span class="token punctuation">.</span><span class="token function">handle</span><span class="token punctuation">(</span>processedRequest<span class="token punctuation">,</span> response<span class="token punctuation">,</span> mappedHandler<span class="token punctuation">.</span><span class="token function">getHandler</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// 调用 processDispatchResult 进行页面渲染</span>
+  <span class="token function">processDispatchResult</span><span class="token punctuation">(</span>processedRequest<span class="token punctuation">,</span> response<span class="token punctuation">,</span> mappedHandler<span class="token punctuation">,</span> mv<span class="token punctuation">,</span> dispatchException<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在这里需要区分一下以上提到的三个组件：Handler、HandlerMapping、HandlerAdapter，以及 ViewResolver。</p>
+<p>Handler：也就是处理器，它直接对应着 MVC 中的 C 也就是Controller层，它的具体表现形式有很多，可以是类，也可以是方法，如果你能想到别的表现形式也可以使用，它的类型是 Object。Spring 中标注了 @RequestMapping 的所有方法都可以看成一个 Handler。只要可以实际处理请求就可以是 Handler。</p>
+<p>HandlerMapping：是用来查找 Handler 的，在 Spring MVC 中会处理很多请求，每个请求都需要一个 Handler 来处理，具体接收到一个请求后使用哪个 Handler 来处理就是 HandlerMapping 要做的事情。</p>
+<p>HandlerAdapter：很多人对这个的理解都不准确，其实从名字上就可以看出它是一个 Adapter，也就是适配器。因为 Spring MVC 中的 Handler 可以是任意的形式，只要能处理请求就 OK，但是 Servlet 需要的处理方法的结构却是固定的，都是以 request 和 response 为参数的方法（如 doService 方法）。怎么让固定的 Servlet 处理方法调用灵活的 Handler 来进行处理呢？这就是 HandlerAdapter 要做的事情。</p>
+<h3 id="渲染页面"><a href="#渲染页面" class="headerlink" title="渲染页面"></a>渲染页面</h3><p>最后调用的 processDispatchResult 主要用来渲染页面，其主要是调用 render 来完成正向流程的渲染过程的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token function">render</span><span class="token punctuation">(</span>mv<span class="token punctuation">,</span> request<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>以下是 render 的简化逻辑</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">render</span><span class="token punctuation">(</span><span class="token class-name">ModelAndView</span> mv<span class="token punctuation">,</span> <span class="token class-name">HttpServletRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">HttpServletResponse</span> response<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+  <span class="token comment">// Determine locale for request and apply it to the response.</span>
+  <span class="token comment">// 对 response 设置 Local，过程中使用到了 LocaleResolver</span>
+  <span class="token class-name">Locale</span> locale <span class="token operator">=</span>
+    <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>localeResolver <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">?</span> <span class="token keyword">this</span><span class="token punctuation">.</span>localeResolver<span class="token punctuation">.</span><span class="token function">resolveLocale</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span> <span class="token operator">:</span> request<span class="token punctuation">.</span><span class="token function">getLocale</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  response<span class="token punctuation">.</span><span class="token function">setLocale</span><span class="token punctuation">(</span>locale<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// 获取实际的 View</span>
+  <span class="token class-name">View</span> view<span class="token punctuation">;</span>
+  <span class="token class-name">String</span> viewName <span class="token operator">=</span> mv<span class="token punctuation">.</span><span class="token function">getViewName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>viewName <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// We need to resolve the view name.</span>
+    view <span class="token operator">=</span> <span class="token function">resolveViewName</span><span class="token punctuation">(</span>viewName<span class="token punctuation">,</span> mv<span class="token punctuation">.</span><span class="token function">getModelInternal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> locale<span class="token punctuation">,</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token punctuation">&#125;</span>
+  <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+    <span class="token comment">// No need to lookup: the ModelAndView object contains the actual View object.</span>
+    view <span class="token operator">=</span> mv<span class="token punctuation">.</span><span class="token function">getView</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">&#125;</span>
+
+  <span class="token comment">// Delegate to the View object for rendering.</span>
+  <span class="token comment">// 调用 View 的 render 进行具体的渲染，渲染的过程使用了 ThemeResolver。</span>
+  view<span class="token punctuation">.</span><span class="token function">render</span><span class="token punctuation">(</span>mv<span class="token punctuation">.</span><span class="token function">getModelInternal</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> request<span class="token punctuation">,</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>另外 View 和 ViewResolver 的原理与 Handler 和 HandlerMapping 的原理类似。View 是用来展示数据的，而 ViewResolver 用来查找 View。View 就是页面所需要的模板，内容就是 Model 中的数据，ViewResolver 就是用来选择使用哪个模板的选择器。</p>
+<p>那么如何将请求与视图对应起来呢？可以通过 RequestToViewNameTranslator 实现所有 Request 到 ViewName 的转换规则，这些都要在一个 Translator 里面全部实现（因为 SpringMVC 中只能配置一个 RequestToViewNameTranslator）。</p>
+<h3 id="支持文件上传"><a href="#支持文件上传" class="headerlink" title="支持文件上传"></a>支持文件上传</h3><p>MultipartResolver 用于处理上传请求，处理方法是将普通的 request 包装成 Multipart-HttpServletRequest，后者可以直接调用 getFile 方法获取到 File，如果上传多个文件，还可以调用 getFileMap 得到 FileName→File 结构的 Map，这样就使得上传请求的处理变得非常简单。当然，这里做的其实是锦上添花的事情，如果上传的请求不用 MultipartResolver 封装成 MultipartHttpServletRequest，直接用原来的 request 也是可以的。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
+ *
+ * &lt;p>There are two concrete implementations included in Spring, as of Spring 3.1:
+ * &lt;ul>
+ * &lt;li>&#123;@link org.springframework.web.multipart.commons.CommonsMultipartResolver&#125;
+ * for Apache Commons FileUpload
+ * &lt;li>&#123;@link org.springframework.web.multipart.support.StandardServletMultipartResolver&#125;
+ * for the Servlet 3.0+ Part API
+ * &lt;/ul>
+ *
+ * &lt;p>There is no default resolver implementation used for Spring
+ * &#123;@link org.springframework.web.servlet.DispatcherServlet DispatcherServlets&#125;,
+ * as an application might choose to parse its multipart requests itself. To define
+ * an implementation, create a bean with the id "multipartResolver" in a
+ * &#123;@link org.springframework.web.servlet.DispatcherServlet DispatcherServlet's&#125;
+ * application context. Such a resolver gets applied to all requests handled
+ * by that &#123;@link org.springframework.web.servlet.DispatcherServlet&#125;.
+ *
+ * &lt;p>If a &#123;@link org.springframework.web.servlet.DispatcherServlet&#125; detects a
+ * multipart request, it will resolve it via the configured &#123;@link MultipartResolver&#125;
+ * and pass on a wrapped &#123;@link javax.servlet.http.HttpServletRequest&#125;. Controllers
+ * can then cast their given request to the &#123;@link MultipartHttpServletRequest&#125;
+ * interface, which allows for access to any &#123;@link MultipartFile MultipartFiles&#125;.
+ * Note that this cast is only supported in case of an actual multipart request.
+ *
+ * &lt;pre class="code">
+ * public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) &#123;
+ *   MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
+ *   MultipartFile multipartFile = multipartRequest.getFile("image");
+ *   ...
+ * &#125;&lt;/pre>
+ *
+ * Instead of direct access, command or form controllers can register a
+ * &#123;@link org.springframework.web.multipart.support.ByteArrayMultipartFileEditor&#125;
+ * or &#123;@link org.springframework.web.multipart.support.StringMultipartFileEditor&#125;
+ * with their data binder, to automatically apply multipart content to form
+ * bean properties.
+ *
+ * &lt;p>As an alternative to using a &#123;@link MultipartResolver&#125; with a
+ * &#123;@link org.springframework.web.servlet.DispatcherServlet&#125;,
+ * a &#123;@link org.springframework.web.multipart.support.MultipartFilter&#125; can be
+ * registered in &#123;@code web.xml&#125;. It will delegate to a corresponding
+ * &#123;@link MultipartResolver&#125; bean in the root application context. This is mainly
+ * intended for applications that do not use Spring's own web MVC framework.
+ *
+ * &lt;p>Note: There is hardly ever a need to access the &#123;@link MultipartResolver&#125;
+ * itself from application code. It will simply do its work behind the scenes,
+ * making &#123;@link MultipartHttpServletRequest MultipartHttpServletRequests&#125;
+ * available to controllers.
+ *
+ * @see MultipartHttpServletRequest
+ * @see MultipartFile
+ * @see org.springframework.web.multipart.commons.CommonsMultipartResolver
+ * @see org.springframework.web.multipart.support.ByteArrayMultipartFileEditor
+ * @see org.springframework.web.multipart.support.StringMultipartFileEditor
+ * @see org.springframework.web.servlet.DispatcherServlet
+ */</span>
+<span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">MultipartResolver</span> <span class="token punctuation">&#123;</span>
+
+   <span class="token comment">// 判断是否为上传请求</span>
+   <span class="token keyword">boolean</span> <span class="token function">isMultipart</span><span class="token punctuation">(</span><span class="token class-name">HttpServletRequest</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+   <span class="token comment">// 将 request 包装为 MultipartHttpServletRequest</span>
+   <span class="token class-name">MultipartHttpServletRequest</span> <span class="token function">resolveMultipart</span><span class="token punctuation">(</span><span class="token class-name">HttpServletRequest</span> request<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">MultipartException</span><span class="token punctuation">;</span>
+   <span class="token comment">// 清理上传过程中产生的临时资源</span>
+   <span class="token keyword">void</span> <span class="token function">cleanupMultipart</span><span class="token punctuation">(</span><span class="token class-name">MultipartHttpServletRequest</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+              <a href="/tags/SpringMVC/" rel="tag"># SpringMVC</a>
+              <a href="/tags/Servlet/" rel="tag"># Servlet</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/08/30/Spring-ApplicationContext%E5%B1%82%E6%AC%A1%E5%8F%8A%E8%81%8C%E8%B4%A3%E8%A7%A3%E6%9E%90/" rel="prev" title="SpringBoot ApplicationContext 层次及职责解析">
+      <i class="fa fa-chevron-left"></i> SpringBoot ApplicationContext 层次及职责解析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/" rel="next" title="架构设计 秒杀系统设计方案">
+      架构设计 秒杀系统设计方案 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#servlet-api-%E6%8E%A5%E5%8F%A3%E8%A7%84%E8%8C%83"><span class="nav-number">1.</span> <span class="nav-text">servlet-api 接口规范</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Servlet-%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.1.</span> <span class="nav-text">Servlet 接口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A5%E5%8F%A3%E5%AE%9A%E4%B9%89"><span class="nav-number">1.1.1.</span> <span class="nav-text">接口定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E-web-xml-%E9%85%8D%E7%BD%AE%E5%85%B3%E8%81%94"><span class="nav-number">1.1.2.</span> <span class="nav-text">与 web.xml 配置关联</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GenericServlet-%E6%8A%BD%E8%B1%A1%E7%B1%BB"><span class="nav-number">1.2.</span> <span class="nav-text">GenericServlet 抽象类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HttpServlet-%E5%AE%9E%E7%8E%B0%E7%B1%BB"><span class="nav-number">1.3.</span> <span class="nav-text">HttpServlet 实现类</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringMVC-%E5%88%9B%E5%BB%BA%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">SpringMVC 创建过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#HttpServletBean"><span class="nav-number">2.1.</span> <span class="nav-text">HttpServletBean</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FrameworkServlet"><span class="nav-number">2.2.</span> <span class="nav-text">FrameworkServlet</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DispatcherServlet"><span class="nav-number">2.3.</span> <span class="nav-text">DispatcherServlet</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#XML-%E9%85%8D%E7%BD%AE%E8%A7%A3%E6%9E%90%E5%8E%9F%E7%90%86"><span class="nav-number">2.4.</span> <span class="nav-text">XML 配置解析原理</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#SpringMVC-%E5%A4%84%E7%90%86%E8%AF%B7%E6%B1%82"><span class="nav-number">3.</span> <span class="nav-text">SpringMVC 处理请求</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#HttpServletBean-1"><span class="nav-number">3.1.</span> <span class="nav-text">HttpServletBean</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#FrameworkServlet-1"><span class="nav-number">3.2.</span> <span class="nav-text">FrameworkServlet</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DispatcherServlet-1"><span class="nav-number">3.3.</span> <span class="nav-text">DispatcherServlet</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%84%E7%90%86%E8%AF%B7%E6%B1%82"><span class="nav-number">3.3.1.</span> <span class="nav-text">处理请求</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B8%B2%E6%9F%93%E9%A1%B5%E9%9D%A2"><span class="nav-number">3.3.2.</span> <span class="nav-text">渲染页面</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%94%AF%E6%8C%81%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0"><span class="nav-number">3.3.3.</span> <span class="nav-text">支持文件上传</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

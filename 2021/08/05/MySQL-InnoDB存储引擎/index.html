@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="InnoDB，是 MySQL 的数据库引擎之一，现为 MySQL 的默认存储引擎，为 MySQL AB 发布 binary 的标准之一。与传统的 ISAM 与 MyISAM 相比，InnoDB 的最大特色就是支持了 ACID 兼容的事务（Transaction）功能，类似于 PostgreSQL。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL InnoDB存储引擎">
+<meta property="og:url" content="http://example.com/2021/08/05/MySQL-InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="InnoDB，是 MySQL 的数据库引擎之一，现为 MySQL 的默认存储引擎，为 MySQL AB 发布 binary 的标准之一。与传统的 ISAM 与 MyISAM 相比，InnoDB 的最大特色就是支持了 ACID 兼容的事务（Transaction）功能，类似于 PostgreSQL。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/MySQL/MySQL%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E4%BD%93%E7%B3%BB%E6%9E%B6%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E5%86%85%E5%AD%98%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1.png">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E5%8F%8C%E5%86%99%E6%9E%B6%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/MySQL/doublewrite%E8%BF%90%E8%A1%8C%E6%83%85%E5%86%B5.png">
+<meta property="article:published_time" content="2021-08-05T03:14:25.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.561Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="InnoDB">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/MySQL/MySQL%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84.png">
+
+<link rel="canonical" href="http://example.com/2021/08/05/MySQL-InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>MySQL InnoDB存储引擎 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/08/05/MySQL-InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL InnoDB存储引擎
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-08-05 11:14:25" itemprop="dateCreated datePublished" datetime="2021-08-05T11:14:25+08:00">2021-08-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index"><span itemprop="name">MySQL</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>InnoDB，是 MySQL 的数据库引擎之一，现为 MySQL 的默认存储引擎，为 MySQL AB 发布 binary 的标准之一。与传统的 ISAM 与 MyISAM 相比，InnoDB 的最大特色就是支持了 ACID 兼容的事务（Transaction）功能，类似于 PostgreSQL。</p>
+<span id="more"></span>
+
+<p><img src="/images/MySQL/MySQL%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84.png"></p>
+<p>当客户端向服务器端发起请求的时候，它首先会到连接池（Connection Pool）中获取一个连接，在连接池中会对连接进行校验、获取连接最大数以及缓存等操作。连接建立成功之后，进入核心服务层，其中包括：</p>
+<ol>
+<li><p>Management Service &amp; Utilities：管理服务及工具，这个模块主要可以完成数据的备份和恢复、集群、安全及系统配置相关。</p>
+</li>
+<li><p>SQL Interface：SQL 接口，在这个模块中支持执行我们封装的 DML，DDL 语句、存储过程，存储函数、视图、触发器等。</p>
+</li>
+<li><p>Parser：SQL 解析器，它用来解析将要被执行 SQL 语句。</p>
+</li>
+<li><p>Optimizer：优化器，在 SQL 语句解析完成后，MySQL 内部会对 SQL 语句进行优化处理。</p>
+</li>
+<li><p>Cache &amp; Buffers：缓存层，SQL 语句优化完成后，如果是 select 语句的话可能还会来到这里进行缓存查询，如果有缓存记录的话就直接返回数据。</p>
+<blockquote>
+<p>  需要注意的是，两个查询请求如果有任何字符上的不同，都会导致缓存不命中。且当对使用 INSERT、UPDATE、DELETE、TRUNCATE TABLE、ALTER TABLE、DROP TABLE 或 DROP DATABASE，则将所有相关表缓存删除。</p>
+<p>  MYSQL 8.0 删除了查询缓存的功能。</p>
+</blockquote>
+</li>
+</ol>
+<p>核心服务层中的操作完成后，继续往下走，来到插件式存储引擎层（Pluggable Storage Rngines），我们可以根据我们的需要去选择对应的存储引擎作为 MySQL 数据的启动器，最终将操作落到存储层，即文件系统（File System），在文件系统中处理存储的表结构和数据之外，还存储了索引、二进制日志、错误日志、查询日志、慢查询日志等。</p>
+<p>下表为 MYSQL 支持的存储引擎：</p>
+<table>
+<thead>
+<tr>
+<th>存储引擎</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Archive</td>
+<td>用于数据存档（记录插入后不再修改）</td>
+</tr>
+<tr>
+<td>BlackHole</td>
+<td>丢弃写操作，读操作会返回空内容</td>
+</tr>
+<tr>
+<td>CSV</td>
+<td>以逗号分隔数据项的存储形式</td>
+</tr>
+<tr>
+<td>Federated</td>
+<td>访问远程表</td>
+</tr>
+<tr>
+<td>InnoDB</td>
+<td>支持事务、行级锁、外键</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>数据只存储在内存，多用于临时表</td>
+</tr>
+<tr>
+<td>MERGE</td>
+<td>用来管理多个 MyISAM 表构成的表集合</td>
+</tr>
+<tr>
+<td>MyISAM</td>
+<td>主要的非事务处理存储引擎</td>
+</tr>
+<tr>
+<td>NDB</td>
+<td>MySQL集群专用存储引擎</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>  也可以通过 SHOW ENGINES 命令查看当前支持的引擎，其中 Transaction 代表是否支持事务，XA 代表存储引擎是否支持分布式事务，Savepoints 代表是否支持事务的部分回滚。</p>
+</blockquote>
+<h1 id="InnoDB体系架构"><a href="#InnoDB体系架构" class="headerlink" title="InnoDB体系架构"></a>InnoDB体系架构</h1><p>InnoDB 体系架构由以下部分组成：</p>
+<ul>
+<li>后台线程</li>
+<li>内存</li>
+<li>文件</li>
+</ul>
+<p><img src="/images/MySQL/InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E4%BD%93%E7%B3%BB%E6%9E%B6%E6%9E%84.png"></p>
+<h2 id="后台线程"><a href="#后台线程" class="headerlink" title="后台线程"></a>后台线程</h2><p>InnoDB 存储引擎是多线程的模型，因此其后台有多个不同的线程，负责处理不同的任务：</p>
+<ol>
+<li><p>Master Thread<br> 一个核心的后台线程，主要负责将缓冲池中的数据异步刷新到磁盘，保证数据的一致性，包括脏页的刷新、合并插入缓冲、Undo 页的回收等。</p>
+</li>
+<li><p>IO Thread<br> InnoDB 存储引擎大量使用了 AIO（Async IO）来处理写 IO 请求，这样极大地提高了数据库的性能。IO Thread 的工作主要是负责这些 IO 请求的回调处理。InnoDB 1.0 版本之前共有 4 个 IO Thread，分别是：write、read、insert buffer 和 log IO Thread。</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text"># show engine innodb status //查看 IO 线程
+--------
+FILE I/O
+--------
+I/O thread 0 state: waiting for i/o request (insert buffer thread)
+I/O thread 1 state: waiting for i/o request (log thread)
+I/O thread 2 state: waiting for i/o request (read thread)
+I/O thread 3 state: waiting for i/o request (read thread)
+I/O thread 4 state: waiting for i/o request (read thread)
+I/O thread 5 state: waiting for i/o request (read thread)
+I/O thread 6 state: waiting for i/o request (write thread)
+I/O thread 7 state: waiting for i/o request (write thread)
+I/O thread 8 state: waiting for i/o request (write thread)
+I/O thread 9 state: waiting for i/o request (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:, log i/o's:, sync i/o's:
+Pending flushes (fsync) log: 0; buffer pool: 0
+7293016 OS file reads, 340479715 OS file writes, 275711769 OS fsyncs
+0.00 reads/s, 0 avg bytes/read, 1.96 writes/s, 1.96 fsyncs/s<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</li>
+<li><p>Purge Thread<br>事务被提交后，其所使用的 Undo Log 可能不再需要，因此需要 Purge Thread 来回收已经使用并分配的 Undo 页。InnoDB 1.1 版本之后，purge 操作从 Master Thread 中独立出来，以此提高 CPU 使用率以及提升存储引擎的性能。由于 purge 属于离散操作，可以通过启用多个 Purge Thread 充分利用磁盘的随机读取性能。</p>
+</li>
+<li><p>Page Cleaner Thread<br>Page Cleaner Thread 是在 InnoDB 1.2.x 版本中引入的。其作用是将之前版本中脏页的刷新操作都放入到单独的线程中来完成。目的是为了减轻原 Master Thread 的工作及对于用户查询线程的阻塞，进一步提高 InnoDB 存储引擎的性能。</p>
+</li>
+</ol>
+<h2 id="内存"><a href="#内存" class="headerlink" title="内存"></a>内存</h2><h3 id="使用方式"><a href="#使用方式" class="headerlink" title="使用方式"></a>使用方式</h3><p>InnoDB 存储引擎的基于磁盘存储的，并将其中的记录按照页的方式进行管理。由于 CPU 速度与磁盘速度之间的鸿沟，基于磁盘的数据库系统通常使用缓冲池技术来提高数据库的整体性能。</p>
+<p>缓冲池是通过内存的速度来弥补磁盘速度对数据库性能影响的方式。</p>
+<p>对于<strong>读取页</strong>操作，首先将从磁盘读到的页存放在缓冲池中，这个过程称为“FIX”在缓冲池中。下一次再读相同的页时，首先判断该页是否在缓冲池中。若在缓冲池中，称该页在缓冲池中被命中，直接读取该页。否则，读取磁盘上的页。</p>
+<p>对于<strong>页修改</strong>操作，首先修改在缓冲池中的页，然后再以一定的频率刷新到磁盘上。这里需要注意的是，页从缓冲池刷新回磁盘并不是在每次页发生更改时触发，而是通过一种叫 Checkpoint 的机制刷新回磁盘。这样最也是为了提高数据库的整体性能。</p>
+<p>具体来看，缓冲池中缓存的数据页类型有：索引页、数据页，undo 页、插入缓冲、自适应哈希索引、InnoDB 存储的锁信息、数据字典信息等。以下是 InnoDB 存储引擎中内存的结构情况：</p>
+<p><img src="/images/MySQL/InnoDB%E5%86%85%E5%AD%98%E6%95%B0%E6%8D%AE%E5%AF%B9%E8%B1%A1.png"></p>
+<p>InnoDB 支持多个缓冲池实例共存。每个页根据哈希值平均到不同缓冲池实例中。这样就减少了数据库内部的资源竞争，增加数据库的并发处理能力。</p>
+<h3 id="管理方式"><a href="#管理方式" class="headerlink" title="管理方式"></a>管理方式</h3><p>通常来说，数据库中的缓冲池是通过 LRU（Latest Recent Used，最近最少使用）算法来进行管理。访问最频繁的页在 LRU 列表的前端，而最少使用的页在 LRU 列表的尾端。缓冲池满时，首先释放尾端页。</p>
+<p>InnoDB 存储引擎中，用<strong>优化过的 LRU 算法</strong>对缓冲池进行管理。LRU列表中加入了 midpoint 位置，新读取到的页，虽然是新页，但并不直接放入到 LRU 列表的首部，而是放入到 LRU 列表的 midpoint 位置。（这个算法在 InnoDB 存储引擎中称为 midpoint insertion strategy）。默认配置下，该位置在 LRU 列表的 37%（innodb_old_blocks_pct&#x3D;37）处，可由参数 innodb_old_blocks_pct 控制。midpoint 之后的列表称为 old 列表，之前的列表称为 new 列表。可以简单地理解为 new 列表中的页都是最为活跃的热点数据。</p>
+<p>那为什么不采用朴素的 LRU 算法，直接将读取的页放人到 LRU 列表的首部呢？这是因为若直接将读取到的页放人到 LRU 的首部，那么某些 SQL 操作可能会使缓冲池中的页被刷新出，从而影响缓冲池的效率。常见的这类操作为索引或数据的扫描操作。这类操作需要访问表中的许多页，甚至是全部的页，而这些页通常来说又仅在这次查询操作中需要，并不是活跃的热点数据。如果页被放人 LRU 列表的首部，那么非常可能将所需要的热点数据页从 LRU 列表中移除，而在下一次需要读取该页时，InnoDB 存储引擎需要再次访问磁盘。也正因为这个原因，才选取了 midpoint insertion strategy 尽可能使 LRU 列表中热点数据不被刷出。</p>
+<p>LRU 列表用来管理已经读取的页，但当数据库刚启动时，LRU 列表是空的，即没有任何的页。这时页都存放在 Free 列表中。当需要从缓冲池中分页时，首先从 Free 列表中查找是否有可用的空闲页，若有则将该页从 Free 列表中删除，放人到 LRU 列表中。否则，根据 LRU 算法，淘汰 LRU 列表末尾的页，将该内存空间分配给新的页。当页从 LRU 列表的 old 部分加入到 new 部分时，称此时发生的操作为 page made young。而因为 <code>innodb_old_blocks_time</code> 的设置而导致页没有从 old 部分移动到 new 部分的操作称为 page not made young。</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text"># show engine innodb status //查看 LRU 列表及 Free 列表的使用情况和运行状态。
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 13193183232
+Dictionary memory allocated 8496582
+Buffer pool size   786432 # 一页16K，786432*16K=12G，可得缓冲池12G
+Free buffers       1024 # 当前 Free 列表中页的数量
+Database pages     727954 # 当前 LRU 列表中页的数量
+Old database pages 268697
+Modified db pages  45383
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 105130599, not young 650706948 # LRU 管理页的次数
+0.02 youngs/s, 0.00 non-youngs/s # 每秒执行操作的次数
+Pages read 7247178, created 15560628, written 83316080
+0.00 reads/s, 0.00 creates/s, 0.00 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000 # 缓冲池命中率 Buffer pool hit rate，如小于可能与全表扫描引起的 LRU 列表被污染有关
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 727954, unzip_LRU len: 0
+I/O sum[0]:cur[0], unzip sum[0]:cur[0]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>有时，Free buffers 与 Database pages 的数量之和不等于 Buffer pool size。因为缓冲池中的页还可能会被分配给自适应哈希索引、Lock 信息、Insert Buffer 等页，而这部分不需要 LRU 算法进行维护，因此不存在于 LRU 列表中。</p>
+<p>InnoDB 存储引擎从 1.0.x 版本开始支持压缩页的功能，即将原本 16KB 的页压缩为 1KB、2KB、4KB 和 8KB。而由于页的大小发生了变化，LRU 列表也有了些许的改变。对于非 16KB 的页，是通过 unzip_LRU 列表进行管理的。</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">LRU len: 727954, unzip_LRU len: 0 # LRU 包含了 unzip_LRU<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>对于压缩页的表，每个表的压缩比率可能各不相同。可能存在有的表页大小为 8KB，有的表页大小为 2KB 的情况。unzip_LRU 是怎样从缓冲池中分配内存的呢?</p>
+<p>首先，在 unzip_LRU 列表中对不同压缩页大小的页进行分别管理。其次，通过伙伴算法进行内存的分配。例如对需要从缓冲池中申请页为 4KB 的大小，其过程如下:</p>
+<ol>
+<li>检查 4KB 的 unzip_LRU 列表，检查是否有可用的空闲页</li>
+<li>若有，则直接使用</li>
+<li>否则，检查 8KB 的 unzip_LRU 列表</li>
+<li>若能够得到空闲页，将页分成 2 个 4KB 页，存放到 4KB 的 unzip_LRU 列表</li>
+<li>若不能得到空闲页，从 LRU 列表中申请一个 16KB 的页，将页分为 1 个 8KB 的页、2个 4KB 的页，分别存放到对应的 unzip_LRU 列表中。</li>
+</ol>
+<p>在 LRU 列表中的页被修改后，称该页为脏页（dirty page），即缓冲池中的页和磁盘上的页的数据产生了不一致，在 Engine Status 中的 Modified db pages 字段中记录了其数量。这时数据库会通过 CHECKPOINT 机制将脏页刷新回磁盘，而 Flush 列表中的页即为脏页列表。需要注意的是，脏页既存在于 LRU 列表中，也存在于 Flush 列表中。LRU 列表用来管理缓冲池中页的可用性，Flush 列表用来管理将页刷新回磁盘，二者互不影响。</p>
+<h3 id="redo-log-buffer"><a href="#redo-log-buffer" class="headerlink" title="redo log buffer"></a>redo log buffer</h3><p>InnoDB 存储引擎的内存区域除了有缓冲池外，还有重做日志缓冲（redo log buffer）。InnoDB 存储引擎首先将重做日志信息先放人到这个缓冲区，然后按一定频率将其刷新到重做日志文件。重做日志缓冲一般不需要设置得很大，因为一般情况下每一秒钟会将重做日志缓冲刷新到日志文件，因此用户只需要保证每秒产生的事务量在这个缓冲大小之内即可。该值可由配置参数 innodb_log_buffer_size 控制，默认为 8MB。</p>
+<p>在通常情况下，8MB 的重做日志缓冲池足以满足绝大部分的应用，因为重做日志在下列三种情况下会将重做日志缓冲中的内容刷新到外部磁盘的重做日志文件中。</p>
+<ul>
+<li>Master Thread 每一秒将 redo log buffer 缓冲刷新到 redo log file</li>
+<li>每个事务提交时会将 redo log buffer 刷新到 redo log file</li>
+<li>当 redo log buffer 剩余空间小于1&#x2F;2时， redo log buffer 刷新到 redo log file</li>
+</ul>
+<h3 id="额外的内存池"><a href="#额外的内存池" class="headerlink" title="额外的内存池"></a>额外的内存池</h3><p>在 InnoDB 存储引擎中，对内存的管理是通过一种称为内存堆（heap）的方式进行的。在对一些数据结构本身的内存进行分配时，需要从额外的内存池中进行申请，当该区域的内存不够时，会从缓冲池中进行申请。例如，分配了缓冲池（innodb_buffer_pool），但是每个缓冲池中的帧缓冲（frame buffer）还有对应的缓冲控制对象（buffer control block），这些对象记录了一些诸如 LRU、锁、等待等信息，而这个对象的内存需要从额外内存池中申请。因此，在申请了很大的 InnoDB 缓冲池时，也应考虑相应增加这个值。</p>
+<h1 id="CheckPoint-技术"><a href="#CheckPoint-技术" class="headerlink" title="CheckPoint 技术"></a>CheckPoint 技术</h1><p>缓冲池的设计目的为了协调 CPU 速度与磁盘速度的鸿沟。因此页的操作首先都是在缓冲池中完成的。如果一条 DML 语句，如 Update 或 Delete 改变了页中的记录，那么此时页是脏的，即缓冲池中的页的版本要比磁盘的新。数据库需要将新版本的页从缓冲池刷新到磁盘。</p>
+<p>倘若每次一个页发生变化，就将新页的版本刷新到磁盘，那么这个开销是非常大的。若热点数据集中在某几个页中，那么数据库的性能将变得非常差。同时，如果在从缓冲池将页的新版本刷新到磁盘时发生了宕机，那么数据就不能恢复了。为了避免发生数据丢失的问题，当前事务数据库系统普遍都采用了 Write Ahead Log 策略，即当事务提交时，先写重做日志，再修改页。当由于发生宕机而导致数据丢失时，通过重做日志来完成数据的恢复。这也是事务 ACID 中 D（Durability 持久性）的要求。</p>
+<p>思考下面的场景，如果重做日志可以无限地增大，同时缓冲池也足够大，能够缓冲所有数据库的数据，那么是不需要将缓冲池中页的新版本刷新回磁盘。因为当发生宕机时，完全可以通过重做日志来恢复整个数据库系统中的数据到宕机发生的时刻。但是这需要两个前提条件：</p>
+<ul>
+<li>缓冲池可以缓存数据库中所有的数据</li>
+<li>重做日志可以无限增大</li>
+</ul>
+<p>对于第一个前提条件，有经验的用户都知道，当数据库刚开始创建时，表中没有任何数据。缓冲池的确可以缓存所有的数据库文件。然而随着市场的推广，用户的增加，产品越来越受到关注，使用量也越来越大。这时负责后台存储的数据库的容量必定会不断增大。当前 3TB 的 MySQL 数据库已并不少见，但是 3TB 的内存却非常少见。目前 Oracle Exadata 旗舰数据库一体机也就只有 2TB 的内存。因此第一个假设对于生产环境应用中的数据库是很难得到保证的。</p>
+<p>再来看第二个前提条件：重做日志可以无限增大。也许是可以的，但是这对成本的要求太高，同时不便于运维。DBA 或 SA 不能知道什么时候重做日志是否已经接近于磁盘可使用空间的阈值，并且要让存储设备支持可动态扩展也是需要一定的技巧和设备支持的。</p>
+<p>好的，即使上述两个条件都满足，那么还有一个情况需要考虑：宕机后数据库的恢复时间。当数据库运行了几个月甚至几年时，这时发生宕机，重新应用重做日志的时间会非常久，此时恢复的代价也会非常大。</p>
+<p>因此 CheckPoint（检查点）技术的目的是解决以下几个问题：</p>
+<ul>
+<li>缩短数据库的恢复时间</li>
+<li>缓冲池不够用时，将脏页刷新到磁盘</li>
+<li>重做日志不可用时，刷新脏页</li>
+</ul>
+<p>当数据库发生宕机时，数据库不需要重做所有的日志，因为 Check Point 之前的页都已经刷新回磁盘。故数据库只需对Checkpoint后的重做日志进行恢复。这样就大大缩短了恢复的时间。</p>
+<p>此外，当缓冲池不够用时，根据 LRU 算法会溢出最近最少使用的页，若此页为脏页，那么需要强制执行Checkpoint，将脏页也就是页的新版本刷回磁盘。</p>
+<p>redo log 出现不可用的情况是因为当前事务数据库系统对重做日志的设计都是循环使用的，并不是让其无限增大的，这从成本及管理上都是比较困难的。redo log 可以被重用的部分是指这些 redo log 已经不再需要，即当数据库发生宕机时，数据库恢复操作不需要这部分的 redo log，因此这部分就可以被覆盖重用。若此时 redo log 还需要使用，那么必须强制产生 Checkpoint，将缓冲池中的页至少刷新到当前 redo log 的位置。</p>
+<p>对于 InnoDB 存储引擎而言，其是通过 LSN（Log Sequence Number）来标记版本的。而 LSN 是 8 字节的数字，其单位是字节。每个页有 LSN，重做日志中也有 LSN，Checkpoint 也有 LSN。 </p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">---
+LOG
+---
+Log sequence number 1288251954287
+Log flushed up to   1288251954287
+Pages flushed up to 1287969327171
+Last checkpoint at  1287969327171
+0 pending log flushes, 0 pending chkp writes
+255211998 log i/o's done, 1.96 log i/o's/second<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>在 InnoDB 存储引擎中，Checkpoint 发生的时间、条件及脏页的选择等都非常复杂。而 Checkpoint 所做的事情无外乎是将缓冲池中的脏页刷回到磁盘。不同之处在于每次刷新多少页到磁盘，每次从哪里取脏页，以及什么时间触发 Checkpoint。在 InnoDB 存储引擎内部，有两种 Checkpoint，分别为:</p>
+<ul>
+<li>Sharp Checkpoint</li>
+<li>Fuzzy Checkpoint</li>
+</ul>
+<p>Sharp Checkpoint 发生在数据库关闭时将所有的脏页都刷新回磁盘，这是默认的工作方式，即参数 <code>innodb_fast_shutdown=1</code>。但是若数据库在运行时也使用 Sharp Checkpoint，那么数据库的可用性就会受到很大的影响。故在 InnoDB 存储引擎内部使用 Fuzzy Checkpoint 进行页的刷新，即只刷新一部分脏页，而不是刷新所有的脏页回磁盘。</p>
+<p>这里笔者进行了概括，在 InnoDB 存储引擎中可能发生如下几种情况的 Fuzzy Checkpoint：</p>
+<ul>
+<li>Master Thread Checkpoint（Master 线程周期性将部分脏页刷入磁盘）</li>
+<li>FLUSH_LRU_LIST Checkpoint（保证 LRU 列表有可用的空闲页）</li>
+<li>Async&#x2F;Sync Flush Checkpoint</li>
+<li>Dirty Page too much Checkpoint（脏页太多时强制触发检查点清除缓存）</li>
+</ul>
+<h1 id="Master-Thread-工作方式"><a href="#Master-Thread-工作方式" class="headerlink" title="Master Thread 工作方式"></a>Master Thread 工作方式</h1><p>Master Thread 具有最高的线程优先级别。其内部由多个循环组成：主循环（loop）、后台循环（background loop）、刷新循环（flush loop）、暂停循环（suspend loop）。Master Thread 会根据数据库运行的状态进行切换。</p>
+<p><strong>Loop 循环</strong></p>
+<p>Loop 被称为主循环，因为大多数的操作是在这个循环中，其中有两大部分的操作——每秒钟的操作和每 10 秒的操作。但这个操作是不精确的，在负载很大的时候可能会有延迟（delay），只能说大概在这个频率下。</p>
+<p>每秒一次的操作包括：</p>
+<ul>
+<li>日志缓冲刷新到磁盘，即使这个事务还没有提交（总是），这个可以解释再大的事务 commit 的时间也是很短的。</li>
+<li>合并插人缓冲（可能）</li>
+<li>至多刷新 100 个 InnoDB 的缓冲池中的脏页到磁盘（可能）</li>
+<li>如果当前没有用户活动，则切换到 background loop（可能）</li>
+</ul>
+<p>每 10 秒一次的操作包括：</p>
+<ul>
+<li>刷新 100 个脏页到磁盘（可能的情况下）</li>
+<li>合并至多 5 个插入缓冲（总是）</li>
+<li>将日志缓冲刷新到磁盘（总是）</li>
+<li>删除无用的 Undo 页（总是）</li>
+<li>刷新 100 个或者 10 个脏页到磁盘（总是）</li>
+</ul>
+<p><strong>Background Loop</strong></p>
+<p>Background Loop 会有以下操作：</p>
+<ul>
+<li>删除无用的 Undo 页（总是）</li>
+<li>合并 20 个插人缓冲（总是）</li>
+<li>跳回到主循环（总是）</li>
+<li>不断刷新 100 个页直到符合条件（可能，跳转到 flush loop 中完成）。</li>
+</ul>
+<p>由于上述都是硬编码，SSD 的出现使得其成为限制 InnoDB 对磁盘 IO 的性能。因此 InnoDB Plugin 提供参数 innodb_io_capacity，用来表示磁盘 IO 吞吐量，默认值为 200。对于刷新到磁盘的数量，会按照百分比进行控制。规则如下：</p>
+<ul>
+<li>在合并插人缓冲时，合并插人缓冲的数量为 innodb_io_capacity 值的 5%</li>
+<li>在从缓冲区刷新脏页时，刷新脏页的数量为 innodb_io_capacity</li>
+</ul>
+<p>InnoDB 1.2.x 版本进一步优化了 Master Thread，srv_active 是之前每秒操作，srv_idle 是之前每十秒操作。同时对于刷新脏页的操作，从 Master Thread 分离到单独的 Page Cleaner Thread，减轻了 Master Thread 负担，提高了系统并发性。</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 507499 srv_active, 0 srv_shutdown, 121 srv_idle
+srv_master_thread log flush and writes: 507619<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h1 id="InnoDB-关键特性"><a href="#InnoDB-关键特性" class="headerlink" title="InnoDB 关键特性"></a>InnoDB 关键特性</h1><p>InnoDB 存储引擎的关键特性包括：</p>
+<ul>
+<li>插入缓存（Insert Buffer）</li>
+<li>两次写（Double Write）</li>
+<li>自适应哈希索引（Adaptive Hash Index）</li>
+<li>异步 IO（Async IO）</li>
+<li>刷新邻接页（Flush Neighbor Page）</li>
+</ul>
+<h2 id="Insert-amp-Delete-Buffer"><a href="#Insert-amp-Delete-Buffer" class="headerlink" title="Insert &amp; Delete Buffer"></a>Insert &amp; Delete Buffer</h2><p><strong>Insert Buffer</strong></p>
+<p>在 InnoDB 存储引擎中，主键是行唯一的标识符。通常应用程序中行记录的插入顺序是按照主键递增的顺序进行插入的。因此，插人聚集索引（Primary Key）一般是顺序的，不需要磁盘的随机读取。但是不可能每张表上只有一个聚集索引，更多情况下，一张表上有多个非聚集的辅助索引（secondary index）。</p>
+<p>InnoDB 存储引擎开创性地设计了 Insert Buffer，对于非聚集索引的插人或更新操作，不是每一次直接插人到索引页中，而是先判断插入的非聚集索引页是否在缓冲池中，若在，则直接插人；若不在，则先放人到一个 Insert Buffer 对象中，好似欺骗。数据库这个非聚集的索引已经插到叶子节点，而实际并没有，只是存放在另一个位置。然后再以一定的频率和情况进行 Insert Buffer 和辅助索引页子节点的 merge（合并）操作，这时通常能将多个插入合并到一个操作中（因为在一个索引页中），这就大大提高了对于非聚集索引插人的性能。</p>
+<p>然而 Insert Buffer 的使用需要同时满足以下两个条件：</p>
+<ul>
+<li>索引是辅助索引（secondary index）</li>
+<li>索引不是唯一的（unique）</li>
+</ul>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 8729, seg size 8731, 257245 merges
+merged operations:
+ insert 453416, delete mark 1360289, delete 10299
+discarded operations:
+ insert 0, delete mark 0, delete 0
+...<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>seg size 代表了当前 Insert Buffer 大小，free list len 代表空闲列表的长度，size 代表已经合并记录页的数量。</p>
+<p>Inserts 代表了插入的记录数；merged recs 代表了合并的插人记录数量；merges 代表合并的次数，也就是实际读取页的次数。merges:merged recs 大约为 1：3，代表了插人缓冲将对于非聚集索引页的离散 IO 逻辑请求大约降低了 2&#x2F;3。 </p>
+<p><strong>Delete Buffer &amp; Purge Buffer</strong></p>
+<p>对一条记录进行 UPDATE 操作可能会分为：</p>
+<ul>
+<li>将记录标记为已删除</li>
+<li>真正将记录删除</li>
+</ul>
+<p>Delete Buffer 对应 UPDATE 操作的第一个过程，Purge Buffer 对应 UPDATE 操作的第二个过程。</p>
+<p><strong>Insert Buffer 实现</strong></p>
+<p>Insert Buffer 是由一棵 B+ 树实现的，且全局只有唯一一颗 Insert Buffer B+ 树存放在共享表空间中。因此试图通过独立表空间 ibd 文件恢复表中数据时，往往会导致 CHECK TABLE 失败。这是因为表的辅助索引中的数据可能还在 Insert Buffer 中，也就是共享表空间中，所以通过 ibd 文件进行恢复后，还需要进行 REPAIR TABLE 操作来重建表上所有的辅助索引。</p>
+<p><strong>Merge Insert Buffer</strong></p>
+<p>我们需要知道，Insert Buffer 中的记录何时合并到真正的辅助索引。概括地说，Merge Insert Buffer 操作可能发生的几种情况：</p>
+<ul>
+<li>辅助索引页被读取到缓冲池时</li>
+<li>Insert Buffer Bitmap 页追踪到该辅助索引页已无可用空间时</li>
+<li>Master Thread</li>
+</ul>
+<p>第一种情况为当辅助索引页被读取到缓冲池中时，例如这在执行正常的 SELECT 查询操作，这时需要检查 Insert Buffer Bitmap 页，然后确认该辅助索引页是否有记录存放于 Insert Buffer B+ 树中。若有，则将 Insert Buffer B+ 树中该页的记录插人到该辅助索引页中。可以看到对该页多次的记录操作通过一次操作合并到了原有的辅助索引页中，因此性能会有大幅提高。</p>
+<p>Insert Buffer Bitmap 页用来追踪每个辅助索引页的可用空间，并至少有 1&#x2F;32 页的空间。若插人辅助索引记录时检测到插人记录后可用空间会小于 1&#x2F;32 页，则会强制进行一个合并操作，即强制读取辅助索引页，将 Insert Buffer B+ 树中该页的记录及待插入的记录插人到辅助索引页中。这就是上述所说的第二种情况。</p>
+<p>还有一种情况，之前在分析 Master Thread 时曾讲到，在 Master Thread 线程中每秒或每 10 秒会进行一次 Merge Insert Buffer 的操作，不同之处在于每次进行 merge 操作的页的数量不同。</p>
+<p>在 Master Thread 中，执行 merge 操作的不止是一个页，而是根据 srv_innodb_io_capacity 的百分比来决定真正要合并多少个辅助索引页。但 InnoDB 存储引擎又是根据怎样的算法来得知需要合并的辅助索引页呢？</p>
+<p>在 Insert Buffer B+ 树中，辅助索引页根据（space, offset）都已排序好，故可以根据（space, offset）的排序顺序进行页的选择。然而，对于 Insert Buffer 页的选择，InnoDB 存储引擎并非采用这个方式，它随机地选择 Insert Buffer B+ 树的一个页，读取该页中的 space 及之后所需要数量的页。该算法在复杂情况下应有更好的公平性。同时，若进行 merge 时，要进行 merge 的表已经被删除，此时可以直接丢弃已经被 Insert&#x2F;Change Buffer的数据记录。</p>
+<h2 id="两次写"><a href="#两次写" class="headerlink" title="两次写"></a>两次写</h2><p>如果说 Insert Buffer 带给 InnoDB 存储引擎的是性能上的提升，那么 double write （两次写）带给 InnoDB 存储引擎的是数据页的可靠性。</p>
+<p>当发生数据库宕机时，可能 InnoDB 存储引擎正在写入某个页到表中，而这个页只写了一部分，比如 16KB 的页，只写了前 4KB，之后就发生了宕机，这种情况被称为部分写失效（partial page write）。在 InnoDB 存储引擎未使用 double write 技术前，曾经出现过因为部分写失效而导致数据丢失的情况。</p>
+<p>有经验的 DBA 也许会想，如果发生写失效，可以通过重做日志进行恢复。这是一个办法。但是必须清楚地认识到，重做日志中记录的是对页的物理操作，如偏移量 800，写 ‘aaaa’ 记录。如果这个页本身已经发生了损坏，再对其进行重做是没有意义的。这就是说，在应用（apply）重做日志前，用户需要一个页的副本，当写入失效发生时，先通过页的副本来还原该页，再进行重做，这就是 double write。在 InnoDB 存储引擎中 double write 的体系架构如下图所示。</p>
+<p><img src="/images/MySQL/InnoDB%E5%8F%8C%E5%86%99%E6%9E%B6%E6%9E%84.png"></p>
+<p>double write 由两部分组成，一部分是内存中的 double write buffer，大小为 2MB，另一部分是物理磁盘上共享表空间中连续的 128 个页，即 2 个区（extent），大小同样为 2MB。在对缓冲池的脏页进行刷新时，并不直接写磁盘，而是会通过 memcpy 函数将脏页先复制到内存中的 double write buffer，之后通过 double write buffer 再分两次，每次 1MB 顺序地写人共享表空间的物理磁盘上，然后马上调用 fsync 函数同步磁盘，避免缓冲写带来的问题。在这个过程中，因为 double write 页是连续的，因此这个过程是顺序写的，开销并不是很大。在完成 double write 页的写入后，再将 double write buffer 中的页写入各个表空间文件中，此时的写入则是离散的。可以通过 <code>GLOBAL STATUS LIKE &#39;innodb_dblwr%&#39;</code> 命令观察到 double write 运行的情况。</p>
+<p><img src="/images/MySQL/doublewrite%E8%BF%90%E8%A1%8C%E6%83%85%E5%86%B5.png"></p>
+<p>可以看到，double write 一共写了 6325194 个页，但实际的写入次数为 100399，基本上符合 64: 1。如果发现系统在高峰时的 Innodb_dblwr_pages_written:Innodb_dblwr_writes 远小于 64: 1,那么可以说明系统写入压力并不是很高。</p>
+<p>如果操作系统在将页写入磁盘的过程中发生了崩溃，在恢复过程中，InnoDB 存储引擎可以从共享表空间中的 double write 中找到该页的一个副本，将其复制到表空间文件，再应用重做日志。下面显示了一个由 double write 进行恢复的情况：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">090924 11:36:32 mysqld restarted
+090924 11:36:33 InnoDB: Database was not shut down normally!
+InnoDB: Starting crash recovery.
+InnoDB: Reading tablespace information from the .ibd files. . .
+InnoDB: Crash recovery may have failed for some .ibd files!
+InnoDB: Restoring possible half-written data pages from the double write
+InnoDB: buffer...<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>若查看 MySQL 官方手册，会发现在命令 SHOW GLOBAL STATUS 中 Innodb_buffer_pool_pages_flushed 变量表示当前从缓冲池中刷新到磁盘页的数量。根据之前的介绍，用户应该了解到，在默认情况下所有页的刷新首先都需要放人到 double write 中，因此该变量应该和 Innodb_dblwr_pages_written 一致。然而在 MySQL 5.5.24 版本之前，Innodb_buffer_pool_pages_flushed 总是为 Innodb_dblwr_pages_written 的 2 倍，而此 Bug 直到 MySQL 5.5.24 才被修复。因此用户若需要统计数据库在生产环境中写入的量，最安全的方法还是根据 Innodb_dblwr_pages_written 来进行统计，这在所有版本的 MySQL 数据库中都是正确的。</p>
+<p>参数 skip_innodb_doublewrite 可以禁止使用 double write 功能，这时可能会发生前面提及的写失效问题。不过如果用户有多个从服务器（slave server），需要提供较快的性能（如在 slave server 上做的是 RAID0），也许启用这个参数是一个办法。不过对于需要提供数据高可靠性的主服务器（master server），任何时候用户都应确保开启 double write 功能。</p>
+<blockquote>
+<p>  注意：注意有些文件系统本身就提供了部分写失效的防范机制，如 ZFS 文件系统。在这种情况下，用户就不要启用 double write 了。</p>
+</blockquote>
+<h2 id="自适应哈希索引"><a href="#自适应哈希索引" class="headerlink" title="自适应哈希索引"></a>自适应哈希索引</h2><p>哈希（hash）是一种非常快的查找方法，在一般情况下这种查找的时间复杂度为O(1)，即一般仅需要一次查找就能定位数据。而 B+ 树的查找次数，取决于 B+ 树的高度，在生产环境中，B+ 树的高度一般为 3<del>4 层，故需要 3</del>4 次的查询。</p>
+<p>InnoDB 存储引擎会监控对表上各索引页的查询。如果观察到建立哈希索引可以带来速度提升，则建立哈希索引，称之为自适应哈希索引（Adaptive Hash Index，AHI）。</p>
+<p>AHI 是通过缓冲池的 B+ 树页构造而来，因此建立的速度很快，而且不需要对整张表构建哈希索引。InnoDB 存储引擎会自动根据访问的频率和模式来自动地为某些热点页建立哈希索引。</p>
+<p>AHI 有一个要求，即对这个页的连续访问模式必须是一样的。例如对于（a, b）这样的联合索引页，其访问模式可以是以下情况：</p>
+<ul>
+<li>WHERE a&#x3D;xxx</li>
+<li>WHERE a&#x3D;xxx and b&#x3D;xxx</li>
+</ul>
+<p>访问模式一样指的是查询的条件一样，若交替进行上述两种查询，那么 InnoDB 存储引擎不会对该页构造 AHI。此外 AHI 还有如下的要求：</p>
+<ul>
+<li>以该模式访问了100 次</li>
+<li>页通过该模式访问了N次，其中N&#x3D;页中记录*1&#x2F;16</li>
+</ul>
+<p>根据 InnoDB 存储引擎官方的文档显示，启用 AHI 后，读取和写入速度可以提高 2 倍，辅助索引的连接操作性能可以提高 5 倍。毫无疑问，AHI 是非常好的优化模式，其设计思想是数据库自优化的（self-tuning），即无需 DBA 对数据库进行人为调整。</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+...
+Hash table size 3187567, node heap has 192 buffer(s)
+Hash table size 3187567, node heap has 982 buffer(s)
+Hash table size 3187567, node heap has 4082 buffer(s)
+Hash table size 3187567, node heap has 44501 buffer(s)
+Hash table size 3187567, node heap has 2086 buffer(s)
+Hash table size 3187567, node heap has 2756 buffer(s)
+Hash table size 3187567, node heap has 2142 buffer(s)
+Hash table size 3187567, node heap has 713 buffer(s)
+11.27 hash searches/s, 7.09 non-hash searches/s<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>值得注意的是，哈希索引只能用来搜索等值的查询，如 <code>SELECT * FROM table WHERE index_col=&#39;xxx&#39;</code>。 而对于其他查找类型，如范围查找，是不能使用哈希索引的，因此这里出现了 non-hash searches&#x2F;s 的情况。</p>
+<p>由于 AHI 是由 InnoDB 存储引擎控制的，因此这里的信息只供用户参考。不过用户可以通过观察 SHOW ENGINE INNODB STATUS 的结果及参数 innodb_adaptive_hash_index 来考虑是禁用或启动此特性，默认 AHI 为开启。</p>
+<h2 id="异步IO"><a href="#异步IO" class="headerlink" title="异步IO"></a>异步IO</h2><p>为了提高磁盘操作性能，当前的数据库系统都采用异步IO (Asynchronous IO，AIO）的方式来处理磁盘操作。InnoDB 存储引擎亦是如此。</p>
+<p>与 AIO 对应的是 Sync IO，即每进行一次 IO 操作，需要等待此次操作结束才能继续接下来的操作。AIO 的另一个优势是可以进行 IO Merge 操作，也就是将多个 IO 合并为 1 个 IO，这样可以提高 IOPS 的性能。例如用户需要访问页的（space，page_no）为：<code>(8，6)、(8，7)，(8， 8)</code> 每个页的大小为 16KB，那么同步 IO 需要进行 3 次 IO 操作。而 AIO 会判断到这三个页是连续的（显然可以通过（space，page_no）得知）。因此 AIO 底层会发送一个 IO 请求，从（8，6）开始，读取 48KB 的页。</p>
+<p>参数 innodb_use_native_aio 用来控制是否启用 aio。用户可以通过开启和关闭 Native AIO 功能来比较 InnoDB 性能的提升。官方的测试显示，启用 Native AIO，恢复速度可以提高 75%。在 InnoDB 存储引擎中，read ahead 方式的读取都是通过 AIO 完成，脏页的刷新，即磁盘的写入操作则全部由 AIO 完成。</p>
+<h2 id="刷新邻接页"><a href="#刷新邻接页" class="headerlink" title="刷新邻接页"></a>刷新邻接页</h2><p>InnoDB 存储引擎还提供了 Flush Neighbor Page（刷新邻接页）的特性。其工作原理为：当刷新一个脏页时，InnoDB 存储引擎会检测该页所在区（extent）的所有页，如果是脏页，那么一起进行刷新。这样做的好处显而易见，通过 AIO 可以将多个 IO 写入操作合并为一个 IO 操作，故该工作机制在传统机械磁盘下有着显著的优势。但是需要考虑到下面两个问题：</p>
+<ul>
+<li>是不是可能将不怎么脏的页进行了写入，而该页之后又会很快变成脏页?</li>
+<li>固态硬盘有着较高的 IOPS，是否还需要这个特性?</li>
+</ul>
+<p>为此，InnoDB 存储引擎从 1.2.x 版本开始提供了参数 innodb_fush_neighbors，用来控制是否启用该特性。对于传统机械硬盘建议启用该特性，而对于固态硬盘有着超高 IOPS 性能的磁盘，则建议将该参数设置为 0，即关闭此特性。</p>
+<h1 id="启动、关闭与恢复"><a href="#启动、关闭与恢复" class="headerlink" title="启动、关闭与恢复"></a>启动、关闭与恢复</h1><p>InnoDB 是 MySQL 数据库的存储引擎之一，因此 InnoDB 存储引擎的启动和关闭，更准确的是指在 MySQL 实例的启动过程中对 InnoDB 存储引擎的处理过程。</p>
+<p>在关闭时，参数 innodb_fast_shutdown 影响着表的存储引擎为 InnoDB 的行为。该参数可取值为 0、1、2，默认值为 1。</p>
+<ul>
+<li>0 表示在 MySQL 数据库关闭时，InnoDB 需要完成所有的 full purge 和 merge insert buffer，并且将所有的脏页刷新回磁盘。这需要一些时间，有时甚至需要几个小时来完成。如果在进行 InnoDB 升级时，必须将这个参数调为 0，然后再关闭数据库。</li>
+<li>1 是参数 innodb_fast_shutdown 的默认值，表示不需要完成上述的 full purge 和 merge insert buffer 操作，但是在缓冲池中的一些数据脏页还是会刷新回磁盘。</li>
+<li>2 表示不完成 full purge 和 merge insert buffer 操作，也不将缓冲池中的数据脏页写回磁盘，而是将日志都写入日志文件。这样不会有任何事务的丢失，但是下次 MySQL 数据库启动时，会进行恢复操作（recovery）。</li>
+</ul>
+<p>当正常关闭 MySQL 数据库时，下次的启动应该会非常“正常”。但是如果没有正常地关闭数据库，如用 kill 命令关闭数据库，在 MySQL 数据库运行中重启了服务器，或者在关闭数据库时，将参数 innodb_fast_shutdown 设为了 2 时，下次 MySQL 数据库启动时都会对 InnoDB 存储引擎的表进行恢复操作。</p>
+<p>参数 innodb_force_recovery 影响了整个 InnoDB 存储引擎恢复的状况。该参数值默认为 0，代表当发生需要恢复时，进行所有的恢复操作，当不能进行有效恢复时，如数据页发生了 corruption，MySQL 数据库可能发生宕机（crash），并把错误写入错误日志中去。</p>
+<p>但是，在某些情况下，可能并不需要进行完整的恢复操作，因为用户自己知道怎么进行恢复。比如在对一个表进行 alter table 操作时发生意外了，数据库重启时会对 InnoDB 表进行回滚操作，对于一个大表来说这需要很长时间，可能是几个小时。这时用户可以自行进行恢复，如可以把表删除，从备份中重新导人数据到表，可能这些操作的速度要远远快于回滚操作。</p>
+<p>参数 innodb_force_recovery 还可以设置为 6 个非零值：1 ~ 6。大的数字表示包含了前面所有小数字表示的影响。具体情况如下：</p>
+<ul>
+<li>1（SRV_FORCE_IGNORE_CORRUPT）：忽略检查到的 corrupt 页。</li>
+<li>2（SRV_FORCE_NO_BACKGROUND）：阻止 Master Thread 线程的运行，如 Master Thread 线程需要进行 full purge 操作，而这会导致 crash。</li>
+<li>3（SRV_FORCE_NO_TRX_UNDO）：不进行事务的回滚操作。</li>
+<li>4（SRV_FORCE_NO_IBUF_MERGE）：不进行插入缓冲的合并操作。</li>
+<li>5（SRV_FORCE_NO_UNDO_LOG_SCAN）：不查看撤销日志（Undo Log），InnoDB 存储引擎会将未提交的事务视为已提交。</li>
+<li>6（SRV_FORCE_NO_LOG_REDO）：不进行前滚的操作。</li>
+</ul>
+<p>需要注意的是，在设置了参数 innodb_force_recovery 大于 0 后，用户可以对表进行 select、create 和 drop 操作，但 insert、update 和 delete 这类 DML 操作是不允许的。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/InnoDB/" rel="tag"># InnoDB</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/07/24/Docker-%E6%9C%8D%E5%8A%A1%E6%BC%94%E8%BF%9B%E5%8F%8A%E6%80%A7%E8%83%BD%E5%AF%B9%E6%AF%94/" rel="prev" title="Docker 服务演进及性能对比">
+      <i class="fa fa-chevron-left"></i> Docker 服务演进及性能对比
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2021/08/07/JDK-Thread-API/" rel="next" title="JDK Thread API">
+      JDK Thread API <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB%E4%BD%93%E7%B3%BB%E6%9E%B6%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">InnoDB体系架构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8E%E5%8F%B0%E7%BA%BF%E7%A8%8B"><span class="nav-number">1.1.</span> <span class="nav-text">后台线程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E5%AD%98"><span class="nav-number">1.2.</span> <span class="nav-text">内存</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E6%96%B9%E5%BC%8F"><span class="nav-number">1.2.1.</span> <span class="nav-text">使用方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AE%A1%E7%90%86%E6%96%B9%E5%BC%8F"><span class="nav-number">1.2.2.</span> <span class="nav-text">管理方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#redo-log-buffer"><span class="nav-number">1.2.3.</span> <span class="nav-text">redo log buffer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%9D%E5%A4%96%E7%9A%84%E5%86%85%E5%AD%98%E6%B1%A0"><span class="nav-number">1.2.4.</span> <span class="nav-text">额外的内存池</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#CheckPoint-%E6%8A%80%E6%9C%AF"><span class="nav-number">2.</span> <span class="nav-text">CheckPoint 技术</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Master-Thread-%E5%B7%A5%E4%BD%9C%E6%96%B9%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">Master Thread 工作方式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E5%85%B3%E9%94%AE%E7%89%B9%E6%80%A7"><span class="nav-number">4.</span> <span class="nav-text">InnoDB 关键特性</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Insert-amp-Delete-Buffer"><span class="nav-number">4.1.</span> <span class="nav-text">Insert &amp; Delete Buffer</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%A4%E6%AC%A1%E5%86%99"><span class="nav-number">4.2.</span> <span class="nav-text">两次写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%87%AA%E9%80%82%E5%BA%94%E5%93%88%E5%B8%8C%E7%B4%A2%E5%BC%95"><span class="nav-number">4.3.</span> <span class="nav-text">自适应哈希索引</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5IO"><span class="nav-number">4.4.</span> <span class="nav-text">异步IO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%B7%E6%96%B0%E9%82%BB%E6%8E%A5%E9%A1%B5"><span class="nav-number">4.5.</span> <span class="nav-text">刷新邻接页</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E3%80%81%E5%85%B3%E9%97%AD%E4%B8%8E%E6%81%A2%E5%A4%8D"><span class="nav-number">5.</span> <span class="nav-text">启动、关闭与恢复</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

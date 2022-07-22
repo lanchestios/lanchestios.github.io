@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文只讨论以太网的物理网卡，不涉及虚拟设备，并且以一个 UDP 包的接收过程作为示例。    本示例里列出的函数调用关系来自于 kernel 3.13.0">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux Network Package传输">
+<meta property="og:url" content="http://example.com/2022/01/13/Linux-Network-Package%E6%95%B0%E6%8D%AE%E5%8C%85/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文只讨论以太网的物理网卡，不涉及虚拟设备，并且以一个 UDP 包的接收过程作为示例。    本示例里列出的函数调用关系来自于 kernel 3.13.0">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Linux/Network接收数据包从网卡到内存.png">
+<meta property="og:image" content="http://example.com/images/Linux/Network%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE%E5%8C%85%E5%86%85%E6%A0%B8%E5%A4%84%E7%90%86.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkUDP层包处理.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkSocket%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8F%91%E9%80%81.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkUDP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkDevice%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png">
+<meta property="article:published_time" content="2022-01-13T03:18:20.000Z">
+<meta property="article:modified_time" content="2022-07-22T08:13:23.599Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Linux">
+<meta property="article:tag" content="Linux Network">
+<meta property="article:tag" content="Package">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Linux/Network接收数据包从网卡到内存.png">
+
+<link rel="canonical" href="http://example.com/2022/01/13/Linux-Network-Package%E6%95%B0%E6%8D%AE%E5%8C%85/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Linux Network Package传输 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/01/13/Linux-Network-Package%E6%95%B0%E6%8D%AE%E5%8C%85/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux Network Package传输
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2022-01-13 11:18:20" itemprop="dateCreated datePublished" datetime="2022-01-13T11:18:20+08:00">2022-01-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文只讨论以太网的物理网卡，不涉及虚拟设备，并且以一个 UDP 包的接收过程作为示例。</p>
+<blockquote>
+<p>  本示例里列出的函数调用关系来自于 kernel 3.13.0</p>
+</blockquote>
+<span id="more"></span>
+
+<h1 id="数据包的接收"><a href="#数据包的接收" class="headerlink" title="数据包的接收"></a>数据包的接收</h1><h2 id="网卡到内存"><a href="#网卡到内存" class="headerlink" title="网卡到内存"></a>网卡到内存</h2><p>网卡需要有驱动才能工作，驱动是加载到内核中的模块，负责衔接网卡和内核的网络模块，驱动在加载的时候将自己注册进网络模块，当相应的网卡收到数据包时，网络模块会调用相应的驱动程序处理数据。</p>
+<img src="/images/Linux/Network接收数据包从网卡到内存.png" style="zoom:80%;" />
+
+<ol>
+<li>数据包从外面的网络进入物理网卡。如果目的地址不是该网卡，且该网卡没有开启混杂模式，该包会被网卡丢弃。</li>
+<li>网卡将数据包通过 DMA 的方式写入到指定的内存地址，该地址由网卡驱动分配并初始化。</li>
+<li>网卡通过硬件中断（IRQ）通知 CPU，告诉它有数据来了。</li>
+<li>CPU 根据中断表，调用已经注册的中断函数，这个中断函数会调到驱动程序（NIC Driver）中相应的函数。</li>
+<li>驱动先禁用网卡的中断，表示驱动程序已经知道内存中有数据了，告诉网卡下次再收到数据包直接写内存就可以了，不要再通知 CPU 了，这样可以提高效率，避免 CPU 不停的被中断。</li>
+<li>启动软中断。这步结束后，硬件中断处理函数就结束返回了。由于硬中断处理程序执行的过程中不能被中断，所以如果它执行时间过长，会导致 CPU 没法响应其它硬件的中断，于是内核引入软中断，这样可以将硬中断处理函数中耗时的部分移到软中断处理函数里面来慢慢处理。</li>
+</ol>
+<h2 id="内核处理网络包"><a href="#内核处理网络包" class="headerlink" title="内核处理网络包"></a>内核处理网络包</h2><p>软中断会触发内核网络模块中的软中断处理函数，后续流程如下：</p>
+<p><img src="/images/Linux/Network%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE%E5%8C%85%E5%86%85%E6%A0%B8%E5%A4%84%E7%90%86.png"></p>
+<ol start="7">
+<li>内核中的 ksoftirqd 进程专门负责软中断的处理，当它收到软中断后，就会调用相应软中断所对应的处理函数，对于上面第 6 步中是网卡驱动模块抛出的软中断，ksoftirqd 会调用网络模块的 net_rx_action 函数。</li>
+<li>net_rx_action 调用网卡驱动里的 poll 函数来一个一个的处理数据包。</li>
+<li>在 poll 函数中，驱动会一个接一个的读取网卡写到内存中的数据包，内存中数据包的格式只有驱动知道。</li>
+<li>驱动程序将内存中的数据包转换成内核网络模块能识别的 skb 格式，然后调用 napi_gro_receive 函数。</li>
+<li>napi_gro_receive 会处理 GRO 相关的内容，也就是将可以合并的数据包进行合并，这样就只需要调用一次协议栈。然后判断是否开启了 RPS，如果开启了，将会调用 enqueue_to_backlog。</li>
+<li>在 enqueue_to_backlog 函数中，会将数据包放入 CPU 的 softnet_data 结构体的 input_pkt_queue 中，然后返回，如果 input_pkt_queue 满了的话，该数据包将会被丢弃，queue 的大小可以通过 net.core.netdev_max_backlog 来配置。</li>
+<li>CPU 会接着在自己的软中断上下文中处理自己 input_pkt_queue 里的网络数据（调用netif_receive_skb_core）</li>
+<li>如果没开启 RPS，napi_gro_receive 会直接调用 netif_receive_skb_core</li>
+<li>看是不是有 AF_PACKET 类型的 socket（也就是我们常说的原始套接字），如果有的话，拷贝一份数据给它。tcpdump 抓包就是抓的这里的包。</li>
+<li>调用协议栈相应的函数，将数据包交给协议栈处理。</li>
+<li>待内存中的所有数据包被处理完成后（即 poll 函数执行完成），启用网卡的硬中断，这样下次网卡再收到数据的时候就会通知 CPU</li>
+</ol>
+<blockquote>
+<p>  enqueue_to_backlog 函数也会被 netif_rx 函数调用，而 netif_rx 正是 lo 设备发送数据包时调用的函数。</p>
+</blockquote>
+<h2 id="协议栈"><a href="#协议栈" class="headerlink" title="协议栈"></a>协议栈</h2><h3 id="IP-层"><a href="#IP-层" class="headerlink" title="IP 层"></a>IP 层</h3><p>由于是 UDP 包，所以第一步会进入 IP 层，然后一级一级的函数往下调：</p>
+<p><img src="/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png"></p>
+<ul>
+<li><strong>ip_rcv：</strong> ip_rcv 函数是 IP 模块的入口函数，在该函数里面，第一件事就是将垃圾数据包（目的 mac 地址不是当前网卡，但由于网卡设置了混杂模式而被接收进来）直接丢掉，然后调用注册在 NF_INET_PRE_ROUTING 上的函数。</li>
+<li><strong>NF_INET_PRE_ROUTING：</strong> netfilter 放在协议栈中的钩子，可以通过 iptables 来注入一些数据包处理函数，用来修改或者丢弃数据包，如果数据包没被丢弃，将继续往下走。</li>
+<li><strong>routing：</strong> 进行路由，如果是目的 IP 不是本地IP，且没有开启 ip forward 功能，那么数据包将被丢弃，如果开启了 ip forward 功能，那将进入 ip_forward 函数</li>
+<li><strong>ip_forward：</strong> ip_forward 会先调用 netfilter 注册的 NF_INET_FORWARD 相关函数，如果数据包没有被丢弃，那么将继续往后调用 dst_output_sk 函数</li>
+<li><strong>dst_output_sk：</strong> 该函数会调用 IP 层的相应函数将该数据包发送出去，同下一篇要介绍的数据包发送流程的后半部分一样。</li>
+<li><strong>ip_local_deliver</strong>：如果上面 <strong>routing</strong> 的时候发现目的 IP 是本地 IP，那么将会调用该函数，在该函数中，会先调用 NF_INET_LOCAL_IN 相关的钩子程序，如果通过，数据包将会向下发送到 UDP 层</li>
+</ul>
+<h3 id="UDP层"><a href="#UDP层" class="headerlink" title="UDP层"></a>UDP层</h3><img src="/images/Linux/NetworkUDP层包处理.png" style="zoom:67%;" />
+
+<ul>
+<li>udp_rcv： udp_rcv 函数是 UDP 模块的入口函数，它里面会调用其它的函数，主要是做一些必要的检查，其中一个重要的调用是 __udp4_lib_lookup_skb，该函数会根据目的 IP 和端口找对应的 socket，如果没有找到相应的 socket，那么该数据包将会被丢弃，否则继续</li>
+<li>sock_queue_rcv_skb： 主要干了两件事，一是检查这个 socket 的 receive buffer 是不是满了，如果满了的话，丢弃该数据包，然后就是调用 sk_filter 看这个包是否是满足条件的包，如果当前 socket 上设置了 filter，且该包不满足条件的话，这个数据包也将被丢弃（在 Linux 里面，每个 socket 上都可以像 tcpdump 里面一样定义 filter，不满足条件的数据包将会被丢弃）</li>
+<li>__skb_queue_tail： 将数据包放入 socket 接收队列的末尾</li>
+<li>sk_data_ready： 通知 socket 数据包已经准备好</li>
+</ul>
+<blockquote>
+<p>  调用完 sk_data_ready 之后，一个数据包处理完成，等待应用层程序来读取，上面所有函数的执行过程都在软中断的上下文中。</p>
+</blockquote>
+<h2 id="socket"><a href="#socket" class="headerlink" title="socket"></a>socket</h2><p>应用层一般有两种方式接收数据，一种是 recvfrom 函数阻塞在那里等着数据来，这种情况下当 socket 收到通知后，recvfrom 就会被唤醒，然后读取接收队列的数据；另一种是通过 epoll 或者 select 监听相应的 socket，当收到通知后，再调用 recvfrom 函数去读取接收队列的数据。两种情况都能正常的接收到相应的数据包。</p>
+<h1 id="数据包的发送"><a href="#数据包的发送" class="headerlink" title="数据包的发送"></a>数据包的发送</h1><h2 id="socket-1"><a href="#socket-1" class="headerlink" title="socket"></a>socket</h2><p><img src="/images/Linux/NetworkSocket%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<ul>
+<li>socket(…)： 创建一个 socket 结构体，并初始化相应的操作函数，由于我们定义的是 UDP 的 socket，所以里面存放的都是跟 UDP 相关的函数</li>
+<li>sendto(sock, …)： 应用层的程序（Application）调用该函数开始发送数据包，该函数数会调用后面的 inet_sendmsg</li>
+<li>inet_sendmsg： 该函数主要是检查当前 socket 有没有绑定源端口，如果没有的话，调用 inet_autobind 分配一个，然后调用 UDP 层的函数</li>
+<li>inet_autobind： 该函数会调用 socket 上绑定的 get_port 函数获取一个可用的端口，由于该 socket 是 UDP 的 socket，所以 get_port 函数会调到 UDP 代码里面的相应函数。</li>
+</ul>
+<h2 id="协议栈-1"><a href="#协议栈-1" class="headerlink" title="协议栈"></a>协议栈</h2><h3 id="UDP层-1"><a href="#UDP层-1" class="headerlink" title="UDP层"></a>UDP层</h3><p><img src="/images/Linux/NetworkUDP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<ul>
+<li>udp_sendmsg： udp 模块发送数据包的入口，该函数较长，在该函数中会先调用 ip_route_output_flow 获取路由信息（主要包括源 IP 和网卡），然后调用 ip_make_skb 构造 skb 结构体，最后将网卡的信息和该 skb 关联。</li>
+<li>ip_route_output_flow： 该函数会根据路由表和目的 IP，找到这个数据包应该从哪个设备发送出去，如果该 socket 没有绑定源 IP，该函数还会根据路由表找到一个最合适的源 IP 给它。 如果该 socket 已经绑定了源 IP，但根据路由表，从这个源 IP 对应的网卡没法到达目的地址，则该包会被丢弃，于是数据发送失败，sendto 函数将返回错误。该函数最后会将找到的设备和源 IP 塞进 flowl4 结构体并返回给 udp_sendmsg</li>
+<li>ip_make_skb： 该函数的功能是构造 skb 包，构造好的 skb 包里面已经分配了 IP 包头，并且初始化了部分信息（IP 包头的源 IP 就在这里被设置进去），同时该函数会调用 ip_append_dat，如果需要分片的话，会在 ip_append_data 函数中进行分片，同时还会在该函数中检查 socket 的 send buffer 是否已经用光，如果被用光的话，返回 ENOBUFS</li>
+<li>udp_send_skb(skb, fl4) 主要是往 skb 里面填充 UDP 的包头，同时处理 checksum，然后调用 IP 层的相应函数。</li>
+</ul>
+<h3 id="IP层"><a href="#IP层" class="headerlink" title="IP层"></a>IP层</h3><p><img src="/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<ul>
+<li>ip_send_skb： IP 模块发送数据包的入口，该函数只是简单的调用一下后面的函数</li>
+<li>__ip_local_out_sk： 设置 IP 报文头的长度和 checksum，然后调用下面 netfilter 的钩子</li>
+<li>NF_INET_LOCAL_OUT： netfilter 的钩子，可以通过 iptables 来配置怎么处理该数据包，如果该数据包没被丢弃，则继续往下走</li>
+<li>dst_output_sk： 该函数根据 skb 里面的信息，调用相应的 output 函数，在我们 UDP IPv4 这种情况下，会调用ip_output</li>
+<li>ip_output： 将上面 udp_sendmsg 得到的网卡信息写入 skb，然后调用 NF_INET_POST_ROUTING 的钩子</li>
+<li>NF_INET_POST_ROUTING： 在这里，用户有可能配置了 SNAT，从而导致该 skb 的路由信息发生变化</li>
+<li>ip_finish_output： 这里会判断经过了上一步后，路由信息是否发生变化，如果发生变化的话，需要重新调用 dst_output_sk（重新调用这个函数时，可能就不会再走到 ip_output，而是走到被 netfilter 指定的 output 函数里，这里有可能是 xfrm4_transport_output），否则往下走</li>
+<li>ip_finish_output2： 根据目的IP到路由表里面找到下一跳（nexthop）的地址，然后调用 ipv4_neigh_lookup_noref 去 arp 表里面找下一跳的 neigh 信息，没找到的话会调用 neigh_create 构造一个空的 neigh 结构体</li>
+<li>dst_neigh_output： 在该函数中，如果上一步 ip_finish_output2 没得到 neigh 信息，那么将会走到函数 neigh_resolve_output 中，否则直接调用 neigh_hh_output，在该函数中，会将 neigh 信息里面的 mac 地址填到 skb 中，然后调用 dev_queue_xmit 发送数据包</li>
+<li>neigh_resolve_output： 该函数里面会发送 arp 请求，得到下一跳的 mac 地址，然后将 mac 地址填到 skb 中并调用 dev_queue_xmit</li>
+</ul>
+<h2 id="netdevice-子系统"><a href="#netdevice-子系统" class="headerlink" title="netdevice 子系统"></a>netdevice 子系统</h2><p><img src="/images/Linux/NetworkDevice%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png"></p>
+<ul>
+<li>dev_queue_xmit： netdevice 子系统的入口函数，在该函数中，会先获取设备对应的 qdisc，如果没有的话（如 loopback 或者 IP tunnels），就直接调用 dev_hard_start_xmit，否则数据包将经过 Traffic Control 模块进行处理</li>
+<li>Traffic Control： 这里主要是进行一些过滤和优先级处理，在这里，如果队列满了的话，数据包会被丢掉，这步完成后也会走到 dev_hard_start_xmit</li>
+<li>dev_hard_start_xmit： 该函数中，首先是拷贝一份 skb 给“packet taps”，tcpdump 就是从这里得到数据的，然后调用 ndo_start_xmit。如果 dev_hard_start_xmit 返回错误的话（大部分情况可能是 NETDEV_TX_BUSY），调用它的函数会把 skb 放到一个地方，然后抛出软中断 NET_TX_SOFTIRQ，交给软中断处理程序 net_tx_action 稍后重试（如果是 loopback 或者 IP tunnels 的话，失败后不会有重试的逻辑）</li>
+<li>ndo_start_xmit： 这是一个函数指针，会指向具体驱动发送数据的函数</li>
+</ul>
+<h2 id="Device-Driver"><a href="#Device-Driver" class="headerlink" title="Device Driver"></a>Device Driver</h2><p>ndo_start_xmit 会绑定到具体网卡驱动的相应函数，到这步之后，就归网卡驱动管了，不同的网卡驱动有不同的处理方式，这里不做详细介绍，其大概流程如下：</p>
+<ol>
+<li>将 skb 放入网卡自己的发送队列</li>
+<li>通知网卡发送数据包</li>
+<li>网卡发送完成后发送中断给 CPU</li>
+<li>收到中断后进行 skb 的清理工作</li>
+</ol>
+<p>在网卡驱动发送数据包过程中，会有一些地方需要和 netdevice 子系统打交道，比如网卡的队列满了，需要告诉上层不要再发了，等队列有空闲的时候，再通知上层接着发数据。</p>
+<h2 id="其它"><a href="#其它" class="headerlink" title="其它"></a>其它</h2><ul>
+<li>SO_SNDBUF: 从上面的流程中可以看出来，对于UDP来说，没有一个对应send buffer存在，SO_SNDBUF只是一个限制，当这个socket分配的skb占用的内存超过这个值的时候，会返回ENOBUFS，所以说只要不出现ENOBUFS错误，把这个值调大没有意义。从sendto函数的帮助文件里面看到这样一句话：(Normally, this does not occur in Linux. Packets are just silently dropped when a device queue overflows.)。这里的device queue应该指的是Traffic Control里面的queue，说明在linux里面，默认的SO_SNDBUF值已经够queue用了，疑问的地方是，queue的长度和个数是可以配置的，如果配置太大的话，按道理应该有可能会出现ENOBUFS的情况。</li>
+<li>txqueuelen: 很多地方都说这个是控制 qdisc 里 queue 的长度的，但貌似只是部分类型的 qdisc 用了该配置，如 linux 默认的 pfifo_fast。</li>
+<li>hardware RX: 一般网卡都有一个自己的 ring queue，这个 queue 的大小可以通过 ethtool 来配置，当驱动收到发送请求时，一般是放到这个 queue 里面，然后通知网卡发送数据，当这个 queue 满的时候，会给上层调用返回 NETDEV_TX_BUSY</li>
+<li>packet taps(AF_PACKET): 当第一次发送数据包和重试发送数据包时，都会经过这里，如果发生重试的情况的话，不确定 tcpdump 是否会抓到两次包，按道理应该不会，可能是我哪里没看懂</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux/" rel="tag"># Linux</a>
+              <a href="/tags/Linux-Network/" rel="tag"># Linux Network</a>
+              <a href="/tags/Package/" rel="tag"># Package</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/11/25/Linux%E5%91%BD%E4%BB%A4-ulimit-%E6%9F%A5%E7%9C%8B%E7%B3%BB%E7%BB%9F%E9%99%90%E5%88%B6/" rel="prev" title="Linux命令 ulimit 查看系统限制">
+      <i class="fa fa-chevron-left"></i> Linux命令 ulimit 查看系统限制
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2022/01/18/Linux-Network-Veth%E8%AE%BE%E5%A4%87%E5%AF%B9/" rel="next" title="Linux Network Veth Peer">
+      Linux Network Veth Peer <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%8C%85%E7%9A%84%E6%8E%A5%E6%94%B6"><span class="nav-number">1.</span> <span class="nav-text">数据包的接收</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BD%91%E5%8D%A1%E5%88%B0%E5%86%85%E5%AD%98"><span class="nav-number">1.1.</span> <span class="nav-text">网卡到内存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%86%85%E6%A0%B8%E5%A4%84%E7%90%86%E7%BD%91%E7%BB%9C%E5%8C%85"><span class="nav-number">1.2.</span> <span class="nav-text">内核处理网络包</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E6%A0%88"><span class="nav-number">1.3.</span> <span class="nav-text">协议栈</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IP-%E5%B1%82"><span class="nav-number">1.3.1.</span> <span class="nav-text">IP 层</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#UDP%E5%B1%82"><span class="nav-number">1.3.2.</span> <span class="nav-text">UDP层</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#socket"><span class="nav-number">1.4.</span> <span class="nav-text">socket</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%8C%85%E7%9A%84%E5%8F%91%E9%80%81"><span class="nav-number">2.</span> <span class="nav-text">数据包的发送</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#socket-1"><span class="nav-number">2.1.</span> <span class="nav-text">socket</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E6%A0%88-1"><span class="nav-number">2.2.</span> <span class="nav-text">协议栈</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#UDP%E5%B1%82-1"><span class="nav-number">2.2.1.</span> <span class="nav-text">UDP层</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IP%E5%B1%82"><span class="nav-number">2.2.2.</span> <span class="nav-text">IP层</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#netdevice-%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="nav-number">2.3.</span> <span class="nav-text">netdevice 子系统</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Device-Driver"><span class="nav-number">2.4.</span> <span class="nav-text">Device Driver</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E5%AE%83"><span class="nav-number">2.5.</span> <span class="nav-text">其它</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">134</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">266</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
