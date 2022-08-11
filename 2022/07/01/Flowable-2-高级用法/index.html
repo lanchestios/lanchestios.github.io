@@ -27,14 +27,20 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="Flowable 高级用法">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/Flowable/%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E8%BE%B9%E7%95%8C%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E5%AE%9A%E6%97%B6%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E5%AE%9A%E6%97%B6%E5%99%A8%E4%B8%AD%E9%97%B4%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E9%94%99%E8%AF%AF%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E8%BE%B9%E7%95%8C%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png">
+<meta property="og:image" content="http://example.com/images/Flowable/%E4%B8%AD%E6%96%AD%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png">
 <meta property="article:published_time" content="2022-07-01T10:00:11.000Z">
-<meta property="article:modified_time" content="2022-07-22T08:13:23.543Z">
+<meta property="article:modified_time" content="2022-08-11T04:26:04.367Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="Flowable">
 <meta property="article:tag" content="流程编排">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/Flowable/%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png">
+<meta name="twitter:image" content="http://example.com/images/Flowable/%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6.png">
 
 <link rel="canonical" href="http://example.com/2022/07/01/Flowable-2-%E9%AB%98%E7%BA%A7%E7%94%A8%E6%B3%95/">
 
@@ -228,7 +234,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-07-22 16:13:23" itemprop="dateModified" datetime="2022-07-22T16:13:23+08:00">2022-07-22</time>
+                <time title="Modified: 2022-08-11 12:26:04" itemprop="dateModified" datetime="2022-08-11T12:26:04+08:00">2022-08-11</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -254,11 +260,87 @@
         <p>Flowable 高级用法</p>
 <span id="more"></span>
 
+<h1 id="事件概览"><a href="#事件概览" class="headerlink" title="事件概览"></a>事件概览</h1><table>
+<thead>
+<tr>
+<th>类型\时机</th>
+<th>开始（捕获）</th>
+<th>中间</th>
+<th>边界（捕获）</th>
+<th>结束（抛出）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>信号</td>
+<td></td>
+<td>信号中间捕获事件（抛出）</td>
+<td>信号边界事件</td>
+<td></td>
+</tr>
+<tr>
+<td>消息</td>
+<td>消息开始事件</td>
+<td>消息中间捕获事件</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>定时器</td>
+<td>定时器开始事件</td>
+<td>定时器中间捕获事件</td>
+<td>定时器边界事件</td>
+<td></td>
+</tr>
+<tr>
+<td>错误</td>
+<td>错误开始事件</td>
+<td></td>
+<td>错误边界事件</td>
+<td>错误结束事件</td>
+</tr>
+<tr>
+<td>取消</td>
+<td></td>
+<td></td>
+<td>取消边界事件</td>
+<td>取消结束事件</td>
+</tr>
+<tr>
+<td>补偿</td>
+<td></td>
+<td>补偿中间抛出事件</td>
+<td>补偿边界事件</td>
+<td></td>
+</tr>
+<tr>
+<td>终止</td>
+<td></td>
+<td></td>
+<td></td>
+<td>终止结束事件</td>
+</tr>
+</tbody></table>
+<h2 id="事件"><a href="#事件" class="headerlink" title="事件"></a>事件</h2><p>事件用来表明流程的生命周期中发生了什么事。 事件总是画成一个圆圈。 在BPMN 2.0中， 事件有两大分类：捕获（catching） 或 触发（throwing） 事件。</p>
+<ul>
+<li>捕获（Catching）：当流程执行到事件， 它会等待被触发。 捕获事件与触发事件在显示方面是根据内部图表是否被填充来区分的（白色的）。</li>
+<li>触发（Throwing）：当流程执行到事件， 会触发一个事件。触发事件与捕获事件在显示方面是根据内部图表是否被填充来区分的（被填充为黑色）。</li>
+</ul>
+<h2 id="事件类型"><a href="#事件类型" class="headerlink" title="事件类型"></a>事件类型</h2><p>信号：以广播的方式在流程引擎范围内发送一个信号事件，所有接到信号的节点都需要执行。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup">就是说， 你可以在一个流程实例中抛出一个信号事件，其他不同流程定义的流程实例 都可以监听到这个事件。然而，有时只希望在同一个流程实例中响应这个信号事件。 比如一个场景是，流程实例中的同步机制，如果两个或更多活动是互斥的。如果想要限制信号事件的范围，可以使用信号事件定义的scope 属性 （不是BPMN2.0的标准属性） 
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>signal</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>alertSignal<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>alert<span class="token punctuation">"</span></span> <span class="token attr-name"><span class="token namespace">activiti:</span>scope"processInstance"</span><span class="token punctuation">/></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>消息：以点对点的方式发送一个消息事件，只有一个接收者接收到后，节点开始执行</p>
+<p>定时器：定时触发节点进行活动</p>
+<p>错误：收到一个Flowable定义的业务Error触发节点活动</p>
+<p>取消：取消一个事务子流程</p>
+<p>补偿：在任务出现异常后，捕获并进行后续的补偿操作。</p>
+<p>终止：抛出终止事件，如果有接收错误事件的触发器，则进入，没有则直接终止流程。</p>
 <h1 id="信号事件"><a href="#信号事件" class="headerlink" title="信号事件"></a>信号事件</h1><p>触发信号事件可通过以下方式</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">processEngine.getRuntimeService().signalEventReceived(&quot;SIGNAL_NAME&quot;);<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
 <p>在阻塞住流程执行时，相关信息会录入 ACT_RU_EVENT_SUBSCR 表，等待被唤醒。</p>
-<h2 id="开始信号事件"><a href="#开始信号事件" class="headerlink" title="开始信号事件"></a>开始信号事件</h2><p><strong>XML 配置</strong></p>
+<h2 id="开始信号事件"><a href="#开始信号事件" class="headerlink" title="开始信号事件"></a>开始信号事件</h2><p>开始信号事件会在接到对应的信号开启一个新的流程。</p>
+<p><strong>XML 配置</strong></p>
 <pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>definitions</span><span class="token punctuation">></span></span>
 
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>signal</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>StartEvent<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>START_EVENT<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span>
@@ -272,9 +354,8 @@
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>process</span><span class="token punctuation">></span></span>
 <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>definitions</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p><strong>作用</strong></p>
-<p>开始信号事件会在接到对应的信号开启一个新的流程。</p>
-<h2 id="中间捕获信号事件"><a href="#中间捕获信号事件" class="headerlink" title="中间捕获信号事件"></a>中间捕获信号事件</h2><p><strong>XML 配置</strong></p>
+<h2 id="中间捕获信号事件"><a href="#中间捕获信号事件" class="headerlink" title="中间捕获信号事件"></a>中间捕获信号事件</h2><p>中间捕获事件会在未接到信号触发之前阻塞，直到接到对应的信号才会继续执行。</p>
+<p><strong>XML 配置</strong></p>
 <pre class="line-numbers language-XML" data-language="XML"><code class="language-XML">&lt;definitions&gt;
   &lt;signal id&#x3D;&quot;InterCatchEventSignal&quot; name&#x3D;&quot;INTER_CATCH_EVENT&quot;&#x2F;&gt;
   &lt;process id&#x3D;&quot;holidayRequest&quot; name&#x3D;&quot;Holiday Request&quot; isExecutable&#x3D;&quot;true&quot;&gt;
@@ -288,9 +369,10 @@
   &lt;&#x2F;process&gt;
 &lt;&#x2F;definitions&gt;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p><strong>作用</strong></p>
-<p>中间捕获事件会在未接到信号触发之前阻塞，直到接到对应的信号才会继续执行。</p>
-<h2 id="中间抛出信号事件"><a href="#中间抛出信号事件" class="headerlink" title="中间抛出信号事件"></a>中间抛出信号事件</h2><p><strong>XML 配置</strong></p>
+<p><img src="/images/Flowable/%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6.png"></p>
+<p>用户支付成功后发送信号，等待接收信号后进入发货节点。</p>
+<h2 id="中间抛出信号事件"><a href="#中间抛出信号事件" class="headerlink" title="中间抛出信号事件"></a>中间抛出信号事件</h2><p>可在 IntermediateThrowEvent 节点抛出 signalRef 引用的信号，对应的捕获事件可收到该信号并执行。</p>
+<p><strong>XML 配置</strong></p>
 <pre class="line-numbers language-XML" data-language="XML"><code class="language-XML">&lt;definitions&gt;
   &lt;signal id&#x3D;&quot;InterThrowEventSignal&quot; name&#x3D;&quot;INTER_THROW_EVENT_SIGNAL&quot;&gt;&lt;&#x2F;signal&gt;
   &lt;process id&#x3D;&quot;holidayRequest&quot; name&#x3D;&quot;Holiday Request&quot; isExecutable&#x3D;&quot;true&quot;&gt;
@@ -304,9 +386,9 @@
   &lt;&#x2F;process&gt;
 &lt;&#x2F;definitions&gt;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p><strong>作用</strong></p>
-<p>可在 IntermediateThrowEvent 节点抛出 signalRef 引用的信号，对应的捕获事件可收到该信号并执行。</p>
-<h2 id="边界信号事件"><a href="#边界信号事件" class="headerlink" title="边界信号事件"></a>边界信号事件</h2><pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>definitions</span><span class="token punctuation">></span></span>
+<h2 id="边界信号事件"><a href="#边界信号事件" class="headerlink" title="边界信号事件"></a>边界信号事件</h2><p>信号边界事件的触发条件是接收信号，它具有全局性，可以捕获全局范围的信号。他也可以通过 cancelActivity 设置不中断当前流程。</p>
+<p>通过 attach 在某个节点上，如果这个节点是个暂停节点会同时创建一个边界信号事件，接收到对应的信号后，可直接跳过该暂停节点并沿着边界事件的 SequenceFlow 继续执行。（如果是一个报错的异步执行节点，ACT_ID 同样暂停了，但不会创建边界信号事件）</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>definitions</span><span class="token punctuation">></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>signal</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>BoundaryEventSignal<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>SIGNAL<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>signal</span><span class="token punctuation">></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>process</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>holidayRequest<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>Holiday Request<span class="token punctuation">"</span></span> <span class="token attr-name">isExecutable</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>true<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
     ...
@@ -317,29 +399,62 @@
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>process</span><span class="token punctuation">></span></span>
 <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>definitions</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<p><strong>作用</strong></p>
-<p>通过 attach 在某个节点上，如果这个节点是个暂停节点会同时创建一个边界信号事件，接收到对应的信号后，可直接跳过该暂停节点并沿着边界事件的 SequenceFlow 继续执行。（如果是一个报错的异步执行节点，ACT_ID 同样暂停了，但不会创建边界信号事件）</p>
+<p><img src="/images/Flowable/%E8%BE%B9%E7%95%8C%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6.png"></p>
+<p>审批节点等待审判时，在接到信号后，流转到更改工单审批节点。</p>
 <h1 id="消息事件"><a href="#消息事件" class="headerlink" title="消息事件"></a>消息事件</h1><p>触发消息事件可通过以下方式</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">processEngine.getRuntimeService().messageEventReceived(&quot;MESSAGE_NAME&quot;, &quot;EXECUTION_ID&quot;);<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
 <p>与信号事件不同，信号为广播事件，接收者可有多人；消息事件为独立事件，接收者只能为一人。</p>
-<h2 id="消息启动事件"><a href="#消息启动事件" class="headerlink" title="消息启动事件"></a>消息启动事件</h2><p>通过消息启动流程。</p>
-<blockquote>
-<p>启动事件如发送一个无订阅关系的消息会抛异常。</p>
-</blockquote>
-<h2 id="消息中间事件"><a href="#消息中间事件" class="headerlink" title="消息中间事件"></a>消息中间事件</h2><p>通过消息继续执行流程。</p>
-<h2 id="消息边界事件"><a href="#消息边界事件" class="headerlink" title="消息边界事件"></a>消息边界事件</h2><p>通过消息跳过阻塞流程，执行边路逻辑。</p>
-<h1 id="定时器事件"><a href="#定时器事件" class="headerlink" title="定时器事件"></a>定时器事件</h1><p>定时器在被定义后会被持久化在 表中。</p>
+<p>消息事件有以下三种：</p>
+<ol>
+<li>消息启动事件：通过消息启动流程。启动事件如发送一个无订阅关系的消息会抛异常。</li>
+<li>消息中间事件：通过消息继续执行流程。</li>
+<li>消息边界事件：通过消息跳过阻塞流程，执行边路逻辑。</li>
+</ol>
+<h1 id="定时器事件"><a href="#定时器事件" class="headerlink" title="定时器事件"></a>定时器事件</h1><p>定时器在被定义后会被持久化在表中。</p>
 <blockquote>
 <p>使用该事件前需要开启异步执行器：</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">async-executor-activate: true<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 </blockquote>
-<h2 id="定时器启动事件"><a href="#定时器启动事件" class="headerlink" title="定时器启动事件"></a>定时器启动事件</h2><p>定时器启动事件一般在流程需要在特定时间，或只需要启动一次，或者需要周期性重复启动时使用。</p>
+<p>定时器事件是根据指定的时间触发的事件。可以用于<strong>开始事件</strong>，<strong>中间事件</strong>或<strong>边界事件</strong>。</p>
+<ol>
+<li>定时器启动事件：定时器启动事件一般在流程的开始，需要在特定时间、或只需要启动一次、或者需要周期性重复启动时使用。</li>
+<li>定时器中间捕获事件：定时器中间捕获事件一般用在执行完前置处理后需要过一段时间再开始执行后续处理的场景。</li>
+<li>定时器边界事件：定时器边界事件一般用在规定时间内任务未处理则走另外的逻辑的场景。</li>
+</ol>
 <blockquote>
 <p>注意：子流程不能有定时器启动事件</p>
 </blockquote>
-<h2 id="定时器中间捕获事件"><a href="#定时器中间捕获事件" class="headerlink" title="定时器中间捕获事件"></a>定时器中间捕获事件</h2><p>定时器中间捕获事件一般用在执行完前置处理后需要过一段时间再开始执行后续处理的场景。</p>
-<h2 id="定时器边界事件"><a href="#定时器边界事件" class="headerlink" title="定时器边界事件"></a>定时器边界事件</h2><p>定时器边界事件一般用在规定时间内任务未处理则走另外的逻辑的场景。</p>
+<p>定时器定义必须下面介绍的一个元素：</p>
+<p>timeDate。使用 ISO 8601 格式指定一个确定的时间，触发事件的时间。示例：</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timerEventDefinition</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timeDate</span><span class="token punctuation">></span></span>2011-03-11T12:13:14<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timeDate</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timerEventDefinition</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>timeDuration。指定定时器之前要等待多长时间， timeDuration可以设置为timerEventDefinition的子元素。 使用ISO 8601规定的格式 （由BPMN 2.0规定）。示例（等待10天）。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timerEventDefinition</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timeDuration</span><span class="token punctuation">></span></span>P10D<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timeDuration</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timerEventDefinition</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>timeCycle。指定重复执行的间隔， 可以用来定期启动流程实例，或为超时时间发送多个提醒。 timeCycle元素可以使用两种格式。第一种是 ISO 8601 标准的格式。示例（重复3次，每次间隔10小时）：</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timerEventDefinition</span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timeCycle</span><span class="token punctuation">></span></span>R3/PT10H<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timeCycle</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timerEventDefinition</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>另外，你可以使用 cron 表达式指定timeCycle，下面的例子是从整点开始，每5分钟执行一次：</p>
+<pre class="line-numbers language-markdown" data-language="markdown"><code class="language-markdown">0 0/5 <span class="token italic"><span class="token punctuation">*</span><span class="token content"> </span><span class="token punctuation">*</span></span> * ?<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>你可以在定时器事件定义中使用表达式，这样你就可以通过流程变量来影响那个定时器定义。 流程定义必须包含ISO 8601（或cron）格式的字符串，以匹配对应的时间类型。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>boundaryEvent</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>escalationTimer<span class="token punctuation">"</span></span> <span class="token attr-name">cancelActivity</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>true<span class="token punctuation">"</span></span> <span class="token attr-name">attachedToRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>firstLineSupport<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timerEventDefinition</span><span class="token punctuation">></span></span>
+     <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>timeDuration</span><span class="token punctuation">></span></span>$&#123;duration&#125;<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timeDuration</span><span class="token punctuation">></span></span>
+   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>timerEventDefinition</span><span class="token punctuation">></span></span>
+ <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>boundaryEvent</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="定时边界事件"><a href="#定时边界事件" class="headerlink" title="定时边界事件"></a>定时边界事件</h2><p><img src="/images/Flowable/%E5%AE%9A%E6%97%B6%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6.png"></p>
+<p>在初级工程师无响应一段时间后，会直接通过边界流转到高级工程师。</p>
+<h2 id="定时器中间事件"><a href="#定时器中间事件" class="headerlink" title="定时器中间事件"></a>定时器中间事件</h2><p><img src="/images/Flowable/%E5%AE%9A%E6%97%B6%E5%99%A8%E4%B8%AD%E9%97%B4%E4%BA%8B%E4%BB%B6.png"></p>
+<p>在支付完成后，一分钟后触发发货任务。</p>
 <h1 id="错误事件"><a href="#错误事件" class="headerlink" title="错误事件"></a>错误事件</h1><p>触发错误事件可通过以下方式：</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">throw new BpmnError(&quot;ERROR_SIGNAL_NAME&quot;);<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
@@ -356,20 +471,24 @@
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>process</span><span class="token punctuation">></span></span>
 <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>definitions</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
-<h2 id="错误边界事件"><a href="#错误边界事件" class="headerlink" title="错误边界事件"></a>错误边界事件</h2><pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>definitions</span><span class="token punctuation">></span></span>
+<h2 id="错误边界事件"><a href="#错误边界事件" class="headerlink" title="错误边界事件"></a>错误边界事件</h2><p>错误边界事件依附在某个流程活动中，用于不活流程中抛出的错误，一般用在嵌入子流程或者调用子流程。错误边界事件会接收错误信号，通过设置 errorRef 属性，如果没有使用该属性，错误边界事件将会捕获任何错误事件而不抛出的 errrorCode。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>definitions</span><span class="token punctuation">></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>error</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>BoundaryEventError<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>ERROR<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>signal</span><span class="token punctuation">></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>process</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>holidayRequest<span class="token punctuation">"</span></span> <span class="token attr-name">name</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>Holiday Request<span class="token punctuation">"</span></span> <span class="token attr-name">isExecutable</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>true<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
     ...
     <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>boundaryEvent</span> <span class="token attr-name">id</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>boundary<span class="token punctuation">"</span></span> <span class="token attr-name">attachedToRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>userTask2<span class="token punctuation">"</span></span> <span class="token attr-name">cancelActivity</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>true<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
-       <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>signalEventDefinition</span> <span class="token attr-name">signalRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>BoundaryEventError<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>signalEventDefinition</span><span class="token punctuation">></span></span>
+       <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>errorEventDefinition</span> <span class="token attr-name">errorRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>BoundaryEventError<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span>
     <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>boundaryEvent</span><span class="token punctuation">></span></span>
     <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>sequenceFlow</span> <span class="token attr-name">sourceRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>boundary<span class="token punctuation">"</span></span> <span class="token attr-name">targetRef</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>serviceTask3<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span>
   <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>process</span><span class="token punctuation">></span></span>
 <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>definitions</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
+<p><img src="/images/Flowable/%E9%94%99%E8%AF%AF%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6.png"></p>
+<p>当服务节点抛出错误后，流转到 ERROR TASK 的用户任务。</p>
 <h1 id="结束事件"><a href="#结束事件" class="headerlink" title="结束事件"></a>结束事件</h1><h2 id="边界错误结束事件"><a href="#边界错误结束事件" class="headerlink" title="边界错误结束事件"></a>边界错误结束事件</h2><p>当流程执行到达错误结束事件（error end event）时，结束执行的当前子流程，并抛出错误。这个错误可以由子流程挂载的错误边界中间事件捕获。如果找不到匹配的错误边界事件，将会抛出异常。</p>
-<p><img src="/../images/Flowable/%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png"></p>
+<p><img src="/images/Flowable/%E8%BE%B9%E7%95%8C%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png"></p>
 <h2 id="中断结束事件"><a href="#中断结束事件" class="headerlink" title="中断结束事件"></a>中断结束事件</h2><p>中断结束事件也称为终止结束事件，主要是对流程进行终止的事件，可以在一个复杂的流程中，如果某方想要提前中断这个流程，可以采用这个事件来处理，可以在并行处理任务中。如果你是在流程实例层处理，整个流程都会被中断，如果是在子流程中使用，那么当前作用域内的所有的内部流程都会被终止。</p>
+<p><img src="/images/Flowable/%E4%B8%AD%E6%96%AD%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6.png"></p>
 <h2 id="取消结束事件"><a href="#取消结束事件" class="headerlink" title="取消结束事件"></a>取消结束事件</h2><p>取消结束事件只能与 BPMN 事务子流程（BPMN transaction subprocess）一起使用。当到达取消结束事件时，会抛出取消事件，且必须由取消边界事件（cancel boundary event）捕获。取消边界事件将取消事务，并触发补偿（compensation）。</p>
 
     </div>
@@ -394,8 +513,8 @@
       <i class="fa fa-chevron-left"></i> Flowable 基本介绍
     </a></div>
       <div class="post-nav-item">
-    <a href="/2022/07/12/Flowable-3-%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B/" rel="next" title="Flowable 执行流程">
-      Flowable 执行流程 <i class="fa fa-chevron-right"></i>
+    <a href="/2022/07/22/G1-1-%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5/" rel="next" title="G1 基本概念">
+      G1 基本概念 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -455,7 +574,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.</span> <span class="nav-text">信号事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E5%A7%8B%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">开始信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.2.</span> <span class="nav-text">中间捕获信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E9%97%B4%E6%8A%9B%E5%87%BA%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.3.</span> <span class="nav-text">中间抛出信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%B9%E7%95%8C%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.4.</span> <span class="nav-text">边界信号事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">消息事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E5%90%AF%E5%8A%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.1.</span> <span class="nav-text">消息启动事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E4%B8%AD%E9%97%B4%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.2.</span> <span class="nav-text">消息中间事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.3.</span> <span class="nav-text">消息边界事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">3.</span> <span class="nav-text">定时器事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E5%90%AF%E5%8A%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">3.1.</span> <span class="nav-text">定时器启动事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">3.2.</span> <span class="nav-text">定时器中间捕获事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6"><span class="nav-number">3.3.</span> <span class="nav-text">定时器边界事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.</span> <span class="nav-text">错误事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%90%AF%E5%8A%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.1.</span> <span class="nav-text">错误启动事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.2.</span> <span class="nav-text">错误边界事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.</span> <span class="nav-text">结束事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%B9%E7%95%8C%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.1.</span> <span class="nav-text">边界错误结束事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.2.</span> <span class="nav-text">中断结束事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%96%E6%B6%88%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.3.</span> <span class="nav-text">取消结束事件</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BA%8B%E4%BB%B6%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">事件概览</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E4%BB%B6%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.2.</span> <span class="nav-text">事件类型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">信号事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%80%E5%A7%8B%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.1.</span> <span class="nav-text">开始信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E9%97%B4%E6%8D%95%E8%8E%B7%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.2.</span> <span class="nav-text">中间捕获信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E9%97%B4%E6%8A%9B%E5%87%BA%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.3.</span> <span class="nav-text">中间抛出信号事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%B9%E7%95%8C%E4%BF%A1%E5%8F%B7%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.4.</span> <span class="nav-text">边界信号事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E4%BA%8B%E4%BB%B6"><span class="nav-number">3.</span> <span class="nav-text">消息事件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.</span> <span class="nav-text">定时器事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.1.</span> <span class="nav-text">定时边界事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E6%97%B6%E5%99%A8%E4%B8%AD%E9%97%B4%E4%BA%8B%E4%BB%B6"><span class="nav-number">4.2.</span> <span class="nav-text">定时器中间事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.</span> <span class="nav-text">错误事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%90%AF%E5%8A%A8%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.1.</span> <span class="nav-text">错误启动事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E8%BE%B9%E7%95%8C%E4%BA%8B%E4%BB%B6"><span class="nav-number">5.2.</span> <span class="nav-text">错误边界事件</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">6.</span> <span class="nav-text">结束事件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%B9%E7%95%8C%E9%94%99%E8%AF%AF%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">6.1.</span> <span class="nav-text">边界错误结束事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">6.2.</span> <span class="nav-text">中断结束事件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%96%E6%B6%88%E7%BB%93%E6%9D%9F%E4%BA%8B%E4%BB%B6"><span class="nav-number">6.3.</span> <span class="nav-text">取消结束事件</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 

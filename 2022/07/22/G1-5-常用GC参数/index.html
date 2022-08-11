@@ -28,7 +28,7 @@
 <meta property="og:description" content="本章主要讲解 JVM 的参数，重点讲解形如 -XX:[+,-]* 的非标准化参数。这些参数相对来说不稳定，随着 JVM 版本的变化可能会发生变化，主要用于 JVM 调优和 DEBUG。">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-07-22T08:14:21.000Z">
-<meta property="article:modified_time" content="2022-07-22T08:15:32.851Z">
+<meta property="article:modified_time" content="2022-08-11T04:26:04.395Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="GC">
@@ -219,10 +219,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">Posted on</span>
-              
 
-              <time title="Created: 2022-07-22 16:14:21 / Modified: 16:15:32" itemprop="dateCreated datePublished" datetime="2022-07-22T16:14:21+08:00">2022-07-22</time>
+              <time title="Created: 2022-07-22 16:14:21" itemprop="dateCreated datePublished" datetime="2022-07-22T16:14:21+08:00">2022-07-22</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-08-11 12:26:04" itemprop="dateModified" datetime="2022-08-11T12:26:04+08:00">2022-08-11</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -510,13 +516,22 @@ Heap after GC invocations&#x3D;15 (full 5):
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 <p><code>Heap before GC</code> 和 <code>Heap after GC</code> 分别表示 GC 前后堆的信息的开始，invocations 表示调用堆信息输出的次数（<code>Heap after GC</code> 对应的 invocations 除 2，即为 GC 的次数），而 full 表示第几次 Full GC。</p>
-<h2 id="输出具体时间"><a href="#输出具体时间" class="headerlink" title="输出具体时间"></a>输出具体时间</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCTimeStamps # 将时间加到GC日志(G1默认开启)
+<h2 id="GC-通用过程信息"><a href="#GC-通用过程信息" class="headerlink" title="GC 通用过程信息"></a>GC 通用过程信息</h2><h3 id="输出日志打印日期"><a href="#输出日志打印日期" class="headerlink" title="输出日志打印日期"></a>输出日志打印日期</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCTimeStamps # 将时间加到GC日志(G1默认开启)
 -XX:+PrintGCDateStamps # 将日期加到GC日志<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
 
 <p>输出内容如下：</p>
 <pre class="line-numbers language-none"><code class="language-none">2022-07-21T15:50:40.086-0800: 0.555: [GC concurrent-root-region-scan-start]<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
-<h2 id="输出新生代到老年代晋升的情况"><a href="#输出新生代到老年代晋升的情况" class="headerlink" title="输出新生代到老年代晋升的情况"></a>输出新生代到老年代晋升的情况</h2><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
+<h3 id="输出GC时应用时间"><a href="#输出GC时应用时间" class="headerlink" title="输出GC时应用时间"></a>输出GC时应用时间</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCApplicationConcurrentTime # GC时打印应用执行时间
+-XX:+PrintGCApplicationStoppedTime    # GC时打印应用停顿时间<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none"># -XX:+PrintGCApplicationConcurrentTime GC前打印
+Application time: 0.2222222 seconds
+# -XX:+PrintGCApplicationStoppedTime GC后打印
+Total time for which application thread were stopped: 0.222222 seconds<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h2 id="GC-功能性信息"><a href="#GC-功能性信息" class="headerlink" title="GC 功能性信息"></a>GC 功能性信息</h2><h3 id="输出新生代到老年代晋升的情况"><a href="#输出新生代到老年代晋升的情况" class="headerlink" title="输出新生代到老年代晋升的情况"></a>输出新生代到老年代晋升的情况</h3><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
 -XX:+PrintTenuringDistribution<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
 
 <p>输出内容如下：</p>
@@ -529,45 +544,7 @@ Desired survivor size 223674368 bytes, new threshold 15 (max 15)
 
 <p>我们需要知道，我们是可以通过 MaxTenuringThreshold 参数控制对象从新生代晋升到老年代经过 GC 次数的最大值，这个默认值是 15，而最大值也是 15，因为对象头里给了 4个 bit 存放，只能表示 15 以内的整数。这个参数并非能达到绝对控制，比如晋升失败会导致对象原地不动，如果 survival 区不够大，可能直接放到老年代。</p>
 <p>这时候 Survivor 的大小是 223674368 字节，<code>new threshold 15</code> 表示 age 为 15 的对象都将送入到老生代分区，最大的年代数是 15。当前 age1 有 63634632 字节，age2 有 1064928 字节，age3 有 24489776 字节，total 是当前加起来的总和。</p>
-<h2 id="输出大对象日志分析"><a href="#输出大对象日志分析" class="headerlink" title="输出大对象日志分析"></a>输出大对象日志分析</h2><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
--XX:+UnlockExperimentalVMOptions
--XX:+G1TraceEagerReclaimHumongousObjects<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
-<p>输出日志如下：</p>
-<pre class="line-numbers language-none"><code class="language-none">Live humongous region 0 size 4194320 start 0x00000000f0000000 length 5 with remset 8194 code roots 0 is marked 0 reclaim candidate 0 type array 0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
-<p>以上日志表示 0 号分区活跃大对象分区为 4M；起始地址为 0x00000000f0000000，占用 5 个分区；RSet 更新过 8194 次，代码块长度为 0，并有被标记；<code>reclaim candidate 0</code> 表示不能被回收；<code>type array 0</code> 表示不是数组类型。</p>
-<h2 id="输出GC时应用时间"><a href="#输出GC时应用时间" class="headerlink" title="输出GC时应用时间"></a>输出GC时应用时间</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintGCApplicationConcurrentTime # GC时打印应用执行时间
--XX:+PrintGCApplicationStoppedTime    # GC时打印应用停顿时间<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<p>输出内容如下：</p>
-<pre class="line-numbers language-none"><code class="language-none"># -XX:+PrintGCApplicationConcurrentTime GC前打印
-Application time: 0.2222222 seconds
-# -XX:+PrintGCApplicationStoppedTime GC后打印
-Total time for which application thread were stopped: 0.222222 seconds<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="输出G1自适应调整详细信息"><a href="#输出G1自适应调整详细信息" class="headerlink" title="输出G1自适应调整详细信息"></a>输出G1自适应调整详细信息</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintAdaptiveSizePolicy<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
-<p>输出内容如下：</p>
-<pre class="line-numbers language-none"><code class="language-none"> 0.018: [G1Ergonomics (Heap Sizing) expand the heap, requested expansion amount: 268435456 bytes, attempted expansion amount: 268435456 bytes]
- 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: occupancy higher than threshold, occupancy: 115343360 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
- 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: requested by GC cause, GC cause: G1 Humongous Allocation]
- 0.187: [G1Ergonomics (Concurrent Cycles) initiate concurrent cycle, reason: concurrent cycle initiation requested]
-0.187: [GC pause (G1 Humongous Allocation) (young) (initial-mark) 0.187: [G1Ergonomics (CSet Construction) start choosing CSet, _pending_cards: 0, predicted base time: 10.00 ms, remaining time: 190.00 ms, target pause time: 200.00 ms]
- 0.187: [G1Ergonomics (CSet Construction) add young regions to CSet, eden: 2 regions, survivors: 0 regions, predicted young region time: 30.60 ms]
- 0.187: [G1Ergonomics (CSet Construction) finish choosing CSet, eden: 2 regions, survivors: 0 regions, old: 0 regions, predicted pause time: 40.60 ms, target pause time: 200.00 ms]
- 102M-&gt;100M(256M), 0.0057796 secs]
-0.193: [GC concurrent-root-region-scan-start]
-0.194: [GC concurrent-root-region-scan-end, 0.0007363 secs]
-0.194: [GC concurrent-mark-start]
-0.194: [GC concurrent-mark-end, 0.0001506 secs]
-0.201: [GC remark, 0.0044089 secs]
-0.211: [GC cleanup 120M-&gt;120M(256M), 0.0009541 secs]
- 0.218: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 149946368 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
- 0.262: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 230686720 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
-0.268: [Full GC (System.gc())  0.272: [G1Ergonomics (Heap Sizing) attempt heap shrinking, reason: capacity higher than max desired capacity after Full GC, capacity: 268435456 bytes, occupancy: 398256 bytes, max desired capacity: 8388608 bytes (70.00 %)]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h2 id="输出并发标记概要信息"><a href="#输出并发标记概要信息" class="headerlink" title="输出并发标记概要信息"></a>输出并发标记概要信息</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+UnlockDiagnosticVMOptions
+<h3 id="输出并发标记概要信息"><a href="#输出并发标记概要信息" class="headerlink" title="输出并发标记概要信息"></a>输出并发标记概要信息</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+UnlockDiagnosticVMOptions
 -XX:+G1SummarizeConcMark<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
 
 <p>输出内容如下：</p>
@@ -591,20 +568,174 @@ Total time for which application thread were stopped: 0.222222 seconds<span aria
  	Total concurrent time &#x3D;     0.76 s (    0.01 s marking).
  	# 并发线程总花费和标记时间花费<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
+<h3 id="输出安全点相关信息"><a href="#输出安全点相关信息" class="headerlink" title="输出安全点相关信息"></a>输出安全点相关信息</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintSafepointStatistics # 输出安全点信息
+-XX:PrintSafepointStatisticsCount&#x3D;n # 每n次进入安全点输出1次信息<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+
+<h3 id="输出大对象日志分析"><a href="#输出大对象日志分析" class="headerlink" title="输出大对象日志分析"></a>输出大对象日志分析</h3><pre class="line-numbers language-none"><code class="language-none"># 适用于YGC
+-XX:+UnlockExperimentalVMOptions
+-XX:+G1TraceEagerReclaimHumongousObjects<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+
+<p>输出日志如下：</p>
+<pre class="line-numbers language-none"><code class="language-none">Live humongous region 0 size 4194320 start 0x00000000f0000000 length 5 with remset 8194 code roots 0 is marked 0 reclaim candidate 0 type array 0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>以上日志表示 0 号分区活跃大对象分区为 4M；起始地址为 0x00000000f0000000，占用 5 个分区；RSet 更新过 8194 次，代码块长度为 0，并有被标记；<code>reclaim candidate 0</code> 表示不能被回收；<code>type array 0</code> 表示不是数组类型。</p>
+<h3 id="输出G1自适应调整详细信息"><a href="#输出G1自适应调整详细信息" class="headerlink" title="输出G1自适应调整详细信息"></a>输出G1自适应调整详细信息</h3><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintAdaptiveSizePolicy<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<p>输出内容如下：</p>
+<pre class="line-numbers language-none"><code class="language-none"> 0.018: [G1Ergonomics (Heap Sizing) expand the heap, requested expansion amount: 268435456 bytes, attempted expansion amount: 268435456 bytes]
+ 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: occupancy higher than threshold, occupancy: 115343360 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+ 0.187: [G1Ergonomics (Concurrent Cycles) request concurrent cycle initiation, reason: requested by GC cause, GC cause: G1 Humongous Allocation]
+ 0.187: [G1Ergonomics (Concurrent Cycles) initiate concurrent cycle, reason: concurrent cycle initiation requested]
+0.187: [GC pause (G1 Humongous Allocation) (young) (initial-mark) 0.187: [G1Ergonomics (CSet Construction) start choosing CSet, _pending_cards: 0, predicted base time: 10.00 ms, remaining time: 190.00 ms, target pause time: 200.00 ms]
+ 0.187: [G1Ergonomics (CSet Construction) add young regions to CSet, eden: 2 regions, survivors: 0 regions, predicted young region time: 30.60 ms]
+ 0.187: [G1Ergonomics (CSet Construction) finish choosing CSet, eden: 2 regions, survivors: 0 regions, old: 0 regions, predicted pause time: 40.60 ms, target pause time: 200.00 ms]
+ 102M-&gt;100M(256M), 0.0057796 secs]
+0.193: [GC concurrent-root-region-scan-start]
+0.194: [GC concurrent-root-region-scan-end, 0.0007363 secs]
+0.194: [GC concurrent-mark-start]
+0.194: [GC concurrent-mark-end, 0.0001506 secs]
+0.201: [GC remark, 0.0044089 secs]
+0.211: [GC cleanup 120M-&gt;120M(256M), 0.0009541 secs]
+ 0.218: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 149946368 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+ 0.262: [G1Ergonomics (Concurrent Cycles) do not request concurrent cycle initiation, reason: still doing mixed collections, occupancy: 230686720 bytes, allocation request: 10485776 bytes, threshold: 120795930 bytes (45.00 %), source: concurrent humongous allocation]
+0.268: [Full GC (System.gc())  0.272: [G1Ergonomics (Heap Sizing) attempt heap shrinking, reason: capacity higher than max desired capacity after Full GC, capacity: 268435456 bytes, occupancy: 398256 bytes, max desired capacity: 8388608 bytes (70.00 %)]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+
+
 <h1 id="GC-文件输出"><a href="#GC-文件输出" class="headerlink" title="GC 文件输出"></a>GC 文件输出</h1><h2 id="Log文件输出"><a href="#Log文件输出" class="headerlink" title="Log文件输出"></a>Log文件输出</h2><pre class="line-numbers language-none"><code class="language-none"># 根据时间戳生成日志名
 -Xloggc:gc-%t.log<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
 
 <h2 id="Dump文件输出"><a href="#Dump文件输出" class="headerlink" title="Dump文件输出"></a>Dump文件输出</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+HeapDumpOnOutOfMemoryError<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
-
-
 <h1 id="GC-功能性参数"><a href="#GC-功能性参数" class="headerlink" title="GC 功能性参数"></a>GC 功能性参数</h1><h2 id="分配物理内存"><a href="#分配物理内存" class="headerlink" title="分配物理内存"></a>分配物理内存</h2><pre class="line-numbers language-none"><code class="language-none">-XX:+AlwaysPreTouch<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 
 <p>服务启动的时候真实的分配物理内存给 JVM。如果没有此参数，则 JVM 启动的时候，分配的只是虚拟内存，当真正使用的时候才会分配物理内存，导致代码运行速度变慢；如果有此参数，则 JVM 启动的时候速度会下降很多。</p>
-<h1 id="TODO-参数"><a href="#TODO-参数" class="headerlink" title="TODO 参数"></a>TODO 参数</h1><pre class="line-numbers language-none"><code class="language-none">-XX:+PrintSafepointStatistics
--XX:PrintSafepointStatisticsCount&#x3D;1
--XX:+PrintReferenceGC
--XX:+G1SummarizeRSetStats 
+<h1 id="GC-引用调优相关参数"><a href="#GC-引用调优相关参数" class="headerlink" title="GC 引用调优相关参数"></a>GC 引用调优相关参数</h1><blockquote>
+<p><strong>引用相关日志输出：</strong></p>
+<p>-XX:+PrintReferenceGC<br>-XX:+TraceReferenceGC</p>
+</blockquote>
+<p><strong>ParallelRefProcBalancingEnabled</strong></p>
+<p>参数 ParallelRefProcBalancingEnabled，默认值为 true，在处理引用的时候，引用（软&#x2F;弱&#x2F;虚&#x2F;final&#x2F;cleaner）对象在同一类型的队列中可能是不均衡的，如果打开该参数则表示可以把链表均衡一下。注意这里的均衡不是指不同引用类型之间的均衡，而是同一引用类型里面有多个队列，同一引用类型多个队列之间的均衡。</p>
+<p><strong>ParallelRefProcEnabled</strong></p>
+<p>参数ParallelRefProcEnabled，默认值为 false，打开之后表示在处理一个引用的时候可以使用多线程的处理方式。这个参数主要是控制引用列表的并发处理。另外引用的处理在 GC 回收和并发标记中都会执行，在 GC 中执行的引用处理使用的线程数目和 GC 线程数目一致，在并发标记中处理引用使用的线程数目和并发标记线程数一致。实际中通常打开该值，减少引用处理的时间。</p>
+<p><strong>RegisterReferences</strong></p>
+<p>参数 RegisterReferences，默认值 true，表示可以在遍历对象的时候发现引用对象类型中的对象是否可以回收，false 表示在遍历对象的时候不处理引用对象。目前的设计中在 GC 发生时不会去遍历引用对象是否可以回收。需要注意的是该参数如果设置为 false，则在 GC 时会执行软引用对象是否可以回收，这将会增加 GC 的时间，所以通常不要修改这个值。</p>
+<p><strong>G1UseConcMarkReferenceProcessing</strong></p>
+<p>参数 G1UseConcMarkReferenceProcessing，默认值 true，表示在并发标记的时候发现对象。</p>
+<p><strong>RefDiscoveryPolicy</strong></p>
+<p>参数 RefDiscoveryPolicy，默认值为 0，0 表示 ReferenceBasedDiscovery，指如果引用对象在我们的处理范围内，则对这个引用对象进行处理。1 表示 ReferentBasedDiscovery，指如果引用对象在我们的处理范围内或者引用对象里面的对象在处理范围内，则对引用对象处理。1 会导致处理的对象更多。</p>
+<p><strong>SoftRefLRUPolicyMSPerMB</strong></p>
+<p>参数 SoftRefLRUPolicyMSPerMB，默认值为 1000，即对软引用的清除参数为每 MB 的内存将会存活 1s，如最大内存为 1GB，则软引用的存活时间为 1024s，大约为 17 分钟，但是如果内存为 100GB，这个参数不调整，软引用对象将存活 102 400s，大约为 28.5小时。所以需要根据总内存大小以及预期软引用的存活时间来调整这个参数。</p>
+<h1 id="GC-字符串去重调优相关参数"><a href="#GC-字符串去重调优相关参数" class="headerlink" title="GC 字符串去重调优相关参数"></a>GC 字符串去重调优相关参数</h1><blockquote>
+<p><strong>字符串去重相关日志输出：</strong></p>
+<p>-XX:+PrintStringDeduplicationStatistics</p>
+<pre class="line-numbers language-none"><code class="language-none">0.317: [GC pause (G1 Evacuation Pause) (young) 33M-&gt;36M(512M), 0.1230416 secs]
+0.440: [GC concurrent-string-deduplication, 62.7K-&gt;37.3K(25.3K), avg 40.1%, 0.0002402 secs]
+   [Last Exec: 0.0002402 secs, Idle: 0.1289596 secs, Blocked: 0&#x2F;0.0000000 secs]
+      [Inspected:            1368]
+         [Skipped:              0(  0.0%)]
+         # 字符串为null则跳过
+         [Hashed:             255( 18.6%)]
+         # 字符串哈希值不为0
+         [Known:              887( 64.8%)]
+         # 字符串共享的次数
+         [New:                481( 35.2%)     62.7K]
+         # 字符串新加入HashTable的次数
+      [Deduplicated:          201( 41.8%)     25.3K( 40.4%)]
+         [Young:                0(  0.0%)      0.0B(  0.0%)]
+         # 字符串在新生代的个数
+         [Old:                201(100.0%)     25.3K(100.0%)]
+         # 字符串在老生代的个数
+   [Total Exec: 2&#x2F;0.0002457 secs, Idle: 2&#x2F;0.2149240 secs, Blocked: 0&#x2F;0.0000000 secs]
+   # 发生GC或并发标记时进行去重总的统计时间，已经发生了2次
+      [Inspected:            1371]
+         [Skipped:              0(  0.0%)]
+         [Hashed:             258( 18.8%)]
+         [Known:              887( 64.7%)]
+         [New:                484( 35.3%)     63.1K]
+      [Deduplicated:          201( 41.5%)     25.3K( 40.1%)]
+         [Young:                0(  0.0%)      0.0B(  0.0%)]
+         [Old:                201(100.0%)     25.3K(100.0%)]
+   [Table]
+      [Memory Usage: 35.4K]
+      [Size: 1024, Min: 1024, Max: 16777216]
+      [Entries: 1170, Load: 114.3%, Cached: 0, Added: 1170, Removed: 0]
+      [Resize Count: 0, Shrink Threshold: 682(66.7%), Grow Threshold: 2048(200.0%)]
+      [Rehash Count: 0, Rehash Threshold: 120, Hash Seed: 0x0]
+      [Age Threshold: 3]
+   [Queue]
+      [Dropped: 0]
+      # 字符串超过队列长度丢弃次数
+[GC concurrent-string-deduplication, deleted 0 entries, 0.0000006 secs]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</blockquote>
+<p><strong>UseStringDeduplication</strong></p>
+<p>参数 UseStringDeduplication，默认值为 false，打开参数表示允许字符串去重。</p>
+<p><strong>StringDeduplicationAgeThreshold</strong></p>
+<p>参数 StringDeduplicationAgeThreshold，默认值为 3，控制字符串是否参与去重的阈值。虽然字符串去重能明显减少内存的使用，但是这会增加 GC 处理的时间。</p>
+<h1 id="GC-安全点调优相关参数"><a href="#GC-安全点调优相关参数" class="headerlink" title="GC 安全点调优相关参数"></a>GC 安全点调优相关参数</h1><blockquote>
+<p>安全点输出相关日志输出：</p>
+<p>-XX:+PrintSafepointStatistics # 输出安全点信息<br>-XX:PrintSafepointStatisticsCount&#x3D;1 # 每一次进入安全点都输出信息</p>
+<p>额外增加的输出参数：</p>
+<p>-XX:+PrintGCApplicationConcurrentTime<br>-XX:+PrintGCApplicationStoppedTime</p>
+<pre class="line-numbers language-none"><code class="language-none">Application time: 0.0441187 seconds
+         vmop              
+         # vmop：指从执行VM操作开始到结束所花费的时间。
+         [threads: total initially_running wait_to_block]    
+         [time: spin block sync cleanup vmop] 
+         # 时间信息含义如下：
+         # spin：指的是如果在进入安全点时，有正在运行的线程，那么VMThread需要等待其他线程
+         #       让出CPU，为了避免上下文的切换，VMThread优先选择自旋。这个时间指的是从进
+         #       入安全点到所有线程都不再运行的时间。
+         # block：指的是如果有线程需要阻塞所花费的时间。注意阻塞和上面提到的运行是不同的状态，
+         #        当线程不处于运行状态时，也并不一定是阻塞状态。
+         # sync：指的是spin和block的总和。
+         # cleanup: 包括几个任务花费的时间。任务主要有：
+         #          1.对Monitor降级。
+         #          2.对inlinecache（JVM为了优化而提供）缓存处理。
+         #          3.对JIT编译策略调整。
+         #          4.如果符号表的个数超过负载均衡因子（60%）可以进行rehash，创建新的符号表。
+         #          5.如果字符串表（用于intern）的个数超过负载均衡因子（60%）可以进行rehash，
+         #            创建新的字符串表。
+         #          6.JIT编译代码回收。
+         page_trap_count 0.132: 
+         # page_trap_count：指的是编译线程通过设置轮询页面不可读进入到安全点的次数。
+         G1IncCollectionPause      
+         # G1IncCollectionPause 表示在增量GC，对G1来说可能是YGC或是MGC
+         [      11          0              0    ]      
+         # 1. 有11个线程
+         # 2. 0 表示在打印这个信息的时候没有正在运行的线程
+         # 3. 0 表示在进入安全点的过程中有0个线程正待被阻塞。
+         [     0     0     0     0     1    ]  0   
+Total time for which application threads were stopped: 0.0018904 seconds, Stopping threads took: 0.0000319 seconds
+Polling page always armed
+CGC_Operation                      2
+G1IncCollectionPause               1
+    0 VM operations coalesced during safepoint
+Maximum sync time      4 ms
+Maximum vm operation time (except for Exit VM operation)      1 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</blockquote>
+<p>不同的线程进入安全点的时间可能各不相同，特别在编译线程中，如果有一个超级大的循环，假设在 JIT 编译中没有在循环中插入安全点，那么循环可能一直执行，导致有编译的线程一直不能进入到安全点。JDK 9 中引入新的参数 UseCountedLoopSafepoints，可打开该参数，允许在循环中插入安全点。</p>
+<p>在进入真正的 VM 操作之前，还需要做一些任务清理工作，这个工作当然也有可能导致进入安全点时间过长。这些工作主要有：Monitor 降级处理、JIT编译代码回收、符号表和字符串表回收。</p>
+<ol>
+<li><p>Monitor降级</p>
+<p>Java 提供了 Synchronized 的关键字，其锁主要存在4种状态，依次是：无锁状态、偏向锁状态、轻量级锁状态、重量级锁状态，他们会随着竞争的激烈而逐渐升级。</p>
+<p>在安全点的时候如果发现锁是空闲的就可以对锁进行降级。有一个参数 MonitorInUseLists（默认值为false），打开该参数表示只对正在使用的 Monitor 进行降级（正在使用的意思指的是只关注在线程栈里面使用的 Monitor），该参数关闭的话则对所有的 Monitor 进行降级。如果你使用的是JDK8或者之前的版本，当发现安全点上有大量的Monitor，可以尝试做两件事：</p>
+<ul>
+<li>打开 MonitorInUseLists，减少 Monitor 降级处理。</li>
+<li>使用 JUC 里面的 lock 来代替 Synchronized。</li>
+</ul>
+</li>
+<li><p>JIT编译代码回收</p>
+<p>有一个参数 MethodFlushing（默认值为true），该参数表示回收已经不再使用的编译代码。如果发现有大量的编译代码回收导致进入安全点时间过长，可以考虑关闭该参数，但是带来的问题很有可能是填满了 JIT 编译代码缓存，从而导致编译停止，引起性能问题。</p>
+</li>
+<li><p>符号表和字符串表回收字符串表回收是指 String 的 intern 处理，如果使用大量的 String 的 intern 方法也有可能导致进入安全点时间过长，如果发生这种情况，可以考虑：</p>
+<ul>
+<li>设置 StringTable 的长度 StringTableSize（这个长度就是intern使用hashTable的长度），在64位机器默认值为60013，32位机器为1009。可以增大该值。</li>
+<li>也可以考虑不再使用 intern，而使用 G1 的字符串去重功能。符号表 SymbolTable 的调整和 StringTable 类似，也可以设置参数 SymbolTableSize（默认值为20011）来减少 rehash 操作。</li>
+</ul>
+</li>
+</ol>
+<h1 id="TODO-参数"><a href="#TODO-参数" class="headerlink" title="TODO 参数"></a>TODO 参数</h1><pre class="line-numbers language-none"><code class="language-none">-XX:+G1SummarizeRSetStats 
 -XX:+DisableExplicitGC 
 -XX:+DebugNonSafepoints 
 -XX:+FlightRecorder 
@@ -613,7 +744,7 @@ Total time for which application thread were stopped: 0.222222 seconds<span aria
 -XX:+TrustFinalNonStaticFields 
 -XX:+UnlockCommercialFeatures 
 -XX:+UseCompressedClassPointers 
--XX:+UseCompressedOops <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+-XX:+UseCompressedOops <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 
 
     </div>
@@ -638,7 +769,10 @@ Total time for which application thread were stopped: 0.222222 seconds<span aria
     <a href="/2022/07/22/G1-4-FullGC%E8%BF%87%E7%A8%8B/" rel="prev" title="G1 FullGC过程">
       <i class="fa fa-chevron-left"></i> G1 FullGC过程
     </a></div>
-      <div class="post-nav-item"></div>
+      <div class="post-nav-item">
+    <a href="/2022/08/11/Flowable-3-%E5%AE%9E%E8%B7%B5%E5%9C%BA%E6%99%AF/" rel="next" title="Flowable 实践场景">
+      Flowable 实践场景 <i class="fa fa-chevron-right"></i>
+    </a></div>
     </div>
       </footer>
     
@@ -697,7 +831,7 @@ Total time for which application thread were stopped: 0.222222 seconds<span aria
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%89%93%E5%8D%B0%E6%8E%A7%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">GC 打印控制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%97%A5%E5%BF%97%E7%AD%89%E7%BA%A7%E6%89%93%E5%8D%B0%E8%AF%A6%E6%83%85"><span class="nav-number">1.1.</span> <span class="nav-text">按日志等级打印详情</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-fine"><span class="nav-number">1.1.1.</span> <span class="nav-text">Level: fine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finer"><span class="nav-number">1.1.2.</span> <span class="nav-text">Level: finer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finest"><span class="nav-number">1.1.3.</span> <span class="nav-text">Level: finest</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%9B%B8%E5%85%B3%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.</span> <span class="nav-text">堆相关信息</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E4%BD%BF%E7%94%A8%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.1.</span> <span class="nav-text">堆使用信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%88%86%E9%85%8D%E5%92%8C%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-number">1.2.2.</span> <span class="nav-text">堆的分配和使用情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA-GC-%E5%89%8D%E5%90%8E%E7%9A%84%E5%A0%86%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.3.</span> <span class="nav-text">输出 GC 前后的堆概要信息</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%85%B7%E4%BD%93%E6%97%B6%E9%97%B4"><span class="nav-number">1.3.</span> <span class="nav-text">输出具体时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E6%96%B0%E7%94%9F%E4%BB%A3%E5%88%B0%E8%80%81%E5%B9%B4%E4%BB%A3%E6%99%8B%E5%8D%87%E7%9A%84%E6%83%85%E5%86%B5"><span class="nav-number">1.4.</span> <span class="nav-text">输出新生代到老年代晋升的情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%A4%A7%E5%AF%B9%E8%B1%A1%E6%97%A5%E5%BF%97%E5%88%86%E6%9E%90"><span class="nav-number">1.5.</span> <span class="nav-text">输出大对象日志分析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BAGC%E6%97%B6%E5%BA%94%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">1.6.</span> <span class="nav-text">输出GC时应用时间</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BAG1%E8%87%AA%E9%80%82%E5%BA%94%E8%B0%83%E6%95%B4%E8%AF%A6%E7%BB%86%E4%BF%A1%E6%81%AF"><span class="nav-number">1.7.</span> <span class="nav-text">输出G1自适应调整详细信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%B9%B6%E5%8F%91%E6%A0%87%E8%AE%B0%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.8.</span> <span class="nav-text">输出并发标记概要信息</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.</span> <span class="nav-text">GC 文件输出</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Log%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.1.</span> <span class="nav-text">Log文件输出</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dump%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.2.</span> <span class="nav-text">Dump文件输出</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%8A%9F%E8%83%BD%E6%80%A7%E5%8F%82%E6%95%B0"><span class="nav-number">3.</span> <span class="nav-text">GC 功能性参数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E9%85%8D%E7%89%A9%E7%90%86%E5%86%85%E5%AD%98"><span class="nav-number">3.1.</span> <span class="nav-text">分配物理内存</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#TODO-%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">TODO 参数</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%89%93%E5%8D%B0%E6%8E%A7%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">GC 打印控制</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%97%A5%E5%BF%97%E7%AD%89%E7%BA%A7%E6%89%93%E5%8D%B0%E8%AF%A6%E6%83%85"><span class="nav-number">1.1.</span> <span class="nav-text">按日志等级打印详情</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-fine"><span class="nav-number">1.1.1.</span> <span class="nav-text">Level: fine</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finer"><span class="nav-number">1.1.2.</span> <span class="nav-text">Level: finer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Level-finest"><span class="nav-number">1.1.3.</span> <span class="nav-text">Level: finest</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%9B%B8%E5%85%B3%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.</span> <span class="nav-text">堆相关信息</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E4%BD%BF%E7%94%A8%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.1.</span> <span class="nav-text">堆使用信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%88%86%E9%85%8D%E5%92%8C%E4%BD%BF%E7%94%A8%E6%83%85%E5%86%B5"><span class="nav-number">1.2.2.</span> <span class="nav-text">堆的分配和使用情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA-GC-%E5%89%8D%E5%90%8E%E7%9A%84%E5%A0%86%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.3.</span> <span class="nav-text">输出 GC 前后的堆概要信息</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GC-%E9%80%9A%E7%94%A8%E8%BF%87%E7%A8%8B%E4%BF%A1%E6%81%AF"><span class="nav-number">1.3.</span> <span class="nav-text">GC 通用过程信息</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E6%97%A5%E5%BF%97%E6%89%93%E5%8D%B0%E6%97%A5%E6%9C%9F"><span class="nav-number">1.3.1.</span> <span class="nav-text">输出日志打印日期</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BAGC%E6%97%B6%E5%BA%94%E7%94%A8%E6%97%B6%E9%97%B4"><span class="nav-number">1.3.2.</span> <span class="nav-text">输出GC时应用时间</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GC-%E5%8A%9F%E8%83%BD%E6%80%A7%E4%BF%A1%E6%81%AF"><span class="nav-number">1.4.</span> <span class="nav-text">GC 功能性信息</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E6%96%B0%E7%94%9F%E4%BB%A3%E5%88%B0%E8%80%81%E5%B9%B4%E4%BB%A3%E6%99%8B%E5%8D%87%E7%9A%84%E6%83%85%E5%86%B5"><span class="nav-number">1.4.1.</span> <span class="nav-text">输出新生代到老年代晋升的情况</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%B9%B6%E5%8F%91%E6%A0%87%E8%AE%B0%E6%A6%82%E8%A6%81%E4%BF%A1%E6%81%AF"><span class="nav-number">1.4.2.</span> <span class="nav-text">输出并发标记概要信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%AE%89%E5%85%A8%E7%82%B9%E7%9B%B8%E5%85%B3%E4%BF%A1%E6%81%AF"><span class="nav-number">1.4.3.</span> <span class="nav-text">输出安全点相关信息</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%A4%A7%E5%AF%B9%E8%B1%A1%E6%97%A5%E5%BF%97%E5%88%86%E6%9E%90"><span class="nav-number">1.4.4.</span> <span class="nav-text">输出大对象日志分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BE%93%E5%87%BAG1%E8%87%AA%E9%80%82%E5%BA%94%E8%B0%83%E6%95%B4%E8%AF%A6%E7%BB%86%E4%BF%A1%E6%81%AF"><span class="nav-number">1.4.5.</span> <span class="nav-text">输出G1自适应调整详细信息</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.</span> <span class="nav-text">GC 文件输出</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Log%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.1.</span> <span class="nav-text">Log文件输出</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dump%E6%96%87%E4%BB%B6%E8%BE%93%E5%87%BA"><span class="nav-number">2.2.</span> <span class="nav-text">Dump文件输出</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%8A%9F%E8%83%BD%E6%80%A7%E5%8F%82%E6%95%B0"><span class="nav-number">3.</span> <span class="nav-text">GC 功能性参数</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E9%85%8D%E7%89%A9%E7%90%86%E5%86%85%E5%AD%98"><span class="nav-number">3.1.</span> <span class="nav-text">分配物理内存</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%BC%95%E7%94%A8%E8%B0%83%E4%BC%98%E7%9B%B8%E5%85%B3%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">GC 引用调优相关参数</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%8E%BB%E9%87%8D%E8%B0%83%E4%BC%98%E7%9B%B8%E5%85%B3%E5%8F%82%E6%95%B0"><span class="nav-number">5.</span> <span class="nav-text">GC 字符串去重调优相关参数</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#GC-%E5%AE%89%E5%85%A8%E7%82%B9%E8%B0%83%E4%BC%98%E7%9B%B8%E5%85%B3%E5%8F%82%E6%95%B0"><span class="nav-number">6.</span> <span class="nav-text">GC 安全点调优相关参数</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#TODO-%E5%8F%82%E6%95%B0"><span class="nav-number">7.</span> <span class="nav-text">TODO 参数</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
