@@ -17,19 +17,19 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C&amp;">
+  <meta name="description" content="Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C&#x2F;">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Netty C&#x2F;S创建与初始化">
 <meta property="og:url" content="http://example.com/2021/01/08/Netty-C-S-%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96/index.html">
 <meta property="og:site_name" content="Lanchester Blog">
-<meta property="og:description" content="Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C&amp;">
+<meta property="og:description" content="Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C&#x2F;">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/Netty/Netty%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
-<meta property="og:image" content="http://example.com/images/Netty/%E6%9C%8D%E5%8A%A1%E7%AB%AFChannelPipeline%E7%88%B6%E5%AD%90Handler%E7%9A%84%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://example.com/images/Netty/Netty%E5%AE%A2%E6%88%B7%E7%AB%AF%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty服务端创建时序图.png">
+<meta property="og:image" content="http://example.com/images/Netty/服务端ChannelPipeline父子Handler的关系.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty客户端创建时序图.png">
 <meta property="og:image" content="http://example.com/images/Netty/SignalHandler.png">
 <meta property="article:published_time" content="2021-01-08T14:24:21.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.525Z">
@@ -37,7 +37,7 @@
 <meta property="article:tag" content="Netty">
 <meta property="article:tag" content="Server &amp; Client">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/Netty/Netty%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F%E5%9B%BE.png">
+<meta name="twitter:image" content="http://example.com/images/Netty/Netty服务端创建时序图.png">
 
 <link rel="canonical" href="http://example.com/2021/01/08/Netty-C-S-%E5%88%9B%E5%BB%BA%E4%B8%8E%E5%88%9D%E5%A7%8B%E5%8C%96/">
 
@@ -254,9 +254,8 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C&#x2F;S 端。 这无疑大大减轻了工作量、降低了开发难度。</p>
+        <p>Netty 封装了 JDK NIO 类库复杂而庞大的通信底层细节，使用户不再和 NIO 的 Selector、ServerSocketChannel、SocketChannel、ByteBuffer、SelectionKey 等组件打交道。而对于 Netty 来说，用户可以直接通过 ServerBootstrap（服务端启动辅助类）和 Bootstrap（客户端启动辅助类）来创建一个可通信的 C/S 端。 这无疑大大减轻了工作量、降低了开发难度。</p>
 <span id="more"></span>
-
 <h1 id="NettyServer-的创建"><a href="#NettyServer-的创建" class="headerlink" title="NettyServer 的创建"></a>NettyServer 的创建</h1><h2 id="NTSC-Server示例代码"><a href="#NTSC-Server示例代码" class="headerlink" title="NTSC-Server示例代码"></a>NTSC-Server示例代码</h2><p>下面我们以一个 NTSC（National Time Service Center，国家授时中心）举例</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public class NettyTimeServer &#123;
     public static void main(String[] args) &#123;
@@ -293,7 +292,6 @@
         &#125;
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="服务端创建及绑定步骤详解"><a href="#服务端创建及绑定步骤详解" class="headerlink" title="服务端创建及绑定步骤详解"></a>服务端创建及绑定步骤详解</h2><p><strong>步骤1：创建 ServerBootstrap 实例</strong></p>
 <p>ServerBootstrap 是 Netty 服务端的启动辅助类，提供了一系列方法用于设置服务端启动相关的参数。底层通过外观模式对各种能力进行抽象和封装，尽量不需要用户跟过多的底层 API 打交道，以降低用户的开发难度。并且，NIO 过多的参数导致不能只依靠构造器来启动服务，此时引入 Builder 模式，使得整体结构更加清晰了。</p>
 <p><strong>步骤2：设置并绑定 Reactor 线程池</strong></p>
@@ -313,7 +311,7 @@
 <li>发生用户自定义事件</li>
 </ol>
 <p><strong>步骤5：初始化 ChannelPipeline 完成之后，添加并设置 ChannelHandler</strong></p>
-<p>ChannelHandler 是 Netty 提供给用户定制和扩展的关键接口。利用 ChannelHandler 用户可以完成大多数的功能定制，例如消息编解码、心跳、安全认证、TSL&#x2F;SSL认证、流量控制和流量整形等。</p>
+<p>ChannelHandler 是 Netty 提供给用户定制和扩展的关键接口。利用 ChannelHandler 用户可以完成大多数的功能定制，例如消息编解码、心跳、安全认证、TSL/SSL认证、流量控制和流量整形等。</p>
 <p>Netty 同时也提供了大量的系统 ChannelHandler 供用户使用，比较实用的系统 ChannelHandler 总结如下</p>
 <ol>
 <li>系统编解码框架 —— ByteToMessageCodec</li>
@@ -341,12 +339,11 @@
 </ul>
 <p><strong>步骤9：执行 Netty 系统 ChannelHandler 和用户添加定制的 ChannelHandler</strong></p>
 <p>ChannelPipeline 根据网络事件的类型，调度并执行 ChannelHandler</p>
-<h2 id="服务端创建及绑定源码分析"><a href="#服务端创建及绑定源码分析" class="headerlink" title="服务端创建及绑定源码分析"></a>服务端创建及绑定源码分析</h2><p><img src="/images/Netty/Netty%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F%E5%9B%BE.png"></p>
+<h2 id="服务端创建及绑定源码分析"><a href="#服务端创建及绑定源码分析" class="headerlink" title="服务端创建及绑定源码分析"></a>服务端创建及绑定源码分析</h2><p><img src="/images/Netty/Netty服务端创建时序图.png" alt=""></p>
 <h3 id="创建启动器"><a href="#创建启动器" class="headerlink" title="创建启动器"></a>创建启动器</h3><p><strong>创建辅助启动器</strong></p>
 <p>首先通过构造函数创建 ServerBootstrap 实例</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Netty用于启动NIO服务端的辅助启动类，目的是降低服务端开发复杂度
 ServerBootstrap bootstrap &#x3D; new ServerBootstrap(); <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <h3 id="配置初始化参数"><a href="#配置初始化参数" class="headerlink" title="配置初始化参数"></a>配置初始化参数</h3><p><strong>配置初始化参数：绑定线程组</strong></p>
 <p>创建两个 EventLoopGroup（ 并不是必须要创建两个不同的 EventLoopGroup，也可以只创建一个并共享），代码如下</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;创建两个NIO线程组(Reactor线程组)，用于网络事件的处理
@@ -354,7 +351,6 @@ ServerBootstrap bootstrap &#x3D; new ServerBootstrap(); <span aria-hidden="true"
 EventLoopGroup bossGroup &#x3D; new NioEventLoopGroup();
 &#x2F;&#x2F;用于SocketChannel网络读写
 EventLoopGroup workerGroup &#x3D; new NioEventLoopGroup();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>NioEventLoopGroup 实际就是 Reactor 线程池，负责调度和执行客户端的接入、网络读写事件的处理、用户自定义任务和定时任务的执行。通过 ServerBootstrap 的 group 方法将两个 EventLoopGroup 实例传入，代码如下。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Class ServerBootstrap（子类）
 public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) &#123;
@@ -369,7 +365,6 @@ public B group(EventLoopGroup group) &#123;
     this.group &#x3D; group;
     return (B) this;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>事实上，无论是客户端还是服务端都需要设置工作IO线程，执行和调度网络事件的读写，因此，AbstractBootstrap 类中设置项是被客户端和服务端重用的。</p>
 <p><strong>配置初始化参数：配置端口监听和客户端链路接入的 Channel</strong></p>
 <p>Netty 通过 Channel 工厂类来创建不同类型的 Channel，对于服务端，需要创建 NioServerSocketChannel。所以，通过指定 Channel 类型的方式创建 Channel 工厂。</p>
@@ -377,11 +372,10 @@ public B group(EventLoopGroup group) &#123;
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">ServerBootstrap</span> <span class="token function">channel</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">extends</span> <span class="token class-name">ServerChannel</span><span class="token punctuation">></span></span> channelClass<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">return</span> <span class="token function">channelFactory</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ServerBootstrapChannelFactory</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ServerChannel</span><span class="token punctuation">></span></span><span class="token punctuation">(</span>channelClass<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>配置初始化参数：配置 Socket Option</strong></p>
 <p>指定 NioServerSocketChannel 后，需要设置 Server Socket 的一些参数。</p>
 <ol>
-<li><p>SO_BACKLOG（指定请求等待队列长度）– Server</p>
+<li><p>SO_BACKLOG（指定请求等待队列长度）— Server</p>
 <p>服务端处理客户端连接请求是顺序处理的，所以同一时间只能处理一个客户端连接，多个客户端来的时候，服务端将不能处理的客户端连接请求放在队列中等待处理。</p>
 <p>内核要维护两个队列：未连接队列和已连接队列，根据 TCP 三次握手过程中三个分节来分隔这两个队列。服务器处于监听状态时，收到客户端 <code>SYN</code> 时在未连接队列中创建一个新的条目，然后以 <code>SYN/ACK</code> 响应客户端，此条目在第三个分节到达前（客户端对服务器 <code>SYN/ACK</code> 响应的 <code>ACK</code>）一直保留在未连接队列中。如果握手完成，该条目将从未连接队列搬到已连接队列尾部。当进程调用 accept 时，从已完成队列中的头部取出一个条目给进程，当已完成队列为空时进程将睡眠，直到有条目在已完成连接队列中才唤醒。backlog 被规定为两个队列总和的最大值，大多数实现默认值为5，但在高并发 Web 服务器中此值显然不够， Lighttpd 中此值达到 128×8，需要设置此值更大一些的原因是未完成连接队列的长度可能因为客户端 syn 的到达及等待三路握手第三个分节的到达延时而增大。</p>
 </li>
@@ -391,7 +385,7 @@ public B group(EventLoopGroup group) &#123;
 <li><p>SO_KEEPALIVE（测试链接的状态）</p>
 <p>当设置该选项以后，连接会测试链接的状态，这个选项用于可能长时间没有数据交流的连接。当设置该选项以后，如果在两小时内没有数据的通信时，TCP会自动发送一个活动探测数据报文。</p>
 </li>
-<li><p>SO_SNDBUF 和 SO_RCVBUF（指定接受&#x2F;发送缓冲区大小）</p>
+<li><p>SO_SNDBUF 和 SO_RCVBUF（指定接受/发送缓冲区大小）</p>
 <p>操作接收缓冲区和发送缓冲区的大小，接收缓冲区用于保存网络协议站内收到的数据，直到应用程序读取成功，发送缓冲区用于保存发送数据，直到发送成功。</p>
 </li>
 <li><p>SO_LINGER</p>
@@ -406,7 +400,7 @@ public B group(EventLoopGroup group) &#123;
 <li><p>CONNECT_TIMEOUT_MILLIS</p>
 <p>客户端连接超时时间，由于NIO原生的客户端并不提供设置连接超时的接口，因此，Netty 用的是自定义连接超时定时器负责检测和超时控制</p>
 </li>
-<li><p><a target="_blank" rel="noopener" href="https://www.gnu.org/software/libc/manual/html_node/Socket_002dLevel-Options.html">更多 Socket Option</a></p>
+<li><p><a target="_blank" rel="noopener" href="https://www.gnu.org/software/libc/manual/html_node/Socket_002dLevel-Options.html">更多 Socket Option</a> </p>
 </li>
 </ol>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">B</span> <span class="token function">option</span><span class="token punctuation">(</span><span class="token class-name">ChannelOption</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> option<span class="token punctuation">,</span> <span class="token class-name">T</span> value<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -415,10 +409,9 @@ public B group(EventLoopGroup group) &#123;
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token class-name">B</span><span class="token punctuation">)</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>配置初始化参数：配置 Pipeline Handler</strong></p>
 <p>用户可以为启动辅助类和其父类分别指定 Handler。两类 Handler 的用途不同：子类中的 Handler 是 NioServerSocketChannel 对应的 ChannelPipeline 的 Handler；父类中的 Handler 是客户端新接入的连接 SocketChannel 对应的 ChannelPipeline 的 Handler。两者的区别可以通过下图来展示。</p>
-<p><img src="/images/Netty/%E6%9C%8D%E5%8A%A1%E7%AB%AFChannelPipeline%E7%88%B6%E5%AD%90Handler%E7%9A%84%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/Netty/服务端ChannelPipeline父子Handler的关系.png" alt=""></p>
 <p>本质区别就是：ServerBootstrap 中的 Handler 是 NioServerSocketChannel 使用的，所有连接该监听端口的客户端都会执行它；父类 AbstractBootstrap 中的 Handler 是个工厂类，它为每个新接入的客户端都创建一个新的 Handler。</p>
 <h3 id="绑定端口"><a href="#绑定端口" class="headerlink" title="绑定端口"></a>绑定端口</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//为了简化展示的代码，进行了合并</span>
 <span class="token keyword">public</span> <span class="token class-name">ChannelFuture</span> <span class="token function">bind</span><span class="token punctuation">(</span><span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -450,7 +443,6 @@ public B group(EventLoopGroup group) &#123;
 
     <span class="token keyword">return</span> promise<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h4 id="初始化NioServerSocketChannel"><a href="#初始化NioServerSocketChannel" class="headerlink" title="初始化NioServerSocketChannel"></a>初始化NioServerSocketChannel</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//为了方便对主线任务的理解，对异常处理进行了删减</span>
 <span class="token keyword">final</span> <span class="token class-name">ChannelFuture</span> <span class="token function">initAndRegister</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token class-name">Channel</span> channel<span class="token punctuation">;</span>
@@ -511,7 +503,6 @@ public B group(EventLoopGroup group) &#123;
     <span class="token comment">//////////////////////////////////////////////////////////////////////////////////</span>
     <span class="token keyword">return</span> regFuture<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h4 id="注册NioServerSocketChannel"><a href="#注册NioServerSocketChannel" class="headerlink" title="注册NioServerSocketChannel"></a>注册NioServerSocketChannel</h4><p>注册 NioServerSocketChannel 到 Reactor 线程的多路复用器上，然后轮询客户端连接事件</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//Channel初始化完成之后，需要将它注册到Reactor线程的多路复用器上监听新客户端的接入</span>
 <span class="token annotation punctuation">@Override</span>
@@ -531,7 +522,6 @@ public B group(EventLoopGroup group) &#123;
         <span class="token comment">//报异常就强行关闭Channel</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>首先判断是否是 NioEventLoop 自身发起的操作。如果是，则不存在并发操作，直接执行 Channel 注册；<br>此处，由于是由 ServerBootstrap 所在线程执行的注册操作，所以会将其封装成 Task 投递到 NioEventLoop 中执行，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">register0</span><span class="token punctuation">(</span><span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     
@@ -549,7 +539,6 @@ public B group(EventLoopGroup group) &#123;
     <span class="token punctuation">&#125;</span>
     <span class="token comment">//如注册失败，抛出异常并释放资源</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doRegister</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">boolean</span> selected <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
@@ -586,7 +575,6 @@ public B group(EventLoopGroup group) &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h4 id="触发ChannelRegistered事件"><a href="#触发ChannelRegistered事件" class="headerlink" title="触发ChannelRegistered事件"></a>触发ChannelRegistered事件</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//思路跳回到 register0 函数的讲解</span>
 <span class="token comment">//Class AbstractChannel</span>
 <span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">register0</span><span class="token punctuation">(</span><span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -612,7 +600,6 @@ public B group(EventLoopGroup group) &#123;
 <span class="token punctuation">&#125;</span>
 <span class="token comment">//Interface ChannelHandlerInvoker </span>
 <span class="token keyword">void</span> <span class="token function">invokeChannelRegistered</span><span class="token punctuation">(</span><span class="token class-name">ChannelHandlerContext</span> ctx<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h4 id="触发ChannelActive事件"><a href="#触发ChannelActive事件" class="headerlink" title="触发ChannelActive事件"></a>触发ChannelActive事件</h4><p>ChannelRegistered事件传递完成后，判断 ServerSocketChannel 监听是否成功，如果成功，需要出发 NioServerSocketChannel 的 ChannelActive 事件。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//Class AbstractChannel</span>
 <span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">register0</span><span class="token punctuation">(</span><span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -622,7 +609,6 @@ public B group(EventLoopGroup group) &#123;
     <span class="token punctuation">&#125;</span>
     <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>inActive() 也是个多态方法。如果是服务端，判断监听是否启动；如果是客户端，判断TCP连接是否完成。 </p>
 <h4 id="依据条件触发Channel读操作"><a href="#依据条件触发Channel读操作" class="headerlink" title="依据条件触发Channel读操作"></a>依据条件触发Channel读操作</h4><p>ChannelActive 事件在 ChannelPipeline 中传递，完成之后根据配置决定是否自动触发 Channel 的读操作，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
@@ -633,7 +619,6 @@ public B group(EventLoopGroup group) &#123;
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>AbstractChannel 的读操作触发 ChannelPipeline 的读操作，最终调用到 HeadHandler 的 read 方法。</p>
 <p>由于不同类型的 Channel 对读操作的准备工作不同，因此， beginRead 也是个多态方法，对于 NIO 通信，无论是客户端还是服务端，都是要修改网络监听操作位为自身感兴趣的，对于 NioServerSocketChannel 感兴趣的操作是 OP_ACCEPT(16)，于是重新修改注册的操作位为 OP_ACCEPT，代码如下。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@Override
@@ -643,14 +628,12 @@ protected void doBeginRead() throws Exception &#123;
         selectionKey.interestOps(interestOps | readInterestOp);
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>以网络操作位来表示状态的好处：可以方便地通过位操作来进行网络操作位的状态判断和状态修改，从而提升操作性能。</p>
 <p>由于创建 NioServerSocketChannel 将 readInterestOp 设置成了 OP_ACCEPT，所以，在服务端链路注册成功之后重新将操作位设置为监听客户端的网络连接操作，初始化 NioServerSocketChannel 的代码如下。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public NioServerSocketChannel(EventLoop eventLoop, EventLoopGroup childGroup) &#123;
     super(null, eventLoop, childGroup, newSocket(), SelectionKey.OP_ACCEPT);
     config &#x3D; new DefaultServerSocketChannelConfig(this, javaChannel().socket());
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="客户端接入源码分析"><a href="#客户端接入源码分析" class="headerlink" title="客户端接入源码分析"></a>客户端接入源码分析</h2><p>负责处理网络读写、连接和客户端请求接入的 Reactor 线程就是 NioEventLoop。</p>
 <p>当多路复用器检测到新的准备就绪的 Channel 时，默认执行 processSelectedKeysOptimized 方法，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
@@ -723,7 +706,6 @@ protected void doBeginRead() throws Exception &#123;
        
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>由于 Channel 的 Attachment 是 NioServerSocketChannel，所以执行 processSelectedKey 方法，根据就绪的操作位，执行不同的操作。此处，由于监听的是连接操作，所以执行 unsafe.read 方法。由于不同的 Channel 执行不同的操作，所以 NioUnsafe 被设计成接口，由不同的 Channel 内部的 NioUnsafe 实现类负责具体实现。我们发现 read 方法的实现有两个，分别是 NioByteUnsafe 和 NioMessageUnsafe。对于 NioServerSocketChannel，它使用的是 NioMessageUnsafe，它的 read 方法代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
     <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -781,7 +763,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>对 doReadMessages 方法进行分析，发现它实际就是接收新的客户端连接并创建 NioSocketChannel</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">doReadMessages</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> buf<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -794,7 +775,6 @@ protected void doBeginRead() throws Exception &#123;
 
     <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>接收到新的客户端连接后，触发 ChannelPipeline 的 ChannelRead 方法</p>
 <p>执行 head ChannelHandlerContext 的 fireChannelRead 方法，事件在 ChannelPipeline 中传递，执行 ServerBootstrapAcceptor 的 channelRead 方法，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
@@ -822,13 +802,11 @@ protected void doBeginRead() throws Exception &#123;
     <span class="token comment">//注册 SocketChannel 到多路复用器</span>
     child<span class="token punctuation">.</span><span class="token function">unsafe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">register</span><span class="token punctuation">(</span>child<span class="token punctuation">.</span><span class="token function">newPromise</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>NioSocketChannel 的注册方法与 ServerSocketChannel 的一致，也是将 Channel 注册到 Reactor 线程的多路复用器上。由于注册的操作位是0，所以，此时 NioSocketChannel 还不能读取客户端发送的消息，那什么时候修改监听操作位为 OP_READ 呢。执行完注册操作之后，紧接着会触发 ChannelReadComplete 事件。我们继续分析 ChannelReadComplete 在 ChannelPipeline 中的处理流程：Netty 的 Header 和 Tail 本身不关注 ChannelReadComplete 事件就直接透传，执行完 ChannelReadComplete 后，接着执行 Pipeline 的 read 方法，最终执行 HeadHandler 的 read 方法。</p>
 <p>HeadHandler read 方法的代码已经在之前的小节介绍过，用来将网络操作位修改为读操作。创建 NioSocketChannel 的时候已经将 AbstractNioChannel 的 readInterestOp 设置为 OP_READ，这样，执行 <code>selectionKey.interestOps(interestOps | readInterestOp)</code>操作时就会把操作位设置为 OP_READ。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token class-name">AbstractNioByteChannel</span><span class="token punctuation">(</span><span class="token class-name">Channel</span> parent<span class="token punctuation">,</span> <span class="token class-name">EventLoop</span> eventLoop<span class="token punctuation">,</span> <span class="token class-name">SelectableChannel</span> ch<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">super</span><span class="token punctuation">(</span>parent<span class="token punctuation">,</span> eventLoop<span class="token punctuation">,</span> ch<span class="token punctuation">,</span> <span class="token class-name">SelectionKey</span><span class="token punctuation">.</span>OP_READ<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>到此，新接入的客户端连接处理完成，可以进行网络读写等IO操作。</p>
 <h1 id="NettyClient-的创建"><a href="#NettyClient-的创建" class="headerlink" title="NettyClient 的创建"></a>NettyClient 的创建</h1><h2 id="NTSC-Client示例代码"><a href="#NTSC-Client示例代码" class="headerlink" title="NTSC-Client示例代码"></a>NTSC-Client示例代码</h2><p>相对于服务端，Netty 客户端的创建更加复杂，除了要考虑线程模型、异步连接、客户端连接超时等因素外，还需要对连接过程中的各种异常进行考虑。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">NettyTimeClient</span> <span class="token punctuation">&#123;</span>
@@ -858,7 +836,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="客户端创建及连接步骤详解"><a href="#客户端创建及连接步骤详解" class="headerlink" title="客户端创建及连接步骤详解"></a>客户端创建及连接步骤详解</h2><p><strong>步骤1</strong></p>
 <p>用户线程创建 Bootstrap实例，通过APl设置创建客户端相关的参数，异步发起客户端连接。</p>
 <p><strong>步骤2</strong></p>
@@ -877,11 +854,10 @@ protected void doBeginRead() throws Exception &#123;
 <p>如果连接成功，设置 Future 结果，发送连接成功事件，触发 ChannelPipeline 执行</p>
 <p><strong>步骤9</strong></p>
 <p>由 ChannelPipeline 调度执行系统和用户的 ChannelHandler，执行业务逻辑。</p>
-<h2 id="客户端创建及连接源码分析"><a href="#客户端创建及连接源码分析" class="headerlink" title="客户端创建及连接源码分析"></a>客户端创建及连接源码分析</h2><p><img src="/images/Netty/Netty%E5%AE%A2%E6%88%B7%E7%AB%AF%E5%88%9B%E5%BB%BA%E6%97%B6%E5%BA%8F%E5%9B%BE.png"></p>
+<h2 id="客户端创建及连接源码分析"><a href="#客户端创建及连接源码分析" class="headerlink" title="客户端创建及连接源码分析"></a>客户端创建及连接源码分析</h2><p><img src="/images/Netty/Netty客户端创建时序图.png" alt=""></p>
 <h3 id="创建及配置初始化参数"><a href="#创建及配置初始化参数" class="headerlink" title="创建及配置初始化参数"></a>创建及配置初始化参数</h3><p><strong>创建辅助启动器</strong></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//客户端辅助启动类</span>
 <span class="token class-name">Bootstrap</span> bootstrap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Bootstrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p><strong>配置初始化参数：绑定线程组</strong></p>
 <p>对于客户端来说，只需要一个处理IO读写的线程组即可。与服务端不同的是，服务端重载了<code>group</code>函数，并增加了一个用于接收客户端连接的线程组。而这一点客户端显然不需要，因此直接采用了 AbstractBootstrap 的方法对线程组进行设置。</p>
 <p><strong>配置初始化参数：配置端口监听和客户端链路接入的 Channel</strong></p>
@@ -894,7 +870,6 @@ protected void doBeginRead() throws Exception &#123;
 <pre class="line-numbers language-text" data-language="text"><code class="language-text">interface ChannelHandler
     -implement class ChannelHandlerAdapter
     	-extends abstract class ChannelInitializer&lt;C extends Channel><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>当TCP链路注册成功之后，会调用 initChannel 接口，用于设置用户 ChannelHandler。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//abstract class ChannelInitializer</span>
 <span class="token annotation punctuation">@Override</span>
@@ -919,7 +894,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="客户端连接操作"><a href="#客户端连接操作" class="headerlink" title="客户端连接操作"></a>客户端连接操作</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">ChannelFuture</span> <span class="token function">doConnect</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">SocketAddress</span> remoteAddress<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//创建和初始化NioSocketChannel并注册到Selector上</span>
     <span class="token keyword">final</span> <span class="token class-name">ChannelFuture</span> regFuture <span class="token operator">=</span> <span class="token function">initAndRegister</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -942,7 +916,6 @@ protected void doBeginRead() throws Exception &#123;
 
     <span class="token keyword">return</span> promise<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">doConnect0</span><span class="token punctuation">(</span>
         <span class="token keyword">final</span> <span class="token class-name">ChannelFuture</span> regFuture<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">Channel</span> channel<span class="token punctuation">,</span>
         <span class="token keyword">final</span> <span class="token class-name">SocketAddress</span> remoteAddress<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -965,7 +938,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>由上述代码可以看出，从 doConnect 操作开始，连接操作切换到了 Netty 的 NIO 线程 NioEventLoop 中进行，此时客户端返回，连接操作异步执行。doConnect 最终调用 HeadHandler 的 connect方法。</p>
 <p>需要注意的是， SocketChannel 执行 connect 操作后有以下三种结果：</p>
 <ol>
@@ -1033,7 +1005,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token function">closeIfClosed</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">fulfillConnectPromise</span><span class="token punctuation">(</span><span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">,</span> <span class="token keyword">boolean</span> wasActive<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// trySuccess() will return false if a user cancelled the connection attempt.</span>
     <span class="token keyword">boolean</span> promiseSet <span class="token operator">=</span> promise<span class="token punctuation">.</span><span class="token function">trySuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -1049,7 +1020,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token function">close</span><span class="token punctuation">(</span><span class="token function">voidPromise</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>ChannelActive 事件处理最终会将 NioSocketChannel 中的 selectionKey 设置为 SelectionKey.OP_READ，用于监听网络读操作。</p>
 <p>如果没有立即连接上服务端，则注册 SelectionKey.OP_CONNECT 到多路复用器，失败则关闭链路。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//class NioSocketChannel</span>
@@ -1073,7 +1043,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="异步连接结果通知"><a href="#异步连接结果通知" class="headerlink" title="异步连接结果通知"></a>异步连接结果通知</h3><p>NioEventLoop 的 Selector 轮询客户端连接 Channel，当服务端返回握手应答之后，对接结果进行判断，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">processSelectedKey</span><span class="token punctuation">(</span><span class="token class-name">SelectionKey</span> k<span class="token punctuation">,</span> <span class="token class-name">AbstractNioChannel</span> ch<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">final</span> <span class="token class-name">NioUnsafe</span> unsafe <span class="token operator">=</span> ch<span class="token punctuation">.</span><span class="token function">unsafe</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -1112,12 +1081,10 @@ protected void doBeginRead() throws Exception &#123;
         unsafe<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span>unsafe<span class="token punctuation">.</span><span class="token function">voidPromise</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>对 finishConnect 进行源码分析</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">boolean</span> wasActive <span class="token operator">=</span> <span class="token function">isActive</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token function">doFinishConnect</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token function">fulfillConnectPromise</span><span class="token punctuation">(</span>connectPromise<span class="token punctuation">,</span> wasActive<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>doFinishConnect 用于判断JDK的 SocketChannel 的连接结果，如果返回true表示连接成功，其他值或者发生异常表示连接失败。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doFinishConnect</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -1125,7 +1092,6 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>连接成功之后，调用 fulfilIConnectPromise 方法，触发链路激活事件，该事件由 ChannePipeline 进行传播，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">fulfillConnectPromise</span><span class="token punctuation">(</span><span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">,</span> <span class="token keyword">boolean</span> wasActive<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// trySuccess() will return false if a user cancelled the connection attempt.</span>
@@ -1142,14 +1108,12 @@ protected void doBeginRead() throws Exception &#123;
         <span class="token function">close</span><span class="token punctuation">(</span><span class="token function">voidPromise</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="客户端连接超时机制"><a href="#客户端连接超时机制" class="headerlink" title="客户端连接超时机制"></a>客户端连接超时机制</h3><p>对于 SocketChannel 接口，JDK 并没有提供连接超时机制，需要 NIO 框架或者用户自已扩展实现。 Netty利用定时器提供了客户端连接超时控制功能。</p>
 <p>首先，用户在创建Netty客户端的时候，可以通过 ChannelOption.CONNECT_TIMEOUT_MILLIS 配置项设置连接超时时间，代码如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java">bootstrap<span class="token punctuation">.</span><span class="token function">group</span><span class="token punctuation">(</span>group<span class="token punctuation">)</span>
         <span class="token punctuation">.</span><span class="token function">channel</span><span class="token punctuation">(</span><span class="token class-name">NioSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span>
         <span class="token punctuation">.</span><span class="token function">option</span><span class="token punctuation">(</span><span class="token class-name">ChannelOption</span><span class="token punctuation">.</span>TCP_NODELAY<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span>
         <span class="token punctuation">.</span><span class="token function">option</span><span class="token punctuation">(</span><span class="token class-name">ChannelOption</span><span class="token punctuation">.</span>CONNECT_TIMEOUT_MILLIS<span class="token punctuation">,</span> <span class="token number">3000</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>发起连接的同时，启动连接超时检测定时器。一旦超时定时器执行，说明客户端连接超时，构造连接超时异常，将异常结果设置到connect Promise中，同时关闭客户端连接，释放句柄。如果在连接超时之前获取到连接结果，则删除连接超时定时器，防止其被触发。无论连接是否成功，只要获取到连接结果，之后就删除连接超时定时器。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//abstract class AbstractNioChannel finishConnect</span>
 <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
@@ -1160,7 +1124,6 @@ protected void doBeginRead() throws Exception &#123;
     <span class="token punctuation">&#125;</span>
     connectPromise <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="进阶：Netty服务端意外退出"><a href="#进阶：Netty服务端意外退出" class="headerlink" title="进阶：Netty服务端意外退出"></a>进阶：Netty服务端意外退出</h1><p>通过阻塞方式绑定监听端口，启动服务端之后，没发生任何异常，程序退出。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//Netty用于启动NIO服务端的辅助启动类，目的是降低服务端开发复杂度</span>
@@ -1183,7 +1146,6 @@ protected void doBeginRead() throws Exception &#123;
     bossGroup<span class="token punctuation">.</span><span class="token function">shutdownGracefully</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     workerGroup<span class="token punctuation">.</span><span class="token function">shutdownGracefully</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>造成该结果的原因</strong></p>
 <ol>
 <li>调用<code>bind.sync</code>同步阻塞直到有结果返回，但线程很快执行完毕。</li>
@@ -1197,8 +1159,7 @@ protected void doBeginRead() throws Exception &#123;
 ChannelFuture f &#x3D; bootstrap.bind(port).sync();
 &#x2F;&#x2F;等待服务端监听端口关闭
 f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
-<ol start="2">
+<ol>
 <li>将<code>finally</code>块中的<code>shutdownGracefully</code>切到监听器</li>
 </ol>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java">f<span class="token punctuation">.</span><span class="token function">channel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">closeFuture</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">addListener</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">ChannelFutureListener</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1209,7 +1170,6 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
         workerGroup<span class="token punctuation">.</span><span class="token function">shutdownGracefully</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>实际项目中的情况</strong></p>
 <p>业务往往是通过某种容器（例如 Tomcat、Spring Boot 等）拉起进程，然后通过容器启动来初始化各种业务资源。因此，不需要担心 Netty 服务端意外退出，启动 Netty 服务端比较容易犯的错误是釆用同步的方式调用Nety，导致初始化Nety服务端的业务线程被阻塞，举例如下。</p>
 <p>错误用法：这种用法会导致调用方的线程一直被阻塞，直到服务端监听句柄关闭</p>
@@ -1252,10 +1212,9 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
     Main end
     Shutdown Hook start performing
     Shutdown Hook end performing</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>Signal</strong></p>
 <p>也可以通过监听信号量并注册 SignalHandler 的方式实现优雅退出，它的工作原理如下图。</p>
-<p><img src="/images/Netty/SignalHandler.png"></p>
+<p><img src="/images/Netty/SignalHandler.png" alt=""></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token import"><span class="token namespace">sun<span class="token punctuation">.</span>misc<span class="token punctuation">.</span></span><span class="token class-name">Signal</span></span><span class="token punctuation">;</span>
 <span class="token keyword">import</span> <span class="token import"><span class="token namespace">sun<span class="token punctuation">.</span>misc<span class="token punctuation">.</span></span><span class="token class-name">SignalHandler</span></span><span class="token punctuation">;</span>
 
@@ -1265,7 +1224,6 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
         <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"process successfully"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token class-name">TestSignalHandler</span> handler <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">TestSignalHandler</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token comment">//判断是否是Windows操作系统，如果是则选择SIGINT，接收Ctrl+C中断的指令，</span>
@@ -1282,7 +1240,6 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <blockquote>
 <p>在 Linux 下支持的信号（具体信号kill -l命令查看）<br>SEGV, ILL, FPE, BUS, SYS, CPU, FSZ, ABRT, INT, TERM, HUP, USR1, USR2, QUIT, BREAK, TRAP, PIPE</p>
 <p>在 Windows 下支持的信号<br>SEGV, ILL, FPE, ABRT, INT, TERM, BREAK</p>
@@ -1415,8 +1372,7 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
 
 <span class="token comment">//NioEventLoop的扫尾处理</span>
 <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>NioEventLoop 除了I&#x2F;O读写，还负责定时任务执行、 ShutdownHook（备注：此处非 JDK 原生的 ShutdownHook）的执行等，如果此时有到期的定时任务，即使 Channel 已经关闭，但是仍然需要继续执行，线程不能退岀，下面继续分析 TaskQueue 的退出处理流程。</p>
+<p>NioEventLoop 除了I/O读写，还负责定时任务执行、 ShutdownHook（备注：此处非 JDK 原生的 ShutdownHook）的执行等，如果此时有到期的定时任务，即使 Channel 已经关闭，但是仍然需要继续执行，线程不能退岀，下面继续分析 TaskQueue 的退出处理流程。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//上面 Run 轮询提到的扫尾工作</span>
 <span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">confirmShutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
    
@@ -1459,7 +1415,6 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
     <span class="token comment">// (Hopefully because we really cannot make a guarantee that there will be no execute() calls by a user.)</span>
     <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>Netty优雅退出的一些误区</strong></p>
 <ol>
 <li>待发送的消息：调用优雅退出方法之后，不会立即关闭链路。ChannelOutboundBuffer 中的消息可以继续发送，本轮发送操作执行完成之后，无论是否还有消息尚未发送出去，在下一轮的 Selector 轮询中，链路都将被关闭，没有发送完成的消息将会被释放和丢弃。</li>
@@ -1665,6 +1620,8 @@ f.channel().closeFuture().sync();<span aria-hidden="true" class="line-numbers-ro
 
 
 
+
+  
 
   
 

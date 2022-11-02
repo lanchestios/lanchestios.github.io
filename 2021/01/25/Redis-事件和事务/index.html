@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="Redis 采用事件驱动机制来处理大量的网络 IO。它并没有使用 libevent 或者 libev 这样的成熟开源方案，而是自己实现一个非常简洁的事件驱动库 ae_event。Redis 基于事件驱动，来实现相应的事务机制。本文做了对应的源码解析并分析了不同场景下事务 ACID 的性质。">
@@ -27,13 +27,13 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="Redis 采用事件驱动机制来处理大量的网络 IO。它并没有使用 libevent 或者 libev 这样的成熟开源方案，而是自己实现一个非常简洁的事件驱动库 ae_event。Redis 基于事件驱动，来实现相应的事务机制。本文做了对应的源码解析并分析了不同场景下事务 ACID 的性质。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/Redis/IO%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E5%92%8CIO%E6%A1%86%E6%9E%B6%E5%92%8C%E4%B8%8A%E5%B1%82%E5%BA%94%E7%94%A8%E7%9A%84%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://example.com/images/Redis/%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E5%99%A8.png">
+<meta property="og:image" content="http://example.com/images/Redis/IO底层实现和IO框架和上层应用的关系.png">
+<meta property="og:image" content="http://example.com/images/Redis/文件事件处理器.png">
 <meta property="og:image" content="http://example.com/images/Redis/客户端服务端通信过程.png">
-<meta property="og:image" content="http://example.com/images/Redis/%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6.png">
-<meta property="og:image" content="http://example.com/images/Redis/%E4%BA%8B%E4%BB%B6%E7%AE%A1%E7%90%86%E5%99%A8.png">
-<meta property="og:image" content="http://example.com/images/Redis/%E5%BC%80%E5%90%AF%E4%BA%8B%E5%8A%A1%E5%90%8E%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%A4%E6%96%AD%E5%91%BD%E4%BB%A4%E5%8E%BB%E5%90%91.png">
-<meta property="og:image" content="http://example.com/images/Redis/%E4%BA%8B%E5%8A%A1%E7%8A%B6%E6%80%81.png">
+<meta property="og:image" content="http://example.com/images/Redis/时间事件.png">
+<meta property="og:image" content="http://example.com/images/Redis/事件管理器.png">
+<meta property="og:image" content="http://example.com/images/Redis/开启事务后服务端判断命令去向.png">
+<meta property="og:image" content="http://example.com/images/Redis/事务状态.png">
 <meta property="og:image" content="http://example.com/images/Redis/WATCH命令数据结构.png">
 <meta property="article:published_time" content="2021-01-25T08:45:00.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.548Z">
@@ -43,7 +43,7 @@
 <meta property="article:tag" content="Transaction">
 <meta property="article:tag" content="ACID">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/Redis/IO%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E5%92%8CIO%E6%A1%86%E6%9E%B6%E5%92%8C%E4%B8%8A%E5%B1%82%E5%BA%94%E7%94%A8%E7%9A%84%E5%85%B3%E7%B3%BB.png">
+<meta name="twitter:image" content="http://example.com/images/Redis/IO底层实现和IO框架和上层应用的关系.png">
 
 <link rel="canonical" href="http://example.com/2021/01/25/Redis-%E4%BA%8B%E4%BB%B6%E5%92%8C%E4%BA%8B%E5%8A%A1/">
 
@@ -262,7 +262,6 @@
       
         <p>Redis 采用事件驱动机制来处理大量的网络 IO。它并没有使用 libevent 或者 libev 这样的成熟开源方案，而是自己实现一个非常简洁的事件驱动库 ae_event。Redis 基于事件驱动，来实现相应的事务机制。本文做了对应的源码解析并分析了不同场景下事务 ACID 的性质。</p>
 <span id="more"></span>
-
 <h1 id="Redis事件调度"><a href="#Redis事件调度" class="headerlink" title="Redis事件调度"></a>Redis事件调度</h1><p>Redis中的事件驱动库只关注网络IO，以及定时器。该事件库处理下面两类事件：</p>
 <ul>
 <li>文件事件(file event)：用于处理 Redis 服务器和客户端之间的网络 IO。</li>
@@ -276,9 +275,9 @@
 <li>Redis 采用的单线程多进程集群的方案可以更好的利用每个核心的性能。</li>
 </ol>
 <p>Redis 使用的IO多路复用技术主要有：<code>select</code>、<code>epoll</code>、<code>evport</code>和<code>kqueue</code>等。每个 IO 多路复用函数库在 Redis 源码中都对应一个单独的文件，比如 ae_select.c，ae_epoll.c，ae_kqueue.c 等。Redis 会根据不同的操作系统，按照不同的优先级选择多路复用技术。事件响应框架一般都采用该架构，比如 netty 和 libevent。</p>
-<p><img src="/images/Redis/IO%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0%E5%92%8CIO%E6%A1%86%E6%9E%B6%E5%92%8C%E4%B8%8A%E5%B1%82%E5%BA%94%E7%94%A8%E7%9A%84%E5%85%B3%E7%B3%BB.png"></p>
-<h3 id="IO多路复用程序的实现"><a href="#IO多路复用程序的实现" class="headerlink" title="IO多路复用程序的实现"></a>IO多路复用程序的实现</h3><p>下图是文件事件处理器，它有四个组成部分，分别是套接字、I&#x2F;O多路复用程序、文件事件分派器以及事件处理器。</p>
-<p><img src="/images/Redis/%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E5%99%A8.png"></p>
+<p><img src="/images/Redis/IO底层实现和IO框架和上层应用的关系.png" alt=""></p>
+<h3 id="IO多路复用程序的实现"><a href="#IO多路复用程序的实现" class="headerlink" title="IO多路复用程序的实现"></a>IO多路复用程序的实现</h3><p>下图是文件事件处理器，它有四个组成部分，分别是套接字、I/O多路复用程序、文件事件分派器以及事件处理器。</p>
+<p><img src="/images/Redis/文件事件处理器.png" alt=""></p>
 <p>文件事件是对套接字操作的抽象，每当一个套接字准备好执行 accept、read、write 和 close 等操作时，就会产生一个文件事件。因为 Redis 通常会连接多个套接字，所以多个文件事件有可能并发的出现。IO 多路复用程序负责监听多个 Socket，并向文件事件派发器传递那些产生了事件的 Socket。</p>
 <p>尽管多个文件事件可能会并发地出现，但 IO 多路复用程序会将所有待处理的事件都放到同一个队列（也就是后文中描述的<code>aeEventLoop</code>的<code>fired</code>就绪事件表）里边，然后文件事件处理器会以有序、同步、单 Socket 的方式处理该队列中的套接字，也就是处理就绪的文件事件。</p>
 <h3 id="文件事件的类型"><a href="#文件事件的类型" class="headerlink" title="文件事件的类型"></a>文件事件的类型</h3><p>IO 多路复用程序可以监听多个 Socket 的<code>ae.h/AE_READABLE</code>事件和<code>ae.h/AE_WRITABLE</code>事件，这两类事件和 Socket 操作之间的对应关系如下：</p>
@@ -287,8 +286,7 @@
 <li>当 Socket 变得可写时（客户端对 Socket 执行 read 操作）， Socket 产生 AE_WRITABLE 事件。</li>
 </ul>
 <p>IO 多路复用程序允许服务器同时监听套接字的 AE_READABLE 事件和 AE_WRITABLE 事件，如果一个套接字同时产生了这两种事件，那么文件事件分派器会优先处理 AE_READABLE 事件。也就是说，如果一个 Socket 又可读又可写的话，那么服务器将先读 Socket，后写 Socket。</p>
-<h3 id="C-x2F-S之间事件处理过程"><a href="#C-x2F-S之间事件处理过程" class="headerlink" title="C&#x2F;S之间事件处理过程"></a>C&#x2F;S之间事件处理过程</h3><img src="/images/Redis/客户端服务端通信过程.png" style="zoom:50%;" />
-
+<h3 id="C-S之间事件处理过程"><a href="#C-S之间事件处理过程" class="headerlink" title="C/S之间事件处理过程"></a>C/S之间事件处理过程</h3><p><img src="/images/Redis/客户端服务端通信过程.png" style="zoom:50%;" /></p>
 <ul>
 <li>客户端向服务端发起建立 Socket 连接的请求，那么监听套接字将产生 AE_READABLE 事件，触发<strong>连接应答处理器</strong>执行。处理器会对客户端的连接请求进行应答，然后创建客户端 Socket，以及客户端状态，并将客户端套接字的 AE_READABLE 事件与<strong>命令请求处理器</strong>关联。</li>
 <li>客户端建立连接后，向服务器发送命令，那么客户端 Socket 将产生 AE_READABLE 事件，触发<strong>命令请求处理器</strong>执行，处理器读取客户端命令，然后传递给相关程序去执行。</li>
@@ -313,13 +311,12 @@
     <span class="token comment">/* 后继节点 */</span>
     <span class="token keyword">struct</span> <span class="token class-name">aeTimeEvent</span> <span class="token operator">*</span>next<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span> aeTimeEvent<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="时间事件的类型"><a href="#时间事件的类型" class="headerlink" title="时间事件的类型"></a>时间事件的类型</h3><ul>
 <li>定时事件：让一段程序在指定的时间之后执行一次。</li>
 <li>周期性事件：让一段程序每隔指定时阃就执行一次。</li>
 </ul>
 <h3 id="实现逻辑"><a href="#实现逻辑" class="headerlink" title="实现逻辑"></a>实现逻辑</h3><p>服务器将所有时间事件都放在一个无序链表中，每当时间事件执行器运行时，它就遍历整个链表，查找所有已到达的时间事件，并调用相应的事件处理器。</p>
-<p><img src="/images/Redis/%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6.png"></p>
+<p><img src="/images/Redis/时间事件.png" alt=""></p>
 <p>一个时间事件是定时事件还是周期性事件取决于时间处理器的返回值：</p>
 <ul>
 <li>如果返回值是 AE_NOMORE，那么这个事件是一个定时事件，该事件在达到后删除，之后不会再重复</li>
@@ -372,7 +369,6 @@ aeEventLoop <span class="token operator">*</span><span class="token function">ae
 err<span class="token operator">:</span>
     <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">aeApiCreate</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     aeApiState <span class="token operator">*</span>state <span class="token operator">=</span> <span class="token function">zmalloc</span><span class="token punctuation">(</span><span class="token keyword">sizeof</span><span class="token punctuation">(</span>aeApiState<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 
@@ -400,7 +396,6 @@ err<span class="token operator">:</span>
     <span class="token comment">/* 存储epoll就绪事件表 */</span>
     <span class="token keyword">struct</span> <span class="token class-name">epoll_event</span> <span class="token operator">*</span>events<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span> aeApiState<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><code>aeApiState</code>对象中<code>epfd</code>存储<code>epoll</code>的标识，<code>events</code>是一个<code>epoll</code>就绪事件数组，当有<code>epoll</code>事件发生时，所有发生的<code>epoll</code>事件和其描述符将存储在这个数组中。这个就绪事件数组由应用层开辟空间、内核负责把所有发生的事件填充到该数组。</p>
 <h3 id="创建文件事件"><a href="#创建文件事件" class="headerlink" title="创建文件事件"></a>创建文件事件</h3><p><code>aeFileEvent</code>是文件事件结构，对于每一个具体的事件，都有读处理函数和写处理函数等。Redis 调用<code>aeCreateFileEvent</code>函数针对不同的套接字的读写事件注册对应的文件事件。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">aeFileEvent</span> <span class="token punctuation">&#123;</span>
@@ -417,16 +412,14 @@ err<span class="token operator">:</span>
 <span class="token keyword">typedef</span> <span class="token keyword">void</span> <span class="token function">aeFileProc</span><span class="token punctuation">(</span><span class="token keyword">struct</span> <span class="token class-name">aeEventLoop</span> <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> 
 <span class="token keyword">int</span> fd<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>clientData<span class="token punctuation">,</span> <span class="token keyword">int</span> mask<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>比如说，Redis 进行主从复制时，从服务器需要主服务器建立连接，它会发起一个 socekt连接，然后调用<code>aeCreateFileEvent</code>函数针对发起的socket的读写事件注册了对应的事件处理器，也就是<code>syncWithMaster</code>函数。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token function">aeCreateFileEvent</span><span class="token punctuation">(</span>server<span class="token punctuation">.</span>el<span class="token punctuation">,</span>fd<span class="token punctuation">,</span>AE_READABLE<span class="token operator">|</span>AE_WRITABLE<span class="token punctuation">,</span>syncWithMaster<span class="token punctuation">,</span><span class="token constant">NULL</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token comment">/* 符合aeFileProc的函数定义 */</span>
 <span class="token keyword">void</span> <span class="token function">syncWithMaster</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>el<span class="token punctuation">,</span> <span class="token keyword">int</span> fd<span class="token punctuation">,</span> <span class="token keyword">void</span> <span class="token operator">*</span>privdata<span class="token punctuation">,</span> <span class="token keyword">int</span> mask<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><code>aeCreateFileEvent</code>的参数<code>fd</code>指的是具体的<code>socket</code>套接字，<code>proc</code>指<code>fd</code>产生事件时，具体的处理函数，<code>clientData</code>则是回调处理函数时需要传入的数据。<br><code>aeCreateFileEvent</code>主要做了三件事情：</p>
 <ul>
 <li>以<code>fd</code>为索引，在<code>events</code>未就绪事件表中找到对应事件。</li>
-<li>调用<code>aeApiAddEvent</code>函数，该事件注册到具体的底层 I&#x2F;O 多路复用中，本例为epoll。</li>
+<li>调用<code>aeApiAddEvent</code>函数，该事件注册到具体的底层 I/O 多路复用中，本例为epoll。</li>
 <li>填充事件的回调、参数、事件类型等参数。</li>
 </ul>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">int</span> <span class="token function">aeCreateFileEvent</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">int</span> fd<span class="token punctuation">,</span> <span class="token keyword">int</span> mask<span class="token punctuation">,</span>
@@ -447,8 +440,7 @@ err<span class="token operator">:</span>
         eventLoop<span class="token operator">-></span>maxfd <span class="token operator">=</span> fd<span class="token punctuation">;</span>
     <span class="token keyword">return</span> AE_OK<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>如上文所说，Redis 基于的底层 I&#x2F;O 多路复用库有多套，所以<code>aeApiAddEvent</code>也有多套实现，下面的源码是<code>epoll</code>下的实现。其核心操作就是调用<code>epoll</code>的<code>epoll_ctl</code>函数来向<code>epoll</code>注册响应事件。</p>
+<p>如上文所说，Redis 基于的底层 I/O 多路复用库有多套，所以<code>aeApiAddEvent</code>也有多套实现，下面的源码是<code>epoll</code>下的实现。其核心操作就是调用<code>epoll</code>的<code>epoll_ctl</code>函数来向<code>epoll</code>注册响应事件。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">aeApiAddEvent</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">int</span> fd<span class="token punctuation">,</span> <span class="token keyword">int</span> mask<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     aeApiState <span class="token operator">*</span>state <span class="token operator">=</span> eventLoop<span class="token operator">-></span>apidata<span class="token punctuation">;</span>
     <span class="token keyword">struct</span> <span class="token class-name">epoll_event</span> ee <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token number">0</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span> <span class="token comment">/* avoid valgrind warning */</span>
@@ -466,10 +458,9 @@ err<span class="token operator">:</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">epoll_ctl</span><span class="token punctuation">(</span>state<span class="token operator">-></span>epfd<span class="token punctuation">,</span>op<span class="token punctuation">,</span>fd<span class="token punctuation">,</span><span class="token operator">&amp;</span>ee<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
     <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="事件处理"><a href="#事件处理" class="headerlink" title="事件处理"></a>事件处理</h3><p>因为 Redis 中同时存在文件事件和时间事件两个事件类型，所以服务器必须对这两个事件进行调度，决定何时处理文件事件，何时处理时间事件，以及如何调度它们。</p>
-<p>下图为事件管理器示意图，其事件驱动库的代码主要是在src&#x2F;ae.c中实现的</p>
-<p><img src="/images/Redis/%E4%BA%8B%E4%BB%B6%E7%AE%A1%E7%90%86%E5%99%A8.png"></p>
+<p>下图为事件管理器示意图，其事件驱动库的代码主要是在src/ae.c中实现的</p>
+<p><img src="/images/Redis/事件管理器.png" alt=""></p>
 <p><code>aeMain</code>函数以一个无限循环不断地调用<code>aeProcessEvents</code>函数来处理所有的事件。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">aeMain</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     eventLoop<span class="token operator">-></span>stop <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
@@ -481,8 +472,7 @@ err<span class="token operator">:</span>
         <span class="token function">aeProcessEvents</span><span class="token punctuation">(</span>eventLoop<span class="token punctuation">,</span> AE_ALL_EVENTS<span class="token operator">|</span>AE_CALL_AFTER_SLEEP<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>下面是<code>aeProcessEvents</code>的伪代码，它会首先计算距离当前时间最近的时间事件，以此计算一个超时时间；然后调用<code>aeApiPoll</code>函数去等待底层的I&#x2F;O多路复用事件就绪；<code>aeApiPoll</code>函数返回之后，会处理所有已经产生文件事件和已经达到的时间事件。</p>
+<p>下面是<code>aeProcessEvents</code>的伪代码，它会首先计算距离当前时间最近的时间事件，以此计算一个超时时间；然后调用<code>aeApiPoll</code>函数去等待底层的I/O多路复用事件就绪；<code>aeApiPoll</code>函数返回之后，会处理所有已经产生文件事件和已经达到的时间事件。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token comment">/* 伪代码 */</span>
 <span class="token keyword">int</span> <span class="token function">aeProcessEvents</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">/* 获取到达时间距离当前时间最接近的时间事件*/</span>
@@ -501,8 +491,7 @@ err<span class="token operator">:</span>
     <span class="token comment">/* 处理所有已经到达的时间事件*/</span>
     <span class="token function">processTimeEvents</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<p>与<code>aeApiAddEvent</code>类似，<code>aeApiPoll</code>也有多套实现，它其实就做了两件事情，调用<code>epoll_wait</code>阻塞等待<code>epoll</code>的事件就绪，超时时间就是之前根据最快达到时间事件计算而来的超时时间；然后将就绪的<code>epoll</code>事件转换到fired就绪事件。<code>aeApiPoll</code>就是上文所说的I&#x2F;O多路复用程序。</p>
+<p>与<code>aeApiAddEvent</code>类似，<code>aeApiPoll</code>也有多套实现，它其实就做了两件事情，调用<code>epoll_wait</code>阻塞等待<code>epoll</code>的事件就绪，超时时间就是之前根据最快达到时间事件计算而来的超时时间；然后将就绪的<code>epoll</code>事件转换到fired就绪事件。<code>aeApiPoll</code>就是上文所说的I/O多路复用程序。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">aeApiPoll</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">,</span> <span class="token keyword">struct</span> <span class="token class-name">timeval</span> <span class="token operator">*</span>tvp<span class="token punctuation">)</span> 
 <span class="token punctuation">&#123;</span>
     aeApiState <span class="token operator">*</span>state <span class="token operator">=</span> eventLoop<span class="token operator">-></span>apidata<span class="token punctuation">;</span>
@@ -536,7 +525,6 @@ err<span class="token operator">:</span>
     <span class="token comment">// 返回已就绪事件个数</span>
     <span class="token keyword">return</span> numevents<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><code>processFileEvent</code>是处理就绪文件事件的伪代码，也是上文所述的文件事件分派器，它其实就是遍历<code>fired</code>就绪事件表，然后根据对应的事件类型来调用事件中注册的不同处理器，读事件调用<code>rfileProc</code>，而写事件调用<code>wfileProc</code>。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">void</span> <span class="token function">processFileEvent</span><span class="token punctuation">(</span><span class="token keyword">int</span> numevents<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">for</span> <span class="token punctuation">(</span>j <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> j <span class="token operator">&lt;</span> numevents<span class="token punctuation">;</span> j<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -568,7 +556,6 @@ err<span class="token operator">:</span>
         processed<span class="token operator">++</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>而<code>processTimeEvents</code>是处理时间事件的函数，它会遍历<code>aeEventLoop</code>的事件事件列表，如果时间事件到达就执行其<code>timeProc</code>函数，并根据函数的返回值是否等于<code>AE_NOMORE</code>来决定该时间事件是否是周期性事件，并修改器到达时间。</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">processTimeEvents</span><span class="token punctuation">(</span>aeEventLoop <span class="token operator">*</span>eventLoop<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">int</span> processed <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
@@ -628,7 +615,6 @@ err<span class="token operator">:</span>
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> processed<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="删除事件"><a href="#删除事件" class="headerlink" title="删除事件"></a>删除事件</h3><p>当不在需要某个事件时，需要把事件删除掉。例如: 如果 fd 同时监听读事件、写事件。当不在需要监听写事件时，可以把该 fd 的写事件删除。</p>
 <p><code>aeDeleteEventLoop</code>函数的执行过程总结为以下几个步骤<br>1、根据<code>fd</code>在未就绪表中查找到事件<br>2、取消该<code>fd</code>对应的相应事件标识符<br>3、调用<code>aeApiFree</code>函数，内核会将epoll监听红黑树上的相应事件监听取消。</p>
 <h1 id="Redis事务调度"><a href="#Redis事务调度" class="headerlink" title="Redis事务调度"></a>Redis事务调度</h1><p>Redis 通过 MULTI、EXEC、WATCH 等命令来实现事务（transaction）功能。事务提供了一种将多个命令请求打包，然后一次性、按顺序地执行多个命令的机制，并且在事务执行期间，服务器不会中断事务而改去执行其他客户端的命令请求，它会将事务中的所有命令都执行完毕，然后才去处理其他客户端的命令请求。</p>
@@ -641,11 +627,10 @@ err<span class="token operator">:</span>
 <h3 id="事务开始"><a href="#事务开始" class="headerlink" title="事务开始"></a>事务开始</h3><p>MULTI 命令的执行标志着事务的开始：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c">redis<span class="token operator">></span> MULTI
 OK <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>MULTI 命令可以将执行该命令的客户端从非事务状态切换至事务状态，这一切换是通过在客户端状态的 flags 属性中打开 REDIS_MULTI 标识来完成的。</p>
 <h3 id="命令入队"><a href="#命令入队" class="headerlink" title="命令入队"></a>命令入队</h3><p><strong>入队前判断</strong></p>
 <p>当一个客户端处于非事务状态时，这个客户端发送的命令会立即被服务器执行。与此不同的是，当一个客户端切换到事务状态之后，服务器会根据这个客户端发来的不同命令执行不同的操作。</p>
-<p><img src="/images/Redis/%E5%BC%80%E5%90%AF%E4%BA%8B%E5%8A%A1%E5%90%8E%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%A4%E6%96%AD%E5%91%BD%E4%BB%A4%E5%8E%BB%E5%90%91.png"></p>
+<p><img src="/images/Redis/开启事务后服务端判断命令去向.png" alt=""></p>
 <p><strong>事务队列</strong></p>
 <p>每个 Redis 客户端都有自己的事务状态，这个事务状态保存在客户端状态的 mstate 属性里面：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisClient</span> <span class="token punctuation">&#123;</span>
@@ -656,7 +641,6 @@ OK <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span>
     
     <span class="token comment">//...</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>事务状态包含一个事务队列，以及一个已入队命令的计数器（也可以说是事务队列的长度）：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">multiState</span> <span class="token punctuation">&#123;</span>
     
@@ -665,7 +649,6 @@ OK <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span>
     <span class="token comment">//已入队命令计数</span>
     <span class="token keyword">int</span> count<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span> multiState<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>事务队列是一个 multiCmd 类型的数组，数组中的每个 multiCmd 结构都保存了一个已入队命令的相关信息，包括指向命令实现函数的指针、命令的参数，以及参数的数量：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">multiCmd</span> <span class="token punctuation">&#123;</span>
 	<span class="token comment">//参数</span>
@@ -677,9 +660,8 @@ OK <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span>
     <span class="token comment">//命令指针</span>
     <span class="token keyword">struct</span> <span class="token class-name">redisCommand</span> <span class="token operator">*</span>cmd<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span> multiCmd<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>下图是事务状态数据结构</p>
-<p><img src="/images/Redis/%E4%BA%8B%E5%8A%A1%E7%8A%B6%E6%80%81.png"></p>
+<p><img src="/images/Redis/事务状态.png" alt=""></p>
 <h3 id="事务执行"><a href="#事务执行" class="headerlink" title="事务执行"></a>事务执行</h3><p>当一个处于事务状态的客户端向服务器发送 EXEC 命令时，这个 EXEC 命令将立即被服务器执行。服务器会遍历这个客户端的事务队列，执行队列中保存的所有命令，最后将执行命令所得的结果全部返回给客户端。</p>
 <pre class="line-numbers language-python" data-language="python"><code class="language-python"><span class="token keyword">def</span> <span class="token function">EXEC</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
 	<span class="token comment">#创建空白的回复队列</span>
@@ -706,13 +688,11 @@ OK <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span>
     
     <span class="token comment">#将事务的执行结果返回给客户端</span>
     send_reply_to_client<span class="token punctuation">(</span>client<span class="token punctuation">,</span> reply_queue<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="WATCH命令的实现"><a href="#WATCH命令的实现" class="headerlink" title="WATCH命令的实现"></a>WATCH命令的实现</h2><p>WATCH 命令是一个乐观锁（optimistic locking），它可以在 EXEC 命令执行之前，监视任意数量的数据库键，并在 EXEC 命令执行时，检查被监视的键是否至少有一个已经被修改过了，如果是的话，服务器将拒绝执行事务，并向客户端返回代表事务执行失败的空回复。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">WATCH <span class="token string">"name"</span>
 MULTI
 SET <span class="token string">"name"</span> <span class="token string">"peter"</span>
 EXEC<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>在事务运行期间，监视的键被修改，服务器会拒绝执行客户端事务，并返回空回复。</p>
 <h3 id="使用WATCH命令监视数据库键"><a href="#使用WATCH命令监视数据库键" class="headerlink" title="使用WATCH命令监视数据库键"></a>使用WATCH命令监视数据库键</h3><p>每个 Redis 数据库都保存着一个 watched_keys 字典，这个字典的键是某个被 WATCH 命令监视的数据库键，而字典的值则是一个链表，链表中记录了所有监视相应数据库键的客户端：</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">redisDb</span> <span class="token punctuation">&#123;</span>
@@ -723,12 +703,10 @@ EXEC<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span
     
     <span class="token comment">//...</span>
 <span class="token punctuation">&#125;</span> redisDb<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>通过 watched_keys 字典，服务器可以清楚地知道哪些数据库键正在被监视，以及哪些客户端正在监视这些数据库键。</p>
 <p>下图是客户端 c1、c2、c10086 在监视 “name” 键，c3、c10086 在监视 “age” 键，c2、c4 在监视 “address” 键。其中 c10086 是运行 WATCH 命令后新增的。</p>
-<img src="/images/Redis/WATCH命令数据结构.png" style="zoom:67%;" />
-
-<h3 id="监视机制的触发"><a href="#监视机制的触发" class="headerlink" title="监视机制的触发"></a>监视机制的触发</h3><p>所有对数据库进行修改的命令，比如 SET、PUSH、SADD、ZREM、DEL、FLUSHDB 等等，在执行之后都会调用 multi.c&#x2F;touchWatchKey 函数对 watched_keys 字典进行检查，查看是否有客户端正在监视刚刚被命令修改过的数据库键，如果有的话，那么 touchWatchKey 函数会将监视被修改键的客户端的 REDIS_DIRTY_CAS 标识打开，表示该客户端的事务安全性已经被破坏。</p>
+<p><img src="/images/Redis/WATCH命令数据结构.png" style="zoom:67%;" /></p>
+<h3 id="监视机制的触发"><a href="#监视机制的触发" class="headerlink" title="监视机制的触发"></a>监视机制的触发</h3><p>所有对数据库进行修改的命令，比如 SET、PUSH、SADD、ZREM、DEL、FLUSHDB 等等，在执行之后都会调用 multi.c/touchWatchKey 函数对 watched_keys 字典进行检查，查看是否有客户端正在监视刚刚被命令修改过的数据库键，如果有的话，那么 touchWatchKey 函数会将监视被修改键的客户端的 REDIS_DIRTY_CAS 标识打开，表示该客户端的事务安全性已经被破坏。</p>
 <p>客户端向服务器发送 EXEC 命令，如果客户端的 REDIS_DIRTY_CAS 标识已经打开，则表明客户端提交事务不再安全，因此服务端会拒绝执行客户端提交的事务。</p>
 <h2 id="事务的ACID性质"><a href="#事务的ACID性质" class="headerlink" title="事务的ACID性质"></a>事务的ACID性质</h2><p>在传统的关系式数据库中，常常用 ACID 性质来检验事务功能的可靠性和安全性。在 Redis 中，事务总是具有原子性（Atomicity）、一致性（Consistency）和隔离性（Isolation），并且当 Redis 运行在某种特定的持久化模式下时，事务也具有耐久性（Durability）。</p>
 <h3 id="原子性"><a href="#原子性" class="headerlink" title="原子性"></a>原子性</h3><p>事务具有原子性指的是，数据库将事务中的多个操作当作一个整体来执行，服务器要么就执行事务中的所有操作，要么就一个操作也不执行。</p>
@@ -859,7 +837,7 @@ EXEC<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis%E4%BA%8B%E4%BB%B6%E8%B0%83%E5%BA%A6"><span class="nav-number">1.</span> <span class="nav-text">Redis事件调度</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">文件事件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E7%A8%8B%E5%BA%8F%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.1.1.</span> <span class="nav-text">IO多路复用程序的实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.1.2.</span> <span class="nav-text">文件事件的类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#C-x2F-S%E4%B9%8B%E9%97%B4%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B"><span class="nav-number">1.1.3.</span> <span class="nav-text">C&#x2F;S之间事件处理过程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.2.</span> <span class="nav-text">时间事件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.2.1.</span> <span class="nav-text">时间事件的类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E9%80%BB%E8%BE%91"><span class="nav-number">1.2.2.</span> <span class="nav-text">实现逻辑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#serverCron"><span class="nav-number">1.2.3.</span> <span class="nav-text">serverCron</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">1.3.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E4%BA%8B%E4%BB%B6%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">1.3.1.</span> <span class="nav-text">创建事件管理器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.3.2.</span> <span class="nav-text">创建文件事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86"><span class="nav-number">1.3.3.</span> <span class="nav-text">事件处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.3.4.</span> <span class="nav-text">删除事件</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis%E4%BA%8B%E5%8A%A1%E8%B0%83%E5%BA%A6"><span class="nav-number">2.</span> <span class="nav-text">Redis事务调度</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.1.</span> <span class="nav-text">事务的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E5%BC%80%E5%A7%8B"><span class="nav-number">2.1.1.</span> <span class="nav-text">事务开始</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%BD%E4%BB%A4%E5%85%A5%E9%98%9F"><span class="nav-number">2.1.2.</span> <span class="nav-text">命令入队</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E6%89%A7%E8%A1%8C"><span class="nav-number">2.1.3.</span> <span class="nav-text">事务执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WATCH%E5%91%BD%E4%BB%A4%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.2.</span> <span class="nav-text">WATCH命令的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8WATCH%E5%91%BD%E4%BB%A4%E7%9B%91%E8%A7%86%E6%95%B0%E6%8D%AE%E5%BA%93%E9%94%AE"><span class="nav-number">2.2.1.</span> <span class="nav-text">使用WATCH命令监视数据库键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%91%E8%A7%86%E6%9C%BA%E5%88%B6%E7%9A%84%E8%A7%A6%E5%8F%91"><span class="nav-number">2.2.2.</span> <span class="nav-text">监视机制的触发</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E7%9A%84ACID%E6%80%A7%E8%B4%A8"><span class="nav-number">2.3.</span> <span class="nav-text">事务的ACID性质</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%9F%E5%AD%90%E6%80%A7"><span class="nav-number">2.3.1.</span> <span class="nav-text">原子性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">2.3.2.</span> <span class="nav-text">一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9A%94%E7%A6%BB%E6%80%A7"><span class="nav-number">2.3.3.</span> <span class="nav-text">隔离性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%80%90%E4%B9%85%E6%80%A7"><span class="nav-number">2.3.4.</span> <span class="nav-text">耐久性</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis%E4%BA%8B%E4%BB%B6%E8%B0%83%E5%BA%A6"><span class="nav-number">1.</span> <span class="nav-text">Redis事件调度</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.1.</span> <span class="nav-text">文件事件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E7%A8%8B%E5%BA%8F%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.1.1.</span> <span class="nav-text">IO多路复用程序的实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.1.2.</span> <span class="nav-text">文件事件的类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#C-S%E4%B9%8B%E9%97%B4%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B"><span class="nav-number">1.1.3.</span> <span class="nav-text">C&#x2F;S之间事件处理过程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.2.</span> <span class="nav-text">时间事件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%97%B6%E9%97%B4%E4%BA%8B%E4%BB%B6%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.2.1.</span> <span class="nav-text">时间事件的类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E9%80%BB%E8%BE%91"><span class="nav-number">1.2.2.</span> <span class="nav-text">实现逻辑</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#serverCron"><span class="nav-number">1.2.3.</span> <span class="nav-text">serverCron</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">1.3.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E4%BA%8B%E4%BB%B6%E7%AE%A1%E7%90%86%E5%99%A8"><span class="nav-number">1.3.1.</span> <span class="nav-text">创建事件管理器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E6%96%87%E4%BB%B6%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.3.2.</span> <span class="nav-text">创建文件事件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86"><span class="nav-number">1.3.3.</span> <span class="nav-text">事件处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E4%BA%8B%E4%BB%B6"><span class="nav-number">1.3.4.</span> <span class="nav-text">删除事件</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Redis%E4%BA%8B%E5%8A%A1%E8%B0%83%E5%BA%A6"><span class="nav-number">2.</span> <span class="nav-text">Redis事务调度</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.1.</span> <span class="nav-text">事务的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E5%BC%80%E5%A7%8B"><span class="nav-number">2.1.1.</span> <span class="nav-text">事务开始</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%BD%E4%BB%A4%E5%85%A5%E9%98%9F"><span class="nav-number">2.1.2.</span> <span class="nav-text">命令入队</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E6%89%A7%E8%A1%8C"><span class="nav-number">2.1.3.</span> <span class="nav-text">事务执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WATCH%E5%91%BD%E4%BB%A4%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.2.</span> <span class="nav-text">WATCH命令的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8WATCH%E5%91%BD%E4%BB%A4%E7%9B%91%E8%A7%86%E6%95%B0%E6%8D%AE%E5%BA%93%E9%94%AE"><span class="nav-number">2.2.1.</span> <span class="nav-text">使用WATCH命令监视数据库键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%91%E8%A7%86%E6%9C%BA%E5%88%B6%E7%9A%84%E8%A7%A6%E5%8F%91"><span class="nav-number">2.2.2.</span> <span class="nav-text">监视机制的触发</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8B%E5%8A%A1%E7%9A%84ACID%E6%80%A7%E8%B4%A8"><span class="nav-number">2.3.</span> <span class="nav-text">事务的ACID性质</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%9F%E5%AD%90%E6%80%A7"><span class="nav-number">2.3.1.</span> <span class="nav-text">原子性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E8%87%B4%E6%80%A7"><span class="nav-number">2.3.2.</span> <span class="nav-text">一致性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9A%94%E7%A6%BB%E6%80%A7"><span class="nav-number">2.3.3.</span> <span class="nav-text">隔离性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%80%90%E4%B9%85%E6%80%A7"><span class="nav-number">2.3.4.</span> <span class="nav-text">耐久性</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -972,6 +950,8 @@ EXEC<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span
 
 
 
+
+  
 
   
 

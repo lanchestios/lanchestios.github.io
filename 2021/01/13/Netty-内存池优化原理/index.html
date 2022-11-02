@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
@@ -28,10 +28,10 @@
 <meta property="og:description" content="为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://example.com/images/Netty/MemoryMap.png">
-<meta property="og:image" content="http://example.com/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty内存池内存分配过程.png">
 <meta property="og:image" content="http://example.com/images/Netty/Subpage.png">
 <meta property="og:image" content="http://example.com/images/Netty/ChunkList.png">
-<meta property="og:image" content="http://example.com/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png">
+<meta property="og:image" content="http://example.com/images/Netty/Netty内存池内存的类别.png">
 <meta property="og:image" content="http://example.com/images/Netty/ChunkListGroup.png">
 <meta property="article:published_time" content="2021-01-13T03:00:00.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.511Z">
@@ -262,7 +262,6 @@
       
         <p>为了提升消息接收和发送性能，Netty 针对 ByteBuf 的申请和释放采用了池化技术，通过 PooledByteBufAllocator 可以创建基于内存池分配的 ByteBuf 对象，这样就避免了每次消息读写都申请和释放ByteBuf，这样很大程度减少了 GC 的次数，对性能提升是非常可观的。</p>
 <span id="more"></span>
-
 <h1 id="PoolChunk内存分配"><a href="#PoolChunk内存分配" class="headerlink" title="PoolChunk内存分配"></a>PoolChunk内存分配</h1><h2 id="模拟内存数据结构"><a href="#模拟内存数据结构" class="headerlink" title="模拟内存数据结构"></a>模拟内存数据结构</h2><p>为了能够简单的操作内存，必须保证每次分配到的内存时连续的。Netty 中底层的内存分配和回收管理主要由 PoolChunk 实现，其内部维护一棵平衡二叉树 MemoryMap，所有子节点管理的内存也属于其父节点。每当申请超过 8KB 内存时，就会从 PoolChunk 获取。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;memoryMap初始化
 memoryMap &#x3D; new byte[maxSubpageAllocs &lt;&lt; 1];
@@ -277,9 +276,8 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
         memoryMapIndex ++;
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>下图是 MemoryMap 的抽象表示</p>
-<p><img src="/images/Netty/MemoryMap.png"></p>
+<p><img src="/images/Netty/MemoryMap.png" alt=""></p>
 <p>PoolChunk 默认由 2048 个 Page 组成，一个 Page 默认大小为 8k，图中树节点的值为在数组 memoryMap 的下标。</p>
 <h2 id="分配内存"><a href="#分配内存" class="headerlink" title="分配内存"></a>分配内存</h2><p><strong>向PoolChunk分配内存</strong></p>
 <p>PoolChunk 内部会保证每次分配内存大小为<code>8K*(2^n)</code>，为了分配一个大小为<code>chunkSize/(2^k)</code>的节点，需要在深度为 k 的层从左开始匹配节点，下面是申请内存的大概流程：</p>
@@ -290,11 +288,11 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 </ol>
 <p>需要说明的是，寻找合适内存的行为是基于深度优先算法的，但是对子节点的选取上是采用的随机选取，而不是常用的依次遍历。</p>
 <p><strong>申请后更新节点层级</strong></p>
-<p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D%E8%BF%87%E7%A8%8B.png"></p>
+<p><img src="/images/Netty/Netty内存池内存分配过程.png" alt=""></p>
 <h2 id="释放内存"><a href="#释放内存" class="headerlink" title="释放内存"></a>释放内存</h2><p>也就是释放相应资源并且根据申请内存过程的原理对节点及其父节点值进行更新。</p>
 <h2 id="对节点状态的维护"><a href="#对节点状态的维护" class="headerlink" title="对节点状态的维护"></a>对节点状态的维护</h2><p>无论是 Chunk 还是 Page，都通过状态位来标识内存是否可用，不同之处是 Chunk 通过在二叉树上对节点进行标识实现，Page 是通过维护块的使用状态标识来实现。</p>
 <h1 id="PoolSubPage内存分配"><a href="#PoolSubPage内存分配" class="headerlink" title="PoolSubPage内存分配"></a>PoolSubPage内存分配</h1><p>在 PoolChunk 中支持分配一块大于 pageSize 的内存，但在实际应用中，存在很多分配小内存的情况，如果也占用一个 page，明显很浪费。针对这种情况，Netty 提供了 PoolSubpage 把 PoolChunk 的一个 page 节点 8k 内存划分成更小的内存段，通过对每个内存段的标记与清理标记进行内存的分配与释放。</p>
-<p><img src="/images/Netty/Subpage.png"></p>
+<p><img src="/images/Netty/Subpage.png" alt=""></p>
 <p>Page 中存储区域的使用状态通过一个 long 数组来维护，数组中每个 long 的每一位表示一个块存储区域的占用情况：0 表示未占用，1 表示以占用。对于一个 4 字节的 Page 来说，如果这个 Page 用来分配 1 个字节的存储区域，那么 long 数组中就只有一个 long 类型的元素，这个数值的低 4 位用来指示各个存储区域的占用情况。对于一个 128 字节的 Page 来说，如果这个 Page 也是用来分配 1 个字节的存储区域，那么 long 数组中就会包含 2 个元素，总共 128 位，每一位代表一个区域的占用情况。</p>
 <h2 id="申请Subpage空间"><a href="#申请Subpage空间" class="headerlink" title="申请Subpage空间"></a>申请Subpage空间</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">PoolSubpage</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// 当前page在chunk中的id</span>
@@ -321,7 +319,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
     <span class="token keyword">private</span> <span class="token keyword">int</span> numAvail<span class="token punctuation">;</span>       
     <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>假设目前需要申请大小为4096的内存：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//PoolChunk</span>
 <span class="token keyword">long</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token keyword">int</span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -332,7 +329,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
         <span class="token keyword">return</span> <span class="token function">allocateSubpage</span><span class="token punctuation">(</span>normCapacity<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> firstVal<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>因为<code>4096&lt;pageSize(8192)</code>，所以采用 allocateSubpage 进行内存分配，具体实现如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">long</span> <span class="token function">allocateSubpage</span><span class="token punctuation">(</span><span class="token keyword">int</span> normCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> curIdx<span class="token punctuation">,</span> <span class="token keyword">int</span> val<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">int</span> state <span class="token operator">=</span> val <span class="token operator">&amp;</span> <span class="token number">3</span><span class="token punctuation">;</span>
@@ -362,7 +358,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 
     <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="Subpage的初始化"><a href="#Subpage的初始化" class="headerlink" title="Subpage的初始化"></a>Subpage的初始化</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//memoryMapIdx 当前page在chunk中的id</span>
 <span class="token comment">//runOffset 当前page在chunk.memory的偏移量</span>
 <span class="token comment">//pageSize page大小</span>
@@ -401,11 +396,10 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 
     <span class="token function">addToPool</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>下面通过分布申请 4096 和 32 大小的内存，说明如何确定 bitmapLength 的值：</p>
 <ol>
-<li>比如，当前申请大小 4096 的内存，maxNumElems 和 numAvail 为2，说明一个 page 被拆分成 2 个内存段，2 &gt;&gt;&gt; 6 &#x3D; 0，且 2 &amp; 63 ！&#x3D; 0，所以 bitmapLength 为 1，说明只需要一个 long 就可以描述 2 个内存段状态。</li>
-<li>如果当前申请大小32的内存，maxNumElems 和 numAvail 为 256，说明一个 page 被拆分成 256 个内存段， 256 &gt;&gt;&gt; 6 &#x3D; 4，说明需要 4 个 long 描述 256 个内存段状态。</li>
+<li>比如，当前申请大小 4096 的内存，maxNumElems 和 numAvail 为2，说明一个 page 被拆分成 2 个内存段，2 &gt;&gt;&gt; 6 = 0，且 2 &amp; 63 ！= 0，所以 bitmapLength 为 1，说明只需要一个 long 就可以描述 2 个内存段状态。</li>
+<li>如果当前申请大小32的内存，maxNumElems 和 numAvail 为 256，说明一个 page 被拆分成 256 个内存段， 256 &gt;&gt;&gt; 6 = 4，说明需要 4 个 long 描述 256 个内存段状态。</li>
 </ol>
 <h2 id="内存分配"><a href="#内存分配" class="headerlink" title="内存分配"></a>内存分配</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">long</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span>elemSize <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -460,7 +454,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
         <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="PoolChunkList内存管理"><a href="#PoolChunkList内存管理" class="headerlink" title="PoolChunkList内存管理"></a>PoolChunkList内存管理</h1><p>PoolChunkList 负责管理多个 chunk 的生命周期，在此基础上对内存分配进行进一步的优化。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">PoolChunkList</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">implements</span> <span class="token class-name">PoolChunkListMetric</span> <span class="token punctuation">&#123;</span>
     
@@ -474,9 +467,8 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
     <span class="token keyword">private</span> <span class="token class-name">PoolChunk</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> head<span class="token punctuation">;</span>
     <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>每个 PoolChunkList 实例维护了一个 PoolChunk 链表，自身也形成一个链表，为何要这么实现？</p>
-<p><img src="/images/Netty/ChunkList.png"></p>
+<p><img src="/images/Netty/ChunkList.png" alt=""></p>
 <p>随着 chunk 中 page 的不断分配和释放，会导致很多碎片内存段，大大增加了之后分配一段连续内存的失败率，针对这种情况，可以把内存使用率超过 maxUsage 的 chunk 移动到下一个 PoolChunkList 链表</p>
 <pre class="line-numbers language-csharp" data-language="csharp"><code class="language-csharp"><span class="token return-type class-name">boolean</span> <span class="token function">allocate</span><span class="token punctuation">(</span><span class="token class-name">PooledByteBuf<span class="token punctuation">&lt;</span>T<span class="token punctuation">></span></span> buf<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">int</span></span> reqCapacity<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">int</span></span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span>head <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -500,7 +492,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>但是，随着 chunk 中内存的释放，其内存使用率也会随着下降，当下降到 minUsage 时，该 chunk 会移动到前一个列表中</p>
 <pre class="line-numbers language-csharp" data-language="csharp"><code class="language-csharp"><span class="token return-type class-name"><span class="token keyword">void</span></span> <span class="token function">free</span><span class="token punctuation">(</span><span class="token class-name">PoolChunk<span class="token punctuation">&lt;</span>T<span class="token punctuation">></span></span> chunk<span class="token punctuation">,</span> <span class="token class-name"><span class="token keyword">long</span></span> handle<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     chunk<span class="token punctuation">.</span><span class="token function">free</span><span class="token punctuation">(</span>handle<span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -514,7 +505,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>从 poolChunkList 的实现可以看出，每个 chunkList 的都有一个上下限：minUsage 和 maxUsage，两个相邻的 chunkList，前一个的 maxUsage 和后一个的 minUsage 必须有一段交叉值进行缓冲，否则会出现某个 chunk 的 usage 处于临界值，而导致不停的在两个 chunk 间移动。</p>
 <p>所以 chunk 的生命周期不会固定在某个 chunkList 中，随着内存的分配和释放，根据当前的内存使用率，在 chunkList 链表中前后移动。</p>
 <h1 id="PoolArena内存管理"><a href="#PoolArena内存管理" class="headerlink" title="PoolArena内存管理"></a>PoolArena内存管理</h1><p>Arena 本身是指一块区域，在内存管理中，Memory Arena 是指内存中的一大块连续的区域，PoolArena 就是 Netty 内存池实现类。</p>
@@ -522,9 +512,8 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 <p>不同的框架，Memory Arena 的实现不同，Netty 的 PoolArena 是由多个 Chunk 组成的大块内存区域，而每个 Chunk 则由一个或者多个 Page 组成，因此，对内存的组织和管理也就主要集中在如何管理和组织 Chunk 和 Page 了。</p>
 <p>应用层的内存分配主要通过如下实现，但最终还是委托给 PoolArena 实现。</p>
 <pre class="line-numbers language-css" data-language="css"><code class="language-css">PooledByteBufAllocator.DEFAULT.<span class="token function">directBuffer</span><span class="token punctuation">(</span>128<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <p>由于 Netty 通常应用于高并发系统，不可避免的有多线程进行同时内存分配，可能会极大的影响内存分配的效率，为了缓解线程竞争，可以通过创建多个 PoolArena 细化锁的粒度，提高并发执行的效率。</p>
-<h2 id="PoolArena-的内部结构"><a href="#PoolArena-的内部结构" class="headerlink" title="PoolArena 的内部结构"></a>PoolArena 的内部结构</h2><p><img src="/images/Netty/Netty%E5%86%85%E5%AD%98%E6%B1%A0%E5%86%85%E5%AD%98%E7%9A%84%E7%B1%BB%E5%88%AB.png"></p>
+<h2 id="PoolArena-的内部结构"><a href="#PoolArena-的内部结构" class="headerlink" title="PoolArena 的内部结构"></a>PoolArena 的内部结构</h2><p><img src="/images/Netty/Netty内存池内存的类别.png" alt=""></p>
 <p>poolArena提供了两种方式进行内存分配</p>
 <ol>
 <li><p>PoolSubpage用于分配小于8k的内存</p>
@@ -540,11 +529,11 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 <li><p>poolChunkList用于分配大于8k的内存</p>
 </li>
 </ol>
-<p><img src="/images/Netty/ChunkListGroup.png"></p>
+<p><img src="/images/Netty/ChunkListGroup.png" alt=""></p>
 <blockquote>
 <p><strong>注意</strong></p>
 <ol>
-<li><p>qInit 前置节点为自己，且 minUsage&#x3D;Integer.MIN_VALUE，意味着一个初分配的 chunk，在最开始的内存分配过程中(内存使用率&lt;25%)，即使完全释放也不会被回收，会始终保留在内存中</p>
+<li><p>qInit 前置节点为自己，且 minUsage=Integer.MIN_VALUE，意味着一个初分配的 chunk，在最开始的内存分配过程中(内存使用率&lt;25%)，即使完全释放也不会被回收，会始终保留在内存中</p>
 </li>
 <li><p>q000没有前置节点，当一个chunk进入到q000列表，如果其内存被完全释放，则不再保留在内存中，其分配的内存被完全回收</p>
 </li>
@@ -587,7 +576,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 
     <span class="token function">allocateNormal</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>allocateNormal实现</strong></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">synchronized</span> <span class="token keyword">void</span> <span class="token function">allocateNormal</span><span class="token punctuation">(</span><span class="token class-name">PooledByteBuf</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> buf<span class="token punctuation">,</span> <span class="token keyword">int</span> reqCapacity<span class="token punctuation">,</span> <span class="token keyword">int</span> normCapacity<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span>q050<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span> q025<span class="token punctuation">.</span><span class="token function">allocate</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">,</span> normCapacity<span class="token punctuation">)</span> <span class="token operator">||</span>
@@ -603,7 +591,6 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
     c<span class="token punctuation">.</span><span class="token function">initBuf</span><span class="token punctuation">(</span>buf<span class="token punctuation">,</span> handle<span class="token punctuation">,</span> reqCapacity<span class="token punctuation">)</span><span class="token punctuation">;</span>
     qInit<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>第一次进行内存分配时，chunkList 没有 chunk 可以分配内存，需通过方法 newChunk 新建一个 chunk 进行内存分配，并添加到 qInit 列表中。如果分配如 512 字节的小内存，除了创建 chunk，还有创建 subpage， PoolSubpage 在初始化之后，会添加到 smallSubpagePools 中，其实并不是直接插入到数组，而是添加到 head 的 next 节点。下次再有分配 512 字节的需求时，直接从 smallSubpagePools 获取对应的 subpage 进行分配。</p>
 <p><strong>分配内存时，为什么不从内存使用率较低的q000开始？</strong></p>
 <p>当应用在实际运行过程中，碰到访问高峰，这时需要分配的内存是平时的好几倍，当然也需要创建好几倍的 chunk，如果先从 q000 开始，这些在高峰期创建的 chunk 被回收的概率会大大降低，延缓了内存的回收进度，造成内存使用的浪费。</p>
@@ -809,6 +796,8 @@ for (int d &#x3D; 0; d &lt;&#x3D; maxOrder; ++ d) &#123; &#x2F;&#x2F; move down 
 
 
 
+
+  
 
   
 

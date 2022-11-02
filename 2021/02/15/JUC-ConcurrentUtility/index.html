@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="本文介绍了三种并发工具：CountDownLatch、CyclicBarrier、Semaphore。它们都直接或者间接使用了 AQS 同步器，使用了 JVM 给它提供的原语操作。">
@@ -258,9 +258,8 @@
       
         <p>本文介绍了三种并发工具：CountDownLatch、CyclicBarrier、Semaphore。它们都直接或者间接使用了 AQS 同步器，使用了 JVM 给它提供的原语操作。</p>
 <span id="more"></span>
-
 <h1 id="CountDownLatch"><a href="#CountDownLatch" class="headerlink" title="CountDownLatch"></a>CountDownLatch</h1><p>CountDownLatch 是一个同步辅助类，在完成一组正在其他线程中执行的操作之前，它允许一个或多个线程一直等待。它继承了 AQS 同步器，使用共享锁对计数进行维护。</p>
-<p><img src="/images/JDK/CountDownLatch.png"></p>
+<p><img src="/images/JDK/CountDownLatch.png" alt=""></p>
 <h2 id="CountDownLatch-API"><a href="#CountDownLatch-API" class="headerlink" title="CountDownLatch API"></a>CountDownLatch API</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">CountDownLatch</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span>
 构造一个用给定计数初始化的 <span class="token class-name">CountDownLatch</span>。
 
@@ -272,27 +271,22 @@
 <span class="token keyword">void</span> <span class="token function">countDown</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
 <span class="token comment">// 返回当前计数。</span>
 <span class="token keyword">long</span> <span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="CountDownLatch计数原理"><a href="#CountDownLatch计数原理" class="headerlink" title="CountDownLatch计数原理"></a>CountDownLatch计数原理</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">CountDownLatch</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span>count <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token string">"count &lt; 0"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token keyword">this</span><span class="token punctuation">.</span>sync <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Sync</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>该函数是创建一个 Sync 对象，而 Sync 是继承于 AQS 类。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Sync</span><span class="token punctuation">(</span><span class="token keyword">int</span> count<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token function">setState</span><span class="token punctuation">(</span>count<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p> setState()在AQS中实现，源码如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">setState</span><span class="token punctuation">(</span><span class="token keyword">long</span> newState<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     state <span class="token operator">=</span> newState<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：在 AQS 中，state 是一个 private volatile long 类型的对象。对于 CountDownLatch 而言，state 表示的”锁计数器“。CountDownLatch 中的<code>getCount()</code>最终是调用 AQS中 的<code>getState()</code>，返回的 state 对象，即”锁计数器“。</p>
 <h3 id="await"><a href="#await" class="headerlink" title="await()"></a>await()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">await</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
     sync<span class="token punctuation">.</span><span class="token function">acquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：该函数实际上是调用的 AQS 的<code>acquireSharedInterruptibly(1)</code></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">acquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token keyword">long</span> arg<span class="token punctuation">)</span>
         <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
@@ -301,16 +295,14 @@
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">tryAcquireShared</span><span class="token punctuation">(</span>arg<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
         <span class="token function">doAcquireSharedInterruptibly</span><span class="token punctuation">(</span>arg<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>acquireSharedInterruptibly()</code>的作用是获取共享锁。</p>
 <p>如果当前线程是中断状态，则抛出异常 InterruptedException。否则，调用<code>tryAcquireShared(arg)</code>尝试获取共享锁；尝试成功则返回，否则就调用<code>doAcquireSharedInterruptibly()</code>。<code>doAcquireSharedInterruptibly()</code>会使当前线程一直等待，直到当前线程获取到共享锁(或被中断)才返回。</p>
 <p><code>tryAcquireShared()</code>在 CountDownLatch 中被重写，它的源码如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">tryAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> acquires<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token function">getState</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token number">1</span> <span class="token operator">:</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>tryAcquireShared()</code>的作用是尝试获取共享锁。</p>
-<p>如果”锁计数器&#x3D;0”，即锁是可获取状态，则返回1；否则，锁是不可获取状态，则返回-1。</p>
+<p>如果”锁计数器=0”，即锁是可获取状态，则返回1；否则，锁是不可获取状态，则返回-1。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">doAcquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token keyword">long</span> arg<span class="token punctuation">)</span>
     <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">// 创建"当前线程"的Node节点，且Node中记录的锁是"共享锁"类型；并将该节点添加到CLH队列末尾。</span>
@@ -345,11 +337,9 @@
             <span class="token function">cancelAcquire</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="countDown"><a href="#countDown" class="headerlink" title="countDown()"></a>countDown()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">countDown</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     sync<span class="token punctuation">.</span><span class="token function">releaseShared</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：该函数实际上调用releaseShared(1)释放共享锁。</p>
 <p>releaseShared()在AQS中实现，源码如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">boolean</span> <span class="token function">releaseShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> arg<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -359,7 +349,6 @@
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>releaseShared()</code>的目的是让当前线程释放它所持有的共享锁。它首先会通过<code>tryReleaseShared()</code>去尝试释放共享锁。尝试成功，则直接返回；尝试失败，则通过<code>doReleaseShared()</code>去释放共享锁。</p>
 <p><code>tryReleaseShared()</code>在 CountDownLatch 中被重写，源码如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">tryReleaseShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> releases<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -376,7 +365,6 @@
             <span class="token keyword">return</span> nextc <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>tryReleaseShared()</code>的作用是释放共享锁，将“锁计数器”的值 - 1。</p>
 <h2 id="CountDownLatch使用示例"><a href="#CountDownLatch使用示例" class="headerlink" title="CountDownLatch使用示例"></a>CountDownLatch使用示例</h2><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public class CountDownLatchTest &#123;
 
@@ -413,7 +401,6 @@
         &#125;
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>运行结果</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">main await begin.
 Thread-0 sleep 1000ms.
@@ -422,11 +409,10 @@ Thread-1 sleep 1000ms.
 Thread-4 sleep 1000ms.
 Thread-3 sleep 1000ms.
 main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>结果说明</strong>：</p>
 <p>主线程通过<code>doneSignal.await()</code>等待其它线程将 doneSignal 递减至 0。其它的 5 个 InnerThread 线程，每一个都通过<code>doneSignal.countDown()</code>将 doneSignal 的值减 1；当 doneSignal 为 0 时，main 被唤醒后继续执行。</p>
 <h1 id="CyclicBarrier"><a href="#CyclicBarrier" class="headerlink" title="CyclicBarrier"></a>CyclicBarrier</h1><p>CyclicBarrier是一个同步辅助类，允许一组线程互相等待，直到到达某个公共屏障点 (common barrier point)。因为该 barrier 在释放等待线程后可以重用，所以称它为循环 的 barrier。</p>
-<p><img src="/images/JDK/CyclicBarrier.png"></p>
+<p><img src="/images/JDK/CyclicBarrier.png" alt=""></p>
 <blockquote>
 <p>注意比较CountDownLatch 和 CyclicBarrier：</p>
 <ol>
@@ -451,7 +437,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
 查询此屏障是否处于损坏状态。
 <span class="token keyword">void</span> <span class="token function">reset</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
 将屏障重置为其初始状态。<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="CyclicBarrier实现原理"><a href="#CyclicBarrier实现原理" class="headerlink" title="CyclicBarrier实现原理"></a>CyclicBarrier实现原理</h2><p>CyclicBarrier 是通过 ReentrantLock (独占锁)和 Condition 来实现的。</p>
 <h3 id="构造函数"><a href="#构造函数" class="headerlink" title="构造函数"></a>构造函数</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">CyclicBarrier</span><span class="token punctuation">(</span><span class="token keyword">int</span> parties<span class="token punctuation">,</span> <span class="token class-name">Runnable</span> barrierAction<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span>parties <span class="token operator">&lt;=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -462,7 +447,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
     <span class="token comment">// barrierCommand表示“parties个线程到达barrier时，会执行的动作”。</span>
     <span class="token keyword">this</span><span class="token punctuation">.</span>barrierCommand <span class="token operator">=</span> barrierAction<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="await-1"><a href="#await-1" class="headerlink" title="await()"></a>await()</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">int</span> <span class="token function">await</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">,</span> <span class="token class-name">BrokenBarrierException</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
         <span class="token keyword">return</span> <span class="token function">dowait</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">,</span> <span class="token number">0L</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -470,7 +454,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
         <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span>toe<span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// cannot happen;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">int</span> <span class="token function">dowait</span><span class="token punctuation">(</span><span class="token keyword">boolean</span> timed<span class="token punctuation">,</span> <span class="token keyword">long</span> nanos<span class="token punctuation">)</span>
     <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span><span class="token punctuation">,</span> <span class="token class-name">BrokenBarrierException</span><span class="token punctuation">,</span>
            <span class="token class-name">TimeoutException</span> <span class="token punctuation">&#123;</span>
@@ -549,7 +532,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
         lock<span class="token punctuation">.</span><span class="token function">unlock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>dowait()</code>的作用就是让当前线程阻塞，直到“有 parties 个线程到达 barrier” 或 “当前线程被中断” 或 “超时”这三者之一发生，当前线程才继续执行。</p>
 <p>generation 是 CyclicBarrier 的一个成员遍历，它的定义如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token class-name">Generation</span> generation <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Generation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -557,7 +539,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
 <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Generation</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">boolean</span> broken <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>在 CyclicBarrier 中，同一批的线程属于同一代，即同一个 Generation；CyclicBarrier 中通过 generation 对象，记录属于哪一代。当有 parties 个线程到达barrier，generation 就会被更新换代。</p>
 <p>如果当前线程被中断，即<code>Thread.interrupted()</code>为 true；则通过<code>breakBarrier()</code>终止 CyclicBarrier。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">breakBarrier</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -565,15 +546,13 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
     count <span class="token operator">=</span> parties<span class="token punctuation">;</span>
     trip<span class="token punctuation">.</span><span class="token function">signalAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><code>breakBarrier()</code>会设置当前中断标记 broken 为true，意味着“将该Generation中断”；同时，设置<code>count=parties</code>，即重新初始化 count；最后，通过<code>signalAll()</code>唤醒 CyclicBarrier 上所有的等待线程。</p>
-<p>将“count计数器”-1，即 –count；然后判断是不是“有 parties 个线程到达 barrier”，即 index 是不是为0。<br>当<code>index=0</code>时，如果 barrierCommand 不为 null，则执行该 barrierCommand，barrierCommand 就是我们创建 CyclicBarrier 时，传入的 Runnable对象。然后，调用<code>nextGeneration()</code>进行换代工作。</p>
+<p>将“count计数器”-1，即 —count；然后判断是不是“有 parties 个线程到达 barrier”，即 index 是不是为0。<br>当<code>index=0</code>时，如果 barrierCommand 不为 null，则执行该 barrierCommand，barrierCommand 就是我们创建 CyclicBarrier 时，传入的 Runnable对象。然后，调用<code>nextGeneration()</code>进行换代工作。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">nextGeneration</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     trip<span class="token punctuation">.</span><span class="token function">signalAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     count <span class="token operator">=</span> parties<span class="token punctuation">;</span>
     generation <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Generation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>首先，它会调用<code>signalAll()</code>唤醒<code>CyclicBarrier</code>上所有的等待线程；接着，重新初始化 count；最后，更新 generation 的值。</p>
 <p>在for(;;)循环中。timed 是用来表示当前是不是“超时等待”线程。如果不是，则通过<code>trip.await()</code>进行等待；否则，调用<code>awaitNanos()</code>进行超时等待。</p>
 <h2 id="CyclicBarrier使用示例"><a href="#CyclicBarrier使用示例" class="headerlink" title="CyclicBarrier使用示例"></a>CyclicBarrier使用示例</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">CyclicBarrierTest</span> <span class="token punctuation">&#123;</span>
@@ -604,7 +583,6 @@ main await finished.<span aria-hidden="true" class="line-numbers-rows"><span></s
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>运行结果</strong>：</p>
 <pre class="line-numbers language-none"><code class="language-none">Thread-1 wait for CyclicBarrier.
 Thread-2 wait for CyclicBarrier.
@@ -616,7 +594,6 @@ Thread-4 continued.
 Thread-2 continued.
 Thread-3 continued.
 Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>结果说明</strong>：</p>
 <p>主线程中新建了 5 个线程，所有的这些线程都调用<code>cb.await()</code>等待。所有这些线程一直等待，直到 cb 中所有线程都达到 barrier 时，这些线程才继续运行。</p>
 <h1 id="Semaphore"><a href="#Semaphore" class="headerlink" title="Semaphore"></a>Semaphore</h1><p>Semaphore是一个计数信号量，它的本质是一个”共享锁”。根据共享锁的获取原则，Semaphore分为”公平信号量”和”非公平信号量”。</p>
@@ -666,7 +643,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
 <span class="token keyword">boolean</span> <span class="token function">tryAcquire</span><span class="token punctuation">(</span><span class="token keyword">int</span> <span class="token keyword">permits</span><span class="token punctuation">,</span> <span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span>
 <span class="token comment">// 如果在给定的等待时间内，此信号量有可用的许可并且当前线程未被中断，则从此信号量获取一个许可。</span>
 <span class="token keyword">boolean</span> <span class="token function">tryAcquire</span><span class="token punctuation">(</span><span class="token keyword">long</span> timeout<span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span> unit<span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="Semaphore实现原理"><a href="#Semaphore实现原理" class="headerlink" title="Semaphore实现原理"></a>Semaphore实现原理</h2><h3 id="构造函数-1"><a href="#构造函数-1" class="headerlink" title="构造函数"></a>构造函数</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">Semaphore</span><span class="token punctuation">(</span><span class="token keyword">int</span> <span class="token keyword">permits</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     sync <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NonfairSync</span><span class="token punctuation">(</span><span class="token keyword">permits</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span>
@@ -674,7 +650,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
 <span class="token keyword">public</span> <span class="token class-name">Semaphore</span><span class="token punctuation">(</span><span class="token keyword">int</span> <span class="token keyword">permits</span><span class="token punctuation">,</span> <span class="token keyword">boolean</span> fair<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     sync <span class="token operator">=</span> fair <span class="token operator">?</span> <span class="token keyword">new</span> <span class="token class-name">FairSync</span><span class="token punctuation">(</span><span class="token keyword">permits</span><span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">NonfairSync</span><span class="token punctuation">(</span><span class="token keyword">permits</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>信号量分为“公平信号量（ FairSync ）和非公平信号量（ NonfairSync ）。<code>Semaphore(int permits)</code>函数会默认创建“非公平信号量”。</p>
 <h3 id="公平信号量的获取"><a href="#公平信号量的获取" class="headerlink" title="公平信号量的获取"></a>公平信号量的获取</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">acquire</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
     sync<span class="token punctuation">.</span><span class="token function">acquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -684,7 +659,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">permits</span> <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     sync<span class="token punctuation">.</span><span class="token function">acquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token keyword">permits</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>信号量中的<code>acquire()</code>获取函数，实际上是调用的 AQS 中的<code>acquireSharedInterruptibly()</code>。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">acquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token keyword">int</span> arg<span class="token punctuation">)</span>
         <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
@@ -695,7 +669,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">tryAcquireShared</span><span class="token punctuation">(</span>arg<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span>
         <span class="token function">doAcquireSharedInterruptibly</span><span class="token punctuation">(</span>arg<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>Semaphore中”公平锁“对应的<code>tryAcquireShared()</code>实现如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">tryAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> acquires<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -713,7 +686,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
             <span class="token keyword">return</span> remaining<span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>tryAcquireShared()</code>的作用是尝试获取 acquires 个信号量许可数。对于 Semaphore 而言，state 表示的是“当前可获得的信号量许可数”。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">doAcquireSharedInterruptibly</span><span class="token punctuation">(</span><span class="token keyword">long</span> arg<span class="token punctuation">)</span>
     <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
@@ -745,7 +717,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
             <span class="token function">cancelAcquire</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>doAcquireSharedInterruptibly()</code>会使当前线程一直等待，直到当前线程获取到共享锁(或被中断)才返回。</p>
 <h3 id="公平信号量的释放"><a href="#公平信号量的释放" class="headerlink" title="公平信号量的释放"></a>公平信号量的释放</h3><p>Semaphore中公平信号量(FairSync)的释放API如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">release</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -756,7 +727,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">permits</span> <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">IllegalArgumentException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     sync<span class="token punctuation">.</span><span class="token function">releaseShared</span><span class="token punctuation">(</span><span class="token keyword">permits</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>信号量的<code>releases()</code>释放函数，实际上是调用的 AQS 中的<code>releaseShared()</code>。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">boolean</span> <span class="token function">releaseShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> arg<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">tryReleaseShared</span><span class="token punctuation">(</span>arg<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -765,7 +735,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>releaseShared()</code>的目的是让当前线程释放它所持有的共享锁。它首先会通过<code>tryReleaseShared()</code>去尝试释放共享锁。尝试成功，则直接返回；尝试失败，则通过<code>doReleaseShared()</code>去释放共享锁。</p>
 <p>Semaphore重写了tryReleaseShared()</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">boolean</span> <span class="token function">tryReleaseShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> releases<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -781,7 +750,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
             <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果<code>tryReleaseShared()</code>尝试释放共享锁失败，则会调用<code>doReleaseShared()</code>去释放共享锁。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">doReleaseShared</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -809,14 +777,12 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
             <span class="token keyword">break</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：<code>doReleaseShared()</code>会释放“共享锁”。它会从前往后的遍历 CLH 队列，依次“唤醒”然后“执行”队列中每个节点对应的线程；最终的目的是让这些线程释放它们所持有的信号量。 </p>
 <h3 id="非公平信号量获取和释放"><a href="#非公平信号量获取和释放" class="headerlink" title="非公平信号量获取和释放"></a>非公平信号量获取和释放</h3><p>Semaphore 中的非公平信号量是 NonFairSync。在 Semaphore 中，“非公平信号量许可的释放(release)”与“公平信号量许可的释放(release)”是一样的。不同的是它们获取“信号量许可”的机制不同，下面是非公平信号量获取信号量许可的代码。</p>
 <p>非公平信号量的<code>tryAcquireShared()</code>实现如下</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">tryAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> acquires<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">return</span> <span class="token function">nonfairTryAcquireShared</span><span class="token punctuation">(</span>acquires<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><code>nonfairTryAcquireShared()</code>的实现如下</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">int</span> <span class="token function">nonfairTryAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> acquires<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -830,7 +796,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
             <span class="token keyword">return</span> remaining<span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>说明</strong>：非公平信号量的<code>tryAcquireShared()</code>调用 AQS 中的<code>nonfairTryAcquireShared()</code>。而在<code>nonfairTryAcquireShared()</code>的 for 循环中，它都会直接判断“当前剩余的信号量许可数”是否足够；足够的话，则直接“设置可以获得的信号量许可数”，进而再获取信号量。而公平信号量的<code>tryAcquireShared()</code>中，在获取信号量之前会通过<code>if (hasQueuedPredecessors())</code>来判断“当前线程是不是在 CLH 队列的头部”，是的话，则返回 -1。 </p>
 <h2 id="Semaphore示例"><a href="#Semaphore示例" class="headerlink" title="Semaphore示例"></a>Semaphore示例</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">SemaphoreTest</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> SEM_MAX <span class="token operator">=</span> <span class="token number">10</span><span class="token punctuation">;</span>
@@ -872,7 +837,6 @@ Thread-1 continued.<span aria-hidden="true" class="line-numbers-rows"><span></sp
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>(某一次)运行结果</strong>：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java">pool<span class="token operator">-</span><span class="token number">1</span><span class="token operator">-</span>thread<span class="token operator">-</span><span class="token number">1</span> acquire count<span class="token operator">=</span><span class="token number">5</span>
 pool<span class="token operator">-</span><span class="token number">1</span><span class="token operator">-</span>thread<span class="token operator">-</span><span class="token number">2</span> acquire count<span class="token operator">=</span><span class="token number">4</span>
@@ -880,7 +844,6 @@ pool<span class="token operator">-</span><span class="token number">1</span><spa
 pool<span class="token operator">-</span><span class="token number">1</span><span class="token operator">-</span>thread<span class="token operator">-</span><span class="token number">2</span> release <span class="token number">4</span>
 pool<span class="token operator">-</span><span class="token number">1</span><span class="token operator">-</span>thread<span class="token operator">-</span><span class="token number">3</span> acquire count<span class="token operator">=</span><span class="token number">7</span>
 pool<span class="token operator">-</span><span class="token number">1</span><span class="token operator">-</span>thread<span class="token operator">-</span><span class="token number">3</span> release <span class="token number">7</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>结果说明</strong>：</p>
 <p>信号量 sem 的许可总数是 10 个；共 3 个线程，分别需要获取的信号量许可数是 5,4,7。前面两个线程获取到信号量的许可后，sem 中剩余的可用的许可数是 1；因此，最后一个线程必须等前两个线程释放了它们所持有的信号量许可之后，才能获取到 7 个信号量许可。</p>
 
@@ -1084,6 +1047,8 @@ pool<span class="token operator">-</span><span class="token number">1</span><spa
 
 
 
+
+  
 
   
 

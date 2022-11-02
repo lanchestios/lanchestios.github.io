@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="介绍了调度线程常用的设计模式。">
@@ -29,14 +29,14 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://example.com/images/JDK/ProducerConsumer模式.png">
 <meta property="og:image" content="http://example.com/images/JDK/WorkerThread模式.png">
-<meta property="og:image" content="http://example.com/images/JDK/%E4%B8%A4%E9%98%B6%E6%AE%B5%E7%BB%88%E6%AD%A2%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F.png">
-<meta property="og:image" content="http://example.com/images/JDK/ActiveObject%E6%A8%A1%E5%BC%8F%E8%B0%83%E7%94%A8%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://example.com/images/JDK/ActiveObject%E6%A8%A1%E5%BC%8F%E8%B0%83%E7%94%A8%E6%B5%81%E7%A8%8B.png">
-<meta property="og:image" content="http://example.com/images/JDK/EventBus%E6%A8%A1%E5%BC%8F.png">
-<meta property="og:image" content="http://example.com/images/JDK/EventBus%E6%9E%B6%E6%9E%84%E7%B1%BB%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/JDK/两阶段终止设计模式.png">
+<meta property="og:image" content="http://example.com/images/JDK/ActiveObject模式调用关系.png">
+<meta property="og:image" content="http://example.com/images/JDK/ActiveObject模式调用流程.png">
+<meta property="og:image" content="http://example.com/images/JDK/EventBus模式.png">
+<meta property="og:image" content="http://example.com/images/JDK/EventBus架构类图.png">
 <meta property="og:image" content="http://example.com/images/JDK/EventEventLoopHandler.png">
-<meta property="og:image" content="http://example.com/images/JDK/EDA%E6%9E%B6%E6%9E%84%E7%B1%BB%E5%9B%BE.png">
-<meta property="og:image" content="http://example.com/images/JDK/%E5%B9%B6%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E5%85%B3%E7%B3%BB%E5%9B%BE.png">
+<meta property="og:image" content="http://example.com/images/JDK/EDA架构类图.png">
+<meta property="og:image" content="http://example.com/images/JDK/并发设计模式关系图.png">
 <meta property="article:published_time" content="2021-07-15T14:10:00.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.494Z">
 <meta property="article:author" content="Wang Zihao">
@@ -263,7 +263,6 @@
       
         <p>介绍了调度线程常用的设计模式。</p>
 <span id="more"></span>
-
 <h1 id="Single-Threaded-Execution-模式"><a href="#Single-Threaded-Execution-模式" class="headerlink" title="Single Threaded Execution 模式"></a>Single Threaded Execution 模式</h1><p>Single Threaded Execution 是指以单线程的形式访问共享资源，保证线程安全。典型例子是使用 mutex lock 使得在同一时间只有 1 个线程访问共享资源。</p>
 <p><strong>别名</strong></p>
 <ul>
@@ -339,8 +338,7 @@
 </li>
 </ol>
 <h1 id="Producer-Consumer-模式"><a href="#Producer-Consumer-模式" class="headerlink" title="Producer-Consumer 模式"></a>Producer-Consumer 模式</h1><p>Producer-Consumer 模式，即生产者安全地将数据交给消费者。一般来说，在该模式中，生产者和消费者都有多个，当然生产者和消费者有时也会只有一个。当两者都只有一个时，我们称之为 Pipe 模式。</p>
-<img src="/images/JDK/ProducerConsumer模式.png" style="zoom: 50%;" />
-
+<p><img src="/images/JDK/ProducerConsumer模式.png" style="zoom: 50%;" /></p>
 <p><strong>问题及解决方案</strong></p>
 <p>想从某个线程（Producer角色）向其他线程（Consumer角色）传递数据时。如果 Producer 角色和 Consumer 角色的处理速度不一致，那么处理速度快的角色会被处理速度慢的角色拖后腿，从而导致吞吐量下降。另外，如果在 Producer 角色写数据的同时，Consumer 角色去读取数据，又会失去安全性。</p>
 <p>因此，在 Producer 角色和 Consumer 角色之间准备一个中转站 —— Channel 角色。接着，让 Channel 角色持有多个数据。这样，就可以缓解 Producer 角色与 Consumer 角色之间的处理速度差异。另外，如果在 Channel 角色中进行线程互斥，就不会失去数据的安全性。这样就可以既不降低吞吐量，又可以在多个线程之间安全地传递数据。</p>
@@ -366,8 +364,7 @@
 <li>在 Worker Thread 模式中可以循环利用已经创建好的线程，避免了不断创建线程的开销。</li>
 </ol>
 <h1 id="Worker-Thread-模式"><a href="#Worker-Thread-模式" class="headerlink" title="Worker Thread 模式"></a>Worker Thread 模式</h1><p>在 Worker Thread 模式中，RM（Resource Manager）会保存工人线程（Worker Thread），工人线程（Worker Thread）会逐个取回工作并进行处理。当所有工作全部完成后，工人线程会等待新的工作到来。另外，如果从“保存多个工人线程的场所”这一点来看，我们也可以称这种模式为 Thread Pool（线程池）模式。</p>
-<img src="/images/JDK/WorkerThread模式.png" style="zoom:50%;" />
-
+<p><img src="/images/JDK/WorkerThread模式.png" style="zoom:50%;" /></p>
 <p><strong>别名</strong></p>
 <ul>
 <li>Thread Pool</li>
@@ -384,7 +381,7 @@
 </ol>
 <h1 id="Two-Phase-Termination-模式"><a href="#Two-Phase-Termination-模式" class="headerlink" title="Two-Phase Termination 模式"></a>Two-Phase Termination 模式</h1><p>Two-Phase Termination 模式的名字直译为中文是“分两阶段终止”的意思。它是一种先执行完终止处理再终止线程的模式。</p>
 <h2 id="问题及解决方案"><a href="#问题及解决方案" class="headerlink" title="问题及解决方案"></a>问题及解决方案</h2><p>当想要终止正在运行的线程时，如果因为外部的原因紧急终止了线程，就会失去安全性。通过实现 Two-Phase Termination 模式，让即将被终止的线程自己去判断开始终止处理的时间点，待将资源处理完毕后，再终止线程。</p>
-<p><img src="/images/JDK/%E4%B8%A4%E9%98%B6%E6%AE%B5%E7%BB%88%E6%AD%A2%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F.png"></p>
+<p><img src="/images/JDK/两阶段终止设计模式.png" alt=""></p>
 <p>我们称线程在进行正常处理时的状态为“操作中”。在要停止该线程时，我们会发出“终止请求”。这样，线程就不会突然终止，而是会先开始进行“打扫工作”。我们称这种状态为“终止处理中”。从“操作中”变为“终止处理中”是线程终止的第一阶段。</p>
 <p>在“终止处理中”状态下，线程不会再进行正常操作了。它虽然仍然在运行，但是只会进行终止处理。终止处理完成后，就会真正地终止线程。“终止处理中”状态结束是线程终止的第二阶段。</p>
 <p>先从“操作中”状态变为“终止处理中”状态，然后再真正地终止线程。这就是 Two-Phase Termination 模式。该模式的要点如下：</p>
@@ -395,38 +392,41 @@
 </ol>
 <h2 id="实现方案"><a href="#实现方案" class="headerlink" title="实现方案"></a>实现方案</h2><p>我们需要通过对三个状态（<code>isInterrupted</code>、<code>isShutdown</code>、<code>isTerminated</code>）的检查，来实现 Two-Phase Termination 模式，也就是优雅停机模式。这里需要用到 <code>interrupt()</code> 方法，我们需要知道它做了什么？</p>
 <p>在一个线程内部存在 interrupt flag 的标识，如果一个线程调用了 interrput，那么它的 flag 将被设置，如果当前的线程正在执行可中断方法被阻塞时，调用 interrupt 方法将其中断，反而会导致 flag 被清除并抛出 InterruptedException 异常。</p>
-<p><strong>仅仅检查 isTerminated&#x2F;isShutdown 终止状态是不够的</strong></p>
-<p>因为当想要终止线程时，该线程可能正在 sleep。而当线程正在 sleep 时，即使将 isTerminated&#x2F;isShutdown 标志设置为 true，线程也不会开始终止处理。等到 sleep 时间过后，线程可能会在某个时间点开始终止处理，但是这样程序的响应性就下降了。如果使用 interrupt 方法的话，就可以中断 sleep。</p>
-<p>另外，线程当时也可能正在 wait。而当线程正在 wait 时，即使将 isTerminated&#x2F;isShutdown 标志设为 true，线程也不会从等待队列中出来，所以我们必须使用 interrupt 方法对线程下达“中断wait”的指示。</p>
+<p><strong>仅仅检查 isTerminated/isShutdown 终止状态是不够的</strong></p>
+<p>因为当想要终止线程时，该线程可能正在 sleep。而当线程正在 sleep 时，即使将 isTerminated/isShutdown 标志设置为 true，线程也不会开始终止处理。等到 sleep 时间过后，线程可能会在某个时间点开始终止处理，但是这样程序的响应性就下降了。如果使用 interrupt 方法的话，就可以中断 sleep。</p>
+<p>另外，线程当时也可能正在 wait。而当线程正在 wait 时，即使将 isTerminated/isShutdown 标志设为 true，线程也不会从等待队列中出来，所以我们必须使用 interrupt 方法对线程下达“中断wait”的指示。</p>
 <p><strong>仅仅检查 isInterrupted 中断状态是不够的</strong></p>
-<p>有人可能会问：“调用 interrupt 方法后，如果线程正在 sleep 或是 wait，那么会抛出 InterruptedException 异常，而如果不抛出异常，线程就会变为中断状态。也就是说，没有必要特意准备一个新的 isTerminated&#x2F;isShutdown 标志。只要捕获 InterruptedException，使用 isInterrupted 方法来检查线程是否处于中断状态不就可以了吗？”</p>
-<p>这样的疑问很有道理。如果是像示例程序那样，开发人员可以看到线程的所有相关程序，那么就无需使用 isTerminated&#x2F;isShutdown 标志。只要捕获 InterruptedException，并使用 isInterrupted 方法就能够正确地开始终止处理。</p>
+<p>有人可能会问：“调用 interrupt 方法后，如果线程正在 sleep 或是 wait，那么会抛出 InterruptedException 异常，而如果不抛出异常，线程就会变为中断状态。也就是说，没有必要特意准备一个新的 isTerminated/isShutdown 标志。只要捕获 InterruptedException，使用 isInterrupted 方法来检查线程是否处于中断状态不就可以了吗？”</p>
+<p>这样的疑问很有道理。如果是像示例程序那样，开发人员可以看到线程的所有相关程序，那么就无需使用 isTerminated/isShutdown 标志。只要捕获 InterruptedException，并使用 isInterrupted 方法就能够正确地开始终止处理。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">try &#123;
     Thread.sleep(1000);
 &#125; catch (InterruptedException e) &#123;
     &#x2F;&#x2F;ignore
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>但是，只要线程正在执行的方法中如上述代码一样忽略 InterruptedException。这样，即使在可中断阻塞状态中被中断时抛出了 InterruptedException，线程也不会变为中断状态。</p>
 <blockquote>
 <p>  补充：当 interrupt 方法被调用后，线程就可以被中断了。中断线程这个行为会带来以下结果之一。</p>
 <ol>
 <li>线程变为“中断状态”：反应为“状态”</li>
-<li>抛出“InterruptedException 异常”：反映为“控制”</li>
+<li><p>抛出“InterruptedException 异常”：反映为“控制”</p>
+<p>我们还需要注意中断状态的读取：</p>
+</li>
 </ol>
-<p>  我们还需要注意中断状态的读取：</p>
 <ul>
-<li><code>Thread.currentThread().isInterrupted()</code> 不清除中断状态位</li>
+<li><p><code>Thread.currentThread().isInterrupted()</code> 不清除中断状态位</p>
+<ul>
 <li><code>Thread.interrupted()</code> 清除中断状态位</li>
 </ul>
-<p>  由于在可中断阻塞状态中被中断时抛出了 InterruptedException，线程不会变为中断状态。所以有时需要防止该中断状态遗失，再次调用中断。</p>
-  <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">try &#123;
+<p>由于在可中断阻塞状态中被中断时抛出了 InterruptedException，线程不会变为中断状态。所以有时需要防止该中断状态遗失，再次调用中断。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">try &#123;
      Thread.sleep(100000000);
    &#125; catch (InterruptedException e) &#123;
      Thread.currentThread().interrupt();
    &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</li>
+</ul>
 </blockquote>
-<p>也就是说，如果程序中没有 isTerminated&#x2F;isShutdown 标志，而且有上面这样的代码，那么即使使用 <code>terminate()</code> 方法发出了终止请求，该请求也不会被处理。isTerminated 是用于记录是否已经发出终止请求的标志。</p>
+<p>也就是说，如果程序中没有 isTerminated/isShutdown 标志，而且有上面这样的代码，那么即使使用 <code>terminate()</code> 方法发出了终止请求，该请求也不会被处理。isTerminated 是用于记录是否已经发出终止请求的标志。</p>
 <p><strong>参考 ThreadPoolExecutor Two-Phase Termination 实现</strong></p>
 <p>通常，线程都会在 ExecutorService 接口背后运行。为了优雅地终止运行中的线程，ExecutorService 接口为我们准备了 shutdown 方法。</p>
 <p>ExecutorService 接口还为我们提供了用于确认终止处理已执行到哪个阶段的方法。isShutdown 方法是用于确认 shutdown 方法是否已经被调用的方法。如果 shutdown 方法已经被调用，那么 isShutdown 会返回 true。但是，即使 isShutdown 为 true，也并不表示线程已经实际停止了。isTerminated 方法是用于确认线程是否已经实际停止了的方法。如果线程已经停止了，isTerminated 会返回 true。</p>
@@ -453,7 +453,7 @@
 <li>Concurrent Object</li>
 </ul>
 <p><strong>角色及调用关系</strong></p>
-<p><img src="/images/JDK/ActiveObject%E6%A8%A1%E5%BC%8F%E8%B0%83%E7%94%A8%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/JDK/ActiveObject模式调用关系.png" alt=""></p>
 <p><strong>Client（委托者）</strong></p>
 <p>Client 角色调用 ActiveObject 角色的方法来委托 Proxy 处理请求。并且 Client 角色在获取处理结果时，会调用 VirtualResult 角色的 getResultValue 方法。这里使用了 Future 模式。</p>
 <p><strong>Proxy（代理人）</strong></p>
@@ -470,11 +470,11 @@
 <p>MethodRequest 角色是与来自 Client 角色的请求对应的角色。MethodRequest 定义了负责执行处理的 Servant 角色，以及负责设置返回值的 Future 角色和负责执行请求的方法（execute ）。</p>
 <p><strong>ConcreteMethodRequest</strong></p>
 <p>ConcreteMethodRequest 角色是使 MethodRequest 角色与具体的方法相对应的角色。对于 ActiveObject 角色中定义的每个方法，会有各个类与之对应，比如MethodAlphaRequest、MethodBetaRequest…。为了便于大家看出它们与 methodAlpha、methodBeta 等方法名的对应关系，上图中并没有使用 ConcreteMethodRequest 这个名字，而是使用 methodAlphaRequest、methodBetaRequest 等名字来表示。各个 ConcreteMethodRequest 角色中的字段分别与方法的参数相对应。</p>
-<p><img src="/images/JDK/ActiveObject%E6%A8%A1%E5%BC%8F%E8%B0%83%E7%94%A8%E6%B5%81%E7%A8%8B.png"></p>
+<p><img src="/images/JDK/ActiveObject模式调用流程.png" alt=""></p>
 <h1 id="Event-Bus-模式"><a href="#Event-Bus-模式" class="headerlink" title="Event Bus 模式"></a>Event Bus 模式</h1><p>Event Bus 模式可以看作多线程实现的观察者模式，用户端通过订阅数据源从而得到服务端推送的数据。</p>
-<p><img src="/images/JDK/EventBus%E6%A8%A1%E5%BC%8F.png"></p>
+<p><img src="/images/JDK/EventBus模式.png" alt=""></p>
 <p>以下是 Event Bus 架构类图</p>
-<p><img src="/images/JDK/EventBus%E6%9E%B6%E6%9E%84%E7%B1%BB%E5%9B%BE.png"></p>
+<p><img src="/images/JDK/EventBus架构类图.png" alt=""></p>
 <ul>
 <li>Bus 接口对外提供了几种主要的使用方式，比如 post 方法用来发送 Event，register 方法用来注册 Event 接收者（Subscriber）接受响应事件，EventBus 采用同步的方式推送 Event，AsyncEventBus 采用异步的方式（Thread-Per-Message）推送 Event。</li>
 <li>Registry 注册表，主要用来记录对应的 Subscriber 以及受理消息的回调方法。</li>
@@ -487,11 +487,10 @@
 <li>Event Loop：维护 Events 和 Event Handlers 之间的交互流程。</li>
 </ul>
 <p>如下图所示，EventA 将被 HandlerA 处理，而 EventB 将被 HandlerB 处理，这一切的分配都是由 Event Loop 所控制的。</p>
-<p><img src="/images/JDK/EventEventLoopHandler.png"></p>
+<p><img src="/images/JDK/EventEventLoopHandler.png" alt=""></p>
 <p>因此，我们需要在 Event Loop 中将事件类型与 Handler（也叫 Channel）绑定，如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">EventLoop</span> el <span class="token operator">=</span> <span class="token class-name">EventLoop</span><span class="token punctuation">.</span><span class="token function">build</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 el<span class="token punctuation">.</span><span class="token function">registerChannel</span><span class="token punctuation">(</span><span class="token class-name">UserEvent</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token class-name">UserEventHandler</span><span class="token punctuation">.</span><span class="token function">instance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p><strong>Event vs Message vs Command</strong></p>
 <p>我们通常会对 Event Driven 模式、Event Bus 模式、Request Driven 模式混淆不清。我们可以将 Event Driven 的 DTO 称作 Event，Event Bus 的 DTO 称作 Message，Request Driven 模式的 DTO 称作 Command。</p>
 <p>我们可以通过以下定义区分：</p>
@@ -501,7 +500,7 @@ el<span class="token punctuation">.</span><span class="token function">registerC
 <li>Event 是一个已发生、待后续系统接收到执行附加处理的命令（流程已进行完毕，附加处理待进行）。</li>
 </ul>
 <p><strong>EDA 架构类图</strong></p>
-<p><img src="/images/JDK/EDA%E6%9E%B6%E6%9E%84%E7%B1%BB%E5%9B%BE.png"></p>
+<p><img src="/images/JDK/EDA架构类图.png" alt=""></p>
 <ul>
 <li>Message 是 Event 更高级别的抽象，用来标识一个事件消息。</li>
 <li>Events 需要包含两个属性：类型和数据，Event 的类型决定了它会被哪个 Handler 处理，数据是在 Handler 中代加工的材料。</li>
@@ -511,7 +510,7 @@ el<span class="token punctuation">.</span><span class="token function">registerC
 <li>Dynamic Router 主要将 Event 注册到对应的 Channel 并且还负责事件的分发。</li>
 </ul>
 <p>在设计 Event 事件时，我们最好使用 Immutable 模式用来阻止处理中产生的并发问题。</p>
-<h1 id="模式总结"><a href="#模式总结" class="headerlink" title="模式总结"></a>模式总结</h1><p><img src="/images/JDK/%E5%B9%B6%E5%8F%91%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E5%85%B3%E7%B3%BB%E5%9B%BE.png"></p>
+<h1 id="模式总结"><a href="#模式总结" class="headerlink" title="模式总结"></a>模式总结</h1><p><img src="/images/JDK/并发设计模式关系图.png" alt=""></p>
 
     </div>
 
@@ -710,6 +709,8 @@ el<span class="token punctuation">.</span><span class="token function">registerC
 
 
 
+
+  
 
   
 

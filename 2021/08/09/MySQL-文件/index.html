@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="本章将分析构成 MySQL 数据库和 InnoDB 存储引擎表的各种类型文件。这些文件都存放在数据目录中，我们可以通过 SHOW VARIABLES LIKE &#39;datadir&#39; 来查看该目录的位置。这些文件类别如下：  参数文件：告诉 MySQL 实例启动时在哪里可以找到数据库文件，并且指定某些初始化参数，这些参数定义了某种内存结构的大小等设置，还会介绍各种参数的类型。 日志文件">
@@ -27,15 +27,15 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="本章将分析构成 MySQL 数据库和 InnoDB 存储引擎表的各种类型文件。这些文件都存放在数据目录中，我们可以通过 SHOW VARIABLES LIKE &#39;datadir&#39; 来查看该目录的位置。这些文件类别如下：  参数文件：告诉 MySQL 实例启动时在哪里可以找到数据库文件，并且指定某些初始化参数，这些参数定义了某种内存结构的大小等设置，还会介绍各种参数的类型。 日志文件">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E5%AF%B9%E4%BA%8E%E6%96%87%E4%BB%B6%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png">
-<meta property="og:image" content="http://example.com/images/MySQL/%E7%89%88%E6%9C%AC%E9%93%BE.png">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB存储引擎对于文件的存储方式.png">
+<meta property="og:image" content="http://example.com/images/MySQL/版本链.png">
 <meta property="article:published_time" content="2021-08-09T12:19:25.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.555Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="File">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/MySQL/InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E5%AF%B9%E4%BA%8E%E6%96%87%E4%BB%B6%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png">
+<meta name="twitter:image" content="http://example.com/images/MySQL/InnoDB存储引擎对于文件的存储方式.png">
 
 <link rel="canonical" href="http://example.com/2021/08/09/MySQL-%E6%96%87%E4%BB%B6/">
 
@@ -262,7 +262,6 @@
 <li>存储引擎文件：因为 MySQL 表存储引擎的关系，每个存储引擎都会有自己的文件来保存各种数据。这些存储引擎真正存储了记录和索引等数据。</li>
 </ul>
 <span id="more"></span>
-
 <h1 id="参数文件"><a href="#参数文件" class="headerlink" title="参数文件"></a>参数文件</h1><p>当 MySQL 实例启动时，数据库会先去读一个配置参数文件，用来寻找数据库的各种文件所在位置以及指定某些初始化参数，这些参数通常定义了某种内存结构有多大等。在默认情况下，MySQL 实例会按照一定的顺序在指定的位置进行读取，用户只需通过命令 <code>mysql --help | grep my.cnf</code> 来寻找即可。</p>
 <p>通过命令 SHOW VARIABLES 或 information_schema 架构下的 GLOBAL_VARIABLES 查看数据库中的所有参数。</p>
 <p>MySQL 数据库中的参数可以分为两类：</p>
@@ -282,7 +281,6 @@ variable: &#123;
   | &#123;PERSIST_ONLY | @@PERSIST_ONLY.&#125; system_var_name
   | [SESSION | @@SESSION. | @@] system_var_name
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>这里可以看到 session 和 global 关键字，它们表明该参数的修改是基于当前会话还是整个实例的生命周期。但需要注意的是，虽然修改了该变量的全局值，在这次的实例生命周期都有效，MySQL 实例本身并不会对参数文件中的该值进行修改。下次 MySQL 服务启动时，MySQL 实例依旧会读取参数文件。</p>
 <h1 id="日志文件"><a href="#日志文件" class="headerlink" title="日志文件"></a>日志文件</h1><p>日志文件记录了影响 MySQL 数据库的各种类型活动。MySQL 数据库中常见的日志文件有：</p>
 <ul>
@@ -299,7 +297,7 @@ variable: &#123;
 <blockquote>
 <p>  使用 mysqldumpslow 命令方便的整理慢查询日志。</p>
 </blockquote>
-<p>参数 log_output 指定了慢查询输出的格式，默认为 FILE，可以将它设为 TABLE，然后就可以查询 mysql 架构下的 slow_ log 表了。参数 log_output 是动态的，并且是全局的，因此用户可以在线进行修改。查看 slow_log 表的定义会发现该表使用的是 CSV 引擎，对大数据量下的查询效率可能不高。用户可以把 slow_log 表的引擎转换到 MyISAM，并在 start_time 列上添加索引以进一步提高查询的效率。</p>
+<p>参数 log<em>output 指定了慢查询输出的格式，默认为 FILE，可以将它设为 TABLE，然后就可以查询 mysql 架构下的 slow</em> log 表了。参数 log_output 是动态的，并且是全局的，因此用户可以在线进行修改。查看 slow_log 表的定义会发现该表使用的是 CSV 引擎，对大数据量下的查询效率可能不高。用户可以把 slow_log 表的引擎转换到 MyISAM，并在 start_time 列上添加索引以进一步提高查询的效率。</p>
 <p>在 InnoDB 引擎中对于 SQL 语句的捕获方式有多种：运行时间、物理读取次数（从磁盘 IO 读取的次数）、逻辑读取次数（所有的读取，包括磁盘和缓冲池），可以使用 <code>slow_query_type</code> 进行配置。</p>
 <h2 id="查询日志"><a href="#查询日志" class="headerlink" title="查询日志"></a>查询日志</h2><p>查询日志记录了所有对 MySQL 数据库请求的信息，无论这些请求是否得到了正确的执行。同样地，可以将查询日志的记录放人 mysql 架构下的 general_log 表中，同 slow_log 相同。</p>
 <h2 id="二进制日志"><a href="#二进制日志" class="headerlink" title="二进制日志"></a>二进制日志</h2><p>二进制日志（binary log）记录了对 MySQL 数据库执行更改的所有操作。然而，若操作本身并没有导致数据库发生变化，那么该操作可能也会写入二进制日志。总的来说，二进制日志有以下作用：</p>
@@ -321,7 +319,7 @@ variable: &#123;
 <p>但是，即使将 <code>sync_binlog</code> 设为 1，还是会有一种情况导致问题的发生。当使用<br>InnoDB 存储引擎时，在一个事务发出 COMMIT 动作之前，由于 <code>sync_binlog</code> 为 1，因此会将二进制日志立即写人磁盘。如果这时已经写人了二进制日志，但是提交还没有发生，并且此时发生了宕机，那么在 MySQL 数据库下次启动时，由于 COMMIT 操作并没有发生，这个事务会被回滚掉。但是二进制日志已经记录了该事务信息，不能被回滚。这个问题可以通过将参数 <code>innodb_support_xa</code> 设为 1 来解决，虽然 <code>innodb_support_xa</code> 与 XA 事务有关，但它同时也确保了二进制日志和 InnoDB 存储引擎数据文件的同步。</p>
 </li>
 <li><p><code>binlog-do-db</code>、<code>binlog-ignore-db</code>、<code>log-slave-update</code></p>
-<p>参数 <code>binlog-do-db</code> 和 <code>binlog-ignore-db</code> 表示需要写入或忽略写入哪些库的日志。默认为空，表示需要同步所有库的日志到二进制日志。如果当前数据库是复制中的 slave 角色，则它不会将从 master 取得并执行的二进制日志写人自己的二进制日志文件中去。如果需要写入，要设置 <code>log-slave-update</code>。如果需要搭建 master&#x3D;&gt;slave&#x3D;&gt;slave 架构的复制，则必须设置该参数。</p>
+<p>参数 <code>binlog-do-db</code> 和 <code>binlog-ignore-db</code> 表示需要写入或忽略写入哪些库的日志。默认为空，表示需要同步所有库的日志到二进制日志。如果当前数据库是复制中的 slave 角色，则它不会将从 master 取得并执行的二进制日志写人自己的二进制日志文件中去。如果需要写入，要设置 <code>log-slave-update</code>。如果需要搭建 master=&gt;slave=&gt;slave 架构的复制，则必须设置该参数。</p>
 </li>
 <li><p>binlog_format</p>
 <p>它有三种模式可供选择：STATEMENT、ROW、MIXED。</p>
@@ -348,7 +346,7 @@ variable: &#123;
 <h2 id="表空间文件"><a href="#表空间文件" class="headerlink" title="表空间文件"></a>表空间文件</h2><p>InnoDB 采用将存储的数据按表空间（tablespace）进行存放的设计。在默认配置下会有一个初始大小为 10MB，名为 ibdata1 的文件。该文件就是默认的表空间文件（tablespace file），用户可以通过参数 <code>innodb_data_file_path</code> 对其进行设置。用户可以通过多个文件组成一个表空间，同时制定文件的属性，这样可以将磁盘的负载平均，提高数据库的整体性能。</p>
 <p>设置 <code>innodb_datafile_path</code> 参数后，所有基于 InnoDB 存储引擎的表的数据都会，记录到该共享表空间中。若设置了参数 <code>innodb_file_per_table</code>， 则用户可以将每个基于 InnoDB 存储引擎的表产生一个独立表空间。独立表空间的命名规则为：<code>表名.ibd</code>。通过这样的方式，用户不用将所有数据都存放于默认的表空间中。</p>
 <p>需要注意的是，这些单独的表空间文件仅存储该表的数据、索引和插入缓冲 BITMAP 等信息，其余信息还是存放在默认的表空间中。下图显示了 InnoDB 存储引擎对于文件的存储方式。</p>
-<p><img src="/images/MySQL/InnoDB%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E5%AF%B9%E4%BA%8E%E6%96%87%E4%BB%B6%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png"></p>
+<p><img src="/images/MySQL/InnoDB存储引擎对于文件的存储方式.png" alt=""></p>
 <h2 id="redo-日志文件"><a href="#redo-日志文件" class="headerlink" title="redo 日志文件"></a>redo 日志文件</h2><p>在默认情况下，在 InnoDB 存储引擎的数据目录下会有两个名为 <code>ib_logfile0</code> 和 <code>ib_logfile1</code> 的文件。在 MySQL 官方手册中将其称为 InnoDB 存储引擎的日志文件，不过更准确的定义应该是重做日志文件（redo log file）。</p>
 <p>为什么强调是重做日志文件呢？因为重做日志文件对于 InnoDB 存储引擎至关重要，它们记录了对于 InnoDB 存储引擎的事务日志。</p>
 <p>当实例或介质失败（media failure）时，重做日志文件就能派上用场。例如，数据库由于所在主机掉电导致实例失败，InnoDB 存储引擎会使用重做日志恢复到掉电前的时刻，以此来保证数据的完整性。</p>
@@ -389,16 +387,14 @@ variable: &#123;
 -rw-rw---- 1 mysql mysql 79691776 Mar 31 01:42 &#x2F;mydata&#x2F;data&#x2F;ibdata1
 -rw-rw---- 1 mysql mysql 50331648 Mar 31 01:42 &#x2F;mydata&#x2F;data&#x2F;ib_logfile0
 -rw-rw---- 1 mysql mysql 50331648 Mar 31 01:42 &#x2F;mydata&#x2F;data&#x2F;ib_logfile1<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果开启了 innodb_file_per_table ，将放在每个表的 .ibd 文件中。</p>
 <p>默认 rollback segment 全部写在一个文件中，但可以通过设置变量 innodb_undo_tablespaces 平均分配到多少个文件中。该变量默认值为 0，即全部写入一个表空间文件。该变量为静态变量，只能在数据库示例停止状态下修改，如写入配置文件或启动时带上对应参数。但是 InnoDB 存储引擎在启动过程中提示，不建议修改为非 0 的值，如下：</p>
 <pre class="line-numbers language-none"><code class="language-none">2022-02-15 13:16:00 7f665bfab720 InnoDB: Expected to open 3 undo tablespaces but was able
 2022-02-15 13:16:00 7f665bfab720 InnoDB: to find only 0 undo tablespaces.
 2022-02-15 13:16:00 7f665bfab720 InnoDB: Set the innodb_undo_tablespaces parameter to the
 2022-02-15 13:16:00 7f665bfab720 InnoDB: correct value and retry. Suggested value is 0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>另外，undo log 也会产生 redo log，因为 undo log 也要实现持久性保护。</p>
-<h3 id="delete-x2F-update-操作的内部机制"><a href="#delete-x2F-update-操作的内部机制" class="headerlink" title="delete&#x2F;update 操作的内部机制"></a>delete&#x2F;update 操作的内部机制</h3><p>当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log，如隔离级别为 repeatable read 时，事务读取的都是开启事务时的最新提交行版本，只要该事务不结束，该行版本就不能删除，即 undo log 不能删除。</p>
+<h3 id="delete-update-操作的内部机制"><a href="#delete-update-操作的内部机制" class="headerlink" title="delete/update 操作的内部机制"></a>delete/update 操作的内部机制</h3><p>当事务提交的时候，InnoDB 不会立即删除 undo log，因为后续还可能会用到 undo log，如隔离级别为 repeatable read 时，事务读取的都是开启事务时的最新提交行版本，只要该事务不结束，该行版本就不能删除，即 undo log 不能删除。</p>
 <p>但是在事务提交的时候，会将该事务对应的 undo log 放入到删除列表中，未来通过 purge 来删除。并且提交事务时，还会判断 undo log 分配的页是否可以重用，如果可以重用，则会分配给后面来的事务，避免为每个独立的事务分配独立的 undo log 页而浪费存储空间和性能。</p>
 <p>通过 undo log 记录 insert、delete 和 update 操作的结果发现：</p>
 <ul>
@@ -406,8 +402,7 @@ variable: &#123;
 </li>
 <li><p>delete 操作实际上不会直接删除，而是将 delete 对象打上 delete flag，标记为删除，最终的删除操作是 purge 线程完成的。</p>
 </li>
-<li><p>update 分为两种情况：update 的列是否是主键列。</p>
-<ul>
+<li>update 分为两种情况：update 的列是否是主键列。<ul>
 <li>如果不是主键列，在 undo log 中直接反向记录是如何 update 的。</li>
 <li>如果是主键列，update 分两部执行：先删除该行，再插入一行目标行。</li>
 </ul>
@@ -419,7 +414,7 @@ variable: &#123;
 <li>roll pointer：每次对某条聚簇索引记录进行改动时，都会把旧的版本写入到 undo 日志中。这个隐藏列就相当于一个指针，可以通过它找到该记录修改前的信息。</li>
 </ul>
 <p>如下图，我们依次提交三次事务，形成的 roll pointer 版本链，头结点是最新的一条数据，向下依次递减。</p>
-<p><img src="/images/MySQL/%E7%89%88%E6%9C%AC%E9%93%BE.png"></p>
+<p><img src="/images/MySQL/版本链.png" alt=""></p>
 <p>MVCC 即是根据事务的隔离状态通过 roll pointer 查询到对应的历史数据。</p>
 
     </div>
@@ -505,7 +500,7 @@ variable: &#123;
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E6%95%B0%E6%96%87%E4%BB%B6"><span class="nav-number">1.</span> <span class="nav-text">参数文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E6%97%A5%E5%BF%97"><span class="nav-number">2.1.</span> <span class="nav-text">错误日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%85%A2%E6%9F%A5%E8%AF%A2%E6%97%A5%E5%BF%97"><span class="nav-number">2.2.</span> <span class="nav-text">慢查询日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E6%97%A5%E5%BF%97"><span class="nav-number">2.3.</span> <span class="nav-text">查询日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E8%BF%9B%E5%88%B6%E6%97%A5%E5%BF%97"><span class="nav-number">2.4.</span> <span class="nav-text">二进制日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A5%97%E6%8E%A5%E5%AD%97%E6%96%87%E4%BB%B6"><span class="nav-number">3.</span> <span class="nav-text">套接字文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#pid-%E6%96%87%E4%BB%B6"><span class="nav-number">4.</span> <span class="nav-text">pid 文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%A1%A8%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89%E6%96%87%E4%BB%B6"><span class="nav-number">5.</span> <span class="nav-text">表结构定义文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E6%96%87%E4%BB%B6"><span class="nav-number">6.</span> <span class="nav-text">InnoDB 存储引擎文件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A8%E7%A9%BA%E9%97%B4%E6%96%87%E4%BB%B6"><span class="nav-number">6.1.</span> <span class="nav-text">表空间文件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#redo-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">6.2.</span> <span class="nav-text">redo 日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E-bin-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">6.2.1.</span> <span class="nav-text">与 bin 日志文件的区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">6.2.2.</span> <span class="nav-text">基本概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%B7%E7%9B%98%E8%A7%84%E5%88%99%E5%8F%8A-checkpoint"><span class="nav-number">6.2.3.</span> <span class="nav-text">刷盘规则及 checkpoint</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#InnoDB-%E7%9A%84%E6%81%A2%E5%A4%8D%E8%A1%8C%E4%B8%BA"><span class="nav-number">6.2.4.</span> <span class="nav-text">InnoDB 的恢复行为</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Undo-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">6.3.</span> <span class="nav-text">Undo 日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#log-%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F"><span class="nav-number">6.3.1.</span> <span class="nav-text">log 存储方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#delete-x2F-update-%E6%93%8D%E4%BD%9C%E7%9A%84%E5%86%85%E9%83%A8%E6%9C%BA%E5%88%B6"><span class="nav-number">6.3.2.</span> <span class="nav-text">delete&#x2F;update 操作的内部机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MVCC-%E5%8E%9F%E7%90%86"><span class="nav-number">6.3.3.</span> <span class="nav-text">MVCC 原理</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%82%E6%95%B0%E6%96%87%E4%BB%B6"><span class="nav-number">1.</span> <span class="nav-text">参数文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">2.</span> <span class="nav-text">日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E6%97%A5%E5%BF%97"><span class="nav-number">2.1.</span> <span class="nav-text">错误日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%85%A2%E6%9F%A5%E8%AF%A2%E6%97%A5%E5%BF%97"><span class="nav-number">2.2.</span> <span class="nav-text">慢查询日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E6%97%A5%E5%BF%97"><span class="nav-number">2.3.</span> <span class="nav-text">查询日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E8%BF%9B%E5%88%B6%E6%97%A5%E5%BF%97"><span class="nav-number">2.4.</span> <span class="nav-text">二进制日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A5%97%E6%8E%A5%E5%AD%97%E6%96%87%E4%BB%B6"><span class="nav-number">3.</span> <span class="nav-text">套接字文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#pid-%E6%96%87%E4%BB%B6"><span class="nav-number">4.</span> <span class="nav-text">pid 文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%A1%A8%E7%BB%93%E6%9E%84%E5%AE%9A%E4%B9%89%E6%96%87%E4%BB%B6"><span class="nav-number">5.</span> <span class="nav-text">表结构定义文件</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#InnoDB-%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E%E6%96%87%E4%BB%B6"><span class="nav-number">6.</span> <span class="nav-text">InnoDB 存储引擎文件</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A8%E7%A9%BA%E9%97%B4%E6%96%87%E4%BB%B6"><span class="nav-number">6.1.</span> <span class="nav-text">表空间文件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#redo-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">6.2.</span> <span class="nav-text">redo 日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8E-bin-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">6.2.1.</span> <span class="nav-text">与 bin 日志文件的区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">6.2.2.</span> <span class="nav-text">基本概念</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%B7%E7%9B%98%E8%A7%84%E5%88%99%E5%8F%8A-checkpoint"><span class="nav-number">6.2.3.</span> <span class="nav-text">刷盘规则及 checkpoint</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#InnoDB-%E7%9A%84%E6%81%A2%E5%A4%8D%E8%A1%8C%E4%B8%BA"><span class="nav-number">6.2.4.</span> <span class="nav-text">InnoDB 的恢复行为</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Undo-%E6%97%A5%E5%BF%97%E6%96%87%E4%BB%B6"><span class="nav-number">6.3.</span> <span class="nav-text">Undo 日志文件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#log-%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F"><span class="nav-number">6.3.1.</span> <span class="nav-text">log 存储方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#delete-update-%E6%93%8D%E4%BD%9C%E7%9A%84%E5%86%85%E9%83%A8%E6%9C%BA%E5%88%B6"><span class="nav-number">6.3.2.</span> <span class="nav-text">delete&#x2F;update 操作的内部机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MVCC-%E5%8E%9F%E7%90%86"><span class="nav-number">6.3.3.</span> <span class="nav-text">MVCC 原理</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -618,6 +613,8 @@ variable: &#123;
 
 
 
+
+  
 
   
 

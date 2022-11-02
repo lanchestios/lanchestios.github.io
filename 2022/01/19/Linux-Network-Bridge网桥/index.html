@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="Bridge 是一个虚拟网络设备，所以具有网络设备的特征，可以配置 IP、MAC 地址等；其次，Bridge 是一个虚拟交换机，和物理交换机有类似的功能。对于普通的网络设备来说，只有两端，从一端进来的数据会从另一端出去，如物理网卡从外面网络中收到的数据会转发给内核协议栈，而从协议栈过来的数据会转发到外面的物理网络中。而 Bridge 不同，Bridge 有多个端口，数据可以从任何端口进来，进来之后">
@@ -258,43 +258,36 @@
       
         <p>Bridge 是一个虚拟网络设备，所以具有网络设备的特征，可以配置 IP、MAC 地址等；其次，Bridge 是一个虚拟交换机，和物理交换机有类似的功能。对于普通的网络设备来说，只有两端，从一端进来的数据会从另一端出去，如物理网卡从外面网络中收到的数据会转发给内核协议栈，而从协议栈过来的数据会转发到外面的物理网络中。而 Bridge 不同，Bridge 有多个端口，数据可以从任何端口进来，进来之后从哪个口出去和物理交换机的原理差不多，要看 MAC 地址。</p>
 <span id="more"></span>
-
 <h1 id="深入理解-Bridge"><a href="#深入理解-Bridge" class="headerlink" title="深入理解 Bridge"></a>深入理解 Bridge</h1><blockquote>
 <p>基本信息简介</p>
-<p>本机 IP：172.30.234.97&#x2F;20（物理网卡 eth0）<br>网关 IP：172.30.224.1&#x2F;20</p>
-<p>Bridge IP：172.30.224.13&#x2F;20<br>Veth0 IP：172.30.224.11&#x2F;20<br>Veth1 IP：172.30.224.12&#x2F;20</p>
+<p>本机 IP：172.30.234.97/20（物理网卡 eth0）<br>网关 IP：172.30.224.1/20</p>
+<p>Bridge IP：172.30.224.13/20<br>Veth0 IP：172.30.224.11/20<br>Veth1 IP：172.30.224.12/20</p>
 <p>注意 Bridge 要和网关保持在同一子网</p>
 </blockquote>
 <h2 id="创建-Bridge"><a href="#创建-Bridge" class="headerlink" title="创建 Bridge"></a>创建 Bridge</h2><p>当刚创建一个 bridge 时，它是一个独立的网络设备，只有一个端口连着协议栈，其它的端口啥都没连，这样的 bridge 没有任何实际功能。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> name br0 <span class="token builtin class-name">type</span> bridge
 $ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> br0 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
-<img src="/images/Linux/LinuxNetworkBridge1.png"  />
-
+<p><img src="/images/Linux/LinuxNetworkBridge1.png"  /></p>
 <h2 id="创建-Veth-Peer"><a href="#创建-Veth-Peer" class="headerlink" title="创建 Veth Peer"></a>创建 Veth Peer</h2><p>创建一对 veth 设备，并配置 IP</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> veth0 <span class="token builtin class-name">type</span> veth peer name veth1
 $ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.11/20 dev veth0
 $ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.12/20 dev veth1
 $ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth0 up
 $ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth1 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>在 Ubuntu 中，处于同一 Network Namespace 的 Veth Peer 无法被 Ping 通，可以通过以下方式解决（或将两个 Veth 置于不同 NS 下）</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/accept_local
 <span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/accept_local
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/all/rp_filter
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/rp_filter
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/rp_filter<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="将-Bridge-和-Veth-设备相连"><a href="#将-Bridge-和-Veth-设备相连" class="headerlink" title="将 Bridge 和 Veth 设备相连"></a>将 Bridge 和 Veth 设备相连</h2><p>将 veth0 连上 br0</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> dev veth0 master br0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <p>查看 bridge 连接情况</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ bridge <span class="token function">link</span>
 <span class="token number">7</span>: veth0@veth1: <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span>
 <span class="token comment"># 可以看到 veth0 连接着 br0，且 veth1 是 veth0 的对端</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>这时候，网络就变成了这个样子:</p>
-<p><img src="/images/Linux/LinuxNetworkBridge2.png"></p>
+<p><img src="/images/Linux/LinuxNetworkBridge2.png" alt=""></p>
 <p>br0 和 veth0 相连之后，发生了几个变化：</p>
 <ul>
 <li>br0 和 veth0 之间连接起来了，并且是双向的通道</li>
@@ -309,7 +302,6 @@ PING <span class="token number">192.168</span>.3.102 <span class="token punctuat
 
 --- <span class="token number">192.168</span>.3.102 <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>为什么 veth0 加入了 bridge 之后，就 ping 不通 veth2 了呢？ 先抓包看看：</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 由于veth0的arp缓存里面没有veth1的mac地址，所以ping之前先发arp请求</span>
 
@@ -330,19 +322,16 @@ $ tcpdump -eni br0
 listening on br0, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
 <span class="token number">16</span>:25:00.590601 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span>
 <span class="token number">16</span>:25:01.595581 06:e0:82:e4:49:ea <span class="token operator">></span> be:f4:3d:23:38:ee, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">192.168</span>.3.102 is-at 06:e0:82:e4:49:ea, length <span class="token number">28</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>从上面的抓包可以看出，去和回来的流程都没有问题，问题就出在 veth0 收到应答包后没有给协议栈，而是给了 br0，于是协议栈得不到 veth1 的 mac 地址，从而通信失败。通过分析可以看出，给 veth0 配置IP没有意义，因为就算协议栈传数据包给 veth0，应答包也回不来。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 可以删除veth0的IP，其结果可造成eth0与网络协议栈的链接断裂</span>
 $ <span class="token function">ip</span> addr del <span class="token number">192.168</span>.3.101/24 dev veth0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <blockquote>
 <p>其实 veth0 和协议栈之间还是有联系的，但由于 veth0 没有配置IP，所以协议栈在路由的时候不会将数据包发给 veth0，就算强制要求数据包通过 veth0 发送出去，但由于 veth0 从另一端收到的数据包只会给 br0，所以协议栈还是没法收到相应的 arp 应答包，导致通信失败。此时 veth0 其实就相当于一根网线。</p>
 </blockquote>
 <h3 id="br0-ping-veth1"><a href="#br0-ping-veth1" class="headerlink" title="br0 ping veth1"></a>br0 ping veth1</h3><p>由于 br0 需要发送和接收数据，因此为其配置 IP</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.30</span>.224.13/20 dev br0<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <p>于是网络变成了这样子：</p>
-<p><img src="/images/Linux/LinuxNetworkBridge3.png"></p>
+<p><img src="/images/Linux/LinuxNetworkBridge3.png" alt=""></p>
 <p>通过 br0 ping 一下 veth1，结果成功</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 <span class="token number">192.168</span>.3.102
 PING <span class="token number">192.168</span>.3.102 <span class="token punctuation">(</span><span class="token number">192.168</span>.3.102<span class="token punctuation">)</span> from <span class="token number">192.168</span>.3.100 br0: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
@@ -351,11 +340,9 @@ PING <span class="token number">192.168</span>.3.102 <span class="token punctuat
 --- <span class="token number">192.168</span>.3.102 <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
 rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">0.037</span>/0.037/0.037/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="将物理网卡连接至-Bridge"><a href="#将物理网卡连接至-Bridge" class="headerlink" title="将物理网卡连接至 Bridge"></a>将物理网卡连接至 Bridge</h2><p>虽然连接 veth1 没有问题，但此时连接外网仍旧是不通的，因为 Bridge 上只有 veth0 这一个设备，与外网根本不连通。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ bridge <span class="token function">link</span>
 <span class="token number">7</span>: veth0@veth1: <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>即通过 eth0（也就是连接外网的物理网卡）可访问到 <code>www.baidu.com</code>，但通过 br0 是不可以的。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 通过br0访问外网，不能连通</span>
 $ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 www.baidu.com
@@ -372,13 +359,11 @@ PING www.a.shifen.com <span class="token punctuation">(</span><span class="token
 --- www.a.shifen.com <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
 rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">17.784</span>/17.784/17.784/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>因此，我们需要将物理网卡 eth0 添加到 br0 上</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> dev eth0 master br0
 $ bridge <span class="token function">link</span>
 <span class="token number">2</span>: eth0 state UP <span class="token builtin class-name">:</span> <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">4</span>
 <span class="token number">6</span>: veth0 state UP <span class="token builtin class-name">:</span> <span class="token operator">&lt;</span>BROADCAST,MULTICAST,UP,LOWER_UP<span class="token operator">></span> mtu <span class="token number">1500</span> master br0 state forwarding priority <span class="token number">32</span> cost <span class="token number">2</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>这时通过 eth0 来 ping 外网失败，但虽然 br0 通过 eth0 这根网线连上了外网的物理交换机，但依然 ping 不通外网。</p>
 <p>这是此时的路由表</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">netstat</span> -rn
@@ -389,17 +374,14 @@ Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
 <span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> veth0
 <span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> veth1
 <span class="token number">172.30</span>.224.0    <span class="token number">0.0</span>.0.0         <span class="token number">255.255</span>.240.0   U         <span class="token number">0</span> <span class="token number">0</span>          <span class="token number">0</span> br0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>由于与上面讲的通过 veth peer 接入，veth0 无法 ping 通 veth1，原因是 br0 截留了网络包。这个也是同样的道理。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 删除eth0的ip（其实删除其对应的默认路由也可，且eth0的ip无用）</span>
 $ <span class="token function">ip</span> addr del <span class="token number">172.30</span>.234.97/20 dev eth0
 <span class="token comment"># 添加默认网关，并将br0设置为出口设备</span>
 $ route <span class="token function">add</span> default gw <span class="token number">172.30</span>.224.1 dev br0<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果出现 <code>ping: www.baidu.com: Temporary failure in name resolution</code>，可以查看一下 DNS 配置。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 直接替换（该文件有其他配置慎用）</span>
 $ <span class="token builtin class-name">echo</span> <span class="token string">'nameserver 8.8.8.8'</span> <span class="token operator">></span> /etc/resolv.conf<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>下面测试下网络连通性</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># br0可连接外网</span>
 $ <span class="token function">ping</span> -c <span class="token number">1</span> -I br0 www.baidu.com
@@ -426,11 +408,10 @@ PING www.wshifen.com <span class="token punctuation">(</span><span class="token 
 --- www.wshifen.com <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
 rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">49.574</span>/49.574/49.574/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-<h1 id="Bridge-常用场景"><a href="#Bridge-常用场景" class="headerlink" title="Bridge 常用场景"></a>Bridge 常用场景</h1><h2 id="虚拟机"><a href="#虚拟机" class="headerlink" title="虚拟机"></a>虚拟机</h2><p>虚拟机通过 tun&#x2F;tap 或者其它类似的虚拟网络设备，将虚拟机内的网卡同 br0 连接起来，这样就达到和真实交换机一样的效果，虚拟机发出去的数据包先到达 br0，然后由 br0 交给 eth0 发送出去，数据包都不需要经过 Host 机器的协议栈，效率高。</p>
-<p><img src="/images/Linux/VMBridge.png"></p>
+<h1 id="Bridge-常用场景"><a href="#Bridge-常用场景" class="headerlink" title="Bridge 常用场景"></a>Bridge 常用场景</h1><h2 id="虚拟机"><a href="#虚拟机" class="headerlink" title="虚拟机"></a>虚拟机</h2><p>虚拟机通过 tun/tap 或者其它类似的虚拟网络设备，将虚拟机内的网卡同 br0 连接起来，这样就达到和真实交换机一样的效果，虚拟机发出去的数据包先到达 br0，然后由 br0 交给 eth0 发送出去，数据包都不需要经过 Host 机器的协议栈，效率高。</p>
+<p><img src="/images/Linux/VMBridge.png" alt=""></p>
 <h2 id="docker"><a href="#docker" class="headerlink" title="docker"></a>docker</h2><p>由于容器运行在自己单独的 network namespace 里面，所以都有自己单独的协议栈，情况和上面的虚拟机差不多，但它采用了另一种方式来和外界通信：</p>
-<p><img src="/images/Linux/DockerBridge.png"></p>
+<p><img src="/images/Linux/DockerBridge.png" alt=""></p>
 <p>容器发送的数据包先到达 br0，然后交给 Host 机器的协议栈，由于目的 IP 是外网 IP，需要 Host 机器开启 IP forward功能，且配置好 NAT 转换。</p>
 
     </div>
@@ -630,6 +611,8 @@ rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token nu
 
 
 
+
+  
 
   
 

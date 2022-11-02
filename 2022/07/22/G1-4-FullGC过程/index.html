@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="当对象分配失败，会进入到 Evac 失败过程，在 GC 日志详情中会打印相关信息。发生失败一般意味着不能继续分配，此时需要做两件事：  处理失败 再次尝试分配，仍不成功，进行Full GC（FGC）">
@@ -266,21 +266,14 @@
 <li>再次尝试分配，仍不成功，进行Full GC（FGC）</li>
 </ol>
 <span id="more"></span>
-
 <h1 id="Evac-失败"><a href="#Evac-失败" class="headerlink" title="Evac 失败"></a>Evac 失败</h1><p>假设在根处理时对象 3 复制发生失败，不能复制。则把对象 3 里面的 Pointer 标记指向自己，形成自引用。然后继续向下处理，注意这里的处理类似于跳过失败的对象，然后进行正常路径的处理。只不过需要一个额外的动作，即把对象放入到一个特殊的 dirty card 队列中。</p>
-<img src="../images/JDK/Evac失败1.png" style="zoom: 60%;" />
-
+<p><img src="../images/JDK/Evac失败1.png" style="zoom: 60%;" /></p>
 <p>继续向下即处理 RSet，处理RSet时发现对象 2 已经成功复制，所以正常更新指针，即用对象 2 的新地址更新对象 5 的 field。假设之后对象都不能成功复制，最终的内存布局如下图所示。</p>
-<img src="../images/JDK/Evac失败2.png" style="zoom:60%;" />
-
+<p><img src="../images/JDK/Evac失败2.png" style="zoom:60%;" /></p>
 <p>接下来就是 Evac 特有的步骤，删除自引用。自引用对象都应该是活跃对象。同时对于已经被复制的对象需要把他们变成 dummy 对象，因为这个时候他们已经可以被回收了。</p>
-<img src="../images/JDK/Evac失败3.png" style="zoom:70%;" />
-
-
-
+<p><img src="../images/JDK/Evac失败3.png" style="zoom:70%;" /></p>
 <p>最后一步也是执行 Redirty 重构整个 RSet，如下图所示，确保引用的正确性。</p>
-<img src="../images/JDK/Evac失败4.png" style="zoom:60%;" />
-
+<p><img src="../images/JDK/Evac失败4.png" style="zoom:60%;" /></p>
 <h1 id="FGC-算法过程"><a href="#FGC-算法过程" class="headerlink" title="FGC 算法过程"></a>FGC 算法过程</h1><h2 id="串行-FGC"><a href="#串行-FGC" class="headerlink" title="串行 FGC"></a>串行 FGC</h2><p>Evac 失败后会进入到 FGC，在 JDK 10 之前 FGC 都是串行回收。在串行回收之前需要做一些预处理，主要有停止并发标记、停止增量回收等动作。串行回收采用的标记清除算法，主要分为 4 步：</p>
 <ol>
 <li>标记活跃对象</li>
@@ -297,23 +290,18 @@
 <li>对系统字典、符号表标记、编译代码、klass 做卸载处理。（卸载：从全局对象中删除无用对象，但不释放）</li>
 </ol>
 <p>下图是 FGC 开始之前的内存情况</p>
-<img src="../images/JDK/FGC开始之前的内存情况.png" alt="FGC开始之前的内存情况" style="zoom:67%;" />
-
+<p><img src="../images/JDK/FGC开始之前的内存情况.png" alt="FGC开始之前的内存情况" style="zoom:67%;" /></p>
 <p>在标记完活跃对象后，内存情况如下图：</p>
-<img src="../images/JDK/标记活跃对象.png" alt="标记活跃对象" style="zoom:67%;" />
-
+<p><img src="../images/JDK/标记活跃对象.png" alt="标记活跃对象" style="zoom:67%;" /></p>
 <h3 id="计算新对象地址"><a href="#计算新对象地址" class="headerlink" title="计算新对象地址"></a>计算新对象地址</h3><p>第二步最主要的工作就是找到每个对象应该在什么位置。从分区的底部开始扫描，同时设置 compact top 也为底部，当对象被标记，即活跃时，把对象的 oop 指针设置为 compact top，这个值就是对象应该所处的位置。</p>
-<img src="../images/JDK/计算活跃对象的新位置.png" alt="计算活跃对象的新位置" style="zoom:67%;" />
-
+<p><img src="../images/JDK/计算活跃对象的新位置.png" alt="计算活跃对象的新位置" style="zoom:67%;" /></p>
 <h3 id="更新引用对象的地址"><a href="#更新引用对象的地址" class="headerlink" title="更新引用对象的地址"></a>更新引用对象的地址</h3><p>在上一步中，我们找到了对象的新位置，然后通过对象头里面的指针指向新位置。这一步最主要的工作就是遍历活跃对象，然后把活跃对象和活跃对象中的引用更新到新位置。</p>
-<img src="../images/JDK/更新对象的引用.png" alt="更新对象的引用" style="zoom:67%;" />
-
+<p><img src="../images/JDK/更新对象的引用.png" alt="更新对象的引用" style="zoom:67%;" /></p>
 <blockquote>
 <p>虚线指针表示对象的新位置<br>点划线指针表示对象引用所在的新位置</p>
 </blockquote>
 <h3 id="移动对象完成压缩"><a href="#移动对象完成压缩" class="headerlink" title="移动对象完成压缩"></a>移动对象完成压缩</h3><p>最后一步就是完成空间的压缩。遍历时必须从前向后依次开始，否则数据会被破坏。</p>
-<img src="../images/JDK/活跃对象移动到新位置.png" alt="活跃对象移动到新位置" style="zoom:67%;" />
-
+<p><img src="../images/JDK/活跃对象移动到新位置.png" alt="活跃对象移动到新位置" style="zoom:67%;" /></p>
 <p>复制之后，通过双点划指针还是可以有效地访问对象，而虚线指针变成无用的。</p>
 <h3 id="后处理"><a href="#后处理" class="headerlink" title="后处理"></a>后处理</h3><p>在第四步压缩结束以后，实际上我们看到分区并没有发生调整，仅仅是把已经死亡的对象回收，而活跃的对象仍然保留在本分区内。所以还需要进行后处理，下面是几个主要的步骤：</p>
 <ol>
@@ -362,7 +350,6 @@
 <h1 id="FGC-过程日志"><a href="#FGC-过程日志" class="headerlink" title="FGC 过程日志"></a>FGC 过程日志</h1><pre class="line-numbers language-none"><code class="language-none">0.458: [Full GC (System.gc())  210M-&gt;388K(8192K), 0.0202676 secs]
    [Eden: 1024.0K(3072.0K)-&gt;0.0B(4096.0K) Survivors: 1024.0K-&gt;0.0B Heap: 210.5M(239.0M)-&gt;388.7K(8192.0K)], [Metaspace: 3086K-&gt;3086K(1056768K)]
  [Times: user&#x3D;0.01 sys&#x3D;0.01, real&#x3D;0.02 secs] <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="FGC-参数"><a href="#FGC-参数" class="headerlink" title="FGC 参数"></a>FGC 参数</h1><p><strong>MinHeapFreeRatio</strong></p>
 <p>参数 MinHeapFreeRatio，这个值用于判断是否可以扩展堆空间，增大该值扩展概率变小，减小该值扩展几率变大。</p>
 <p><strong>MaxHeapFreeRatio</strong></p>
@@ -567,6 +554,8 @@
 
 
 
+
+  
 
   
 

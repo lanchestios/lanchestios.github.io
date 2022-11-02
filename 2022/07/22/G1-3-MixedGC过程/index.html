@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="混合回收（Mixed GC，也称为混合 GC）既收集 YHR 也收集 OHR。因为涉及老生代的回收，通常来说老生代的空间比较大，收集老生代可能会花费更多的时间。所以涉及老生代的混合收集算法也不同于新生代回收算法，最明显的是引入并发标记，这里的并发标记指的是标记工作线程可以和 Mutator 同时运行，也就是标记垃圾对象准备回收的线程和生成垃圾对象的线程同时工作，这就引入了新的复杂度。">
@@ -266,7 +266,6 @@
       
         <p>混合回收（Mixed GC，也称为混合 GC）既收集 YHR 也收集 OHR。因为涉及老生代的回收，通常来说老生代的空间比较大，收集老生代可能会花费更多的时间。所以涉及老生代的混合收集算法也不同于新生代回收算法，最明显的是引入并发标记，这里的并发标记指的是标记工作线程可以和 Mutator 同时运行，也就是标记垃圾对象准备回收的线程和生成垃圾对象的线程同时工作，这就引入了新的复杂度。</p>
 <span id="more"></span>
-
 <h1 id="并发标记算法"><a href="#并发标记算法" class="headerlink" title="并发标记算法"></a>并发标记算法</h1><h2 id="并发标记算法过程"><a href="#并发标记算法过程" class="headerlink" title="并发标记算法过程"></a>并发标记算法过程</h2><p>并发标记算法是混合回收中最重要的算法。并发标记指的是标记线程和 Mutator 并发运行。那么标记线程如何并发地进行标记？正如我们前面提到的并发标记的难点，一边标记垃圾对象，一边还在生成垃圾对象。为了解决这个问题，以前的算法采用串行执行，这里的串行指的是标记工作和对象生成工作不同时进行，但在 G1 中引入了新的算法。在介绍并发标记算法之前我们首先回顾一下对象分配，再来讨论这个问题。</p>
 <p><strong>算法需要区分标记过和未标记过的内存段</strong></p>
 <p>在堆分区中分配对象都是连续的，因此在堆分区没有被回收之前，分区中占用的内存只能是增长的。</p>
@@ -276,29 +275,25 @@
 <li>Prev、Next：定义并发标记工作内存区域</li>
 </ol>
 <p>我们来详细解释一下这四个指针的含义，算法用 Prev 指针指向上一次并发处理后的地址，用 Next 指向并发标记开始之前内存已经分配成功的地址，当并发标记开始之后，如果有新的对象分配，可以移动 Top 指针，使 Top 指针指向当前内存分配成功的地址。Next 指针和 Top 指针之间的地址就是 Mutator 新增的对象使用的地址。</p>
-<img src="/images/JDK/并发标记开始之前.png" alt="并发标记开始之前" style="zoom:67%;" />
-
+<p><img src="/images/JDK/并发标记开始之前.png" alt="并发标记开始之前" style="zoom:67%;" /></p>
 <blockquote>
-<p>TAMS &#x3D; Top-at-Mark-Start</p>
+<p>TAMS = Top-at-Mark-Start</p>
 </blockquote>
 <p>如果我们假设 Prev 指针之前的对象已经标记成功，在并发标记的时候从根出发，不仅仅标记 Prev 和 Next 之间的对象，还标记了 Prev 指针之前活跃的对象。当并发标记结束之后，只需要把 Prev 指针设置为 Next 指针即可开始新一轮的标记处理。</p>
 <p><strong>算法需要区分标记过和未标记过的对象位置</strong></p>
 <p>我们已经能区分内存中哪一段被我们标记过，我们还需要记录标记过的内存段中哪些对象活跃。借鉴前面介绍过的方法，Bitmap 能很好的解决这个问题。</p>
-<img src="/images/JDK/并发标记结束状态.png" alt="并发标记结束状态" style="zoom:75%;" />
-
+<p><img src="/images/JDK/并发标记结束状态.png" alt="并发标记结束状态" style="zoom:75%;" /></p>
 <p>所以并发标记引入两个位图 PrevBitMap 和 NextBitMap，用 PrevBitmap 记录 Prev 指针之前内存的标记状况，用 NextBitmap 来表示 Bottom 到 Next 指针之间的标记状态。</p>
 <blockquote>
 <p>为什么要引入 Prev 和 Next 两个 Bitmap？只要一个就可以记录到对象的状态啊！</p>
 <p>原因是标记不是每次都会成功的，存在失败的可能。如果标记失败，会丢失上一次对 Prev 指针之前所有的标记状况，因此需要留一个存档来避免因标记失败导致的重新标记整个内存。</p>
 </blockquote>
 <p>如上图所示，Prev 就是前一次标记的地址即 Prev TAMS，Next 指向的是当前开始标记时最新的地址即 Next TAMS。并发标记会从根对象出发开始进行并发标记。在第一次标记时 PrevBitmap 为空，NextBitmap 待标记。</p>
-<img src="/images/JDK/并发标记第二次开始之前状态.png" alt="并发标记第二次开始之前状态" style="zoom:76%;" />
-
+<p><img src="/images/JDK/并发标记第二次开始之前状态.png" alt="并发标记第二次开始之前状态" style="zoom:76%;" /></p>
 <p>并发标记结束后，NextBitmap 标记了分区对象存活的情况，如上图所示。</p>
 <p><strong>新一轮的并发标记</strong></p>
 <p>假定上图的位图中黑色区域表示堆分区中对应的对象还活着。在并发标记的同时 Mutator 继续运行，所以 Top 会继续增长。新一轮的并发标记开始，交换位图，重置指针。如下图所示。</p>
-<img src="/images/JDK/并发标记第二次结束状态.png" alt="并发标记第二次结束状态" style="zoom:75%;" />
-
+<p><img src="/images/JDK/并发标记第二次结束状态.png" alt="并发标记第二次结束状态" style="zoom:75%;" /></p>
 <h2 id="并发标记难点"><a href="#并发标记难点" class="headerlink" title="并发标记难点"></a>并发标记难点</h2><p>并发标记的主要问题是垃圾回收器在标记对象的过程中，Mutator 可能正在改变对象引用关系图，从而造成漏标和错标。错标不会影响程序的正确性，只是造成所谓的浮动垃圾。但漏标则会导致可达对象被当做垃圾收集掉，从而影响程序的正确性。为了区别对象的不同状态，引入了三色标记法。</p>
 <h3 id="三色标记法"><a href="#三色标记法" class="headerlink" title="三色标记法"></a>三色标记法</h3><p>三色标记法是一个逻辑上的抽象，将对象分成三种颜色：</p>
 <ol>
@@ -317,40 +312,33 @@
 <li>增量更新算法：关注对象引用插入，把被更新的黑色或者白色对象标记成灰色，打破第一个条件。</li>
 <li>SATB：关注引用的删除，即在对象被赋值前，把老的被引用对象记录下来，然后根据这些对象为根重新标记一遍，打破第二个条件。</li>
 </ol>
-<h3 id="漏标的场景"><a href="#漏标的场景" class="headerlink" title="漏标的场景"></a>漏标的场景</h3><img src="/images/JDK/并发标记的中间状态.png" alt="并发标记的中间状态" style="zoom:67%;" />
-
+<h3 id="漏标的场景"><a href="#漏标的场景" class="headerlink" title="漏标的场景"></a>漏标的场景</h3><p><img src="/images/JDK/并发标记的中间状态.png" alt="并发标记的中间状态" style="zoom:67%;" /></p>
 <p>已知对象 1 和对象 2 都可以通过根对象到达。假定对象 1 已经被标记，所以设置为黑色。处理完对象 1 会把对象 1 的 field 指向的对象地址放入到待标记栈。当对象 2 已经标记完成，需要把对象 2 的 field 指向的对象栈，即对象 3 入栈待处理。如果此时并发标记线程让出 CPU，Mutator 执行并修改了引用关系。<code>对象2.field=NULL</code>，<code>对象1.field=对象3</code>，如下图所示：</p>
-<img src="/images/JDK/Mutator运行导致关系变更.png" alt="Mutator运行导致关系变更" style="zoom:67%;" />
-
+<p><img src="/images/JDK/Mutator运行导致关系变更.png" alt="Mutator运行导致关系变更" style="zoom:67%;" /></p>
 <p>这时候并发线程重新获得执行，将会发生什么？对象 1 已经变成黑色，说明 field 都标记完了。对象 2 灰色待处理 field，但是 field 已经为NULL，所以不需要处理。那么对象 3 怎么办？如果不进行额外的处理就会导致漏标。这里就需要上面提到的两种解决漏标的方法。</p>
 <p><strong>增量更新</strong></p>
 <p>增量更新的思路就是当发生了 <code>对象1.field=对象3</code>，就把对象 1 重新标记为灰色，意味着对象 1 的 field 需要被再次处理一遍，如下图所示：</p>
-<img src="/images/JDK/增量更新算法.png" alt="增量更新算法" style="zoom:67%;" />
-
+<p><img src="/images/JDK/增量更新算法.png" alt="增量更新算法" style="zoom:67%;" /></p>
 <p>第二种方法就是 SATB，这个思路就是在发生 <code>对象2.field=NULL</code> 之前把老的 <code>对象2.field</code> 指向的对象 3 放入待标记栈中，相当于把对象 3 设置成灰色，如下图所示。</p>
-<img src="/images/JDK/SATB更新算法.png" alt="SATB更新算法" style="zoom:67%;" />
-
+<p><img src="/images/JDK/SATB更新算法.png" alt="SATB更新算法" style="zoom:67%;" /></p>
 <h1 id="MGC-算法过程"><a href="#MGC-算法过程" class="headerlink" title="MGC 算法过程"></a>MGC 算法过程</h1><p>混合回收可以总结为两个阶段：并发标记、垃圾回收。</p>
 <h2 id="并发标记过程"><a href="#并发标记过程" class="headerlink" title="并发标记过程"></a>并发标记过程</h2><p>并发标记目的是识别老生代分区中的活跃对象，并计算分区中垃圾对象所占空间的多少，用于垃圾回收过程中判断是否回收分区。</p>
 <h3 id="初始标记子阶段"><a href="#初始标记子阶段" class="headerlink" title="初始标记子阶段"></a>初始标记子阶段</h3><p>初始标记是借助 YGC 阶段完成，这里我们仅仅关心和并发标记相关的部分。</p>
 <p>初始标记子阶段负责标记所有直接可达的根对象（栈对象、全局对象、JNI对象等），根是对象图的起点，因此初始标记需要将 Mutator 线程暂停，也就是需要一个STW的时间段。混合收集中的初始标记和新生代的初始标记几乎一样。实际上混合收集的初始标记是借用了新生代收集的结果，即新生代垃圾回收后的新生代 Survivor 分区作为根，所以混合收集一定发生在新生代回收之后，且不需要再进行一次初始标记。</p>
-<img src="/images/JDK/YGC结束状态.png" alt="YGC结束状态" style="zoom:67%;" />
-
+<p><img src="/images/JDK/YGC结束状态.png" alt="YGC结束状态" style="zoom:67%;" /></p>
 <blockquote>
 <p>F：Free Region<br>S：Survivor Region<br>E：Eden Region<br>Old：Old Region</p>
 </blockquote>
 <p>在 YGC 阶段时，首先判定是否需要进行并发标记，如果需要，在对象复制阶段当发现有根集合直接到老生代的引用，那么这些对象会在 YGC 阶段被标记，如上图中 nextMarkBitmap 所示。</p>
 <h3 id="根扫描子阶段"><a href="#根扫描子阶段" class="headerlink" title="根扫描子阶段"></a>根扫描子阶段</h3><p>根扫描主要是针对 Survivor 分区进行处理，所有的 Survivor 对象都将被认为是老生代的根，如下图所示。</p>
-<img src="/images/JDK/并发标记根扫描.png" alt="并发标记根扫描" style="zoom:73%;" />
-
+<p><img src="/images/JDK/并发标记根扫描.png" alt="并发标记根扫描" style="zoom:73%;" /></p>
 <p>注意这一阶段仅仅对 Survivor 里面的对象标记，而不会处理对象的 field。图中深色区域是新增的活跃对象对应的区域。</p>
 <blockquote>
 <p>这里需要注意，因为混合 GC 依赖于 YGC 的 Survivor 区，可能发生这样一种情况，当混合 GC 扫描还没有结束，如果又发生了 YGC，那么 Survivor 就会变化，这对混合 GC 来说是不可接受的，因为它不能准确地标记对象。所以在混合 GC 的时候一定会要求做完 Survivor 分区的扫描之后才能再进行一次新的 YGC。</p>
 </blockquote>
 <h3 id="并发标记子阶段"><a href="#并发标记子阶段" class="headerlink" title="并发标记子阶段"></a>并发标记子阶段</h3><p>并发标记的时机是在 YGC 后，只有达到 InitiatingHeapOccupancyPercent 阈值后，才会触发并发标记。InitiatingHeapOccupancyPercent 默认值是 45，表示的是当已经分配的内存加上即将分配的内存超过内存总容量的 45% 就可以开始并发标记。并发标记线程在并发标记阶段启动，每个线程每次只扫描一个分区，从而标记出存活对象。在标记的时候还会计算存活的数量（Live Data Accounting），只要一个对象被标记，同时会计算字节数，并计入分区空间，这和并发算法相关。并发标记会对所有的分区进行标记。这个阶段并不需要 STW，故标记线程和 Mutator 并发运行。</p>
 <p>并发标记子阶段主要处理 SATB 队列，然后选择分区，根据 nextMarkBitmap 中已经标记的信息，对标记对象的每一个 field 指向的对象递归地进行标记。这里的并发标记子阶段指的是，每个并发标记线程从全局的指针开始抢占分区（其实就是使用 CAS 指令进行串行处理），所有线程停止的条件就是所有的分区处理完毕。</p>
-<img src="/images/JDK/并发标记子阶段结束状态.png" alt="并发标记子阶段结束状态" style="zoom:67%;" />
-
+<p><img src="/images/JDK/并发标记子阶段结束状态.png" alt="并发标记子阶段结束状态" style="zoom:67%;" /></p>
 <p>在上图中 SATB 队列的处理可能会涉及所有的分区，然后根据分区递归处理已经标记的对象的 Field，直到所有的分区处理完毕。</p>
 <blockquote>
 <p>在并发标记子阶段中如果待标记对象过多，可能导致标记栈溢出，这个时候会再次循环处理根标记和并发标记子阶段。</p>
@@ -362,8 +350,7 @@
 <li>所有的引用变更都被处理了；这里的引用变更包括新增空间分配和引用变更，新增的空间所有对象都认为是活的，引用变更处理 SATB。</li>
 </ol>
 <p>前两个条件是很容易达到的，但是最后一个是很困难的。如果不引入一个 STW 的再标记过程，那么应用会不断地更新引用，也就是说，会不断产生新的引用变更，因而永远也无法达成完成标记的条件。这个阶段也是并行执行的，通过参数 <code>-XX:ParallelGCThreads</code> 可设置GC暂停时可用的GC线程数。同时，引用处理也是再标记阶段的一部分，所有重度使用引用对象（弱引用、软引用、虚引用、最终引用）的应用都需要不少的开销来处理引用。</p>
-<img src="/images/JDK/再标记子阶段结束状态.png" alt="再标记子阶段结束状态" style="zoom:67%;" />
-
+<p><img src="/images/JDK/再标记子阶段结束状态.png" alt="再标记子阶段结束状态" style="zoom:67%;" /></p>
 <p>再标记子阶段结束之后整个分区都已经完成了标记。</p>
 <h3 id="清理子阶段"><a href="#清理子阶段" class="headerlink" title="清理子阶段"></a>清理子阶段</h3><p>再标记阶段之后进入清理子阶段，也是需要 STW 的。清理子阶段主要执行以下操作：</p>
 <ol>
@@ -377,8 +364,7 @@
 <p>首先，根扫描主要是针对 Survivor 分区进行处理，但结果是把垃圾比较多的老生代分区加入到 CSet。但事实上，我们还需要考虑 GCRoots 直接引用的老年代的情况，在只处理 Survivor 分区时，这些活跃对象会被漏标，最终导致被错误地清理。因此，最终只是为了回收的安全性。</p>
 </blockquote>
 <p>清理阶段结束状态如下图所示。</p>
-<img src="/images/JDK/清理阶段结束状态.png" alt="清理阶段结束状态" style="zoom:67%;" />
-
+<p><img src="/images/JDK/清理阶段结束状态.png" alt="清理阶段结束状态" style="zoom:67%;" /></p>
 <h2 id="垃圾回收过程"><a href="#垃圾回收过程" class="headerlink" title="垃圾回收过程"></a>垃圾回收过程</h2><p>垃圾回收和新生代回收的步骤完全一致，重用了新生代回收的代码，最大的不同是在回收时不仅仅回收新生代分区，同时回收并发标记中识别到的垃圾多的老生代分区。</p>
 <h1 id="MGC-过程日志"><a href="#MGC-过程日志" class="headerlink" title="MGC 过程日志"></a>MGC 过程日志</h1><p>Evacuation Pause 除了是 YGC 触发之外，还可能是 Mixed GC，日志如下所示，Mixed GC 的整个子任务和 YGC 完全一样，只是回收的范围（CSet）不一样而已，YGC 只回收 Young 区，而 Mixed GC 回收 Young 区+部分 Old 区：</p>
 <pre class="line-numbers language-none"><code class="language-none">29.268: [GC pause (G1 Evacuation Pause) (mixed), 0.0059011 secs]
@@ -391,10 +377,9 @@
 … …
 [Eden: 14.0M(14.0M)-&gt;0.0B(156.0M) Survivors: 10.0M-&gt;4096.0K Heap: 165.9M(512.0M)-&gt;148.7M(512.0M)]
 [Times: user&#x3D;0.02 sys&#x3D;0.01, real&#x3D;0.00 secs]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="MGC-参数"><a href="#MGC-参数" class="headerlink" title="MGC 参数"></a>MGC 参数</h1><p><strong>InitiatingHeapOccupancyPercent</strong></p>
 <p>参数 InitiatingHeapOccupancyPercent（简称为IHOP），默认值为45，这个值是启动并发标记的先决条件，只有当老生代内存占总空间 45% 之后才会启动并发标记任务。增加该值，将导致并发标记可能花费更多的时间，也会导致 YGC 或者混合 GC 收集时收集的分区变少，但另一方面就有可能导致 FGC。</p>
-<p>根据经验这个值通常根据整体应用占用的平均内存来设置，可以把该值设置得比平均内存稍高一些，此时性能最好（即 YGC&#x2F;混合GC 比较快，且 FGC 比较少）。</p>
+<p>根据经验这个值通常根据整体应用占用的平均内存来设置，可以把该值设置得比平均内存稍高一些，此时性能最好（即 YGC/混合GC 比较快，且 FGC 比较少）。</p>
 <p>那么如何得到应用程序在运行时的内存使用情况？可以打开 G1PrintHeapRegions 观察内存的分配和使用情况，另外 JVM 提供了一个诊断选项 G1PrintRegionLivenessInfo，打开该选项，可以查看到内存的使用情况。IHOP 的设置非常有用，但是设置合理的 IHOP 并不容易，需要不断地尝试。</p>
 <p><strong>G1ReservePercent</strong></p>
 <p>通过 <code>-XX:G1ReservePercent</code> 指定 G1 为分配担保预留的空间比例，默认 10%。也就是老年代会预留 10% 的空间来给新生代的对象晋升，如果经常发生新生代晋升失败而导致 Full GC，那么可以适当调高此阈值。但是调高此值同时也意味着降低了老年代的实际可用空间。</p>
@@ -411,7 +396,7 @@
 <p><strong>G1SATBBufferEnqueueingThresholdPercent</strong></p>
 <p>参数 G1SATBBufferEnqueueingThresholdPercent（默认值是60），表示当一个队列满了之后，首先进行过滤处理，过滤后如果使用率超过这个阈值把队列送入到 queue set 并新分配一个队列。</p>
 <p><strong>MarkStackSize 和 MarkStackSizeMax</strong> </p>
-<p>参数 MarkStackSize 和 MarkStackSizeMax，在 32 位 JVM 中设置为 32K 和 4M，64 位 JVM 中设置为 4M 和 512M。如果没有设置可以启发式推断参数，确保 MarkStackSize 最小为 32k（或者和并发线程参数 ParallelGCThreads 正相关，如 ParallelGCThreads&#x3D;8，则 32 位 JVM 中 MarkStackSize&#x3D;8×16k&#x3D;128K，其中 16K 是队列的大小），这个参数是并发标记子阶段中用到的标记栈的大小。</p>
+<p>参数 MarkStackSize 和 MarkStackSizeMax，在 32 位 JVM 中设置为 32K 和 4M，64 位 JVM 中设置为 4M 和 512M。如果没有设置可以启发式推断参数，确保 MarkStackSize 最小为 32k（或者和并发线程参数 ParallelGCThreads 正相关，如 ParallelGCThreads=8，则 32 位 JVM 中 MarkStackSize=8×16k=128K，其中 16K 是队列的大小），这个参数是并发标记子阶段中用到的标记栈的大小。</p>
 <p><strong>GCDrainStackTargetSize</strong></p>
 <p>参数 GCDrainStackTargetSize，默认值为 64，表示并发标记子阶段处理时为了保证处理的性能，一次标记的最多对象个数。</p>
 <p><strong>G1MixedGCLiveThresholdPercent</strong></p>
@@ -626,6 +611,8 @@
 
 
 
+
+  
 
   
 

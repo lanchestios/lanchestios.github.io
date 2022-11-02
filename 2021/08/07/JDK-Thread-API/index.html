@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="线程是操作系统能够进行运算调度的最小单位。它被包含在进程之中，是进程中的实际运作单位。一条线程指的是进程中一个单一顺序的控制流，一个进程中可以并发多个线程，每条线程并行执行不同的任务。在 Unix System V 及 SunOS 中也被称为轻量进程（lightweight processes），但轻量进程更多指内核线程（kernel thread），而把用户线程（user thread）称为线程">
@@ -28,7 +28,7 @@
 <meta property="og:description" content="线程是操作系统能够进行运算调度的最小单位。它被包含在进程之中，是进程中的实际运作单位。一条线程指的是进程中一个单一顺序的控制流，一个进程中可以并发多个线程，每条线程并行执行不同的任务。在 Unix System V 及 SunOS 中也被称为轻量进程（lightweight processes），但轻量进程更多指内核线程（kernel thread），而把用户线程（user thread）称为线程">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://example.com/images/JDK/WaitSet.png">
-<meta property="og:image" content="http://example.com/images/JDK/%E7%AD%89%E5%BE%85%E9%80%9A%E7%9F%A5%E6%9C%BA%E5%88%B6.png">
+<meta property="og:image" content="http://example.com/images/JDK/等待通知机制.png">
 <meta property="og:image" content="http://example.com/images/JDK/线程关系树结构.png">
 <meta property="article:published_time" content="2021-08-06T16:31:04.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.498Z">
@@ -255,8 +255,7 @@
       
         <p>线程是操作系统能够进行运算调度的最小单位。它被包含在进程之中，是进程中的实际运作单位。一条线程指的是进程中一个单一顺序的控制流，一个进程中可以并发多个线程，每条线程并行执行不同的任务。在 Unix System V 及 SunOS 中也被称为轻量进程（lightweight processes），但轻量进程更多指内核线程（kernel thread），而把用户线程（user thread）称为线程。</p>
 <span id="more"></span>
-
-<h1 id="Thread-API"><a href="#Thread-API" class="headerlink" title="Thread API"></a>Thread API</h1><h2 id="Priority"><a href="#Priority" class="headerlink" title="Priority"></a>Priority</h2><p>线程有 1-10 的优先级，MAX_PRIORITY&#x3D;10、NORM_PRIORITY&#x3D;5，MIN_PRIORITY&#x3D;1。在操作系统中，线程优先级高的任务可分配到更多的 CPU 资源，CPU 有限执行线程优先级高的任务。设置线程优先级有助于线程规划器确定哪个任务需要优先执行。</p>
+<h1 id="Thread-API"><a href="#Thread-API" class="headerlink" title="Thread API"></a>Thread API</h1><h2 id="Priority"><a href="#Priority" class="headerlink" title="Priority"></a>Priority</h2><p>线程有 1-10 的优先级，MAX_PRIORITY=10、NORM_PRIORITY=5，MIN_PRIORITY=1。在操作系统中，线程优先级高的任务可分配到更多的 CPU 资源，CPU 有限执行线程优先级高的任务。设置线程优先级有助于线程规划器确定哪个任务需要优先执行。</p>
 <p>线程优先级具有继承特性，当 A 线程创建 B 线程，A 与 B 的线程优先级是相同的。并且其优先级又有其规则性，高优先级的线程总是大部分先执行完，但不代表高优先级的项目总是先全部执行完。先调用执行的线程不一定先执行完。CPU 总会尽量把执行资源让给优先级比较高的线程。</p>
 <h2 id="Sleep"><a href="#Sleep" class="headerlink" title="Sleep"></a>Sleep</h2><p>sleep 方法会使当前线程进人指定毫秒数的休眠，暂停执行，虽然给定了一个休眠的时间，但是最终要以系统的定时器和调度器的精度为准。Sleep 有一个非常重要的特性，那就是其不会放弃 monitor 锁的所有权。因此，其他需要相同锁的线程会阻塞，即使 CPU 可用。所以要避免在同步方法或块内让线程休眠。</p>
 <p>通过调用重载的<code>Thread.sleep()</code>静态方法，线程可以进入指定毫秒数或包括微秒的休眠。</p>
@@ -264,7 +263,6 @@
 public static void sleep (long milliseconds) throws InterruptedException;
 &#x2F;&#x2F;接受要休眠的亳秒数和亳微秒数
 public static void sleep (long milliseconds, int nanoseconds) throws InterruptedException;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>Thread 类提供的 sleep 方法的版本能够让开发者以纳秒来指定时间。大部分的 JVM 并不支持这种时间精确度。在运行 sleep 方法时，它会四舍五入纳秒的参数成最接近的毫秒。事实上，大部分的操作系统还会进一步地将毫秒参数以一个数字的倍数来调整：如 20 或 50 毫秒。因此，在大部分 Java 的实现中，可用的最小沉睡时间是 20 或 50 毫秒。如果想拥有更加精确的时间，是需要本地硬件和虚拟机同时满足的。</p>
 <p>Java Community Process 正在进行的项目中有一个 real-time 的 Java 实现，在这个实现中，指定给 sleep 方法的分辨率终于可以实现。在大部分的平台上，开发者无法设计出可以支持纳秒（甚至是精确的毫秒）的应用程序。</p>
 <p>线程不能绝对保证一定会休眠所期望的那么长时间。有时，在请求唤醒呼叫之后过段时间线程才会真正唤醒，因为 VM 正在忙于做其他事情。也可能时间还没有到，但有其他线程完成了一些操作而唤醒了休眠的线程。一般情况下，通过调用休眠线程的 interrupt 方法来唤醒休眠的线程。这会让休眠中的线程得到一个 InterruptedException 异常，正确捕获这个异常可以让线程继续运行下去。</p>
@@ -274,6 +272,7 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 <p>  需要注意的是，当抛出 InterruptedException 异常的同时会清除中断状态。</p>
 </blockquote>
 <p><strong>检查中断的方法</strong></p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -281,7 +280,8 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 <th>description</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>thread.isInterrupted()</td>
 <td>检查中断状态，但不清除中断状态</td>
 </tr>
@@ -289,11 +289,13 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 <td>Thread.interrupted()</td>
 <td>检查中断状态，并清除中断状态</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <blockquote>
 <p>  Thread.interrupted 仅能清除自己线程的中断状态</p>
 </blockquote>
-<h2 id="Suspend-x2F-Resume"><a href="#Suspend-x2F-Resume" class="headerlink" title="Suspend&#x2F;Resume"></a>Suspend&#x2F;Resume</h2><p>在 Thread 调用中可使用 suspend 暂停线程，resume 恢复线程执行。对于暂停线程的情况来说，暂停线程后，不会释放 Monitor 等资源，因此会带来线程独占的问题。下面有一个有趣的线程独占例子：</p>
+<h2 id="Suspend-Resume"><a href="#Suspend-Resume" class="headerlink" title="Suspend/Resume"></a>Suspend/Resume</h2><p>在 Thread 调用中可使用 suspend 暂停线程，resume 恢复线程执行。对于暂停线程的情况来说，暂停线程后，不会释放 Monitor 等资源，因此会带来线程独占的问题。下面有一个有趣的线程独占例子：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">MyThread</span> <span class="token keyword">extends</span> <span class="token class-name">Thread</span> <span class="token punctuation">&#123;</span>
 
     <span class="token keyword">public</span> <span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
@@ -306,7 +308,6 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">MAIN</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">InterruptedException</span> <span class="token punctuation">&#123;</span>
         <span class="token class-name">MyThread</span> thread <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">MyThread</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -316,7 +317,6 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
         <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"MAIN END"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果在 MyThread 中将输出注释掉，运行结果是线程被暂停，程序不结束运行，MAIN 线程运行完成，输出 MAIN END。如果将注释打开，线程持续输出数字，直到被休眠，MAIN END 不被输出。原因如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">println</span><span class="token punctuation">(</span><span class="token class-name">String</span> x<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">synchronized</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -324,22 +324,20 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
         <span class="token function">newLine</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>输出函数为同步方法，当程序运行到 println 方法内部暂停后，同步锁未被释放，被锁住的打印函数无法打印 MAIN END。</p>
 <h2 id="Yield"><a href="#Yield" class="headerlink" title="Yield"></a>Yield</h2><p>yield 方法属于一种启发式的方法，其会提醒调度器我愿意放弃当前的 CPU 资源，如果 CPU 的资源不紧张则会忽略这种提醒。调用 yield 方法会使当前线程从 RUNNING 状态切换到 RUNNABLE 状态。</p>
-<h2 id="Wait-x2F-Notify-Mechanism"><a href="#Wait-x2F-Notify-Mechanism" class="headerlink" title="Wait&#x2F;Notify Mechanism"></a>Wait&#x2F;Notify Mechanism</h2><p>等待 - 通知机制，是指一个线程 A 调用了对象 O 的 wait() 方法进入等待状态，而另一个线程 B 调用了对象 O 的 notify() 或者 notifyAll() 方法，线程 A 收到通知后从对象 O 的 wait() 方法返回，进而执行后续操作。上述两个线程通过对象 O 来完成交互，而对象上的 wait() 和 notify&#x2F;notifyAll() 的关系就如同开关信号一样，用来完成等待方和通知方之间的交互工作。</p>
+<h2 id="Wait-Notify-Mechanism"><a href="#Wait-Notify-Mechanism" class="headerlink" title="Wait/Notify Mechanism"></a>Wait/Notify Mechanism</h2><p>等待 - 通知机制，是指一个线程 A 调用了对象 O 的 wait() 方法进入等待状态，而另一个线程 B 调用了对象 O 的 notify() 或者 notifyAll() 方法，线程 A 收到通知后从对象 O 的 wait() 方法返回，进而执行后续操作。上述两个线程通过对象 O 来完成交互，而对象上的 wait() 和 notify/notifyAll() 的关系就如同开关信号一样，用来完成等待方和通知方之间的交互工作。</p>
 <p>在虚拟机规范中存在一个 wait set 的概念，至于该 wait set 是怎样的数据结构，不同的 JVM 由不同的实现方式，但线程调用了某个对象的 wait 方法之后都会被加入与该对象 monitor 关联的 wait set 中，并且释放 monitor 的所有权。</p>
-<img src="/images/JDK/WaitSet.png" style="zoom: 50%;" />
-
+<p><img src="/images/JDK/WaitSet.png" style="zoom: 50%;" /></p>
 <p>上图是若干个线程调用了 wait 方法之后被加入与 monitor 关联的 wait set 中，待另外一个线程调用该 monitor 的 notify 方法之后，其中一个线程会从 wait set 中弹出，至于是随机弹出还是以先进先出的方式弹出，虚拟机规范同样也没有给出强制的要求。而执行 notifyAll 则不需要考虑哪个线程会被弹出，因为 wait set 中的所有 wait 线程都将被弹出。</p>
 <p>需要注意的是，<code>wait()</code> 方法会使线程状态由 RUNNING 变为 WAITING，并释放对应的 Monitor 锁。而 <code>notify()</code> 方法将等待队列中的一个等待线程从等待队列中移到同步队列中，被移动的线程状态由 WAITING 转为 BLOCKED，并尝试获取 Monitor 锁。</p>
-<p><img src="/images/JDK/%E7%AD%89%E5%BE%85%E9%80%9A%E7%9F%A5%E6%9C%BA%E5%88%B6.png"></p>
+<p><img src="/images/JDK/等待通知机制.png" alt=""></p>
 <p>关键字 synchronized 可以将任何一个 Object 对象作为同步对象来看待，而 Java 为每个 Object 都实现了 wait 和 notify 方法，它们必须用在被 synchronized 同步的 Object 的临界区内。通过调用 wait 方法可以使处于临界区内的线程进入等待状态，同时释放被同步对象的锁。而 notify 操作可以唤醒一个因调用了 wait 操作而处于阻塞状态中的线程，使其进入就绪状态。被重新换醒的线程会试图重新获得临界区的控制权，也就是锁，并继续执行临界区内 wait 之后的代码。如果发岀 notify 操作时没有处于阻塞状态中的线程，那么该命令会被忽略。</p>
 <p><strong>API Lock 实现</strong> </p>
 <blockquote>
 <p>关于 JUC 包中的 Lock 实现，详情请阅读 JUC 系列。</p>
 </blockquote>
-<p>通过 Wait&#x2F;Notify Mechanism 实现一个 API 级别的锁。</p>
+<p>通过 Wait/Notify Mechanism 实现一个 API 级别的锁。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">BooleanLock</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//当前拥有该锁的线程</span>
     <span class="token keyword">private</span> <span class="token class-name">Thread</span> currentThread<span class="token punctuation">;</span>
@@ -388,7 +386,6 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>问题：线程被中断，它还有可能存在于 blockList</strong></p>
 <p>在 <code>lock()</code> 方法中捕获 InterruptedException 异常，处理完 blockList 再抛出就好了。</p>
 <h2 id="Daemon-Thread"><a href="#Daemon-Thread" class="headerlink" title="Daemon Thread"></a>Daemon Thread</h2><p>Java 线程分为用户线程和守护线程。在 JVM 中，所有非守护线程都执行完毕后，无论有没有守护线程，虚拟机都会自动退出。当进程中不存在非守护线程，则守护线程自动销毁。最典型的守护线程就是垃圾回收线程，当进程中没有非守护线程，则垃圾回收线程也没有存在的必要了，自动销毁。</p>
@@ -398,7 +395,6 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">Runtime.getRuntime().addShutdownHook(new Thread(()-&gt;&#123;
     &#x2F;&#x2F;OP
 &#125;));<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>Hook 线程应用场景以及注意事项</strong></p>
 <ul>
 <li>Hook 线程只有在收到退出信号的时候会被执行，如果在 kill 的时候使用了参数 -9，那么 Hook 线程不会得到执行，进程将会立即退出。</li>
@@ -406,8 +402,7 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 <li>尽量不要在 Hook 线程中执行一些耗时非常长的操作，因为其会导致程序迟迟不能退出。</li>
 </ul>
 <h1 id="线程组"><a href="#线程组" class="headerlink" title="线程组"></a>线程组</h1><p>可以把线程归属到某一个线程组中，线程组中可以有线程对象，也可以有线程组，组中还可以有线程。这样的组织结构有些类似于树的形式。</p>
-<img src="/images/JDK/线程关系树结构.png" style="zoom:50%;" />
-
+<p><img src="/images/JDK/线程关系树结构.png" style="zoom:50%;" /></p>
 <p>所有 Java 线程都基于 System Thread Group 创建，在实例化一个 ThreadGroup 线程组时如果不指定所属的线程组则该线程组自动归到当前线程对象所属的线程组中。Java 应用程序都是以 Main 函数启动应用，因此通常情况下的线程组的继承关系为：<code>system -&gt; main -&gt; custom</code>。 </p>
 <p>线程组可以很方便的以组为单位对线程进行组织，例如：<code>interrupt()</code> 中断整个线程组的线程，或是 <code>enumerate(Thread list[], boolean recurse)</code> 递归或非递归的获取组内的所有线程对象。</p>
 <h2 id="销毁-Group"><a href="#销毁-Group" class="headerlink" title="销毁 Group"></a>销毁 Group</h2><p>销毁 ThreadGroup 及其子 ThreadGroup，在该 ThreadGroup 中所有的线程必须是空的，也就是说，ThreadGroup 或者子 ThreadGroup 所有的线程都已经停止运行，如果有 Active 线程存在，调用 destroy 方法则会抛出异常。</p>
@@ -496,7 +491,7 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Thread-API"><span class="nav-number">1.</span> <span class="nav-text">Thread API</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Priority"><span class="nav-number">1.1.</span> <span class="nav-text">Priority</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sleep"><span class="nav-number">1.2.</span> <span class="nav-text">Sleep</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Interrupt"><span class="nav-number">1.3.</span> <span class="nav-text">Interrupt</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Suspend-x2F-Resume"><span class="nav-number">1.4.</span> <span class="nav-text">Suspend&#x2F;Resume</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Yield"><span class="nav-number">1.5.</span> <span class="nav-text">Yield</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Wait-x2F-Notify-Mechanism"><span class="nav-number">1.6.</span> <span class="nav-text">Wait&#x2F;Notify Mechanism</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Daemon-Thread"><span class="nav-number">1.7.</span> <span class="nav-text">Daemon Thread</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exception-Handler"><span class="nav-number">1.8.</span> <span class="nav-text">Exception Handler</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Hook"><span class="nav-number">2.</span> <span class="nav-text">Hook</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%84"><span class="nav-number">3.</span> <span class="nav-text">线程组</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%80%E6%AF%81-Group"><span class="nav-number">3.1.</span> <span class="nav-text">销毁 Group</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%88%E6%8A%A4-Group"><span class="nav-number">3.2.</span> <span class="nav-text">守护 Group</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Thread-API"><span class="nav-number">1.</span> <span class="nav-text">Thread API</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Priority"><span class="nav-number">1.1.</span> <span class="nav-text">Priority</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sleep"><span class="nav-number">1.2.</span> <span class="nav-text">Sleep</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Interrupt"><span class="nav-number">1.3.</span> <span class="nav-text">Interrupt</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Suspend-Resume"><span class="nav-number">1.4.</span> <span class="nav-text">Suspend&#x2F;Resume</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Yield"><span class="nav-number">1.5.</span> <span class="nav-text">Yield</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Wait-Notify-Mechanism"><span class="nav-number">1.6.</span> <span class="nav-text">Wait&#x2F;Notify Mechanism</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Daemon-Thread"><span class="nav-number">1.7.</span> <span class="nav-text">Daemon Thread</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exception-Handler"><span class="nav-number">1.8.</span> <span class="nav-text">Exception Handler</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Hook"><span class="nav-number">2.</span> <span class="nav-text">Hook</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E7%BB%84"><span class="nav-number">3.</span> <span class="nav-text">线程组</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%94%80%E6%AF%81-Group"><span class="nav-number">3.1.</span> <span class="nav-text">销毁 Group</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%88%E6%8A%A4-Group"><span class="nav-number">3.2.</span> <span class="nav-text">守护 Group</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -609,6 +604,8 @@ public static void sleep (long milliseconds, int nanoseconds) throws Interrupted
 
 
 
+
+  
 
   
 

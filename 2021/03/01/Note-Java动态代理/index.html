@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="在业务中使用动态代理，一般是为了给需要实现的方法添加预处理或者添加后续操作，但是不干预实现类的正常业务，把一些基本业务和主要的业务逻辑分离。我们一般所熟知的 Spring 的 AOP 原理就是基于动态代理实现的。">
@@ -255,7 +255,6 @@
       
         <p>在业务中使用动态代理，一般是为了给需要实现的方法添加预处理或者添加后续操作，但是不干预实现类的正常业务，把一些基本业务和主要的业务逻辑分离。我们一般所熟知的 Spring 的 AOP 原理就是基于动态代理实现的。</p>
 <span id="more"></span>
-
 <p>反射机制在生成类的过程中比较高效，而 ASM 在生成类之后的相关执行过程中比较高效（可以通过将 ASM 生成的类进行缓存，这样解决 ASM 生成类过程低效问题）。还有一点必须注意：JDK 动态代理的应用前提，必须是目标类基于统一的接口。如果没有上述前提，JDK 动态代理不能应用。由此可以看出，JDK 动态代理有一定的局限性，CGLIB 这种第三方类库实现的动态代理应用更加广泛，且在效率上更有优势。</p>
 <p>下面是公用的一小部分代码</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public interface Subject &#123;
@@ -268,7 +267,6 @@ public class SubjectImpl implements Subject &#123;
         System.out.println(&quot;hello  &quot; + str);
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="JDK-动态代理"><a href="#JDK-动态代理" class="headerlink" title="JDK 动态代理"></a>JDK 动态代理</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">JDKProxy</span> <span class="token punctuation">&#123;</span>
 
     <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token class-name">T</span> <span class="token function">getProxy</span><span class="token punctuation">(</span><span class="token class-name">Class</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> clazz<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -290,7 +288,6 @@ public class SubjectImpl implements Subject &#123;
         subject<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token string">"world"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>通过反射调用程序，无法享受编译器对代码的优化策略。</p>
 <h1 id="CGLIB动态代理"><a href="#CGLIB动态代理" class="headerlink" title="CGLIB动态代理"></a>CGLIB动态代理</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">CglibProxy</span> <span class="token keyword">implements</span> <span class="token class-name">MethodInterceptor</span> <span class="token punctuation">&#123;</span>
 
@@ -310,7 +307,6 @@ public class SubjectImpl implements Subject &#123;
         subject<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token string">"world"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>CGLIB 不同于 JDK，它的底层使用 ASM 字节码框架在类中修改指令码实现代理，所以这种代理方式也就不需要像 JDK 那样需要接口才能代理。同时得益于字节码框架的使用，所以这种代理方式也会比使用 JDK 代理的方式快 1.5~2.0 倍。</p>
 <h1 id="ASM代理方式"><a href="#ASM代理方式" class="headerlink" title="ASM代理方式"></a>ASM代理方式</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ASMProxy</span> <span class="token keyword">extends</span> <span class="token class-name">ClassLoader</span> <span class="token punctuation">&#123;</span>
 
@@ -355,7 +351,6 @@ public class SubjectImpl implements Subject &#123;
         proxy<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token string">"world"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>使用字节码编程的方式进行处理，它的实现方式相对复杂，而且需要了解 Java 虚拟机规范相关的知识。因为你的每一步代理操作，都是在操作字节码指令。但这种最接近底层的方式，也是最快的方式。所以在一些使用字节码插装的全链路监控中，会非常常见。</p>
 <h1 id="Byte-Buddy代理方式"><a href="#Byte-Buddy代理方式" class="headerlink" title="Byte-Buddy代理方式"></a>Byte-Buddy代理方式</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">ByteBuddyProxy</span> <span class="token punctuation">&#123;</span>
 
@@ -382,7 +377,6 @@ public class SubjectImpl implements Subject &#123;
     <span class="token class-name">Subject</span> subject <span class="token operator">=</span> <span class="token class-name">ByteBuddyProxy</span><span class="token punctuation">.</span><span class="token function">getProxy</span><span class="token punctuation">(</span><span class="token class-name">SubjectImpl</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     subject<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token string">"world"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>Byte Buddy 也是一个字节码操作的类库，但 Byte Buddy 的使用方式更加简单。无需理解字节码指令，即可使用简单的 API 就能很容易操作字节码，控制类和方法。比起 JDK 动态代理、CGLIB，Byte Buddy 在性能上具有一定的优势。另外，2015年10月，Byte Buddy 被 Oracle 授予了 Duke’s Choice 大奖。该奖项对 Byte Buddy 的“Java 技术方面的巨大创新 ”表示赞赏。</p>
 <h1 id="Javassist代理方式"><a href="#Javassist代理方式" class="headerlink" title="Javassist代理方式"></a>Javassist代理方式</h1><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">JavassistProxy</span> <span class="token keyword">extends</span> <span class="token class-name">ClassLoader</span> <span class="token punctuation">&#123;</span>
 
@@ -406,7 +400,6 @@ public class SubjectImpl implements Subject &#123;
         subject<span class="token punctuation">.</span><span class="token function">say</span><span class="token punctuation">(</span><span class="token string">"world"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>Javassist 是一个使用非常广的字节码插装框架，几乎一大部分非入侵的全链路监控都是会选择使用这个框架。因为它不想 ASM 那样操作字节码导致风险，同时它的功能也非常齐全。另外，这个框架即可使用它所提供的方式直接编写插装代码，也可以使用字节码指令进行控制生成代码，所以综合来看也是一个非常不错的字节码框架。</p>
 
     </div>
@@ -609,6 +602,8 @@ public class SubjectImpl implements Subject &#123;
 
 
 
+
+  
 
   
 

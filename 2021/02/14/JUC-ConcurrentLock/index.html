@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="锁是为了保护竞争资源，防止多个线程同时操作共享资源而发生数据不一致的问题。本文介绍了三种 JUC 包提供的锁：ReentrantLock、ReentrantReadWriteLock、StampedLock。基于 AQS 实现的有 ReentrantLock、ReentrantReadWriteLock，而 StampedLock 实现了自己的队列。">
@@ -30,7 +30,7 @@
 <meta property="og:image" content="http://example.com/images/JDK/ReentrantLock.png">
 <meta property="og:image" content="http://example.com/images/JDK/ReentrantReadWriteLock.png">
 <meta property="og:image" content="http://example.com/images/JDK/StampedLock.png">
-<meta property="og:image" content="http://example.com/images/JDK/StampedLock%E5%B8%B8%E9%87%8F.png">
+<meta property="og:image" content="http://example.com/images/JDK/StampedLock常量.png">
 <meta property="article:published_time" content="2021-02-14T10:05:32.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.546Z">
 <meta property="article:author" content="Wang Zihao">
@@ -260,11 +260,11 @@
       
         <p>锁是为了保护竞争资源，防止多个线程同时操作共享资源而发生数据不一致的问题。本文介绍了三种 JUC 包提供的锁：ReentrantLock、ReentrantReadWriteLock、StampedLock。基于 AQS 实现的有 ReentrantLock、ReentrantReadWriteLock，而 StampedLock 实现了自己的队列。</p>
 <span id="more"></span>
-
 <h1 id="ReentrantLock"><a href="#ReentrantLock" class="headerlink" title="ReentrantLock"></a>ReentrantLock</h1><p>ReentrantLock 是一个可重入的互斥锁，又被称为“独占锁”，即在同一个时间点只能被一个线程锁持有。它分为“公平锁”和“非公平锁”。它们的区别体现在获取锁的机制上是否公平。ReentraantLock 是通过一个 FIFO 的等待队列来管理获取该锁所有线程的。在“公平锁”的机制下，线程依次排队获取锁；而“非公平锁”在锁是可获取状态时，不管自己是不是在队列的开头都会获取锁。下图是 ReentrantLock 的 UML 图。</p>
-<p><img src="/images/JDK/ReentrantLock.png"></p>
+<p><img src="/images/JDK/ReentrantLock.png" alt=""></p>
 <p>上图可看出 ReentrantLock 与 Sync 是组合关系。并且，Sync 是 AQS 的子类，FairSync（公平锁）和 NonFairSync（非公平锁）。ReentrantLock 是一个独占锁，至于它具体是公平锁还是非公平锁，就取决于 Sync 对象是 FairSync 的实例还是 NonFairSync 的实例。</p>
-<h2 id="ReentrantLock-API"><a href="#ReentrantLock-API" class="headerlink" title="ReentrantLock API"></a>ReentrantLock API</h2><h3 id="ReentrantLock-线程状态"><a href="#ReentrantLock-线程状态" class="headerlink" title="ReentrantLock 线程状态"></a>ReentrantLock 线程状态</h3><table>
+<h2 id="ReentrantLock-API"><a href="#ReentrantLock-API" class="headerlink" title="ReentrantLock API"></a>ReentrantLock API</h2><h3 id="ReentrantLock-线程状态"><a href="#ReentrantLock-线程状态" class="headerlink" title="ReentrantLock 线程状态"></a>ReentrantLock 线程状态</h3><div class="table-container">
+<table>
 <thead>
 <tr>
 <th>函数</th>
@@ -272,7 +272,8 @@
 <th>返回值</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>getHoldCount</td>
 <td>查询当前线程保持此锁的次数</td>
 <td>int</td>
@@ -332,8 +333,11 @@
 <td>判断是否有任意线程获取此锁</td>
 <td>boolean</td>
 </tr>
-</tbody></table>
-<h3 id="ReentrantLock-锁功能"><a href="#ReentrantLock-锁功能" class="headerlink" title="ReentrantLock 锁功能"></a>ReentrantLock 锁功能</h3><table>
+</tbody>
+</table>
+</div>
+<h3 id="ReentrantLock-锁功能"><a href="#ReentrantLock-锁功能" class="headerlink" title="ReentrantLock 锁功能"></a>ReentrantLock 锁功能</h3><div class="table-container">
+<table>
 <thead>
 <tr>
 <th>函数</th>
@@ -341,7 +345,8 @@
 <th>返回值</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>lock</td>
 <td>获取锁</td>
 <td>void</td>
@@ -366,8 +371,11 @@
 <td>释放锁</td>
 <td>void</td>
 </tr>
-</tbody></table>
-<h3 id="ReentrantLock-条件变量"><a href="#ReentrantLock-条件变量" class="headerlink" title="ReentrantLock 条件变量"></a>ReentrantLock 条件变量</h3><table>
+</tbody>
+</table>
+</div>
+<h3 id="ReentrantLock-条件变量"><a href="#ReentrantLock-条件变量" class="headerlink" title="ReentrantLock 条件变量"></a>ReentrantLock 条件变量</h3><div class="table-container">
+<table>
 <thead>
 <tr>
 <th>函数</th>
@@ -375,7 +383,8 @@
 <th>返回值</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>newCondition</td>
 <td>返回用来与此Lock实例一起使用的Condition实例</td>
 <td>Condition</td>
@@ -410,7 +419,9 @@
 <td>通知所有等待使用Condition对象的thread此条件已经发生。</td>
 <td>void</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h2 id="条件变量"><a href="#条件变量" class="headerlink" title="条件变量"></a>条件变量</h2><p>条件变量（condition variable）是一种由许多其他 threading 系统所提供的同步类型。条件变量非常类似 Java 的等待-通知机制，事实上，在大部分情况下它们的功能是相同的。</p>
 <p>POSIX 条件变量的四个基本函数 wait、timed_wait、signal 与 broadcast，直接对应到 Java 所提供的 method（<code>wait()</code>、<code>wait(long timeout)</code>、<code>notify()</code>、<code>notifyAll()</code>）。它们的实现在逻辑上也是相同的。条件变量的 wait 操作需要持有 mutex 的 lock。它在返回到调用者之前的等待与重新取得 lock 的时候会释放掉 lock。signal 这个 function 会唤醒一个 thread，而 broadcast 会唤醒所有在等待的 thread，这些 function 同样也需要在调用的时候持有 mutex。条件变量的 race condition 会以与 Java 的等待-通知机制相同的方式来解决。</p>
 <p>然而其中还是有些许的不同之处，等待-通知机制是与所关联的 lock 高度地整合过，这会让此机制比条件变量的相对应功能更易于使用。从 synchronized 程序代码区段调用 wait 与 notify 方法就是它们自然的运用方式。然而，使用条件变量需要创建独立的 mutex lock、存储此 mutex，最终在不需要的时候将 mutex 销毁。</p>
@@ -418,10 +429,9 @@
 <p>J2SE 加入了提供条件变量功能的 class。此 class 是与 Lock interface 并用。因为这个新的 interface（及由此来的对象）是与调用的对象以及 lock 对象分开的，它在使用方法上的灵活性就如同其他 threading 系统中的条件变量一样。在 Java 中，条件变量是实现出 Condition interface 的对象。Condition interface 是绑在 Lock interface 上，就好像等待-通知机制是绑在同步 lock 上一样。</p>
 <h2 id="可重入的互斥锁"><a href="#可重入的互斥锁" class="headerlink" title="可重入的互斥锁"></a>可重入的互斥锁</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//在公平锁和非公平锁都调用了该代码获取锁</span>
 <span class="token function">acquire</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>“当前线程”实际上是通过<code>acquire(1)</code>获取锁的。</p>
 <p>这里说明一下“1”的含义，它是设置“锁的状态”的参数。对于“独占锁”而言，锁处于可获取状态时，它的状态值是 0；锁被线程初次获取到了，它的状态值就变成了 1。</p>
-<p>由于 ReentrantLock（公平锁&#x2F;非公平锁）是可重入锁，所以“独占锁”可以被单个线程多次获取，每获取 1 次就将锁的状态加一。也就是说，初次获取锁时，通过<code>acquire(1)</code>将锁的状态值设为 1；再次获取锁时，将锁的状态值设为 2；依次类推…这就是为什么获取锁时，传入的参数是 1 的原因了。</p>
+<p>由于 ReentrantLock（公平锁/非公平锁）是可重入锁，所以“独占锁”可以被单个线程多次获取，每获取 1 次就将锁的状态加一。也就是说，初次获取锁时，通过<code>acquire(1)</code>将锁的状态值设为 1；再次获取锁时，将锁的状态值设为 2；依次类推…这就是为什么获取锁时，传入的参数是 1 的原因了。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">NonfairSync</span> <span class="token keyword">extends</span> <span class="token class-name">Sync</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">long</span> serialVersionUID <span class="token operator">=</span> <span class="token number">7316153563782823691L</span><span class="token punctuation">;</span>
 
@@ -475,13 +485,12 @@
         <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="ReentrantReadWriteLock"><a href="#ReentrantReadWriteLock" class="headerlink" title="ReentrantReadWriteLock"></a>ReentrantReadWriteLock</h1><p>ReentrantReadWriteLock，是可重入读写锁。它维护了一对相关的锁 —— 读锁和写锁。</p>
 <ul>
 <li>读锁用于只读操作，它是共享锁，能同时被多个线程获取。</li>
 <li>写锁用于写入操作，它是独占锁，写锁只能被一个线程锁获取。</li>
 </ul>
-<p><img src="/images/JDK/ReentrantReadWriteLock.png"></p>
+<p><img src="/images/JDK/ReentrantReadWriteLock.png" alt=""></p>
 <h2 id="ReentrantReadWriteLock-API"><a href="#ReentrantReadWriteLock-API" class="headerlink" title="ReentrantReadWriteLock API"></a>ReentrantReadWriteLock API</h2><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 创建一个新的 ReentrantReadWriteLock，默认是采用“非公平策略”。
 ReentrantReadWriteLock()
 &#x2F;&#x2F; 创建一个新的 ReentrantReadWriteLock，fair是“公平策略”。fair为true，意味着公平策略；否则，意味着非公平策略。
@@ -523,7 +532,6 @@ boolean isWriteLockedByCurrentThread()
 ReentrantReadWriteLock.ReadLock readLock()
 &#x2F;&#x2F; 返回用于写入操作的锁。
 ReentrantReadWriteLock.WriteLock writeLock()<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="AQS状态"><a href="#AQS状态" class="headerlink" title="AQS状态"></a>AQS状态</h2><p>AQS 的状态 state 是 32 位（int 类型）的，辦成两份，读锁用高 16 位，表示持有读锁的线程数（sharedCount），写锁低 16 位，表示写锁的重入次数 （exclusiveCount）。状态值为 0 表示锁空闲，sharedCount 不为 0 表示分配了读锁，exclusiveCount 不为 0 表示分配了写锁，sharedCount 和 exclusiveCount 一般不会同时不为 0，只有当线程占用了写锁，该线程可以重入获取读锁，反之不成立。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">abstract</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Sync</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractQueuedSynchronizer</span> <span class="token punctuation">&#123;</span>
 
@@ -544,7 +552,6 @@ ReentrantReadWriteLock.WriteLock writeLock()<span aria-hidden="true" class="line
     <span class="token comment">// 写锁的计数，也就是它的重入次数</span>
     <span class="token keyword">static</span> <span class="token keyword">int</span> <span class="token function">exclusiveCount</span><span class="token punctuation">(</span><span class="token keyword">int</span> c<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token keyword">return</span> c <span class="token operator">&amp;</span> EXCLUSIVE_MASK<span class="token punctuation">;</span> <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p> 重入计数：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">abstract</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">Sync</span> <span class="token keyword">extends</span> <span class="token class-name">AbstractQueuedSynchronizer</span> <span class="token punctuation">&#123;</span>
 
@@ -608,7 +615,6 @@ ReentrantReadWriteLock.WriteLock writeLock()<span aria-hidden="true" class="line
         <span class="token function">setState</span><span class="token punctuation">(</span><span class="token function">getState</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 确保 readHolds 的内存可见性，利用 volatile 写的内存语义。</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="共享读锁的实现原理分析"><a href="#共享读锁的实现原理分析" class="headerlink" title="共享读锁的实现原理分析"></a>共享读锁的实现原理分析</h2><pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;ReadLock
 public void lock() &#123;
     sync.acquireShared(1);
@@ -618,7 +624,6 @@ public final void acquireShared(int arg) &#123;
     if (tryAcquireShared(arg) &lt; 0)
         doAcquireShared(arg);
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><code>acquireShared()</code>首先会通过<code>tryAcquireShared()</code>来尝试获取锁。尝试成功的话，则不再做任何动作（因为已经成功获取到锁了）。尝试失败的话，则通过<code>doAcquireShared()</code>来获取锁。<code>doAcquireShared()</code>会获取到锁了才返回。</p>
 <p>其中<code>int tryAcquireShared(int unused)</code>的具体实现如下：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">int</span> <span class="token function">tryAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> unused<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -667,7 +672,6 @@ public final void acquireShared(int arg) &#123;
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token function">fullTryAcquireShared</span><span class="token punctuation">(</span>current<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>整个函数的工作流程如下：</p>
 <ul>
 <li>如果写锁已经被持有了，但是持有写锁的不是当前写出，那么就直接返回-1（体现写锁的排他性）.</li>
@@ -734,7 +738,6 @@ public final void acquireShared(int arg) &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>可以看出其实<code>int fullTryAcquireShared(Thread current)</code>也每什么特别，它的代码和<code>int tryAcquireShared(int unused)</code>差不多。只不过是增加了自旋重试，和“持有读锁数的延迟读取”</p>
 <p>回到<code>acquireShared(int arg)</code>方法，如果<code>tryAcquireShared(arg)</code>获取读锁失败后，会调用<code>doAcquireShared(arg)</code></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">doAcquireShared</span><span class="token punctuation">(</span><span class="token keyword">int</span> arg<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -766,7 +769,6 @@ public final void acquireShared(int arg) &#123;
             <span class="token function">cancelAcquire</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>整个获取共享读锁的流程总结出来，获取锁一般的流程就是首先尝试去直接获取，如果获取不到了，那么尝试自旋获取，如果还是获取不到，那么就去等待队列排队，排队的时候，如果发现自己是第二个那么就再次尝试获取锁，如果还是没获取到，那么就在等待队列中 park 阻塞等待了。</p>
 <h2 id="排他写锁的实现原理分析"><a href="#排他写锁的实现原理分析" class="headerlink" title="排他写锁的实现原理分析"></a>排他写锁的实现原理分析</h2><p>排他写锁的实现原理与 ReentrantLock 一致。直接参照上节所讲即可。</p>
 <h1 id="StampedLock"><a href="#StampedLock" class="headerlink" title="StampedLock"></a>StampedLock</h1><p>ReentrantReadWriteLock 使得多个读线程同时持有读锁（只要写锁未被占用），而写锁是独占的。它拥有的是悲观的读锁，如果在读多写少的情况下，使用不当很容易产生“饥饿”问题，虽然使用“公平”策略可以一定程度上缓解这个问题，但是“公平”策略是以牺牲系统吞吐量为代价的。</p>
@@ -775,7 +777,7 @@ public final void acquireShared(int arg) &#123;
 <p>首先明确下，该类的设计初衷是作为一个内部工具类，用于辅助开发其它线程安全组件，用得好，该类可以提升系统性能，用不好，容易产生死锁和其它莫名其妙的问题。</p>
 <h2 id="StampedLock的特点"><a href="#StampedLock的特点" class="headerlink" title="StampedLock的特点"></a>StampedLock的特点</h2><p>try 系列获取锁的函数，当获取锁失败后会返回为 0 的 stamp 值。当调用释放锁和转换锁的方法时候需要传入获取锁时候返回的 stamp 值。</p>
 <p>StampedLock 的内部实现是基于 CLH 锁的，CLH锁原理：锁维护着一个等待线程队列，所有申请锁且失败的线程都记录在队列。一个节点代表一个线程，保存着一个标记位 locked，用以判断当前线程是否已经释放锁。当一个线程试图获取锁时，从队列尾节点作为前序节点，循环判断所有的前序节点是否已经成功释放锁。</p>
-<p><img src="/images/JDK/StampedLock.png"></p>
+<p><img src="/images/JDK/StampedLock.png" alt=""></p>
 <p><strong>StampedLock 的等待队列与 AQS 的 CLH 队列对比</strong></p>
 <ol>
 <li>当入队一个线程时，如果队尾是读结点，不会直接链接到队尾，而是链接到该读结点的 cowait 链中，cowait 链本质是一个栈；</li>
@@ -853,7 +855,6 @@ public final void acquireShared(int arg) &#123;
         &#125;
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>由上面的例子，我们可以总结出 StampedLock 的用法</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">long stamp &#x3D; lock.tryOptimisticRead();  &#x2F;&#x2F; 非阻塞获取版本信息
 copyVaraibale2ThreadMemory();           &#x2F;&#x2F; 拷贝变量到线程本地堆栈
@@ -867,7 +868,6 @@ if(!lock.validate(stamp))&#123;              &#x2F;&#x2F; 校验
 
 &#125;
 useThreadMemoryVarables();              &#x2F;&#x2F; 使用线程本地堆栈里面的数据进行操作<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>和 ReadWriteLock 相比，写入的加锁是完全一样的，不同的是读取。注意到首先我们通过<code>tryOptimisticRead()</code>获取一个乐观读锁，并返回版本号。接着进行读取，读取完成后，我们通过<code>validate()</code>去验证版本号，如果在读取过程中没有写入，版本号不变，验证成功，我们就可以放心地继续后续操作。如果在读取过程中有写入，版本号会发生变化，验证将失败。在失败的时候，我们再通过获取悲观读锁再次读取。由于写入的概率不高，程序在绝大部分情况下可以通过乐观读锁获取数据，极少数情况下使用悲观读锁获取数据。</p>
 <p>可见，StampedLock把读锁细分为乐观读和悲观读，能进一步提升并发效率。但这也是有代价的：一是代码更加复杂，二是 StampedLock 是不可重入锁，不能在一个线程中反复获取同一个锁。StampedLock 还提供了更复杂的将悲观读锁升级为写锁的功能，它主要使用在 if-then-update 的场景：即先读，如果读的数据满足条件，就返回，如果读的数据不满足条件，再尝试写。</p>
 <h2 id="StampedLock的内部常量"><a href="#StampedLock的内部常量" class="headerlink" title="StampedLock的内部常量"></a>StampedLock的内部常量</h2><p>StampedLock 虽然不像其它锁一样定义了内部类来实现 AQS 框架，但是 StampedLock 的基本实现思路还是利用 CLH 队列进行线程的管理，通过同步状态值来表示锁的状态和类型。</p>
@@ -896,9 +896,8 @@ useThreadMemoryVarables();              &#x2F;&#x2F; 使用线程本地堆栈里
 <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">volatile</span> <span class="token keyword">long</span> state<span class="token punctuation">;</span>
 <span class="token comment">/** 因为读锁只使用前7位，所以当超过了 128 之后将使用一个 int 变量来记录 */</span>
 <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">int</span> readerOverflow<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>部分常量的比特位表示如下：</p>
-<p><img src="/images/JDK/StampedLock%E5%B8%B8%E9%87%8F.png"></p>
+<p><img src="/images/JDK/StampedLock常量.png" alt=""></p>
 <p>另外，StampedLock 相比 ReentrantReadWriteLock，对多核 CPU 进行了优化，可以看到，当 CPU 核数超过 1 时，会有一些自旋操作:</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;** CPU 核数，用于控制自旋次数 *&#x2F;
 private static final int NCPU &#x3D; Runtime.getRuntime().availableProcessors();
@@ -911,7 +910,6 @@ private static final int HEAD_SPINS &#x3D; (NCPU &gt; 1) ? 1 &lt;&lt; 10 : 0;
 
 &#x2F;** 再次进入阻塞之前的最大重试次数 *&#x2F;
 private static final int MAX_HEAD_SPINS &#x3D; (NCPU &gt; 1) ? 1 &lt;&lt; 16 : 0;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="StampedLock实现原理"><a href="#StampedLock实现原理" class="headerlink" title="StampedLock实现原理"></a>StampedLock实现原理</h2><h3 id="等待队列节点状态"><a href="#等待队列节点状态" class="headerlink" title="等待队列节点状态"></a>等待队列节点状态</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 节点状态</span>
 <span class="token comment">// 初始状态 0</span>
 <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> WAITING   <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
@@ -936,17 +934,14 @@ private static final int MAX_HEAD_SPINS &#x3D; (NCPU &gt; 1) ? 1 &lt;&lt; 16 : 0
 <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">volatile</span> <span class="token class-name">WNode</span> whead<span class="token punctuation">;</span>
 <span class="token comment">/** Tail (last) of CLH queue */</span>
 <span class="token keyword">private</span> <span class="token keyword">transient</span> <span class="token keyword">volatile</span> <span class="token class-name">WNode</span> wtail<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="StampedLock对象的创建"><a href="#StampedLock对象的创建" class="headerlink" title="StampedLock对象的创建"></a>StampedLock对象的创建</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token class-name">StampedLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     state <span class="token operator">=</span> ORIGIN<span class="token punctuation">;</span> <span class="token comment">//state 1 0000 0000</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>StampedLock 提供了三类视图：</p>
 <pre class="line-numbers language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// views</span>
 transient ReadLockView readLockView<span class="token punctuation">;</span>
 transient WriteLockView writeLockView<span class="token punctuation">;</span>
 transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>这些视图其实是对 StamedLock 方法的封装，便于习惯了 ReentrantReadWriteLock 的用户使用：<br>例如，ReadLockView 其实相当于<code>ReentrantReadWriteLock.readLock()</code>返回的读锁</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">final</span> <span class="token keyword">class</span> <span class="token class-name">ReadLockView</span> <span class="token keyword">implements</span> <span class="token class-name">Lock</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span> <span class="token function">readLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token punctuation">&#125;</span>
@@ -963,7 +958,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
         <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">UnsupportedOperationException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="调用writeLock获取写锁"><a href="#调用writeLock获取写锁" class="headerlink" title="调用writeLock获取写锁"></a>调用writeLock获取写锁</h3><p><strong>获取写锁成功</strong></p>
 <p>获取写锁成功，将调用 writeLock 方法</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">writeLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -974,7 +968,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
              <span class="token class-name">U</span><span class="token punctuation">.</span><span class="token function">compareAndSwapLong</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> STATE<span class="token punctuation">,</span> s<span class="token punctuation">,</span> next <span class="token operator">=</span> s <span class="token operator">+</span> WBIT<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">?</span>
             next <span class="token operator">:</span> <span class="token function">acquireWrite</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">,</span> <span class="token number">0L</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//获取失败则调用 acquireWrite，加入到等待队列</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>说明：上述代码获取写锁，如果获取失败，则进入阻塞，注意该方法不响应中断，返回非0表示获取成功。</p>
 <p><strong>写锁被其他线程持有，写锁获取失败</strong></p>
 <p>自旋入队操作，如果没用任何锁被占用，则立即尝试获取写锁，获取成功则返回，如果存在锁被使用，则将当前线程包装成独占节点，并插入等待队列尾部</p>
@@ -1077,7 +1070,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="调用readLock获取读锁"><a href="#调用readLock获取读锁" class="headerlink" title="调用readLock获取读锁"></a>调用readLock获取读锁</h3><p><strong>写锁被其他线程持有，读锁获取失败</strong></p>
 <p>获取读锁失败，将调用 acquireRead 方法，加入等待队列：</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">long</span> <span class="token function">readLock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1086,7 +1078,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
              <span class="token class-name">U</span><span class="token punctuation">.</span><span class="token function">compareAndSwapLong</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">,</span> STATE<span class="token punctuation">,</span> s<span class="token punctuation">,</span> next <span class="token operator">=</span> s <span class="token operator">+</span> RUNIT<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">?</span>
             next <span class="token operator">:</span> <span class="token function">acquireRead</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">,</span> <span class="token number">0L</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>说明：上述代码获取读锁，如果写锁被占用，线程会阻塞，注意该方法不响应中断，返回非0表示获取成功。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
  * 尝试自旋的获取读锁, 获取不到则加入等待队列, 并阻塞线程
@@ -1269,7 +1260,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="调用unlockWrite释放写锁"><a href="#调用unlockWrite释放写锁" class="headerlink" title="调用unlockWrite释放写锁"></a>调用unlockWrite释放写锁</h3><p>通过 CAS 操作，修改 State 成功后，会调用 release 方法唤醒等待队列的队首结点：</p>
 <pre class="line-numbers language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">//释放写锁</span>
 <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">unlockWrite</span><span class="token punctuation">(</span><span class="token parameter">long stamp</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1280,7 +1270,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
     <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>h <span class="token operator">=</span> whead<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token keyword">null</span> <span class="token operator">&amp;&amp;</span> h<span class="token punctuation">.</span>status <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">)</span>
         <span class="token function">release</span><span class="token punctuation">(</span>h<span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//唤醒等待队列中的队首节点</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>release 方法非常简单，先将头结点的等待状态置为 0，表示即将唤醒后继结点，然后立即唤醒队首结点：</p>
 <pre class="line-numbers language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">//唤醒等待队列的队首节点（即头结点whead的后继节点）</span>
 <span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">release</span><span class="token punctuation">(</span><span class="token parameter">WNode h</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1296,7 +1285,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
             <span class="token constant">U</span><span class="token punctuation">.</span><span class="token function">unpark</span><span class="token punctuation">(</span>w<span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//唤醒队首节点</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="调用unlockRead释放读锁"><a href="#调用unlockRead释放读锁" class="headerlink" title="调用unlockRead释放读锁"></a>调用unlockRead释放读锁</h3><p>CAS 操作 State 将读锁数量减 1</p>
 <pre class="line-numbers language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">//释放读锁</span>
 <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">unlockRead</span><span class="token punctuation">(</span><span class="token parameter">long stamp</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1316,7 +1304,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
             <span class="token keyword">break</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>注意，当读锁的数量变为0时才会调用 release 方法，唤醒队首结点：</p>
 <pre class="line-numbers language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">//唤醒等待队列中的队首节点（即头结点whead的后继节点）</span>
 <span class="token keyword">private</span> <span class="token keyword">void</span> <span class="token function">release</span><span class="token punctuation">(</span><span class="token parameter">WNode h</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1332,7 +1319,6 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
             <span class="token constant">U</span><span class="token punctuation">.</span><span class="token function">unpark</span><span class="token punctuation">(</span>w<span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//唤醒队首节点</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 
     </div>
 
@@ -1534,6 +1520,8 @@ transient ReadWriteLockView readWriteLockView<span class="token punctuation">;</
 
 
 
+
+  
 
   
 

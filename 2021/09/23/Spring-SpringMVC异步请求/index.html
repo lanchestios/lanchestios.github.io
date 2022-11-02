@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="Servlet 3.0 规范新增了对异步请求的支持，Spring MVC 也在此基础上对异步请求提供了方便。异步请求是在处理比较耗时的业务时先将 request 返回，然后另起线程处理耗时的业务，处理完后再返回给用户。">
@@ -251,7 +251,6 @@
       
         <p>Servlet 3.0 规范新增了对异步请求的支持，Spring MVC 也在此基础上对异步请求提供了方便。异步请求是在处理比较耗时的业务时先将 request 返回，然后另起线程处理耗时的业务，处理完后再返回给用户。</p>
 <span id="more"></span>
-
 <p>HTTP 协议是单向的，只能客户端自己拉不能服务器主动推，Servlet 对异步请求的支持并没有修改 HTTP 协议，而是对 HTTP 的巧妙利用。异步请求的核心原理主要分为两大类，一类是轮询，另一类是长连接。轮询就是定时自动发起请求检查有没有需要返回的数据，这种方式对资源的浪费是比较大的；长连接的原理是在客户端发起请求，服务端处理并返回后并不结束连接，这样就可以在后面再次返回给客户端数据。Servlet 对异步请求的支持其实采用的是长连接的方式，也就是说，异步请求中在原始的请求返回的时候并没有关闭连接，关闭的，只是处理请求的那个线程（一般是回收的线程池里了），只有在异步请求全部处理完之后才会关闭连接。</p>
 <h1 id="Servlet-3-0-对异步请求的支持"><a href="#Servlet-3-0-对异步请求的支持" class="headerlink" title="Servlet 3.0 对异步请求的支持"></a>Servlet 3.0 对异步请求的支持</h1><p>在 Servlet 3.0 规范中使用异步处理请求非常简单，只需要在请求处理过程中调用 request 的 startAsync 方法即可，其返回值是 AsyncContext。</p>
 <p>AsyncContext 是保存与异步请求相关的所有信息，类似于 Servlet 中的 ServletContext。异步请求主要是使用 AsyncContext 进行操作，它是在请求处理的过程中调用 Request 的 startAsync 方法返回的，需要注意的是多次调用 startAsync 方法返回的是同一个 AsyncContext。AsyncContext 接口定义如下：</p>
@@ -289,7 +288,6 @@
 
     <span class="token keyword">long</span> <span class="token function">getTimeout</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h1 id="SpringMVC-中的异步请求"><a href="#SpringMVC-中的异步请求" class="headerlink" title="SpringMVC 中的异步请求"></a>SpringMVC 中的异步请求</h1><p>Spring MVC 为了方便使用异步请求专门提供了 AsyncWebRequest 类型的 request，并且提供了处理异步请求的管理器 WebAsyncManager 和工具 WebAsyncUtils。</p>
 <p>Spring MVC 将异步请求细分为了 Callable、WebAsyncTask、DeferredResult 和 ListenableFuture 四种类型。Spring MVC 专门提供了 AsyncRestTemplate 方法调用别的资源，并返回 ListenableFuture 类型。</p>
 <h2 id="异步请求示例"><a href="#异步请求示例" class="headerlink" title="异步请求示例"></a>异步请求示例</h2><h3 id="Callable"><a href="#Callable" class="headerlink" title="Callable"></a>Callable</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@RequestMapping</span><span class="token punctuation">(</span><span class="token string">"/hello"</span><span class="token punctuation">)</span>
@@ -302,7 +300,6 @@
     <span class="token punctuation">&#125;</span>
   <span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>Callable 的处理其实是在 WebAsyncManager 内部封装成 WebAsyncTask 后再处理的。核心逻辑在返回值处理器 CallableMethodReturnValueHandler。</p>
 <h3 id="WebAsyncTask"><a href="#WebAsyncTask" class="headerlink" title="WebAsyncTask"></a>WebAsyncTask</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@RequestMapping</span><span class="token punctuation">(</span><span class="token string">"/hello"</span><span class="token punctuation">)</span>
 <span class="token keyword">public</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> <span class="token function">hello</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -312,7 +309,6 @@
   <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
   <span class="token keyword">return</span> task<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>WebAsyncTask 比 Callable 更好的是支持设置 timeout 和 Executor，以及支持 Timeout、Complete、Error 事件回调。</p>
 <h3 id="DeferredResult"><a href="#DeferredResult" class="headerlink" title="DeferredResult"></a>DeferredResult</h3><p>DeferredResult 是 Spring 提供的一种用于封装延迟处理结果的类，当一个处理器返回<br>DeferredResult 类型的返回值时将启动异步处理。其含义是当结果好了 set 就可以了。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@RequestMapping(&quot;&#x2F;hello&quot;)
@@ -325,7 +321,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
   &#125;).start();
   return result;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>其支持设置 timeout 和 结果处理器，以及支持 Timeout、Complete、Error 事件回调。</p>
 <h3 id="ListenableFuture"><a href="#ListenableFuture" class="headerlink" title="ListenableFuture"></a>ListenableFuture</h3><p>ListenableFuture 继承自 Future，ListenableFuture 在 Future 阻塞获取结果的基础上，增加了可以添加处理成功和处理失败回调方法的方法，代码如下:</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">ListenableFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">Future</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
@@ -356,7 +351,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
    <span class="token punctuation">&#125;</span>
 
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>ListenableFutureCallback 继承自 SuccessCallback 和 FailureCallback 接口，后两个接口分别有一个 onSuccess 方法和 onFailure 方法，用于处理异步处理成功的返回值和异步处理失败的返回值。</p>
 <h2 id="异步请求组件"><a href="#异步请求组件" class="headerlink" title="异步请求组件"></a>异步请求组件</h2><h3 id="AsyncWebRequest"><a href="#AsyncWebRequest" class="headerlink" title="AsyncWebRequest"></a>AsyncWebRequest</h3><p>AsyncWebRequest 是专门处理异步请求的 request。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">AsyncWebRequest</span> <span class="token keyword">extends</span> <span class="token class-name">NativeWebRequest</span> <span class="token punctuation">&#123;</span>
@@ -371,7 +365,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
    <span class="token keyword">void</span> <span class="token function">addTimeoutHandler</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> runnable<span class="token punctuation">)</span><span class="token punctuation">;</span>
    <span class="token keyword">void</span> <span class="token function">addCompletionHandler</span><span class="token punctuation">(</span><span class="token class-name">Runnable</span> runnable<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>其实现类有两个，一个是 NoSupportAsyncWebRequest，另一个是 StandardServletAsyncWebRequest，前者不支持异步请求，所以在 Spring MVC 中实际用作异步请求的 request 是 StandardServletAsyncWebRequest。</p>
 <p>StandardServletAsyncWebRequest 还实现了 AsyncListener 接口，其本质就是一个监听器。并且在 startAsync 方法中创建出 AsyncContext 后会将自己当作监听器注册进去。</p>
 <h3 id="WebAsyncManager"><a href="#WebAsyncManager" class="headerlink" title="WebAsyncManager"></a>WebAsyncManager</h3><p>WebAsyncManager 是 Spring MVC 处理异步请求过程中最核心的类，它管理着整个异步<br>处理的过程。</p>
@@ -399,7 +392,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">afterCompletion</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> task<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
 
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>下面是 DeferredResult 类型的拦截器</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 用作拦截 DeferredResult 类型的异步请求</span>
 <span class="token keyword">public</span> <span class="token keyword">interface</span> <span class="token class-name">DeferredResultProcessingInterceptor</span> <span class="token punctuation">&#123;</span>
@@ -415,7 +407,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
    <span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> <span class="token keyword">void</span> <span class="token function">afterCompletion</span><span class="token punctuation">(</span><span class="token class-name">NativeWebRequest</span> request<span class="token punctuation">,</span> <span class="token class-name">DeferredResult</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> deferredResult<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
 
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>CallableInterceptorChain 和 DeferredResultInterceptorChain 分别用于封装两个 Interceptor，它们都是将多个相应的拦截器封装到一个 List 类型的属性，然后在相应的方法中调用所封装的 Interceptor 相应方法进行处理。</p>
 <p>下面分析 WebAsyncManager 的核心代码： </p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">startCallableProcessing</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">WebAsyncTask</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> webAsyncTask<span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> processingContext<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -490,7 +481,6 @@ public DeferredResult&lt;String&gt; hello() &#123;
       <span class="token keyword">throw</span> ex<span class="token punctuation">;</span>
    <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>concurrentResult 是 WebAsyncManager 中用来保存异步处理结果的属性，hasConcurrentResult 方法用来判断 concurrentResult 是否已经存在返回值。整个方法过程是：如果 concurrentResult 已经有返回值则直接返回，否则将传入的参数设置到 concurrentResult，然后调用 <code>asyncWebRequest.isAsyneComplete()</code> 检查 Request 是否已设置为异步处理完成状态（网络中断会造成 Request 设置为异步处理完成状态），如果是则保存错误日志并返回，否则调用。</p>
 <p><code>asyncWebRequest.dispatch()</code> 发送请求。Spring MVC 中异步请求处理完成后会再次发起一个相同的请求，然后在 HandlerAdapter 中使用一个特殊的 HandlerMethod 来处理它，具体过程后面再讲解，不过通过 Request 的 dispatch 方法发起的请求使用的还是原来的 Request，也就是说原来保存在 Request 中的属性不会丢失。</p>
 <p>startDeferredResultProcessing 方法和 startCallableProcessing 方法执行过程类似，只是并没有使用 taskExecutor 来提交执行，这是因为 DeferredResult 并不需要执行处理，在后面讲了 DeferredResult 的用法后大家就明白了。</p>
@@ -508,13 +498,11 @@ asyncManager<span class="token punctuation">.</span><span class="token function"
 asyncManager<span class="token punctuation">.</span><span class="token function">setAsyncWebRequest</span><span class="token punctuation">(</span>asyncWebRequest<span class="token punctuation">)</span><span class="token punctuation">;</span>
 asyncManager<span class="token punctuation">.</span><span class="token function">registerCallableInterceptors</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>callableInterceptors<span class="token punctuation">)</span><span class="token punctuation">;</span>
 asyncManager<span class="token punctuation">.</span><span class="token function">registerDeferredResultInterceptors</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>deferredResultInterceptors<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="返回结果处理"><a href="#返回结果处理" class="headerlink" title="返回结果处理"></a>返回结果处理</h3><p>如果是该请求第一次进入 DispatcherServlet，会直接通过 ServletInvocableHandlerMethod 桥接到 Controller 层获取到需要异步执行的任务（如 Callable 等），再通过 ReturnValueHandler 做异步处理后返回 null。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">invocableMethod.invokeAndHandle(webRequest, mavContainer);
 if (asyncManager.isConcurrentHandlingStarted()) &#123;
    return null;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>下面主要解释一下 ReturnValueHandler 的行为（以 Callable 为例）：</p>
 <p>先通过 HandlerMethodReturnValueHandlerComposite 匹配出 Callable 对应的处理器 CallableMethodReturnValueHandler，并调用 handleReturnValue 做异步处理。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// WebAsyncManager</span>
@@ -538,7 +526,6 @@ if (asyncManager.isConcurrentHandlingStarted()) &#123;
   
    <span class="token comment">// ... exception process</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果当前请求是异步请求而且已经处理出了结果，则将异步处理结果与之前保存到 WebAsyncManager 里的 ModelAndViewContainer 取出来，并将 WebAsyncManager 里的结果清空，然后调用 ServletInvocableHandlerMethod 的 wrapConcurrentResult 方法创建 ConcurrentResultHandlerMethod 类型的 ServletInvocableHandlerMethod 来替换自己，创建出来的 ConcurrentResultHandlerMethod 并不执行请求，它的主要功能是判断异步处理的结果是不是异常类型，如果是则抛出，如果不是则使用 ReturmValueHandler 对其进行解析并返回。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span>asyncManager<span class="token punctuation">.</span><span class="token function">hasConcurrentResult</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
    <span class="token class-name">Object</span> result <span class="token operator">=</span> asyncManager<span class="token punctuation">.</span><span class="token function">getConcurrentResult</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -550,12 +537,12 @@ if (asyncManager.isConcurrentHandlingStarted()) &#123;
    <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
    invocableMethod <span class="token operator">=</span> invocableMethod<span class="token punctuation">.</span><span class="token function">wrapConcurrentResult</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <blockquote>
 <p>  超时、线程池等属性都可以在 RequestMappingHandlerAdapter 中设置</p>
 </blockquote>
 <h2 id="异步请求的问题"><a href="#异步请求的问题" class="headerlink" title="异步请求的问题"></a>异步请求的问题</h2><p>第一是异步请求相应的拦截器里的方法会被调用两次。这是不合适的，而且有的时候还会出问题，比如，如果用了拦截器来检查 Token，那么第一次检查通过后就会将相应内容删除，第二次再检查的时候就检查失败了。</p>
 <p>第二个是通过 FlashMap 传递 Redirect 参数的情况。FlashMapManager 获取 FlashMap 的时候说过，每次获取后就会将相应的 FlashMap 删除，但异步请求会获取两次，如果异步处理器是 Redirect 到的结果处理器，并且使用 FlashMap 传递了参数，这种情况下如果在第二次获取 FlashMap 的时候（异步请求处理完了）正好用户又发了一个相同的请求，而且 RedirectView 已经将 FlashMap 设置到了 Session，在获取之前可能被前面的请求获取删除，导致自己获取不到，示例如下：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -563,7 +550,8 @@ if (asyncManager.isConcurrentHandlingStarted()) &#123;
 <th>请求2</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>saveOutputFlashMap 设置到 FM1</td>
 <td></td>
 </tr>
@@ -587,7 +575,9 @@ if (asyncManager.isConcurrentHandlingStarted()) &#123;
 <td></td>
 <td>retrieveAndUpdate 获取到 null</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>这样请求 2 设置的 FlashMap 就会被请求 1 的第二次 retrieveAndUpdate 获取到并从 Session 中删除，请求 2 就获取不到了，这样造成了两个请求的值都出了问题。</p>
 
     </div>
@@ -786,6 +776,8 @@ if (asyncManager.isConcurrentHandlingStarted()) &#123;
 
 
 
+
+  
 
   
 

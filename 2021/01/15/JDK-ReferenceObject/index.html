@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="对 Java 的五种引用（强引用、软引用、弱引用、虚引用、终引用）进行了概念上的介绍，着重介绍了 Reference 配合 ReferenceQueue 的状态流转、ReferenceQueue 的原理介绍和 FinalReference 与 JVM 的调用关系和原理。">
@@ -27,9 +27,9 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="对 Java 的五种引用（强引用、软引用、弱引用、虚引用、终引用）进行了概念上的介绍，着重介绍了 Reference 配合 ReferenceQueue 的状态流转、ReferenceQueue 的原理介绍和 FinalReference 与 JVM 的调用关系和原理。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://example.com/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png">
-<meta property="og:image" content="http://example.com/images/JDK/%E6%A0%91%E5%BD%A2%E5%BC%95%E7%94%A8%E9%93%BE.png">
+<meta property="og:image" content="http://example.com/images/JDK/Reference继承关系.png">
+<meta property="og:image" content="http://example.com/images/JDK/Reference四种状态.png">
+<meta property="og:image" content="http://example.com/images/JDK/树形引用链.png">
 <meta property="article:published_time" content="2021-01-15T01:23:35.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.505Z">
 <meta property="article:author" content="Wang Zihao">
@@ -37,7 +37,7 @@
 <meta property="article:tag" content="Reference">
 <meta property="article:tag" content="ReferenceQueue">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta name="twitter:image" content="http://example.com/images/JDK/Reference继承关系.png">
 
 <link rel="canonical" href="http://example.com/2021/01/15/JDK-ReferenceObject/">
 
@@ -256,54 +256,45 @@
       
         <p>对 Java 的五种引用（强引用、软引用、弱引用、虚引用、终引用）进行了概念上的介绍，着重介绍了 Reference 配合 ReferenceQueue 的状态流转、ReferenceQueue 的原理介绍和 FinalReference 与 JVM 的调用关系和原理。</p>
 <span id="more"></span>
-
 <h1 id="Reference-Object"><a href="#Reference-Object" class="headerlink" title="Reference Object"></a>Reference Object</h1><p>Java 引用有五种类型：强（strong）引用、软（soft）引用、弱（weak）引用、虚（phantom）引用、终（final）引用。除了强引用，其他几种引用均继承<code>java.lang.ref.Reference</code>。</p>
-<p><img src="/images/JDK/Reference%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/JDK/Reference继承关系.png" alt=""></p>
 <p><strong>Strong Reference</strong></p>
 <p>最常用的引用类型，在执行下面的语句时，变量 <code>o</code> 即为一个强引用。</p>
 <p>强引用（Strong Reference）是我们平时使用最多的一种对象引用，当一个对象被关键字 new 实例化出来的时候，JVM 会在堆（heap）内存中开辟一片内存区域，用于存放与该实例对应的数据结构。JVM 垃圾回收器线程会在达到 GC 条件的时候尝试回收（Full GC，Young GC）堆栈内存中的数据，强引用的特点是只要引用到 ROOT 根的路径可达，无论怎样的 GC 都不会将其释放，而是宁可出现 JVM 内存溢出。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">Object o &#x3D; new Object();<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <h2 id="Reference基本用法"><a href="#Reference基本用法" class="headerlink" title="Reference基本用法"></a>Reference基本用法</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//T 被引用的对象</span>
 <span class="token class-name">Reference</span><span class="token punctuation">(</span><span class="token class-name">T</span> referent<span class="token punctuation">,</span> <span class="token class-name">ReferenceQueue</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span> <span class="token keyword">super</span> <span class="token class-name">T</span><span class="token punctuation">></span></span> queue<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">this</span><span class="token punctuation">.</span>referent <span class="token operator">=</span> referent<span class="token punctuation">;</span>
     <span class="token keyword">this</span><span class="token punctuation">.</span>queue <span class="token operator">=</span> <span class="token punctuation">(</span>queue <span class="token operator">==</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token operator">?</span> <span class="token class-name">ReferenceQueue</span><span class="token punctuation">.</span>NULL <span class="token operator">:</span> queue<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果我们在创建一个引用对象时，指定了<code>ReferenceQueue</code>，那么当引用对象指向的对象达到合适的状态（根据引用类型不同而不同）时，GC 会把引用对象本身添加到这个队列中，方便我们处理它，因为引用对象指向的对象 GC 会自动清理，但是引用对象本身也是对象（是对象就占用一定资源），所以需要我们自己清理。</p>
 <p>例如：</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">Object o &#x3D; new Object();
 SoftReference&lt;Object&gt; sr &#x3D; new SoftReference&lt;&gt;(o , queue);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p><code>sr</code>为软引用，指向<code>o</code>这个对象，<code>o</code>会在一定时机被 GC 自动清理，但是<code>sr</code>对象本身的清理工作依赖于<code>queue</code>，当<code>sr</code>出现在<code>queue</code>中时，说明其指向的对象已经无效，可以放心清理了。</p>
 <h2 id="Reference的四种状态"><a href="#Reference的四种状态" class="headerlink" title="Reference的四种状态"></a>Reference的四种状态</h2><p>每一时刻，<code>Reference</code>对象都处于下面四种状态中。这四种状态用<code>Reference</code>的成员变量<code>queue</code>与<code>next</code>（类似于单链表中的next）来标示。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ReferenceQueue&lt;? super T&gt; queue; 
 Reference next;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>Active：新创建的引用对象都是这个状态，在 GC 检测到引用对象已经到达合适的 reachability 时，GC 会根据引用对象是否在创建时制定<code>ReferenceQueue</code>参数进行状态转移，如果指定了，那么转移到<code>Pending</code>，如果没指定，转移到<code>Inactive</code>。在这个状态中</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;如果构造参数中没指定queue，那么queue为ReferenceQueue.NULL，否则为构造参数中传递过来的queue
 queue &#x3D; ReferenceQueue || ReferenceQueue.NULL
 next &#x3D; null<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>Pending：pending-Reference 列表中的引用都是这个状态，它们等着被内部线程<code>ReferenceHandler</code>处理（会调用<code>ReferenceQueue.enqueue</code>方法）。没有注册的实例不会进入这个状态。在这个状态中</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;构造参数参数中传递过来的queue
 queue &#x3D; ReferenceQueue
 next &#x3D; 该queue中的下一个引用，如果是该队列中的最后一个，那么为this<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p>Enqueued：调用<code>ReferenceQueue.enqueued</code>方法后的引用处于这个状态中。没有注册的实例不会进入这个状态。在这个状态中</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java">queue <span class="token operator">=</span> <span class="token class-name">ReferenceQueue</span><span class="token punctuation">.</span>ENQUEUED<span class="token punctuation">;</span>
 next <span class="token operator">=</span> 该queue中的下一个引用，如果是该队列中的最后一个，那么为<span class="token keyword">this</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>Inactive：最终状态，处于这个状态的引用对象，状态不会在改变。在这个状态中</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">queue &#x3D; ReferenceQueue.NULL;
 next &#x3D; this;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>有了这些约束，GC 只需要检测<code>next</code>字段就可以知道是否需要对该引用对象采取特殊处理</p>
 <ul>
 <li>如果<code>next</code>为<code>null</code>，那么说明该引用为<code>Active</code>状态</li>
 <li>如果<code>next</code>不为<code>null</code>，那么 GC 应该按其正常逻辑处理该引用。</li>
 </ul>
-<p><img src="/images/JDK/Reference%E5%9B%9B%E7%A7%8D%E7%8A%B6%E6%80%81.png"></p>
+<p><img src="/images/JDK/Reference四种状态.png" alt=""></p>
 <blockquote>
 <p><strong>注意</strong></p>
 <ol>
@@ -323,7 +314,6 @@ next &#x3D; this;<span aria-hidden="true" class="line-numbers-rows"><span></span
         <span class="token keyword">super</span><span class="token punctuation">(</span>referent<span class="token punctuation">,</span> q<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>JDK 对 FinalReference 的扩展</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">final class Finalizer extends FinalReference &#123; &#x2F;* Package-private; must be in
                                                   same package as the Reference
@@ -367,12 +357,10 @@ next &#x3D; this;<span aria-hidden="true" class="line-numbers-rows"><span></span
     &#125;
     ...
 &#125;    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>什么是Finalizer类</strong></p>
 <p>判断当前类是否为<code>Finalizer</code>类的标准是覆盖<code>finalize</code>方法，且该方法体必须非空。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Object
 protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <blockquote>
 <p>需要注意的是，JVM 在类加载的时候会遍历当前类的所有方法，包括父类的方法，只要重写非空<code>finalize</code>方法就认为这个类是 Finalizer 类。</p>
 <p>如果不是 Finalizer 类的话，该类在被 GC 回收时其实并不会调用它的<code>finalize</code>方法。</p>
@@ -383,7 +371,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 3: dup
 4: iconst_2
 5: invokespecial #11                 &#x2F;&#x2F; Method &quot;&lt;init&gt;&quot;:(I)V<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>先执行 new 分配好对象空间，然后再执行 invokespecial 调用构造函数，JVM 里其实可以让用户在这两个时机中选择一个，将当前对象传递给<code>Finalizer.register</code>方法来注册到<code>Finalizer</code>对象链里，这个选择取决于是否设置了<code>RegisterFinalizersAtInit</code>这个 vm 参数，默认值为 true，也就是在构造函数返回之前调用<code>Finalizer.register</code>方法，如果通过<code>-XX:-RegisterFinalizersAtInit</code>关闭了该参数，那将在对象空间分配好之后将这个对象注册进去。</p>
 <p>另外需要提醒的是，当我们通过 clone 的方式复制一个对象时，如果当前类是一个 Finalizer 类，那么在 clone 完成时将调用<code>Finalizer.register</code>方法进行注册。</p>
 <p><strong>hotspot如何实现Finalizer类对象在构造函数执行完毕后调用Finalizer.register</strong></p>
@@ -391,7 +378,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <pre class="line-numbers language-none"><code class="language-none">0: aload_0
 1: invokespecial #21                 &#x2F;&#x2F; Method java&#x2F;lang&#x2F;Object.&quot;&lt;init&gt;&quot;:()V
 4: return<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>Finalizer类对象的GC回收</strong></p>
 <p>在<code>Finalizer</code>类的<code>clinit</code>方法（静态块）里，我们看到它会创建一个<code>FinalizerThread</code>守护线程，这个线程的优先级并不是最高的，意味着在CPU很紧张的情况下其被调度的优先级可能会受到影响</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">FinalizerThread</span> <span class="token keyword">extends</span> <span class="token class-name">Thread</span> <span class="token punctuation">&#123;</span>
@@ -424,7 +410,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
     finalizer<span class="token punctuation">.</span><span class="token function">setDaemon</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     finalizer<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>这个线程用来从queue里获取<code>Finalizer</code>对象，然后执行该对象的<code>runFinalizer</code>方法，该方法会将<code>Finalizer</code>对象从<code>Finalizer</code>对象链里剥离出来，这样意味着下次GC发生时就可以将其关联的<code>Finalizer</code>对象回收了，最后将这个<code>Finalizer</code>对象关联的<code>Finalizer</code>对象传给一个 native 方法<code>invokeFinalizeMethod</code>。</p>
 <blockquote>
 <p>如果这个对象被判定为有必要执行 finalized 方法，那么这个对象将会放置在一个叫做<code>F-Queue</code>的队列之中，并在稍后由一个由虚拟机自动建立的、低优先级的 Finalizer 线程去执行它。这里所谓的“执行”是指虚拟机会触发这个方法，但并不承诺会等待它运行结束，这样做的原因是，如果一个对象在 finalized 方法中执行缓慢，或者发生了死循环（更极端的情况），将很可能会导致<code>F-Queue</code>队列中其他对象永久处于等待，甚至导致整个内存回收系统崩溃。</p>
@@ -448,7 +433,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <span class="token punctuation">&#125;</span>
 
  <span class="token keyword">static</span> <span class="token keyword">native</span> <span class="token keyword">void</span> <span class="token function">invokeFinalizeMethod</span><span class="token punctuation">(</span><span class="token class-name">Object</span> o<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Throwable</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>其实<code>invokeFinalizeMethod</code>方法就是调了这个f对象的finalize方法.</p>
 <pre class="line-numbers language-c" data-language="c"><code class="language-c">JNIEXPORT <span class="token keyword">void</span> JNICALL
 <span class="token function">Java_java_lang_ref_Finalizer_invokeFinalizeMethod</span><span class="token punctuation">(</span>JNIEnv <span class="token operator">*</span>env<span class="token punctuation">,</span> jclass clazz<span class="token punctuation">,</span>
@@ -463,7 +447,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
     <span class="token keyword">if</span> <span class="token punctuation">(</span>mid <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
     <span class="token punctuation">(</span><span class="token operator">*</span>env<span class="token punctuation">)</span><span class="token operator">-></span><span class="token function">CallVoidMethod</span><span class="token punctuation">(</span>env<span class="token punctuation">,</span> ob<span class="token punctuation">,</span> mid<span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>Finalizer对象的finalize方法会执行多次吗</strong></p>
 <p>如果我们在f对象的<code>finalize</code>方法里重新将当前对象赋值，变成可达对象，当这个f对象再次变成不可达时还会执行<code>finalize</code>方法吗？答案是否定的，因为在执行完第一次<code>finalize</code>方法后，这个<code>Finalizer</code>对象已经和之前的<code>Finalizer</code>对象剥离了，也就是下次GC的时候不会再发现<code>Finalizer</code>对象指向该<code>Finalizer</code>对象了，自然也就不会调用这个<code>Finalizer</code>对象的<code>finalize</code>方法了。</p>
 <p><strong>Finalizer对象何时被放到ReferenceQueue里</strong></p>
@@ -476,7 +459,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">finalize</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">IOException</span> <span class="token punctuation">&#123;</span>
     <span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>其实这么做的主要目的是万一用户忘记关闭Socket，那么在这个对象被回收时能主动关闭Socket来释放一些系统资源，但是如果用户真的忘记关闭，那这些<code>socket</code>对象可能因为<code>FinalizeThread</code>迟迟没有执行这些<code>socket</code>对象的<code>finalize</code>方法，而导致内存泄露。</p>
 <p><strong>Finalizer的客观评价</strong></p>
 <p>Java 里我们看到有构造函数，但是并没有看到析构函数一说，<code>Finalizer</code>其实是实现了析构函数的概念，我们在对象被回收前可以执行一些“收拾性”的逻辑，应该说是一个特殊场景的补充，但是这种概念的实现给<code>Finalizer</code>对象生命周期以及 GC 等带来了一些影响：</p>
@@ -492,7 +474,7 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <li>单条引用路径可及性判断：在这条路径中，最弱的一个引用决定对象的可及性。</li>
 <li>多条引用路径可及性判断：几条路径中，最强的一条的引用决定对象的可及性。</li>
 </ol>
-<p><img src="/images/JDK/%E6%A0%91%E5%BD%A2%E5%BC%95%E7%94%A8%E9%93%BE.png"></p>
+<p><img src="/images/JDK/树形引用链.png" alt=""></p>
 <p>在这个树形的引用链中，箭头的方向代表了引用的方向，所指向的对象是被引用对象。</p>
 <p>假设在树形引用链中，「路径1」和 「路径3」为强引用，「路径2」为软引用，「路径4」为弱引用。</p>
 <p>对于「对象5」按照这两个判断原则，「路径1-2」取最弱的引用（也就是「路径2」的软引用），因此该路径对「对象5」的引用为软引用。同样，「路径3-4」为弱引用。在这两条路径之间取最强的引用，于是「对象5」是一个软可及对象。</p>
@@ -502,7 +484,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <span class="token keyword">transient</span> <span class="token keyword">private</span> <span class="token class-name">Reference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">T</span><span class="token punctuation">></span></span> discovered<span class="token punctuation">;</span>  <span class="token comment">/* used by VM */</span>
 <span class="token comment">//JVM 在 GC 时通过discovered不断地拿到下一个对象赋值给pending(因有两个线程访问，需加锁)</span>
 <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">Reference</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> pending <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">if</span> <span class="token punctuation">(</span>pending <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
      r <span class="token operator">=</span> pending<span class="token punctuation">;</span>
     <span class="token comment">// 'instanceof' might throw OutOfMemoryError sometimes</span>
@@ -511,7 +492,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
     <span class="token comment">// unlink 'r' from 'pending' chain</span>
     pending <span class="token operator">=</span> r<span class="token punctuation">.</span>discovered<span class="token punctuation">;</span>
     r<span class="token punctuation">.</span>discovered <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="重要方法"><a href="#重要方法" class="headerlink" title="重要方法"></a>重要方法</h2><h3 id="Clear方法"><a href="#Clear方法" class="headerlink" title="Clear方法"></a>Clear方法</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
  * Clears this reference object.  Invoking this method will not cause this
  * object to be enqueued.
@@ -522,7 +502,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">this</span><span class="token punctuation">.</span>referent <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="ReferenceHandler线程"><a href="#ReferenceHandler线程" class="headerlink" title="ReferenceHandler线程"></a>ReferenceHandler线程</h3><p>这个线程在 Reference 类的 static 构造块中启动，并且被设置为高优先级和 daemon 状态。此线程要做的事情，是不断的检查 pending 是否为 null，如果 pending不为 null，则将 pending 进行 enqueue，否则线程进入 wait 状态。</p>
 <p>由此可见，pending 是由 JVM 来赋值的，当 Reference 内部的 referent 对象的可达状态改变时，JVM 会将 Reference 对象放入 pending 链表。并且这里 enqueue 的队列是我们在初始化（构造函数）Reference 对象时传进来的 queue，如果传入了 null（实际使用的是ReferenceQueue.NULL），则 ReferenceHandler 则不进行 enqueue 操作，所以只有非 RefernceQueue.NULL 的 queue 才会将 Reference 进行 enqueue。</p>
 <p>ReferenceQueue 是作为 JVM GC 与上层 Reference 对象管理之间的一个消息传递方式，它使得我们可以对所监听的对象引用可达发生变化时做一些处理</p>
@@ -547,7 +526,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>其优先级最高，可以理解为需要不断地处理引用对象。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">ReferenceHandler</span> <span class="token keyword">extends</span> <span class="token class-name">Thread</span> <span class="token punctuation">&#123;</span>
 
@@ -577,7 +555,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">/**
      * Try handle pending &#123;@link Reference&#125; if there is one.&lt;p>
      * Return &#123;@code true&#125; as a hint that there might be another
@@ -640,11 +617,6 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
     <span class="token keyword">if</span> <span class="token punctuation">(</span>q <span class="token operator">!=</span> <span class="token class-name">ReferenceQueue</span><span class="token punctuation">.</span>NULL<span class="token punctuation">)</span> q<span class="token punctuation">.</span><span class="token function">enqueue</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-
-
-
 
     </div>
 
@@ -843,6 +815,8 @@ protected void finalize() throws Throwable &#123; &#125;<span aria-hidden="true"
 
 
 
+
+  
 
   
 

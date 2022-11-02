@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="Veth Peer 是成对出现的一种虚拟网络设备接口，一端连着网络协议栈，一端彼此相连。由于它的这个特性，常常被用于构建虚拟网络拓扑。例如连接两个不同的网络命名空间（netns），连接 docker 容器，连接网桥（Bridge）等，其中一个很常见的案例就是 OpenStack Neutron 底层用它来构建非常复杂的网络拓扑。">
@@ -252,11 +252,10 @@
       
         <p>Veth Peer 是成对出现的一种虚拟网络设备接口，一端连着网络协议栈，一端彼此相连。由于它的这个特性，常常被用于构建虚拟网络拓扑。例如连接两个不同的网络命名空间（netns），连接 docker 容器，连接网桥（Bridge）等，其中一个很常见的案例就是 OpenStack Neutron 底层用它来构建非常复杂的网络拓扑。</p>
 <span id="more"></span>
-
 <h1 id="深入理解-Veth"><a href="#深入理解-Veth" class="headerlink" title="深入理解 Veth"></a>深入理解 Veth</h1><blockquote>
 <p>  基本信息简介</p>
-<p>  本机 IP：172.20.88.202&#x2F;20（物理网卡 eth0）<br>  网关 IP：172.20.80.1</p>
-<p>  Veth0 IP：172.20.80.101&#x2F;20<br>  Veth1 IP：172.20.80.102&#x2F;20</p>
+<p>  本机 IP：172.20.88.202/20（物理网卡 eth0）<br>  网关 IP：172.20.80.1</p>
+<p>  Veth0 IP：172.20.80.101/20<br>  Veth1 IP：172.20.80.102/20</p>
 </blockquote>
 <p>注意内核中的一些 ARP 相关配置导致 Veth Peer 不返回 ARP 应答包，解决方法如下：</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token builtin class-name">echo</span> <span class="token number">1</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/accept_local
@@ -264,12 +263,10 @@
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/all/rp_filter
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth0/rp_filter
 <span class="token builtin class-name">echo</span> <span class="token number">0</span> <span class="token operator">></span> /proc/sys/net/ipv4/conf/veth1/rp_filter<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="只给一个veth设备配置IP"><a href="#只给一个veth设备配置IP" class="headerlink" title="只给一个veth设备配置IP"></a>只给一个veth设备配置IP</h2><pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> <span class="token function">link</span> <span class="token function">add</span> veth0 <span class="token builtin class-name">type</span> veth peer name veth1
 $ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.20</span>.80.101/20 dev veth0
 $ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth0 up
 $ <span class="token function">ip</span> <span class="token function">link</span> <span class="token builtin class-name">set</span> veth1 up<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>这里不给 veth1 设备配置 IP 的原因就是想看看在 veth1 没有IP的情况下，veth0 收到协议栈的数据后会不会转发给 veth1。</p>
 <p>ping 一下 eth0，由于 veth1 还没配置 IP，所以肯定不通。</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I veth1 <span class="token number">172.20</span>.88.216
@@ -278,10 +275,8 @@ PING <span class="token number">172.20</span>.88.216 <span class="token punctuat
 
 --- <span class="token number">172.20</span>.88.216 <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">0</span> received, <span class="token number">100</span>% packet loss, <span class="token function">time</span> 0ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="给两个veth设备都配置IP"><a href="#给两个veth设备都配置IP" class="headerlink" title="给两个veth设备都配置IP"></a>给两个veth设备都配置IP</h2><p>给 veth1 也配置上 IP</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ip</span> addr <span class="token function">add</span> <span class="token number">172.20</span>.80.102/20 dev veth1<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">ping</span> -c <span class="token number">1</span> -I veth1 <span class="token number">172.20</span>.88.216
 PING <span class="token number">172.20</span>.88.216 <span class="token punctuation">(</span><span class="token number">172.20</span>.88.216<span class="token punctuation">)</span> from <span class="token number">172.20</span>.80.102 veth1: <span class="token number">56</span><span class="token punctuation">(</span><span class="token number">84</span><span class="token punctuation">)</span> bytes of data.
 <span class="token number">64</span> bytes from <span class="token number">172.20</span>.88.216: <span class="token assign-left variable">icmp_seq</span><span class="token operator">=</span><span class="token number">1</span> <span class="token assign-left variable">ttl</span><span class="token operator">=</span><span class="token number">64</span> <span class="token assign-left variable">time</span><span class="token operator">=</span><span class="token number">0.055</span> ms
@@ -289,7 +284,6 @@ PING <span class="token number">172.20</span>.88.216 <span class="token punctuat
 --- <span class="token number">172.20</span>.88.216 <span class="token function">ping</span> statistics ---
 <span class="token number">1</span> packets transmitted, <span class="token number">1</span> received, <span class="token number">0</span>% packet loss, <span class="token function">time</span> 0ms
 rtt min/avg/max/mdev <span class="token operator">=</span> <span class="token number">0.055</span>/0.055/0.055/0.000 ms<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>再来看看抓包情况，我们在veth0和veth1上都看到了ICMP echo的请求包，但为什么没有应答包呢？上面不是显示ping进程已经成功收到了应答包吗？</p>
 <pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">$ tcpdump -eni veth0
 listening on veth0, link-type EN10MB <span class="token punctuation">(</span>Ethernet<span class="token punctuation">)</span>, capture size <span class="token number">262144</span> bytes
@@ -303,7 +297,6 @@ listening on veth1, link-type EN10MB <span class="token punctuation">(</span>Eth
 <span class="token number">22</span>:34:58.119853 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype IPv4 <span class="token punctuation">(</span>0x0800<span class="token punctuation">)</span>, length <span class="token number">98</span>: <span class="token number">172.20</span>.80.102 <span class="token operator">></span> <span class="token number">172.20</span>.88.216: ICMP <span class="token builtin class-name">echo</span> request, <span class="token function">id</span> <span class="token number">811</span>, <span class="token function">seq</span> <span class="token number">1</span>, length <span class="token number">64</span>
 <span class="token number">22</span>:35:03.127900 <span class="token number">96</span>:4b:d4:18:76:4b <span class="token operator">></span> <span class="token number">66</span>:0d:24:5a:ca:32, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Request who-has <span class="token number">172.20</span>.88.216 tell <span class="token number">172.20</span>.80.102, length <span class="token number">28</span>
 <span class="token number">22</span>:35:03.128021 <span class="token number">66</span>:0d:24:5a:ca:32 <span class="token operator">></span> <span class="token number">96</span>:4b:d4:18:76:4b, ethertype ARP <span class="token punctuation">(</span>0x0806<span class="token punctuation">)</span>, length <span class="token number">42</span>: Reply <span class="token number">172.20</span>.88.216 is-at <span class="token number">66</span>:0d:24:5a:ca:32, length <span class="token number">28</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>看看数据包的流程就明白了：</p>
 <ol>
 <li>ping 进程构造 ICMP echo 请求包，并通过 socket 发给协议栈</li>
@@ -518,6 +511,8 @@ listening on lo, link-type EN10MB <span class="token punctuation">(</span>Ethern
 
 
 
+
+  
 
   
 

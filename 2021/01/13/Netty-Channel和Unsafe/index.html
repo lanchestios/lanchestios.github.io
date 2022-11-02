@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="提起 Channel，可以联想到java.nio.SocketChannel和java.nio.ServerSocketChannel，它们用于非阻塞的IO操作。类似于 NIO 的 Channel，Netty 提供了自己的 Channel 和其子类实现，用于异步 IO 操作和其他相关的操作。 Unsafe 是个内部接口，聚合在 Channel 中协助进行网络读写相关的操作，因为它的设计初衷就是 C">
@@ -27,8 +27,8 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="提起 Channel，可以联想到java.nio.SocketChannel和java.nio.ServerSocketChannel，它们用于非阻塞的IO操作。类似于 NIO 的 Channel，Netty 提供了自己的 Channel 和其子类实现，用于异步 IO 操作和其他相关的操作。 Unsafe 是个内部接口，聚合在 Channel 中协助进行网络读写相关的操作，因为它的设计初衷就是 C">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/Netty/NioServerSocketChannel%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
-<meta property="og:image" content="http://example.com/images/Netty/NioSocketChannel%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta property="og:image" content="http://example.com/images/Netty/NioServerSocketChannel继承关系.png">
+<meta property="og:image" content="http://example.com/images/Netty/NioSocketChannel继承关系.png">
 <meta property="og:image" content="http://example.com/images/Netty/UnsafeAPI.png">
 <meta property="og:image" content="http://example.com/images/Netty/Unsafe.png">
 <meta property="og:image" content="http://example.com/images/Netty/UnsafeConnect.png">
@@ -39,7 +39,7 @@
 <meta property="article:tag" content="Channel">
 <meta property="article:tag" content="Unsafe">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/Netty/NioServerSocketChannel%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png">
+<meta name="twitter:image" content="http://example.com/images/Netty/NioServerSocketChannel继承关系.png">
 
 <link rel="canonical" href="http://example.com/2021/01/13/Netty-Channel%E5%92%8CUnsafe/">
 
@@ -259,12 +259,11 @@
         <p>提起 Channel，可以联想到<code>java.nio.SocketChannel</code>和<code>java.nio.ServerSocketChannel</code>，它们用于非阻塞的IO操作。类似于 NIO 的 Channel，Netty 提供了自己的 Channel 和其子类实现，用于异步 IO 操作和其他相关的操作。</p>
 <p>Unsafe 是个内部接口，聚合在 Channel 中协助进行网络读写相关的操作，因为它的设计初衷就是 Channel 的内部辅助类，不应该被 Netty 框架的上层使用者调用，所以被命名为 Unsafe。这里不能仅从字面理解认为它是不安全的操作，而要从整个架构的设计层面体会它的设计初衷和职责。</p>
 <span id="more"></span>
-
 <h1 id="Channel功能说明"><a href="#Channel功能说明" class="headerlink" title="Channel功能说明"></a>Channel功能说明</h1><p><code>io.netty.channel.Channel</code>是 Netty 网络操作抽象类，它聚合了一组功能，包括但不限于网路的读、写，客户端发起连接，主动关闭连接，链路关闭，获取通信双方的网络地址等。它也包含了 Netty 框架相关的一些功能，包括获取该 Channel 的 EventLoop，获取缓冲分配器 ByteBufAllocator 和 pipeline等。</p>
-<h2 id="Channel的工作原理"><a href="#Channel的工作原理" class="headerlink" title="Channel的工作原理"></a>Channel的工作原理</h2><p>Channel 是 Netty 抽象出来的网络I&#x2F;O读写相关的接口，为什么不使用 JDK NIO 原生的 Channel 而要另起炉灶呢，主要原因如下：</p>
+<h2 id="Channel的工作原理"><a href="#Channel的工作原理" class="headerlink" title="Channel的工作原理"></a>Channel的工作原理</h2><p>Channel 是 Netty 抽象出来的网络I/O读写相关的接口，为什么不使用 JDK NIO 原生的 Channel 而要另起炉灶呢，主要原因如下：</p>
 <ol>
 <li>JDK 的 SocketChannel 和 ServerSocketChannel 没有统一的 Channel 接口供业务开发者使用，对于用户而言，没有统一的操作视图，使用起来并不方便。</li>
-<li>JDK 的 SocketChannel 和 ServerSocketChannel 的主要职责就是网络 I&#x2F;O 操作，由于它们是 SPI 类接口，由具体的虚拟机厂家来提供，所以通过继承 SPI 功能类来扩展其功能的难度很大；直接实现 ServerSocketChannel 和 SocketChannel 抽象类，其工作量和重新开发一个新的 Channel 功能类是差不多的。</li>
+<li>JDK 的 SocketChannel 和 ServerSocketChannel 的主要职责就是网络 I/O 操作，由于它们是 SPI 类接口，由具体的虚拟机厂家来提供，所以通过继承 SPI 功能类来扩展其功能的难度很大；直接实现 ServerSocketChannel 和 SocketChannel 抽象类，其工作量和重新开发一个新的 Channel 功能类是差不多的。</li>
 <li>Netty 的 Channel 需要能够跟 Netty 的整体架构融合在一起，例如 IO 模型、基于 ChannelPipeline 的定制模型，以及基于元数据描述配置化的 TCP 参数等，这些 JDK 的 SocketChannel 和 ServerSocketChannel 都没有提供，需要重新封装。</li>
 <li>自定义的 Channel，功能实现更加灵活。</li>
 </ol>
@@ -276,53 +275,44 @@
 </ol>
 <h2 id="Channel功能介绍"><a href="#Channel功能介绍" class="headerlink" title="Channel功能介绍"></a>Channel功能介绍</h2><h3 id="网络IO操作"><a href="#网络IO操作" class="headerlink" title="网络IO操作"></a>网络IO操作</h3><p><strong>1. read()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">Channel read();<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
-<p>从当前的 Channel 中读取数据到第一个 inbound 缓冲区中，如果数据被成功读取，触发**channelRead()<strong>事件，读取操作API调用完成之后，紧接着会触发</strong>channelReadComplete()**事件，这样业务的 ChannelHandler 可以决定是否需要继续读取数据。如果已经有读操作请求被挂起，则后续的读操作会被忽略。</p>
+<p>从当前的 Channel 中读取数据到第一个 inbound 缓冲区中，如果数据被成功读取，触发<strong>channelRead()</strong>事件，读取操作API调用完成之后，紧接着会触发<strong>channelReadComplete()</strong>事件，这样业务的 ChannelHandler 可以决定是否需要继续读取数据。如果已经有读操作请求被挂起，则后续的读操作会被忽略。</p>
 <p><strong>2. write()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture write(Object msg, ChannelPromise promise);
 ChannelFuture write(Object msg);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>请求将当前的参数 msg 通过 ChannelPipeline 写入到目标 Channel 中。</p>
 <blockquote>
 <p><strong>注意</strong><br>write 操作只是将消息存入到消息发送环形数组中，并没有真正被发送，只有调用 flush 操作才会被写入到 Channel 中，发送给对方。</p>
 </blockquote>
 <p><strong>3. flush()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">Channel flush();<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
-
 <p>将之前写入到发送环形数组中的消息全部写入到目标 Channel 中，发送给通信对方。</p>
 <p><strong>4. writeAndFlush()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture writeAndFlush(Object msg, ChannelPromise promise);
 ChannelFuture writeAndFlush(Object msg);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>write 和 flush 的聚合操作</p>
 <p><strong>5. bind()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture bind(SocketAddress localAddress);
 ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>绑定指定的本地 Socket 地址 localAddress，该方法会级联触发 bind 事件。</p>
 <p><strong>6. connect()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture connect(SocketAddress remoteAddress);
 ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress);
 ChannelFuture connect(SocketAddress remoteAddress, ChannelPromise promise);
 ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>客户端使用指定的服务端地址 Remote Address 发起连接请求，如果连接因为应答超时而失败，ChannelFuture 中的操作结果就是 ConnectTimeoutException 异常；如果连接被拒绝，操作结果为 ConnectException。该方法会级联触发 ChannelPipeline 中所有 ChannelHandler 的 connect 事件。该方法也可以携带一个 ChannelPromise 参数用于写入操作结果。</p>
 <p><strong>7. disconnect()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture disconnect();
 ChannelFuture disconnect(ChannelPromise promise);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>请求断开与远程通信对端的连接并使用 ChannelPromise 来获取操作结果的通知消息。该方法会级联触发 ChannelPipeline 中所有 ChannelHandler 的 disconnect 事件。</p>
 <p><strong>8. close()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">ChannelFuture close();
 ChannelFuture close(ChannelPromise promise);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <p>主动关闭当前连接，通过参数 ChannelPromise 设置操作结果并进行结果通知，无论操作是否成功，都可以通过 ChannelPromise 获取操作结果。该操作会级联触发 ChannelPipeline 中所有 ChannelHandler 的 close 事件。</p>
 <p><strong>9. config() &amp; metadata()</strong></p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Channel配置信息
 ChannelConfig config();
 &#x2F;&#x2F;对应连接的Channel的TCP参数配置（每个连接都有自己的TCP参数配置）
 ChannelMetadata metadata();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="其他常用API"><a href="#其他常用API" class="headerlink" title="其他常用API"></a>其他常用API</h3><p><strong>1. eventLoop()</strong></p>
 <p>Channel 需要注册到 EventLoop 的多路复用器上，用于处理IO事件，通过 eventLoop() 方法可以获取到 Channel 注册的 EventLoop。EventLoop本质上就是处理网络读写事件的 Reactor 线程。在 Netty 中，它不仅仅用来处理网络事件，也可以用来执行定时任务和用户自定义 NioTask 等任务。</p>
 <p><strong>2. parent()</strong><br>对于服务端 Channel 而言，它的父 Channel 为空；对于客户端 Channel，它的父 Channel 就是创建它的 ServerSocketChannel。</p>
@@ -338,13 +328,12 @@ ChannelMetadata metadata();<span aria-hidden="true" class="line-numbers-rows"><s
 </ol>
 <h1 id="Channel源码分析"><a href="#Channel源码分析" class="headerlink" title="Channel源码分析"></a>Channel源码分析</h1><p>Channel 的实现子类非常多，我们只对 NioSocketChannel 和 NioServerSocketChannel 进行重点分析</p>
 <p>下图为 NioServerSocketChannel 继承关系</p>
-<p><img src="/images/Netty/NioServerSocketChannel%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/Netty/NioServerSocketChannel继承关系.png" alt=""></p>
 <p>下图为 NioSocketChannel 继承关系</p>
-<p><img src="/images/Netty/NioSocketChannel%E7%BB%A7%E6%89%BF%E5%85%B3%E7%B3%BB.png"></p>
+<p><img src="/images/Netty/NioSocketChannel继承关系.png" alt=""></p>
 <h2 id="AbstractChannel源码分析"><a href="#AbstractChannel源码分析" class="headerlink" title="AbstractChannel源码分析"></a>AbstractChannel源码分析</h2><p>AbstractChannel 聚合了所有 Channel 使用到的能力对象，并提供初始化和统一封装，如果功能和子类强相关，则定义成抽象方法由子类具体实现。</p>
 <h3 id="成员变量定义"><a href="#成员变量定义" class="headerlink" title="成员变量定义"></a>成员变量定义</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//estimatorHandle用于预测下一个报文的大小，它基于之前数据的采样进行分析预测</span>
 <span class="token keyword">private</span> <span class="token class-name">MessageSizeEstimator<span class="token punctuation">.</span>Handle</span> estimatorHandle<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <h3 id="核心API源码分析"><a href="#核心API源码分析" class="headerlink" title="核心API源码分析"></a>核心API源码分析</h3><p>Netty 基于事件驱动，当 Channel 进行 IO 操作时会产生对应的 IO 事件，然后驱动事件在 ChannelPipeline 中传播，由对应的 ChannelHandler 对事件进行拦截和处理，不关心的事件可以直接忽略。采用事件驱动的方式可以非常轻松地通过事件定义来划分事件拦截切面，方便业务的定制和功能扩展，相比AOP，其性能更高，但是功能却基本等价。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token class-name">ChannelFuture</span> <span class="token function">connect</span><span class="token punctuation">(</span><span class="token class-name">SocketAddress</span> remoteAddress<span class="token punctuation">,</span> <span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -366,7 +355,6 @@ ChannelMetadata metadata();<span aria-hidden="true" class="line-numbers-rows"><s
     pipeline<span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="AbstractNioChannel源码分析"><a href="#AbstractNioChannel源码分析" class="headerlink" title="AbstractNioChannel源码分析"></a>AbstractNioChannel源码分析</h2><h3 id="成员变量定义-1"><a href="#成员变量定义-1" class="headerlink" title="成员变量定义"></a>成员变量定义</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//由于 NIO Channel、NioSocketChannel 和 NioServerSocketChannel 需要共用，</span>
 <span class="token comment">//所以定义了一个`java.nio.SocketChannel` 和`java.nio.ServerSocketChannel`的</span>
 <span class="token comment">//公共父类 SelectableChannel，用于设置 SelectableChannel 参数和进行IO操作。</span>
@@ -387,7 +375,6 @@ ChannelMetadata metadata();<span aria-hidden="true" class="line-numbers-rows"><s
 <span class="token keyword">private</span> <span class="token class-name">ScheduledFuture</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token operator">?</span><span class="token punctuation">></span></span> connectTimeoutFuture<span class="token punctuation">;</span>
 <span class="token comment">//请求的通信地址信息</span>
 <span class="token keyword">private</span> <span class="token class-name">SocketAddress</span> requestedRemoteAddress<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="核心API源码分析-1"><a href="#核心API源码分析-1" class="headerlink" title="核心API源码分析"></a>核心API源码分析</h3><h4 id="Channel的注册"><a href="#Channel的注册" class="headerlink" title="Channel的注册"></a>Channel的注册</h4><p>定义一个布尔类型的局部变量 selected 来标识注册操作是否成功，调用 SelectableChannel 的 register 方法，将当前的 Channel 注册到 EventLoop 的多路复用器上。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doRegister</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -418,7 +405,6 @@ ChannelMetadata metadata();<span aria-hidden="true" class="line-numbers-rows"><s
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>注册 Channel 的时候需要指定监听的网络操作位来表示 Channel 对哪几类网络事件感兴趣，具体的定义如下。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// -- Operation bits and bit-testing convenience methods --</span>
 
@@ -447,7 +433,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
 */</span>
 <span class="token comment">// S accept C</span>
 <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> OP_ACCEPT <span class="token operator">=</span> <span class="token number">1</span> <span class="token operator">&lt;&lt;</span> <span class="token number">4</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h4 id="Channel读取前处理"><a href="#Channel读取前处理" class="headerlink" title="Channel读取前处理"></a>Channel读取前处理</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doBeginRead</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//判断Channel是否关闭，如果处于关闭中，则直接返回</span>
@@ -467,10 +452,8 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         selectionKey<span class="token punctuation">.</span><span class="token function">interestOps</span><span class="token punctuation">(</span>interestOps <span class="token operator">|</span> readInterestOp<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="AbstractNioByteChannel源码分析"><a href="#AbstractNioByteChannel源码分析" class="headerlink" title="AbstractNioByteChannel源码分析"></a>AbstractNioByteChannel源码分析</h2><h3 id="成员变量定义-2"><a href="#成员变量定义-2" class="headerlink" title="成员变量定义"></a>成员变量定义</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//负责继续写半包消息</span>
 <span class="token keyword">private</span> <span class="token class-name">Runnable</span> flushTask<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
-
 <h3 id="核心API源码分析-2"><a href="#核心API源码分析-2" class="headerlink" title="核心API源码分析"></a>核心API源码分析</h3><h4 id="Channel的写操作"><a href="#Channel的写操作" class="headerlink" title="Channel的写操作"></a>Channel的写操作</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doWrite</span><span class="token punctuation">(</span><span class="token class-name">ChannelOutboundBuffer</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">int</span> writeSpinCount <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
@@ -582,7 +565,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>处理半包发送任务的方法</strong></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">protected</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">incompleteWrite</span><span class="token punctuation">(</span><span class="token keyword">boolean</span> setOpWrite<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//判断是否需要设置写半包标识，如果需要则调用setOpWrite设置写半包标识</span>
@@ -607,7 +589,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token function">eventLoop</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span>flushTask<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="AbstractNioMessageChannel源码分析"><a href="#AbstractNioMessageChannel源码分析" class="headerlink" title="AbstractNioMessageChannel源码分析"></a>AbstractNioMessageChannel源码分析</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//主要实现方法只有这一个</span>
 <span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doWrite</span><span class="token punctuation">(</span><span class="token class-name">ChannelOutboundBuffer</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -643,7 +624,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>在循环体内对消息进行发送，从 ChannelOutboundBuffer 中弹出一条消息进行处理，如果消息为空，说明发送缓冲区为空，所有消息都已经被发送完成。清除写半包标识，退出循环。与 AbstractNioByteChannel 的循环发送类似，利用 writeSpinCount 对单条消息进行发送，调用 doWriteMessage 判断消息是否发送成功。如果成功，则将发送标识 done 设置为 true，退出循环；否则继续执行循环，直到执行 writeSpinCount 次。</p>
 <p>发送操作完成之后，判断发送结果，如果当前的消息被完全发送出去，则将该消息从缓冲数组中删除；否则设置半包标识，注册 SelectionKey.OP_WRITE 到多路复用器上，由多路复用器轮询对应的 Channel 重新发送尚未发送完全的半包消息。</p>
 <p>通过代码分析我们发现， AbstractNioMessageChannel 和 AbstractNioByteChannel 的消息发送实现比较相似，不同之处在于：一个发送的是 ByteBuf 或者 FileRegion，它们可以直接被发送：另一个发送的则是 POJO 对象。</p>
@@ -663,7 +643,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token keyword">return</span> childGroup<span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>每当服务端接入一个新的客户端连接 NioSocketChannel 时，都会调用 childEventLoopGroup 方法获取 EventLoopGroup 线程组，用于给 NioSocketChannel 分配 Reactor 线程 EventLoop。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//class NioServerSocketChannel</span>
 <span class="token annotation punctuation">@Override</span>
@@ -675,7 +654,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="NioServerSocketChannel源码分析"><a href="#NioServerSocketChannel源码分析" class="headerlink" title="NioServerSocketChannel源码分析"></a>NioServerSocketChannel源码分析</h2><h3 id="成员变量定义-3"><a href="#成员变量定义-3" class="headerlink" title="成员变量定义"></a>成员变量定义</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//metadate &amp; config</span>
 <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token class-name">ChannelMetadata</span> METADATA <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ChannelMetadata</span><span class="token punctuation">(</span><span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token keyword">private</span> <span class="token keyword">final</span> <span class="token class-name">ServerSocketChannelConfig</span> config<span class="token punctuation">;</span>
@@ -683,7 +661,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
 <span class="token keyword">private</span> <span class="token keyword">static</span> <span class="token class-name">ServerSocketChannel</span> <span class="token function">newSocket</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">return</span> <span class="token class-name">ServerSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="核心API源码分析-3"><a href="#核心API源码分析-3" class="headerlink" title="核心API源码分析"></a>核心API源码分析</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">doReadMessages</span><span class="token punctuation">(</span><span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Object</span><span class="token punctuation">></span></span> buf<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token class-name">SocketChannel</span> ch <span class="token operator">=</span> <span class="token function">javaChannel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -693,7 +670,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>首先通过 ServerSocketChannel 的 accept 接收新的客户端连接，如果 SocketChannel 不为空，则利用当前的 NioServerSocketChannel、EventLoop 和 SocketChannel 创建新的 NioSocketChannel，并将其加入到 <code>List&lt;object&gt; buf</code>中，最后返回1，表示服务端消息读取成功。</p>
 <p>对于 NioServerSocketChannel，它的读取操作就是接收客户端的连接，创建 NioSocketChannel 对象。</p>
 <p>对于与服务端 Channel 无关的接口定义，由于这些方法是客户端 Channel 相关的，因此，对于服务端 Channel 无须实现。如果这些方法被误调，则返回 UnsupportedOperationException 异常。</p>
@@ -723,7 +699,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
 <span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">doWriteMessage</span><span class="token punctuation">(</span><span class="token class-name">Object</span> msg<span class="token punctuation">,</span> <span class="token class-name">ChannelOutboundBuffer</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">UnsupportedOperationException</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="NioSocketChannel源码分析"><a href="#NioSocketChannel源码分析" class="headerlink" title="NioSocketChannel源码分析"></a>NioSocketChannel源码分析</h2><h3 id="连接操作"><a href="#连接操作" class="headerlink" title="连接操作"></a>连接操作</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">boolean</span> <span class="token function">doConnect</span><span class="token punctuation">(</span><span class="token class-name">SocketAddress</span> remoteAddress<span class="token punctuation">,</span> <span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token comment">//参数检验</span>
@@ -753,7 +728,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="写半包"><a href="#写半包" class="headerlink" title="写半包"></a>写半包</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doWrite</span><span class="token punctuation">(</span><span class="token class-name">ChannelOutboundBuffer</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -881,13 +855,11 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="读写操作"><a href="#读写操作" class="headerlink" title="读写操作"></a>读写操作</h3><p>NioSocketChannel 的读写操作实际上是基于 NIO 的 SocketChannel 和 Netty 的 ByteBuf 封装而成。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">int</span> <span class="token function">doReadBytes</span><span class="token punctuation">(</span><span class="token class-name">ByteBuf</span> byteBuf<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">return</span> byteBuf<span class="token punctuation">.</span><span class="token function">writeBytes</span><span class="token punctuation">(</span><span class="token function">javaChannel</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> byteBuf<span class="token punctuation">.</span><span class="token function">writableBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">int</span> <span class="token function">writeBytes</span><span class="token punctuation">(</span><span class="token class-name">ScatteringByteChannel</span> in<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">IOException</span> <span class="token punctuation">&#123;</span>
     <span class="token function">ensureWritable</span><span class="token punctuation">(</span>length<span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -898,7 +870,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
     <span class="token punctuation">&#125;</span>
     <span class="token keyword">return</span> writtenBytes<span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">int</span> <span class="token function">setBytes</span><span class="token punctuation">(</span><span class="token keyword">int</span> index<span class="token punctuation">,</span> <span class="token class-name">ScatteringByteChannel</span> in<span class="token punctuation">,</span> <span class="token keyword">int</span> length<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">IOException</span> <span class="token punctuation">&#123;</span>
     <span class="token function">ensureAccessible</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -908,13 +879,12 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>从 SocketChannel 中读取字节数组到缓冲区<code>java.nio.ByteBuffer</code>中，它的起始 position 为 writeIndex，limit 为 writeIndex + length。</p>
 <h1 id="Unsafe功能说明"><a href="#Unsafe功能说明" class="headerlink" title="Unsafe功能说明"></a>Unsafe功能说明</h1><p>Unsafe 接口实际上是 Channel 接口的辅助接口，它不应该被用户代码直接调用。实际的IO读写操作都是由 Unsafe 接口负责完成的。</p>
 <p>下图是 Unsafe API</p>
-<p><img src="/images/Netty/UnsafeAPI.png"></p>
+<p><img src="/images/Netty/UnsafeAPI.png" alt=""></p>
 <h1 id="Unsafe源码分析"><a href="#Unsafe源码分析" class="headerlink" title="Unsafe源码分析"></a>Unsafe源码分析</h1><p>实际的网络IO操作基本都是由 Unsafe 功能类负责实现的，下面我们一起看下它的主要功能子类和重要的API实现。</p>
-<p><img src="/images/Netty/Unsafe.png"></p>
+<p><img src="/images/Netty/Unsafe.png" alt=""></p>
 <h2 id="AbstractUnsafe源码分析"><a href="#AbstractUnsafe源码分析" class="headerlink" title="AbstractUnsafe源码分析"></a>AbstractUnsafe源码分析</h2><h3 id="register方法"><a href="#register方法" class="headerlink" title="register方法"></a>register方法</h3><p>register 方法主要用于将当前 Unsafe 对应的 Channel 注册到 EventLoop 的多路复用器上并 Trigger 相应的事件</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">register</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -952,7 +922,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         pipeline<span class="token punctuation">.</span><span class="token function">fireChannelActive</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="bind方法"><a href="#bind方法" class="headerlink" title="bind方法"></a>bind方法</h3><p>bind 方法主要用于绑定指定的端口，对于服务端，用于绑定监听端口，可以设置 backlog 参数；对于客户端，主要用于指定客户端 Channel 的本地绑定 Socket 地址。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">bind</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">SocketAddress</span> localAddress<span class="token punctuation">,</span> <span class="token keyword">final</span> <span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -980,7 +949,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
     <span class="token punctuation">&#125;</span>
     promise<span class="token punctuation">.</span><span class="token function">setSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="disconnect方法"><a href="#disconnect方法" class="headerlink" title="disconnect方法"></a>disconnect方法</h3><p>disconnect 用于客户端或者服务端主动关闭连接</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">final</span> <span class="token keyword">void</span> <span class="token function">disconnect</span><span class="token punctuation">(</span><span class="token keyword">final</span> <span class="token class-name">ChannelPromise</span> promise<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
@@ -1003,7 +971,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
     promise<span class="token punctuation">.</span><span class="token function">setSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token function">closeIfClosed</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// doDisconnect() might have closed the channel</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h3 id="close方法"><a href="#close方法" class="headerlink" title="close方法"></a>close方法</h3><p>在链路关闭之前需要首先判断是否处于刷新状态，如果处于刷新状态说明还有消息尚未发送出去，需要等到所有消息发送完成再关闭链路，因此，将关闭操作封装成 Runnable 稍后再执行。</p>
 <p>如果链路没有处于刷新状态，需要从 closeFuture 中判断关闭操作是否完成，如果已经完成，不需要重复关闭链路，设置 ChannelPromise 的操作结果为成功并返回。</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
@@ -1023,7 +990,6 @@ Suppose that a selection key's interest set contains OP_ACCEPT at the start of a
         promise<span class="token punctuation">.</span><span class="token function">setSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
         <span class="token keyword">return</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>执行关闭操作，将消息发送缓冲数组设置为空，通知JVM进行内存回收。调用抽象方法 doClose 关闭链路。如果关闭操作成功，设置 ChannelPromise 结果为成功。如果操作失败，则设置异常对象到 ChannelPromise 中。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">boolean wasActive &#x3D; isActive();
 ChannelOutboundBuffer outboundBuffer &#x3D; this.outboundBuffer;
@@ -1037,7 +1003,6 @@ try &#123;
     closeFuture.setClosed();
     promise.setFailure(t);
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>调用 ChannelOutboundBuffer 的 close 方法释放缓冲区的消息，随后构造链路关闭通知 Runnable 放到 NioEventLoop 中执行。</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">    &#x2F;&#x2F; Fail all the queued messages
     try &#123;
@@ -1057,7 +1022,6 @@ try &#123;
         deregister();
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>最后，调用 deregister 方法，将 Channel 从多路复用器上取消注册。</p>
 <h3 id="write方法"><a href="#write方法" class="headerlink" title="write方法"></a>write方法</h3><p>write 方法实际上将消息添加到环形发送数组中，并不是真正的写 Channel</p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
@@ -1075,7 +1039,6 @@ try &#123;
         outboundBuffer<span class="token punctuation">.</span><span class="token function">addMessage</span><span class="token punctuation">(</span>msg<span class="token punctuation">,</span> promise<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>如果 Channel 没有处于激活状态，说明 TCP 链路还没有真正建立成功，当前 Channel 存在以下两种状态。</p>
 <ol>
 <li>Channel 打开，但是 TCP 链路尚未建立成功：NOT_YET_CONNECTED_EXCEPTION</li>
@@ -1131,7 +1094,6 @@ try &#123;
         inFlush0 <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p><strong>doWrite方法</strong></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"> <span class="token annotation punctuation">@Override</span>
 <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">doWrite</span><span class="token punctuation">(</span><span class="token class-name">ChannelOutboundBuffer</span> in<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
@@ -1211,7 +1173,6 @@ try &#123;
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <h2 id="AbstractNioUnsafe源码分析"><a href="#AbstractNioUnsafe源码分析" class="headerlink" title="AbstractNioUnsafe源码分析"></a>AbstractNioUnsafe源码分析</h2><p>AbstractNioUnsafe 是 AbstractUnsafe 类的 NIO 实现，它主要实现了 connect 操作</p>
 <pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@Override
 public void connect(
@@ -1271,7 +1232,6 @@ public void connect(
         closeIfClosed();
     &#125;
 &#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>首先获取当前的连接状态进行缓存，然后发起连接操作，连接操作（doConnect）有三种可能产生的结果：</p>
 <ol>
 <li><p>连接成功，返回true</p>
@@ -1287,7 +1247,7 @@ public void connect(
 <p>而 ChannelActive 事件最终会将 NioSocketChannel 中的 selectionKey 设置为 SelectionKey.OP_READ，用于监听网络读操作位</p>
 </blockquote>
 <p>下图是连接操作的执行流程</p>
-<p><img src="/images/Netty/UnsafeConnect.png"></p>
+<p><img src="/images/Netty/UnsafeConnect.png" alt=""></p>
 <h2 id="NioByteUnsafe源码分析"><a href="#NioByteUnsafe源码分析" class="headerlink" title="NioByteUnsafe源码分析"></a>NioByteUnsafe源码分析</h2><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Override</span>
 <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">final</span> <span class="token class-name">ChannelConfig</span> config <span class="token operator">=</span> <span class="token function">config</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -1378,9 +1338,6 @@ public void connect(
         <span class="token function">handleReadException</span><span class="token punctuation">(</span>pipeline<span class="token punctuation">,</span> byteBuf<span class="token punctuation">,</span> t<span class="token punctuation">,</span> close<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
-
-
 <h3 id="RecvByteBufAllocator分析"><a href="#RecvByteBufAllocator分析" class="headerlink" title="RecvByteBufAllocator分析"></a>RecvByteBufAllocator分析</h3><p>RecvByteBufAllocator默认有两种实现，分别是 AdaptiveRecvByteBufAllocator 和 FixedRecvByteBufAllocator。下面介绍的是 AdaptiveRecvByteBufAllocator（缓冲区大小可以动态调整的 ByteBuf 分配器）。</p>
 <p><strong>成员变量</strong></p>
 <pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">static</span> <span class="token keyword">final</span> <span class="token keyword">int</span> DEFAULT_MINIMUM <span class="token operator">=</span> <span class="token number">64</span><span class="token punctuation">;</span>
@@ -1407,7 +1364,6 @@ public void connect(
         SIZE_TABLE<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> sizeTable<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>它分别定义了三个系统默认值：最小缓冲区长度64字节、初始容量1024字节、最大容量65536字节。还定义了两个动态调整容量时的步进参数：扩张的步进索引为4、收缩的步进索引为1。最后，定义了长度的向量表 SIZE_TABLE 并初始化它。</p>
 <p>向量数组的每个值都对应一个 Buffer 容量，当容量小于512的时候，由于缓冲区已经比较小，需要降低步进值，容量每次下调的幅度要小些；当大于 512 时，说明需要解码的消息码流比较大，这时采用调大步进幅度的方式减少动态扩张的频率，所以它采用 512 的倍数进行扩张。</p>
 <p><strong>HandleImpl</strong></p>
@@ -1441,7 +1397,6 @@ public void connect(
         <span class="token punctuation">&#125;</span>
     <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>使用动态缓冲区分配器的优点如下:</p>
 <ol>
 <li>Netty 作为一个通用的 NIO 框架，并不对用户的应用场景进行假设，可以使用它做流媒体传输，也可以用它做聊天工具。不同的应用场景，传输的码流大小千差万别，无论初始化分配的是 32KB 还是 1MB，都会随着应用场景的变化而变得不适应。因此，Netty 根据上次实际读取的码流大小对下次的接收 Buffer 缓冲区进行预测和调整，能够最大限度地满足不同行业的应用场景。</li>
@@ -1647,6 +1602,8 @@ public void connect(
 
 
 
+
+  
 
   
 

@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="本文只讨论以太网的物理网卡，不涉及虚拟设备，并且以一个 UDP 包的接收过程作为示例。    本示例里列出的函数调用关系来自于 kernel 3.13.0">
@@ -28,13 +28,13 @@
 <meta property="og:description" content="本文只讨论以太网的物理网卡，不涉及虚拟设备，并且以一个 UDP 包的接收过程作为示例。    本示例里列出的函数调用关系来自于 kernel 3.13.0">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://example.com/images/Linux/Network接收数据包从网卡到内存.png">
-<meta property="og:image" content="http://example.com/images/Linux/Network%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE%E5%8C%85%E5%86%85%E6%A0%B8%E5%A4%84%E7%90%86.png">
-<meta property="og:image" content="http://example.com/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png">
+<meta property="og:image" content="http://example.com/images/Linux/Network接收数据包内核处理.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkIP层包处理.png">
 <meta property="og:image" content="http://example.com/images/Linux/NetworkUDP层包处理.png">
-<meta property="og:image" content="http://example.com/images/Linux/NetworkSocket%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8F%91%E9%80%81.png">
-<meta property="og:image" content="http://example.com/images/Linux/NetworkUDP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png">
-<meta property="og:image" content="http://example.com/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png">
-<meta property="og:image" content="http://example.com/images/Linux/NetworkDevice%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkSocket网络包发送.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkUDP层包发送.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkIP层包发送.png">
+<meta property="og:image" content="http://example.com/images/Linux/NetworkDevice层包处理.png">
 <meta property="article:published_time" content="2022-01-13T03:18:20.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.542Z">
 <meta property="article:author" content="Wang Zihao">
@@ -264,10 +264,8 @@
 <p>  本示例里列出的函数调用关系来自于 kernel 3.13.0</p>
 </blockquote>
 <span id="more"></span>
-
 <h1 id="数据包的接收"><a href="#数据包的接收" class="headerlink" title="数据包的接收"></a>数据包的接收</h1><h2 id="网卡到内存"><a href="#网卡到内存" class="headerlink" title="网卡到内存"></a>网卡到内存</h2><p>网卡需要有驱动才能工作，驱动是加载到内核中的模块，负责衔接网卡和内核的网络模块，驱动在加载的时候将自己注册进网络模块，当相应的网卡收到数据包时，网络模块会调用相应的驱动程序处理数据。</p>
-<img src="/images/Linux/Network接收数据包从网卡到内存.png" style="zoom:80%;" />
-
+<p><img src="/images/Linux/Network接收数据包从网卡到内存.png" style="zoom:80%;" /></p>
 <ol>
 <li>数据包从外面的网络进入物理网卡。如果目的地址不是该网卡，且该网卡没有开启混杂模式，该包会被网卡丢弃。</li>
 <li>网卡将数据包通过 DMA 的方式写入到指定的内存地址，该地址由网卡驱动分配并初始化。</li>
@@ -277,8 +275,8 @@
 <li>启动软中断。这步结束后，硬件中断处理函数就结束返回了。由于硬中断处理程序执行的过程中不能被中断，所以如果它执行时间过长，会导致 CPU 没法响应其它硬件的中断，于是内核引入软中断，这样可以将硬中断处理函数中耗时的部分移到软中断处理函数里面来慢慢处理。</li>
 </ol>
 <h2 id="内核处理网络包"><a href="#内核处理网络包" class="headerlink" title="内核处理网络包"></a>内核处理网络包</h2><p>软中断会触发内核网络模块中的软中断处理函数，后续流程如下：</p>
-<p><img src="/images/Linux/Network%E6%8E%A5%E6%94%B6%E6%95%B0%E6%8D%AE%E5%8C%85%E5%86%85%E6%A0%B8%E5%A4%84%E7%90%86.png"></p>
-<ol start="7">
+<p><img src="/images/Linux/Network接收数据包内核处理.png" alt=""></p>
+<ol>
 <li>内核中的 ksoftirqd 进程专门负责软中断的处理，当它收到软中断后，就会调用相应软中断所对应的处理函数，对于上面第 6 步中是网卡驱动模块抛出的软中断，ksoftirqd 会调用网络模块的 net_rx_action 函数。</li>
 <li>net_rx_action 调用网卡驱动里的 poll 函数来一个一个的处理数据包。</li>
 <li>在 poll 函数中，驱动会一个接一个的读取网卡写到内存中的数据包，内存中数据包的格式只有驱动知道。</li>
@@ -295,7 +293,7 @@
 <p>  enqueue_to_backlog 函数也会被 netif_rx 函数调用，而 netif_rx 正是 lo 设备发送数据包时调用的函数。</p>
 </blockquote>
 <h2 id="协议栈"><a href="#协议栈" class="headerlink" title="协议栈"></a>协议栈</h2><h3 id="IP-层"><a href="#IP-层" class="headerlink" title="IP 层"></a>IP 层</h3><p>由于是 UDP 包，所以第一步会进入 IP 层，然后一级一级的函数往下调：</p>
-<p><img src="/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png"></p>
+<p><img src="/images/Linux/NetworkIP层包处理.png" alt=""></p>
 <ul>
 <li><strong>ip_rcv：</strong> ip_rcv 函数是 IP 模块的入口函数，在该函数里面，第一件事就是将垃圾数据包（目的 mac 地址不是当前网卡，但由于网卡设置了混杂模式而被接收进来）直接丢掉，然后调用注册在 NF_INET_PRE_ROUTING 上的函数。</li>
 <li><strong>NF_INET_PRE_ROUTING：</strong> netfilter 放在协议栈中的钩子，可以通过 iptables 来注入一些数据包处理函数，用来修改或者丢弃数据包，如果数据包没被丢弃，将继续往下走。</li>
@@ -304,8 +302,7 @@
 <li><strong>dst_output_sk：</strong> 该函数会调用 IP 层的相应函数将该数据包发送出去，同下一篇要介绍的数据包发送流程的后半部分一样。</li>
 <li><strong>ip_local_deliver</strong>：如果上面 <strong>routing</strong> 的时候发现目的 IP 是本地 IP，那么将会调用该函数，在该函数中，会先调用 NF_INET_LOCAL_IN 相关的钩子程序，如果通过，数据包将会向下发送到 UDP 层</li>
 </ul>
-<h3 id="UDP层"><a href="#UDP层" class="headerlink" title="UDP层"></a>UDP层</h3><img src="/images/Linux/NetworkUDP层包处理.png" style="zoom:67%;" />
-
+<h3 id="UDP层"><a href="#UDP层" class="headerlink" title="UDP层"></a>UDP层</h3><p><img src="/images/Linux/NetworkUDP层包处理.png" style="zoom:67%;" /></p>
 <ul>
 <li>udp_rcv： udp_rcv 函数是 UDP 模块的入口函数，它里面会调用其它的函数，主要是做一些必要的检查，其中一个重要的调用是 __udp4_lib_lookup_skb，该函数会根据目的 IP 和端口找对应的 socket，如果没有找到相应的 socket，那么该数据包将会被丢弃，否则继续</li>
 <li>sock_queue_rcv_skb： 主要干了两件事，一是检查这个 socket 的 receive buffer 是不是满了，如果满了的话，丢弃该数据包，然后就是调用 sk_filter 看这个包是否是满足条件的包，如果当前 socket 上设置了 filter，且该包不满足条件的话，这个数据包也将被丢弃（在 Linux 里面，每个 socket 上都可以像 tcpdump 里面一样定义 filter，不满足条件的数据包将会被丢弃）</li>
@@ -316,21 +313,21 @@
 <p>  调用完 sk_data_ready 之后，一个数据包处理完成，等待应用层程序来读取，上面所有函数的执行过程都在软中断的上下文中。</p>
 </blockquote>
 <h2 id="socket"><a href="#socket" class="headerlink" title="socket"></a>socket</h2><p>应用层一般有两种方式接收数据，一种是 recvfrom 函数阻塞在那里等着数据来，这种情况下当 socket 收到通知后，recvfrom 就会被唤醒，然后读取接收队列的数据；另一种是通过 epoll 或者 select 监听相应的 socket，当收到通知后，再调用 recvfrom 函数去读取接收队列的数据。两种情况都能正常的接收到相应的数据包。</p>
-<h1 id="数据包的发送"><a href="#数据包的发送" class="headerlink" title="数据包的发送"></a>数据包的发送</h1><h2 id="socket-1"><a href="#socket-1" class="headerlink" title="socket"></a>socket</h2><p><img src="/images/Linux/NetworkSocket%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<h1 id="数据包的发送"><a href="#数据包的发送" class="headerlink" title="数据包的发送"></a>数据包的发送</h1><h2 id="socket-1"><a href="#socket-1" class="headerlink" title="socket"></a>socket</h2><p><img src="/images/Linux/NetworkSocket网络包发送.png" alt=""></p>
 <ul>
 <li>socket(…)： 创建一个 socket 结构体，并初始化相应的操作函数，由于我们定义的是 UDP 的 socket，所以里面存放的都是跟 UDP 相关的函数</li>
 <li>sendto(sock, …)： 应用层的程序（Application）调用该函数开始发送数据包，该函数数会调用后面的 inet_sendmsg</li>
 <li>inet_sendmsg： 该函数主要是检查当前 socket 有没有绑定源端口，如果没有的话，调用 inet_autobind 分配一个，然后调用 UDP 层的函数</li>
 <li>inet_autobind： 该函数会调用 socket 上绑定的 get_port 函数获取一个可用的端口，由于该 socket 是 UDP 的 socket，所以 get_port 函数会调到 UDP 代码里面的相应函数。</li>
 </ul>
-<h2 id="协议栈-1"><a href="#协议栈-1" class="headerlink" title="协议栈"></a>协议栈</h2><h3 id="UDP层-1"><a href="#UDP层-1" class="headerlink" title="UDP层"></a>UDP层</h3><p><img src="/images/Linux/NetworkUDP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<h2 id="协议栈-1"><a href="#协议栈-1" class="headerlink" title="协议栈"></a>协议栈</h2><h3 id="UDP层-1"><a href="#UDP层-1" class="headerlink" title="UDP层"></a>UDP层</h3><p><img src="/images/Linux/NetworkUDP层包发送.png" alt=""></p>
 <ul>
 <li>udp_sendmsg： udp 模块发送数据包的入口，该函数较长，在该函数中会先调用 ip_route_output_flow 获取路由信息（主要包括源 IP 和网卡），然后调用 ip_make_skb 构造 skb 结构体，最后将网卡的信息和该 skb 关联。</li>
 <li>ip_route_output_flow： 该函数会根据路由表和目的 IP，找到这个数据包应该从哪个设备发送出去，如果该 socket 没有绑定源 IP，该函数还会根据路由表找到一个最合适的源 IP 给它。 如果该 socket 已经绑定了源 IP，但根据路由表，从这个源 IP 对应的网卡没法到达目的地址，则该包会被丢弃，于是数据发送失败，sendto 函数将返回错误。该函数最后会将找到的设备和源 IP 塞进 flowl4 结构体并返回给 udp_sendmsg</li>
 <li>ip_make_skb： 该函数的功能是构造 skb 包，构造好的 skb 包里面已经分配了 IP 包头，并且初始化了部分信息（IP 包头的源 IP 就在这里被设置进去），同时该函数会调用 ip_append_dat，如果需要分片的话，会在 ip_append_data 函数中进行分片，同时还会在该函数中检查 socket 的 send buffer 是否已经用光，如果被用光的话，返回 ENOBUFS</li>
 <li>udp_send_skb(skb, fl4) 主要是往 skb 里面填充 UDP 的包头，同时处理 checksum，然后调用 IP 层的相应函数。</li>
 </ul>
-<h3 id="IP层"><a href="#IP层" class="headerlink" title="IP层"></a>IP层</h3><p><img src="/images/Linux/NetworkIP%E5%B1%82%E5%8C%85%E5%8F%91%E9%80%81.png"></p>
+<h3 id="IP层"><a href="#IP层" class="headerlink" title="IP层"></a>IP层</h3><p><img src="/images/Linux/NetworkIP层包发送.png" alt=""></p>
 <ul>
 <li>ip_send_skb： IP 模块发送数据包的入口，该函数只是简单的调用一下后面的函数</li>
 <li>__ip_local_out_sk： 设置 IP 报文头的长度和 checksum，然后调用下面 netfilter 的钩子</li>
@@ -343,7 +340,7 @@
 <li>dst_neigh_output： 在该函数中，如果上一步 ip_finish_output2 没得到 neigh 信息，那么将会走到函数 neigh_resolve_output 中，否则直接调用 neigh_hh_output，在该函数中，会将 neigh 信息里面的 mac 地址填到 skb 中，然后调用 dev_queue_xmit 发送数据包</li>
 <li>neigh_resolve_output： 该函数里面会发送 arp 请求，得到下一跳的 mac 地址，然后将 mac 地址填到 skb 中并调用 dev_queue_xmit</li>
 </ul>
-<h2 id="netdevice-子系统"><a href="#netdevice-子系统" class="headerlink" title="netdevice 子系统"></a>netdevice 子系统</h2><p><img src="/images/Linux/NetworkDevice%E5%B1%82%E5%8C%85%E5%A4%84%E7%90%86.png"></p>
+<h2 id="netdevice-子系统"><a href="#netdevice-子系统" class="headerlink" title="netdevice 子系统"></a>netdevice 子系统</h2><p><img src="/images/Linux/NetworkDevice层包处理.png" alt=""></p>
 <ul>
 <li>dev_queue_xmit： netdevice 子系统的入口函数，在该函数中，会先获取设备对应的 qdisc，如果没有的话（如 loopback 或者 IP tunnels），就直接调用 dev_hard_start_xmit，否则数据包将经过 Traffic Control 模块进行处理</li>
 <li>Traffic Control： 这里主要是进行一些过滤和优先级处理，在这里，如果队列满了的话，数据包会被丢掉，这步完成后也会走到 dev_hard_start_xmit</li>
@@ -562,6 +559,8 @@
 
 
 
+
+  
 
   
 

@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。">
@@ -27,21 +27,22 @@
 <meta property="og:site_name" content="Lanchester Blog">
 <meta property="og:description" content="本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png">
-<meta property="og:image" content="http://example.com/images/MySQL/%E9%A1%B5%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
-<meta property="og:image" content="http://example.com/images/MySQL/%E7%BB%84%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
-<meta property="og:image" content="http://example.com/images/MySQL/%E7%BB%84%E4%B8%AD%E7%9A%84%E9%A1%B5%E7%B1%BB%E5%9E%8B.png">
-<meta property="og:image" content="http://example.com/images/MySQL/COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%A4%BA%E6%84%8F%E5%9B%BE.png">
-<meta property="og:image" content="http://example.com/images/MySQL/%E5%BD%93%E5%88%97%E5%8D%A0%E7%94%A8%E7%9A%84%E5%AD%98%E5%82%A8%E7%A9%BA%E9%97%B4%E7%9B%B8%E5%BD%93%E5%A4%A7%E6%97%B6COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png">
-<meta property="og:image" content="http://example.com/images/MySQL/Barracuda%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E7%9A%84%E6%BA%A2%E5%87%BA%E8%A1%8C.png">
-<meta property="og:image" content="http://example.com/images/MySQL/MySQL%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F.png">
+<meta property="og:image" content="http://example.com/images/MySQL/InnoDB逻辑存储结构.png">
+<meta property="og:image" content="http://example.com/images/MySQL/页示意图.png">
+<meta property="og:image" content="http://example.com/images/MySQL/组示意图.png">
+<meta property="og:image" content="http://example.com/images/MySQL/组中的页类型.png">
+<meta property="og:image" content="http://example.com/images/MySQL/COMPACT行格式示意图.png">
+<meta property="og:image" content="http://example.com/images/MySQL/当列占用的存储空间相当大时COMPACT行格式的存储方式.png">
+<meta property="og:image" content="http://example.com/images/MySQL/Barracuda文件格式的溢出行.png">
+<meta property="og:image" content="http://example.com/images/MySQL/Infimun和Supremum%20Records.png">
+<meta property="og:image" content="http://example.com/images/MySQL/MySQL文件格式.png">
 <meta property="article:published_time" content="2021-08-12T09:20:25.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.545Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="MySQL">
 <meta property="article:tag" content="Form">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png">
+<meta name="twitter:image" content="http://example.com/images/MySQL/InnoDB逻辑存储结构.png">
 
 <link rel="canonical" href="http://example.com/2021/08/12/MySQL-%E8%A1%A8/">
 
@@ -260,15 +261,14 @@
       
         <p>本文将从 InnoDB 存储引擎表的逻辑存储及实现开始进行介绍，然后将重点分析表的物理存储特征，即数据在表中是如何组织和存放的。</p>
 <span id="more"></span>
-
 <h1 id="索引组织表"><a href="#索引组织表" class="headerlink" title="索引组织表"></a>索引组织表</h1><p>在 InnoDB 存储引擎中，表都是根据主键顺序组织存放的，这种存储方式的表称为索引组织表（index organized table）。在 InnoDB 存储引擎表中，每张表都有个主键（Primary Key），如果在创建表时没有显式地定义主键，则 InnoDB 存储引擎会按如下方式选择或创建主键：</p>
 <ul>
 <li>首先判断表中是否有非空的唯一索引（Unique NOT NULL），如果有，则该列即为主键。</li>
 <li>如果不符合上述条件，InnoDB 存储引擎自动创建一个 6 字节大小的指针。</li>
 </ul>
 <h1 id="InnoDB-逻辑存储结构"><a href="#InnoDB-逻辑存储结构" class="headerlink" title="InnoDB 逻辑存储结构"></a>InnoDB 逻辑存储结构</h1><p>从 InnoDB 存储引擎的逻辑存储结构看，所有数据都被逻辑地存放在一个空间中，称之为表空间（table space）。 表空间又由段（segment）、区（extent）、页（page）组成。页在一些文档中有时也称为块（block），InnoDB 存储引擎的逻辑存储结构大致如下图所示。</p>
-<p><img src="/images/MySQL/InnoDB%E9%80%BB%E8%BE%91%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84.png"></p>
-<h2 id="行-Row"><a href="#行-Row" class="headerlink" title="行 Row"></a>行 Row</h2><p>InnoDB 存储引擎是面向列的（row-oriented），也就说数据是按行进行存放的。每个页存放的行记录也是有硬性定义的，最多允许存放 16KB &#x2F; 2 - 200 行的记录，即 7992 行记录。这里提到了 row-oriented 的数据库，也就是说，存在有 column-oriented 的数据库。MySQL infobright 存储引擎就是按列来存放数据的，这对于数据仓库下的分析类 SQL 语句的执行及数据压缩非常有帮助。类似的数据库还有 Google Big Table 等。面向列的数据库是当前数据库发展的一个方向。</p>
+<p><img src="/images/MySQL/InnoDB逻辑存储结构.png" alt=""></p>
+<h2 id="行-Row"><a href="#行-Row" class="headerlink" title="行 Row"></a>行 Row</h2><p>InnoDB 存储引擎是面向列的（row-oriented），也就说数据是按行进行存放的。每个页存放的行记录也是有硬性定义的，最多允许存放 16KB / 2 - 200 行的记录，即 7992 行记录。这里提到了 row-oriented 的数据库，也就是说，存在有 column-oriented 的数据库。MySQL infobright 存储引擎就是按列来存放数据的，这对于数据仓库下的分析类 SQL 语句的执行及数据压缩非常有帮助。类似的数据库还有 Google Big Table 等。面向列的数据库是当前数据库发展的一个方向。</p>
 <h2 id="页-Page"><a href="#页-Page" class="headerlink" title="页 Page"></a>页 Page</h2><p>同大多数数据库一样，InnoDB 有页（Page）的概念，页是 InnoDB 磁盘操作的最小单位。在 InnoDB 存储引擎中，默认每个页的大小为 16KB。而从 InnoDB 1.2.x 版本开始，可以通过参数 innodb_page_size 将页的大小设置为 4K、8K、16K。若设置完成，则所有表中页的大小都为 innodb_page_size，不可以对其再次进行修改。除非通过 mysql dump 导入和导出操作来产生新的库。</p>
 <p>在 InnoDB 存储引擎中，常见的页类型有：</p>
 <ul>
@@ -282,17 +282,17 @@
 <li>压缩的二进制大对象页（compressed BLOB Page）</li>
 </ul>
 <h2 id="区-Extent"><a href="#区-Extent" class="headerlink" title="区 Extent"></a>区 Extent</h2><p>区是由连续页组成的空间，在任何情况下每个区的大小都为 1MB。为了保证区中页的连续性，InnoDB 存储引擎一次从磁盘申请 4~5 个区。在默认情况下，InnoDB 存储引擎页的大小为 16KB，即一个区中一共有 64 个连续的页。</p>
-<p><img src="/images/MySQL/%E9%A1%B5%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<p><img src="/images/MySQL/页示意图.png" alt=""></p>
 <p>InnoDB 1.0.x 版本开始引入压缩页，即每个页的大小可以通过参数 KEY_BLOCK_SIZE 设置为 2K、4K、8K，因此每个区对应页的数量就应该为 512、256、128。</p>
 <p>InnoDB 1.2.x 版本新增了参数 innodb_page_size，通过该参数可以将默认页的大小设置为 4K、8K，但是页中的数据库不是压缩。这时区中页的数量同样也为 256、128。总之，不论页的大小怎么变化，区的大小总是为 1M。</p>
 <p>但是，这里还有这样一个问题：在用户启用了参数 innodb_file_per_table 后，创建的表默认大小是 96KB。区中是 64 个连续的页，创建的表的大小至少是 1MB 才对啊？其实这是因为在每个段开始时，先用 32 个页大小的碎片页（fragment page）来存放数据，在使用完这些页之后才是 64 个连续页的申请。这样做的目的是，对于一些小表，或者是 undo 这类的段，可以在开始时申请较少的空间，节省磁盘容量的开销。</p>
 <h2 id="组-Group"><a href="#组-Group" class="headerlink" title="组 Group"></a>组 Group</h2><p>而为了方便管理和记录，又将每 256 个区域划分成一组。</p>
-<p><img src="/images/MySQL/%E7%BB%84%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<p><img src="/images/MySQL/组示意图.png" alt=""></p>
 <p>这些组的头几个页类型都是相似的。</p>
-<p><img src="/images/MySQL/%E7%BB%84%E4%B8%AD%E7%9A%84%E9%A1%B5%E7%B1%BB%E5%9E%8B.png"></p>
+<p><img src="/images/MySQL/组中的页类型.png" alt=""></p>
 <p>每一个表空间的第一个组的最开始三个页面是固定的，分别如下：</p>
 <ul>
-<li>FSP_HDR：这个类型的页面用来登记整个表空间的一些整体属性以及本组所有的区（也就是 extent 0 ~ extent 255 这 256 个区）的属性。需要注意的<br>一点是，整个表空间只有一个FSP_ HDR类型的页面。</li>
+<li>FSP<em>HDR：这个类型的页面用来登记整个表空间的一些整体属性以及本组所有的区（也就是 extent 0 ~ extent 255 这 256 个区）的属性。需要注意的<br>一点是，整个表空间只有一个FSP</em> HDR类型的页面。</li>
 <li>IBUF_BITMAP：这个类型的页面用来存储关于 Change Buffer 的一些信息。</li>
 <li>INODE：这个类型的页面存储了许多称为 INODE Entry 的数据结构。</li>
 </ul>
@@ -303,8 +303,8 @@
 </ul>
 <blockquote>
 <p>  <strong>为什么提出区的概念？</strong></p>
-<p>  页的物理位置不连续，对于传统的机械硬盘来说，需要重新定位磁头位置，也就是会产生随机 IO，这样会影响磁盘的性能。所以我们应该尽量让页面链表中相邻的页的物理位置也相邻，这样在扫描叶子节点中大量的记录时才可以使用顺序 I&#x2F;O。</p>
-<p>  所以才引入了区（extent）的概念。一个区就是在物理位置上连续的 64 个页（区里页面的页号都是连续的）。在表中的数据量很大时，为某个索引分配空间的时候就不再按照页为单位分配了，而是按照区为单位进行分配。甚至在表中的数据非常非常多的时候，可以一次性分配多个连续的区。虽然这可能造成一点点空间的浪费（数据不足以填充满整个区），但是从性能角度看，可以消除很多的随机 I&#x2F;O。</p>
+<p>  页的物理位置不连续，对于传统的机械硬盘来说，需要重新定位磁头位置，也就是会产生随机 IO，这样会影响磁盘的性能。所以我们应该尽量让页面链表中相邻的页的物理位置也相邻，这样在扫描叶子节点中大量的记录时才可以使用顺序 I/O。</p>
+<p>  所以才引入了区（extent）的概念。一个区就是在物理位置上连续的 64 个页（区里页面的页号都是连续的）。在表中的数据量很大时，为某个索引分配空间的时候就不再按照页为单位分配了，而是按照区为单位进行分配。甚至在表中的数据非常非常多的时候，可以一次性分配多个连续的区。虽然这可能造成一点点空间的浪费（数据不足以填充满整个区），但是从性能角度看，可以消除很多的随机 I/O。</p>
 <p>  并且由于扫描叶子结点和非叶子结点是两种不同的场景，且如果不区分其查询效率会非常低，因此叶子结点和非叶子结点都有自己独有的区。因此，索引会生成两个段：一个叶子结点段和一个非叶子结点段。</p>
 </blockquote>
 <h2 id="段-Segment"><a href="#段-Segment" class="headerlink" title="段 Segment"></a>段 Segment</h2><p>表空间是由各个段组成的，常见的段有数据段、索引段、回滚段等。因为前面已经介绍过了 InnoDB 存储引擎表是索引组织的（index organized），因此数据即索引，索引即数据。那么数据段即为 B+ 树的叶子节点（Leaf node segment），索引段即为 B+ 树的非索引节点（Non-leaf node segment）。</p>
@@ -317,7 +317,7 @@
 <p>如果启用了 innodb_file_per_table 的参数，需要注意的是每张表的表空间内存放的只是数据、索引和插人缓冲 Bitmap 页，其他类的数据，如回滚（undo）信息，插人缓冲索引页、系统事务信息、二次写缓冲（Double write buffer）等还是存放在原来的共享表空间内。这同时也说明了另一个问题：即使在启用了参数 innodb_file_per_table 之后，共享表空间（默认 ibdata1）还是会不断地增加其大小。</p>
 <h1 id="InnoDB-行记录格式"><a href="#InnoDB-行记录格式" class="headerlink" title="InnoDB 行记录格式"></a>InnoDB 行记录格式</h1><p>InnoDB 存储引擎提供了 Compact 格式来存放行记录数据。另一种存放记录格式 Redundant 是为兼容 5.1 之前版本而保留的。用户可以通过命令 <code>SHOW TABLE STATUS LIKE &#39;table_name&#39;</code> 来查看当前表使用的行格式，其中 row_format 属性表示当前所使用的行记录结构类型。</p>
 <h2 id="Compact-行记录格式"><a href="#Compact-行记录格式" class="headerlink" title="Compact 行记录格式"></a>Compact 行记录格式</h2><p>Compact 行记录是在 MySQL 5.0 中引人的，其设计目标是高效地存储数据。简单来说，一个页中存放的行数据越多，其性能就越高。下图显示了 Compact 行记录的存储方式：</p>
-<p><img src="/images/MySQL/COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%A4%BA%E6%84%8F%E5%9B%BE.png"></p>
+<p><img src="/images/MySQL/COMPACT行格式示意图.png" alt=""></p>
 <h3 id="记录的额外信息"><a href="#记录的额外信息" class="headerlink" title="记录的额外信息"></a>记录的额外信息</h3><p>这部分信息是服务器为了更好地管理记录而添加的一些信息。其中包括：变长字段长度列表、NULL标志位、记录头信息。</p>
 <p><strong>1. 变长字段长度列表</strong></p>
 <p>MySQL 支持一些变长的数据类型，比如 VARCHAR(M)、VARBINARY(M)、各种 TEXT 类型、各种 BLOB 类型。变长字段中存储多少字节的数据是不固定的，所以我们在存储真实数据的时候需要顺便把这些数据占用的字节数也存起来，这样才不至于把 MySQL 服务器搞懵。也就是说这些变长字段占用的存储空间分为两部分：真正的数据内容、该数据占用的字节数。</p>
@@ -330,6 +330,7 @@
 <p>变长字段之后的第二个部分是 NULL 标志位，该位指示了该行数据中是否有 NULL 值，有则用 1 表示。同变长字段长度列表，NULL 标志位也是按照列的顺序逆序存放的。</p>
 <p><strong>3. 记录头信息</strong></p>
 <p>接下来的部分是记录头信息（record header），固定占用 5 字节（40 位），每位的含义见下表。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -338,7 +339,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>预留位1</td>
 <td>1</td>
 <td>未知</td>
@@ -378,8 +380,11 @@
 <td>16</td>
 <td>表示下一条记录的相对位置</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h3 id="记录的真实数据"><a href="#记录的真实数据" class="headerlink" title="记录的真实数据"></a>记录的真实数据</h3><p>最后的部分就是实际存储每个列的数据。需要特别注意的是，NULL 不占该部分任何空间，即 NULL 除了占有 NULL 标志位，实际存储不占有任何空间。另外有一点需要注意的是，每行数据除了用户定义的列外，还有两个隐藏列：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -389,7 +394,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>db_row_id</td>
 <td>否</td>
 <td>6 字节</td>
@@ -407,17 +413,20 @@
 <td>7 字节</td>
 <td>回滚指针</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>这里需要提一下 InnoDB 表的主键生成策略：优先使用用户自定义的主键作为主键；如果用户没有定义主键，则选取一个不允许存储 NULL 值的 UNIQUE 键作为主键；如果表中连不允许存储 NULL 值的 UNIQUE 键都没有定义，则 InnoDB 会为表默认添加一个名为 row id 的隐藏列作为主键。</p>
 <h2 id="行溢出数据"><a href="#行溢出数据" class="headerlink" title="行溢出数据"></a>行溢出数据</h2><p>InnoDB 存储引擎可以将一条记录中的某些数据存储在真正的数据页面之外。前面介绍到，InnoDB 以页为基本单位管理存储空间，而一个页的大小一般是 16KB，也就是 16384 字节。而如果某条 VARCHAR 列的实际数据就大于 16384 字节（理论值为 65536 字节）显然一个页也存不了一条记录。此时，在 COMPACT 和 REDUNDANT 行格式中，对于占用存储空间非常多的列，在记录的真实数据处只会存储该列的一部分数据，而把剩余的数据分散存储在几个其他的页中，然后在记录的真实数据处用 20 字节存储指向这些页的地址（当然，这 20 字节还包括分散在其他页面中的数据所占用的字节数），从而可以找到剩余数据所在的页，如下图。</p>
-<p><img src="/images/MySQL/%E5%BD%93%E5%88%97%E5%8D%A0%E7%94%A8%E7%9A%84%E5%AD%98%E5%82%A8%E7%A9%BA%E9%97%B4%E7%9B%B8%E5%BD%93%E5%A4%A7%E6%97%B6COMPACT%E8%A1%8C%E6%A0%BC%E5%BC%8F%E7%9A%84%E5%AD%98%E5%82%A8%E6%96%B9%E5%BC%8F.png"></p>
+<p><img src="/images/MySQL/当列占用的存储空间相当大时COMPACT行格式的存储方式.png" alt=""></p>
 <p>从上图中可以看出，对于 COMPACT 和 REDUNDANT 行格式来说，如果某一列中的数据非常多，则在本记录的真实数据处只会存储该列前 768 字节的数据以及一个指向其他页的地址，然后把剩下的数据存放到其他页中。这些存储 768 字节之外的数据的页面也称为溢出页（off-page），当发生行溢出时，数据存放在页类型为 Uncompress BLOB 的页中。</p>
 <p>需要注意的是，VARCHAR(M)、TEXT、BLOB 在存储数据相当多的情况下都可能成为溢出页。</p>
 <h2 id="Compressed-和-Dynamic-行记录格式"><a href="#Compressed-和-Dynamic-行记录格式" class="headerlink" title="Compressed 和 Dynamic 行记录格式"></a>Compressed 和 Dynamic 行记录格式</h2><p>InnoDB 1.0.x 版本开始引入了新的文件格式（file format，用户可以理解为新的页格式），以前支持的 Compact 和 Redundant 格式称为 Antelope 文件格式，新的文件格式称为 Barracuda 文件格式。Barracuda 文件格式下拥有两种新的行记录格式：Compressed 和 Dynamic。</p>
 <p>新的两种记录格式对于存放在 BLOB 中的数据采用了完全的行溢出的方式，如下图所示，在数据页中只存放 20 个字节的指针，实际的数据都存放在 Off Page 中，而之前的 Compact 和 Redundant 两种格式会存放 768 个前缀字节。</p>
-<p><img src="/images/MySQL/Barracuda%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E7%9A%84%E6%BA%A2%E5%87%BA%E8%A1%8C.png"></p>
+<p><img src="/images/MySQL/Barracuda文件格式的溢出行.png" alt=""></p>
 <p>Compressed 行记录格式不同于 DYNAMIC 行记录格式的一点是，存储在其中的行数据会以 zlib 的算法进行压缩，因此对于 BLOB、TEXT、VARCHAR 这类大长度类型的数据能够进行非常有效的存储。</p>
 <h1 id="InnoDB-数据页结构"><a href="#InnoDB-数据页结构" class="headerlink" title="InnoDB 数据页结构"></a>InnoDB 数据页结构</h1><p>页是 InnoDB 存储引擎管理数据库的最小磁盘单位。页类型为 B-tree Node 的页存放的即是表中行的实际数据了。下表为数据页结构：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -427,7 +436,8 @@
 <th>简单描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>File Header</td>
 <td>文件头部</td>
 <td>38字节</td>
@@ -469,11 +479,13 @@
 <td>8字节</td>
 <td>校验页是否完整</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h2 id="User-Records-和-Free-Space"><a href="#User-Records-和-Free-Space" class="headerlink" title="User Records 和 Free Space"></a>User Records 和 Free Space</h2><p>在页的 7 个组成部分中，我们自己存储的记录会按照指定的行格式存储到 User Records 部分。但是在一开始生成页的时候，其实并没有 User Records 部分，每当插入一条记录时，都会从 Free Space 部分（也就是尚未使用的存储空间）申请一个记录大小的空间， 并将这个空间划分到 User Records 部分。当 Free Space 部分的空间全部被 User Records 部分替代掉之后，也就意味着这个页使用完了，此时如果还有新的记录插入，就需要去申请新的页了。</p>
 <p>再次强调，InnoDB 存储引擎表总是 B+ 树索引组织的。Free Space 很明显指的就是空闲空间，同样也是个链表数据结构。在一条记录被删除后，该空间会被加入到空闲链表中。</p>
 <h2 id="Infimun-和-Supremum-Records"><a href="#Infimun-和-Supremum-Records" class="headerlink" title="Infimun 和 Supremum Records"></a>Infimun 和 Supremum Records</h2><p>在 InnoDB 存储引擎中，每个数据页中有两个虚拟的行记录，用来限定记录的边界。Infimum 记录是比该页中任何主键值都要小的值，Supremum 指比任何可能大的值还要大的值。这两个值在页创建时被建立，并且在任何情况下不会被删除。在 Compact 行格式和 Redundant 行格式下，两者占用的字节数各不相同。</p>
-<p>![](&#x2F;images&#x2F;MySQL&#x2F;Infimun和Supremum Records.png)</p>
+<p><img src="/images/MySQL/Infimun和Supremum Records.png" alt=""></p>
 <h2 id="Page-Directory"><a href="#Page-Directory" class="headerlink" title="Page Directory"></a>Page Directory</h2><p>Page Directory（页目录）中存放了记录的相对位置（注意，这里存放的是页相对位置，而不是偏移量），有些时候这些记录指针称为 Slots（槽）。与其他数据库系统不同的是，在 InnoDB 中并不是每个记录拥有一个槽，InnoDB 存储引擎的槽是一个稀疏目录（sparse directory）， 即一个槽中可能包含多个记录。伪记录 Infimum 的 n_owned 值总是为 1，记录 Supremum 的 n_owned 的取值范围为 [1, 8]，其他用户记录 n_owned 的取值范围为 [4, 8]。当记录被插人或删除时需要对槽进行分裂或平衡的维护操作。在 Slots 中记录按照索引键值顺序存放，这样可以利用二叉查找迅速找到记录的指针。</p>
 <p>由于在 InnoDB 存储引擎中 Page Directory 是稀疏目录，二叉查找的结果只是一个粗略的结果，因此 InnoDB 存储引擎必须通过 record header 中的 next_record 来继续查找相关记录。同时，Page Directory 很好地解释了 record header 中的 n_owned 值的含义，因为这些记录并不包括在 Page Directory 中。</p>
 <p>需要牢记的是，B+ 树索引本身并不能找到具体的一条记录，能找到只是该记录所在的页。数据库把页载入到内存，然后通过 Page Directory 再进行二叉查找。只不过二叉查找的时间复杂度很低，同时在内存中的查找很快，因此通常忽略这部分查找所用的时间。</p>
@@ -486,6 +498,7 @@
 </ol>
 </blockquote>
 <h2 id="Page-Header"><a href="#Page-Header" class="headerlink" title="Page Header"></a>Page Header</h2><p>Page Header 占用固定的 56 字节，专门存储各种状态信息。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -494,7 +507,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>PAGE_N_DIR_SLOTS</td>
 <td>2字节</td>
 <td>在页目录中的槽数量</td>
@@ -559,8 +573,11 @@
 <td>10字节</td>
 <td>B+树非叶子结点段的头部信息，仅在B+树的根页面中定义</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h2 id="File-Header"><a href="#File-Header" class="headerlink" title="File Header"></a>File Header</h2><p>File Header 固定占用 38 字节，记录通用的页信息。</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -569,7 +586,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>FIL_PAGE_SPACE_OR_CHKSUM</td>
 <td>4字节</td>
 <td>当MySQL的版本低于4.0.14时，该属性表示本页面所在的表空间ID;在之后的版本中，该属性表示页的校验和(checksum)</td>
@@ -609,8 +627,11 @@
 <td>4字节</td>
 <td>页属于哪个表空间</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <p>下表是页类型的分类：</p>
+<div class="table-container">
 <table>
 <thead>
 <tr>
@@ -619,7 +640,8 @@
 <th>描述</th>
 </tr>
 </thead>
-<tbody><tr>
+<tbody>
+<tr>
 <td>FIL_PAGE_TYPE_ALLOCATED</td>
 <td>0x0000</td>
 <td>最新分配还未使用</td>
@@ -674,7 +696,9 @@
 <td>0x45BF</td>
 <td>索引页，也就是我们所说的数据页</td>
 </tr>
-</tbody></table>
+</tbody>
+</table>
+</div>
 <h2 id="File-Trailer"><a href="#File-Trailer" class="headerlink" title="File Trailer"></a>File Trailer</h2><p>为了检测页是否已经完整地写入磁盘（如可能发生的写入过程中磁盘损坏、机器关机等），InnoDB 存储引擎的页中设置了 File Trailer 部分。File Trailer 只有一个 FIL_PAGE_END_LSN 部分，占用 8 字节。可以分为两部分：</p>
 <ol>
 <li>前 4 字节代表页的校验和。这个部分与 File Header 中的校验和相对应。每当一个页面在内存中发生修改时，在刷新之前就要把页面的校验和算出来。因为 File Header 在页面的前边，所以 File Header 中的校验和会被首先刷新到磁盘，当完全写完后，校验和也会被写到页的尾部。如果页面刷新成功，则页首和页尾的校验和应该是一致的。如果刷新了一部分后断电了，那么 File Header 中的校验和就代表着已经修改过的页，而 File Trailer 中的校验和代表着原先的页，二者不同则意味着刷新期间发生了错误。</li>
@@ -683,7 +707,7 @@
 <p>在默认配置下，InnoDB 存储引擎每次从磁盘读取一个页就会检测该页的完整性，即页是否发生 Corrupt，这就是通过 File Trailer 部分进行检测，而该部分的检测会有一定的开销。用户可以通过参数 innodb_checksums 来开启或关闭对这个页完整性的检查。</p>
 <h1 id="Named-File-Formats-机制"><a href="#Named-File-Formats-机制" class="headerlink" title="Named File Formats 机制"></a>Named File Formats 机制</h1><p>随着 InnoDB 存储引擎的发展，新的页数据结构有时用来支持新的功能特性。比如前面提到的 InnoDB 1.0.x 版本提供了新的页数据结构来支持表压缩功能，完全的溢出（Offpage）大变长字符类型字段的存储。这些新的页数据结构和之前版本的页并不兼容，因此从 InnoDB 1.0.x 版本开始，InnoDB 存储引通过 Named File Formats 机制来解决不同版本下页结构兼容性的问题。</p>
 <p>InnoDB 存储引擎将 1.0.x 版本之前的文件格式（file format）定义为 Antelope，将这个版本支持的文件格式定义为 Barracuda。新的文件格式总是包含于之前的版本的页格式。下图显示了 Barracuda 文件格式和 Antelope 文件格式之间的关系，Antelope 文件格式有 Compact 和 Redudant 的行格式，Barracuda 文件格式既包括了 Antelope 所有的文件格式，另外新加入了之前已经提到过的 Compressed 和 Dynamic 行格式。</p>
-<p><img src="/images/MySQL/MySQL%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F.png"></p>
+<p><img src="/images/MySQL/MySQL文件格式.png" alt=""></p>
 <h1 id="视图"><a href="#视图" class="headerlink" title="视图"></a>视图</h1><h2 id="虚拟视图"><a href="#虚拟视图" class="headerlink" title="虚拟视图"></a>虚拟视图</h2><p>在 MySQL 数据库中，视图（View）是一个命名的虚表，它由一个 SQL 查询来定义，可以当做表使用。与持久表（permanent table）不同的是，视图中的数据没有实际的物理存储。</p>
 <h2 id="物化视图"><a href="#物化视图" class="headerlink" title="物化视图"></a>物化视图</h2><p>Oracle 数据库支持物化视图——该视图不是基于基表的虚表，而是根据基表实际存在的实表，即物化视图的数据存储在非易失的存储设备上。物化视图可以用于预先计算并保存多表的链接（JOIN）或聚集（GROUP BY）等耗时较多的 SQL 操作结果。这样，在执行复杂查询时，就可以避免进行这些耗时的操作，从而快速得到结果。物化视图的好处是对于一些复杂的统计类查询能直接查出结果。在 Microsoft SQL Server 数据库中，称这种视图为索引视图。</p>
 <h1 id="分区表"><a href="#分区表" class="headerlink" title="分区表"></a>分区表</h1><h2 id="分区概述"><a href="#分区概述" class="headerlink" title="分区概述"></a>分区概述</h2><p>分区功能并不是在存储引擎层完成的，因此不是只有 InnoDB 存储引擎支持分区，常见的存储引擎 MyISAM、NDB 等都支持。但也并不是所有的存储引擎都支持，如 CSV、FEDORATED、MERGE 等就不支持。在使用分区功能前，应该对选择的存储引擎对分区的支持有所了解。</p>
@@ -731,7 +755,7 @@
 </ul>
 <p>对于之前的 RANGE 和 LIST 分区，用户可以用 RANGE COLUMNS 和 LIST COLUMNS 分区进行很好的代替。</p>
 <h2 id="子分区"><a href="#子分区" class="headerlink" title="子分区"></a>子分区</h2><p>子分区（subpartitioning）是在分区的基础上再进行分区，有时也称这种分区为复合分区（composite partitioning）。MySQL 数据库允许在 RANGE 和 LIST 的分区上再进行 HASH 或 KEY 的子分区。</p>
-<p>子分区可以用于特别大的表，在多个磁盘间分别分配数据和索引。假设有 6 个磁盘，分别为 &#x2F;disk0、&#x2F;disk1、 &#x2F;disk2 等。</p>
+<p>子分区可以用于特别大的表，在多个磁盘间分别分配数据和索引。假设有 6 个磁盘，分别为 /disk0、/disk1、 /disk2 等。</p>
 <h2 id="分区中的-NULL-值"><a href="#分区中的-NULL-值" class="headerlink" title="分区中的 NULL 值"></a>分区中的 NULL 值</h2><p>MySQL 数据库允许对 NULL 值做分区，但是处理的方法与其他数据库可能完全不同。MYSQL 数据库的分区总是视 NULL 值视小于任何的一个非 NULL 值，这和 MySQL 数据库中处理 NULL 值的 ORDER BY 操作是一样的。因此对于不同的分区类型，MySQL 数据库对于 NULL 值的处理也是各不相同。</p>
 <h2 id="在表和分区间交换数据"><a href="#在表和分区间交换数据" class="headerlink" title="在表和分区间交换数据"></a>在表和分区间交换数据</h2><p>MySQL 5.6 开始支持 <code>ALTER TABLE ... EXCHANGE PARTITION</code> 语法。该语句允许分区或子分区中的数据与另一个非分区的表中的数据进行交换。如果非分区表中的数据为空，那么相当于将分区中的数据移动到非分区表中。若分区表中的数据为空，则相当于将外部表中的数据导入到分区中。</p>
 
@@ -931,6 +955,8 @@
 
 
 
+
+  
 
   
 

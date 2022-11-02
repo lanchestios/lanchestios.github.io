@@ -17,7 +17,7 @@
 
 <script id="hexo-configurations">
     var NexT = window.NexT || {};
-    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
   </script>
 
   <meta name="description" content="Message Queue 从最初的架构设计到现在的贴近云原生的架构风格已经演进的非常成熟，本文通过将 RocketMQ、Kafka、Pulsar 进行对比来整理当下 MQ 中间件对于存储、通信的实现。">
@@ -28,10 +28,10 @@
 <meta property="og:description" content="Message Queue 从最初的架构设计到现在的贴近云原生的架构风格已经演进的非常成熟，本文通过将 RocketMQ、Kafka、Pulsar 进行对比来整理当下 MQ 中间件对于存储、通信的实现。">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://example.com/images/MQ/LongPolling请求过程.png">
-<meta property="og:image" content="http://example.com/images/MQ/Pulsar%E8%AE%A2%E9%98%85%E6%A8%A1%E5%BC%8F.png">
-<meta property="og:image" content="http://example.com/images/MQ/kafka%E5%AD%98%E5%82%A8%E5%88%86%E5%B1%82.png">
-<meta property="og:image" content="http://example.com/images/MQ/Pulsar%E6%9E%B6%E6%9E%84.png">
-<meta property="og:image" content="http://example.com/images/MQ/Bookkeeper%E8%AF%BB%E5%86%99%E6%9E%B6%E6%9E%84.png">
+<meta property="og:image" content="http://example.com/images/MQ/Pulsar订阅模式.png">
+<meta property="og:image" content="http://example.com/images/MQ/kafka存储分层.png">
+<meta property="og:image" content="http://example.com/images/MQ/Pulsar架构.png">
+<meta property="og:image" content="http://example.com/images/MQ/Bookkeeper读写架构.png">
 <meta property="article:published_time" content="2022-02-22T01:51:21.000Z">
 <meta property="article:modified_time" content="2022-09-08T02:10:34.559Z">
 <meta property="article:author" content="Wang Zihao">
@@ -257,7 +257,6 @@
       
         <p>Message Queue 从最初的架构设计到现在的贴近云原生的架构风格已经演进的非常成熟，本文通过将 RocketMQ、Kafka、Pulsar 进行对比来整理当下 MQ 中间件对于存储、通信的实现。</p>
 <span id="more"></span>
-
 <h1 id="消息获取模式"><a href="#消息获取模式" class="headerlink" title="消息获取模式"></a>消息获取模式</h1><h2 id="Push"><a href="#Push" class="headerlink" title="Push"></a>Push</h2><p>Push 即服务端主动发送数据给客户端。在服务端收到消息之后立即推送给客户端。</p>
 <p>Push 模型最大的好处就是实时性。因为服务端可以做到只要有消息就立即推送，所以消息的消费没有“额外”的延迟。</p>
 <p>但是 Push 模式在消息中间件的场景中会面临以下一些问题：</p>
@@ -299,15 +298,13 @@
 第三个R：Broker 收到请求读取了这条数据，那么返回到 Consumer 需要一个 R 的时间
 
 所以总共需要3R（不考虑读取的开销，只考虑网络开销）<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-
 <p>在这种情况下 Broker 和 Consumer 之间一直在进行请求和响应。</p>
-<img src="/images/MQ/LongPolling请求过程.png" alt="img"  />
-
-<h2 id="Dynamic-Push-x2F-Pull"><a href="#Dynamic-Push-x2F-Pull" class="headerlink" title="Dynamic Push&#x2F;Pull"></a>Dynamic Push&#x2F;Pull</h2><blockquote>
+<p><img src="/images/MQ/LongPolling请求过程.png" alt="img"  /></p>
+<h2 id="Dynamic-Push-Pull"><a href="#Dynamic-Push-Pull" class="headerlink" title="Dynamic Push/Pull"></a>Dynamic Push/Pull</h2><blockquote>
 <p>  参考：Reactive Stream Processing with Akka Streams</p>
 </blockquote>
-<p>Dynamic Push&#x2F;Pull 有 Long-Polling 的优势，同时能减少在有消息可读的情况下由 Broker 主动 Push 消息给 Consumer，减少不必要的请求。</p>
-<p>Dynamic Push&#x2F;Pull 通过在消息中间件的 Consumer 中新增一个 Buffer 来缓存从 Broker 获取的消息，而用户的消费线程从这个 Buffer 中获取消费来消息，获取消息的线程和消费线程通过这个 Buffer 进行数据传递。有了这个 Buffer 存在，当 Consumer 向 Broker 通过 Long-Polling 请求时，将 Buffer 剩余空间告知给 Broker，当 Consumer 容量对于 Broker 是透明时，Broker 就可以控制推送行为，可以避免过量的请求冲垮 Consumer，也可以避免过多的请求和时延。</p>
+<p>Dynamic Push/Pull 有 Long-Polling 的优势，同时能减少在有消息可读的情况下由 Broker 主动 Push 消息给 Consumer，减少不必要的请求。</p>
+<p>Dynamic Push/Pull 通过在消息中间件的 Consumer 中新增一个 Buffer 来缓存从 Broker 获取的消息，而用户的消费线程从这个 Buffer 中获取消费来消息，获取消息的线程和消费线程通过这个 Buffer 进行数据传递。有了这个 Buffer 存在，当 Consumer 向 Broker 通过 Long-Polling 请求时，将 Buffer 剩余空间告知给 Broker，当 Consumer 容量对于 Broker 是透明时，Broker 就可以控制推送行为，可以避免过量的请求冲垮 Consumer，也可以避免过多的请求和时延。</p>
 <blockquote>
 <p>  这个时候滞后的 Buffer 容量信息，总会带来一些容量和性能上的浪费。</p>
 </blockquote>
@@ -323,7 +320,7 @@
 <li>广播模式：一条消息能被集群内所有的消费者消费。</li>
 </ul>
 <h2 id="Pulsar"><a href="#Pulsar" class="headerlink" title="Pulsar"></a>Pulsar</h2><p>在 Pulsar 中提供了 4 种消费者订阅模式，分别是独占，灾备，共享，键共享：</p>
-<p><img src="/images/MQ/Pulsar%E8%AE%A2%E9%98%85%E6%A8%A1%E5%BC%8F.png"></p>
+<p><img src="/images/MQ/Pulsar订阅模式.png" alt=""></p>
 <ul>
 <li><p>exclusive：消费组里有且仅有一个 Consumer 能够进行消费，其它的无法连接。适用于全局有序的消息。</p>
 </li>
@@ -344,11 +341,11 @@
 <h1 id="P-消息发送模式"><a href="#P-消息发送模式" class="headerlink" title="P 消息发送模式"></a>P 消息发送模式</h1><p>Send 分为 Async 和 Sync 两种模式，但实际上在 Pulsar 内部 Sync 模式也是采用的 Async 模式，在 Sync 模式下模拟回调阻塞，达到同步的效果，这个在 Kafka 中也是采用的这个模式，但是在 RocketMQ 中，所有的 Send 都是真正的同步，都会直接请求到 Broker。</p>
 <h1 id="物理存储设计"><a href="#物理存储设计" class="headerlink" title="物理存储设计"></a>物理存储设计</h1><h2 id="Kafka"><a href="#Kafka" class="headerlink" title="Kafka"></a>Kafka</h2><p>Kafka 中消息是以 Topic 进行分类的，生产者生产消息，消费者消费消息，都是面向 Topic 的。Topic 是逻辑上的概念，而 Partition 是物理上的概念，每个 Partition 都对应一个 Log 文件，该 Log 文件中存储的就是 Producer 生产的数据。</p>
 <p>在创建主题时，Kafka 首先会决定如何在 Broker 间分配分区。假设有 6 个 Broker，打算创建一个包含 10 个分区的主题，并且复制系数为 3（确保至少有 3 台 Broker）。那么 Kafka 就会有 30 个分区副本，它们可以被平均分配给 6 个 Broker 并且每个副本会尽可能分布在不同的 Broker 上。但是，当新的 Broker 加入并不会导致 Partition 的 rebalance，只会处理新的 Topic；如果需要分担旧 topic-partition 的压力，需要手动迁移 Partition，这时会占用大量集群带宽。</p>
-<p><img src="/images/MQ/kafka%E5%AD%98%E5%82%A8%E5%88%86%E5%B1%82.png"></p>
+<p><img src="/images/MQ/kafka存储分层.png" alt=""></p>
 <p>由于生产者生产的消息会不断追加到 Log 文件末端，为防止 Log 文件过大导致数据定位效率低，Kafka 采取了分片和索引机制，将每个 Partition 分为多个 Segment（逻辑上的概念，index+log 文件）</p>
 <p>每个 Partition（目录）相当于一个巨型文件被平均分配到多个大小相等的 Segment（片段）数据文件中（每个 Segment 文件中消息数量不一定相等），这种特性也方便 Old Segment 的删除，即方便已被消费的消息的清理，提高磁盘的利用率。每个 Partition 只需要支持顺序读写就行，Segment 的文件生命周期由服务端配置参数（log.segment.bytes，log.roll.{ms,hours} 等若干参数）决定。</p>
 <blockquote>
-<p>   由于上面物理储存逻辑的限制，可以轻易的得出以下不足：</p>
+<p>   由于上面物理储存逻辑的限制，可以轻易的得出以下不足：</p>
 <ol>
 <li>Broker 上 Partition 过多会使得磁盘顺序写几乎退化成随机写。</li>
 <li>Broker 不能弹性扩容，需要人工手动迁移将旧 Partition 迁移到新 Broker。</li>
@@ -359,9 +356,9 @@
 <p>  RocketMQ 虽然将多个 Topic 对应一个写入文件，让写入变成了顺序写，但是我们的读取很容易导致我们的 Page Cache 被各种覆盖刷新，这对于我们的 IO 的影响是非常大的。</p>
 </blockquote>
 <h2 id="Pulsar-1"><a href="#Pulsar-1" class="headerlink" title="Pulsar"></a>Pulsar</h2><p>Pulsar 采用的是存储计算分离的架构，而存储端使用的是 BookKeeper 作为实现。</p>
-<p><img src="/images/MQ/Pulsar%E6%9E%B6%E6%9E%84.png"></p>
+<p><img src="/images/MQ/Pulsar架构.png" alt=""></p>
 <p>下图是 Bookie 的读写架构图，里面有一些名词需要先介绍一下</p>
-<p><img src="/images/MQ/Bookkeeper%E8%AF%BB%E5%86%99%E6%9E%B6%E6%9E%84.png"></p>
+<p><img src="/images/MQ/Bookkeeper读写架构.png" alt=""></p>
 <ul>
 <li>Entry：Entry 是存储到 bookkeeper 中的一条记录，其中包含 Entry ID，记录实体等。</li>
 <li>Ledger：多个 Entry序列组成一个 Ledger。</li>
@@ -461,7 +458,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E8%8E%B7%E5%8F%96%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">消息获取模式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Push"><span class="nav-number">1.1.</span> <span class="nav-text">Push</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Pull"><span class="nav-number">1.2.</span> <span class="nav-text">Pull</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Long-Polling"><span class="nav-number">1.3.</span> <span class="nav-text">Long-Polling</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dynamic-Push-x2F-Pull"><span class="nav-number">1.4.</span> <span class="nav-text">Dynamic Push&#x2F;Pull</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#C-%E6%B6%88%E6%81%AF%E8%AE%A2%E9%98%85%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">C 消息订阅模式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Pulsar"><span class="nav-number">2.1.</span> <span class="nav-text">Pulsar</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#P-%E6%B6%88%E6%81%AF%E5%8F%91%E9%80%81%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">P 消息发送模式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E5%AD%98%E5%82%A8%E8%AE%BE%E8%AE%A1"><span class="nav-number">4.</span> <span class="nav-text">物理存储设计</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Kafka"><span class="nav-number">4.1.</span> <span class="nav-text">Kafka</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RocketMQ"><span class="nav-number">4.2.</span> <span class="nav-text">RocketMQ</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Pulsar-1"><span class="nav-number">4.3.</span> <span class="nav-text">Pulsar</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%B6%88%E6%81%AF%E8%8E%B7%E5%8F%96%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">消息获取模式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Push"><span class="nav-number">1.1.</span> <span class="nav-text">Push</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Pull"><span class="nav-number">1.2.</span> <span class="nav-text">Pull</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Long-Polling"><span class="nav-number">1.3.</span> <span class="nav-text">Long-Polling</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Dynamic-Push-Pull"><span class="nav-number">1.4.</span> <span class="nav-text">Dynamic Push&#x2F;Pull</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#C-%E6%B6%88%E6%81%AF%E8%AE%A2%E9%98%85%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.</span> <span class="nav-text">C 消息订阅模式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Pulsar"><span class="nav-number">2.1.</span> <span class="nav-text">Pulsar</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#P-%E6%B6%88%E6%81%AF%E5%8F%91%E9%80%81%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">P 消息发送模式</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%89%A9%E7%90%86%E5%AD%98%E5%82%A8%E8%AE%BE%E8%AE%A1"><span class="nav-number">4.</span> <span class="nav-text">物理存储设计</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Kafka"><span class="nav-number">4.1.</span> <span class="nav-text">Kafka</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RocketMQ"><span class="nav-number">4.2.</span> <span class="nav-text">RocketMQ</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Pulsar-1"><span class="nav-number">4.3.</span> <span class="nav-text">Pulsar</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -574,6 +571,8 @@
 
 
 
+
+  
 
   
 
