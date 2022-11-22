@@ -35,7 +35,7 @@
 <meta property="og:image" content="http://example.com/images/JDK/ScheduledThreadPoolTaskLeaderFollower机制.png">
 <meta property="og:image" content="http://example.com/images/JDK/WorkStealing.png">
 <meta property="article:published_time" content="2021-03-30T03:17:28.000Z">
-<meta property="article:modified_time" content="2022-11-08T06:56:58.175Z">
+<meta property="article:modified_time" content="2022-11-22T04:12:53.951Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="JUC">
@@ -238,7 +238,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -780,7 +780,8 @@ private final class Worker
     <span class="token function">addWorker</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token boolean">false</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
   <span class="token punctuation">&#125;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<h3 id="释放资源"><a href="#释放资源" class="headerlink" title="释放资源"></a>释放资源</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">shutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+<h3 id="释放资源"><a href="#释放资源" class="headerlink" title="释放资源"></a>释放资源</h3><h4 id="优雅下线"><a href="#优雅下线" class="headerlink" title="优雅下线"></a>优雅下线</h4><p>线程池拒接收新提交的任务，同时等待线程池里的任务执行完毕后关闭线程池。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">shutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
     <span class="token keyword">final</span> <span class="token class-name">ReentrantLock</span> mainLock <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>mainLock<span class="token punctuation">;</span>
     <span class="token comment">// 利用排它锁进行上锁，保证只有一个线程执行关闭流程</span>
     mainLock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
@@ -789,7 +790,7 @@ private final class Worker
         <span class="token function">checkShutdownAccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
         <span class="token comment">// 内部通过自旋+CAS修改线程池状态为shutdown</span>
         <span class="token function">advanceRunState</span><span class="token punctuation">(</span>SHUTDOWN<span class="token punctuation">)</span><span class="token punctuation">;</span>
-        <span class="token comment">// 遍历所有的worker，进行线程中断通知</span>
+        <span class="token comment">// 遍历空闲的worker（能拿到Worker锁就算空闲），进行线程中断通知</span>
         <span class="token function">interruptIdleWorkers</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
         <span class="token comment">// 钩子函数</span>
         <span class="token function">onShutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// hook for ScheduledThreadPoolExecutor</span>
@@ -799,6 +800,66 @@ private final class Worker
     <span class="token comment">// 进行最后的整理工作</span>
     <span class="token function">tryTerminate</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p><strong>优雅下线示例</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public class Main &#123;
+
+    public static void main(String[] args) throws InterruptedException &#123;
+        ExecutorService executor &#x3D; Executors.newSingleThreadExecutor();
+        for (int i &#x3D; 0; i &lt; 10; i++) &#123;
+            executor.execute(setupTask(i));
+        &#125;
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -&gt; &#123;
+            System.out.println(&quot;优雅下线处理剩余任务开始&quot;);
+            &#x2F;&#x2F; 优雅下线
+            executor.shutdown();
+            try &#123;
+                &#x2F;&#x2F; 阻塞等待线程池执行完成
+                executor.awaitTermination(1, TimeUnit.MINUTES);
+            &#125; catch (InterruptedException e) &#123;
+                throw new RuntimeException(e);
+            &#125;
+            System.out.println(&quot;优雅下线处理剩余任务结束&quot;);
+        &#125;));
+
+    &#125;
+
+    private static Runnable setupTask(Integer integer) &#123;
+        return () -&gt; &#123;
+            try &#123;
+                Thread.sleep(1000L);
+                System.out.println(integer);
+            &#125; catch (InterruptedException e) &#123;
+                System.out.println(&quot;不处理&quot;);
+            &#125;
+
+        &#125;;
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+</blockquote>
+<h4 id="强制下线"><a href="#强制下线" class="headerlink" title="强制下线"></a>强制下线</h4><p>线程池拒接收新提交的任务，同时立马关闭线程池，线程池里的任务不再执行。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">public List&lt;Runnable&gt; shutdownNow() &#123;
+    List&lt;Runnable&gt; tasks;
+    final ReentrantLock mainLock &#x3D; this.mainLock;
+    &#x2F;&#x2F; 利用排它锁进行上锁，保证只有一个线程执行关闭流程
+    mainLock.lock();
+    try &#123;
+      &#x2F;&#x2F; 安全检查
+      checkShutdownAccess();
+      &#x2F;&#x2F; 内部通过自旋+CAS修改线程池状态为shutdown
+      advanceRunState(STOP);
+      &#x2F;&#x2F; 遍历所有的worker，进行线程中断通知
+      interruptWorkers();
+      &#x2F;&#x2F; 将未执行的任务返回给调用方
+      tasks &#x3D; drainQueue();
+    &#125; finally &#123;
+      mainLock.unlock();
+    &#125;
+    &#x2F;&#x2F; 进行最后的整理工作
+    tryTerminate();
+    return tasks;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <h2 id="实践考量因素"><a href="#实践考量因素" class="headerlink" title="实践考量因素"></a>实践考量因素</h2><h3 id="线程池大小设置"><a href="#线程池大小设置" class="headerlink" title="线程池大小设置"></a>线程池大小设置</h3><p>一般需要根据任务类型来配置线程池大小</p>
 <ul>
 <li>如果是 CPU 密集型任务，那么就意味着 CPU 是稀缺资源，这个时候我们通常不能通过增加线程数来提高计算能力，因为线程数量太多，会导致频繁的上下文切换，一般这种情况下，建议合理的线程数值是 <code>N(CPU)数 + 1</code>。比CPU核心数多出来的一个线程是为了防止线程偶发的缺页中断，或者其它原因导致的任务暂停而带来的影响。一旦任务暂停，CPU就会处于空闲状态，而在这种情况下多出来的一个线程就可以充分利用CPU的空闲时间。</li>
@@ -1088,7 +1149,7 @@ void setExecuteExistingDelayedTasksAfterShutdownPolicy(boolean value)<span aria-
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8E%A5%E5%8F%A3%E5%AE%9A%E4%B9%89"><span class="nav-number">1.</span> <span class="nav-text">接口定义</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Executor%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.1.</span> <span class="nav-text">Executor接口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ExecutorService%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.2.</span> <span class="nav-text">ExecutorService接口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ScheduledExecutorService%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.3.</span> <span class="nav-text">ScheduledExecutorService接口</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ThreadPoolExecutor"><span class="nav-number">2.</span> <span class="nav-text">ThreadPoolExecutor</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8"><span class="nav-number">2.1.</span> <span class="nav-text">函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E5%8F%82%E6%95%B0"><span class="nav-number">2.2.</span> <span class="nav-text">关键参数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F"><span class="nav-number">2.3.</span> <span class="nav-text">生命周期</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.</span> <span class="nav-text">运行过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E6%B7%BB%E5%8A%A0%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.1.</span> <span class="nav-text">任务添加过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0Worker%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.2.</span> <span class="nav-text">添加Worker过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Worker%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B"><span class="nav-number">2.4.3.</span> <span class="nav-text">Worker的工作流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8A%9F%E8%83%BD%E7%BB%93%E6%9E%84"><span class="nav-number">2.4.3.1.</span> <span class="nav-text">功能结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B-1"><span class="nav-number">2.4.3.2.</span> <span class="nav-text">运行过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E4%BB%BB%E5%8A%A1"><span class="nav-number">2.4.3.3.</span> <span class="nav-text">获取任务</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E7%BA%BF%E7%A8%8B%E9%80%80%E5%87%BA"><span class="nav-number">2.4.3.4.</span> <span class="nav-text">工作线程退出</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E8%B5%84%E6%BA%90"><span class="nav-number">2.4.4.</span> <span class="nav-text">释放资源</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E8%B7%B5%E8%80%83%E9%87%8F%E5%9B%A0%E7%B4%A0"><span class="nav-number">2.5.</span> <span class="nav-text">实践考量因素</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E6%B1%A0%E5%A4%A7%E5%B0%8F%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.1.</span> <span class="nav-text">线程池大小设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E9%98%9F%E5%88%97%E7%9A%84%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.2.</span> <span class="nav-text">任务队列的设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8B%92%E7%BB%9D%E7%AD%96%E7%95%A5%E7%9A%84%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.3.</span> <span class="nav-text">拒绝策略的设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E5%89%8D%E7%9A%84%E9%A2%84%E7%83%AD"><span class="nav-number">2.5.4.</span> <span class="nav-text">启动前的预热</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E5%87%A0%E4%B8%AA%E9%97%AE%E9%A2%98"><span class="nav-number">2.5.5.</span> <span class="nav-text">需要注意的几个问题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ScheduledThreadPool"><span class="nav-number">3.</span> <span class="nav-text">ScheduledThreadPool</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8-1"><span class="nav-number">3.1.</span> <span class="nav-text">函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">执行任务模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E6%AC%A1%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.2.1.</span> <span class="nav-text">单次执行任务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%A8%E6%9C%9F%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.2.2.</span> <span class="nav-text">周期执行任务</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="nav-number">3.3.</span> <span class="nav-text">任务触发机制</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ForkJoinPool"><span class="nav-number">4.</span> <span class="nav-text">ForkJoinPool</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#work-stealing%E6%9C%BA%E5%88%B6"><span class="nav-number">4.1.</span> <span class="nav-text">work-stealing机制</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8E%A5%E5%8F%A3%E5%AE%9A%E4%B9%89"><span class="nav-number">1.</span> <span class="nav-text">接口定义</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Executor%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.1.</span> <span class="nav-text">Executor接口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ExecutorService%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.2.</span> <span class="nav-text">ExecutorService接口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ScheduledExecutorService%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.3.</span> <span class="nav-text">ScheduledExecutorService接口</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ThreadPoolExecutor"><span class="nav-number">2.</span> <span class="nav-text">ThreadPoolExecutor</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8"><span class="nav-number">2.1.</span> <span class="nav-text">函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E5%8F%82%E6%95%B0"><span class="nav-number">2.2.</span> <span class="nav-text">关键参数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F"><span class="nav-number">2.3.</span> <span class="nav-text">生命周期</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.</span> <span class="nav-text">运行过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E6%B7%BB%E5%8A%A0%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.1.</span> <span class="nav-text">任务添加过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0Worker%E8%BF%87%E7%A8%8B"><span class="nav-number">2.4.2.</span> <span class="nav-text">添加Worker过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Worker%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B"><span class="nav-number">2.4.3.</span> <span class="nav-text">Worker的工作流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8A%9F%E8%83%BD%E7%BB%93%E6%9E%84"><span class="nav-number">2.4.3.1.</span> <span class="nav-text">功能结构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BF%90%E8%A1%8C%E8%BF%87%E7%A8%8B-1"><span class="nav-number">2.4.3.2.</span> <span class="nav-text">运行过程</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E4%BB%BB%E5%8A%A1"><span class="nav-number">2.4.3.3.</span> <span class="nav-text">获取任务</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E7%BA%BF%E7%A8%8B%E9%80%80%E5%87%BA"><span class="nav-number">2.4.3.4.</span> <span class="nav-text">工作线程退出</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E8%B5%84%E6%BA%90"><span class="nav-number">2.4.4.</span> <span class="nav-text">释放资源</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BC%98%E9%9B%85%E4%B8%8B%E7%BA%BF"><span class="nav-number">2.4.4.1.</span> <span class="nav-text">优雅下线</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%BC%BA%E5%88%B6%E4%B8%8B%E7%BA%BF"><span class="nav-number">2.4.4.2.</span> <span class="nav-text">强制下线</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E8%B7%B5%E8%80%83%E9%87%8F%E5%9B%A0%E7%B4%A0"><span class="nav-number">2.5.</span> <span class="nav-text">实践考量因素</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BA%BF%E7%A8%8B%E6%B1%A0%E5%A4%A7%E5%B0%8F%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.1.</span> <span class="nav-text">线程池大小设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E9%98%9F%E5%88%97%E7%9A%84%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.2.</span> <span class="nav-text">任务队列的设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8B%92%E7%BB%9D%E7%AD%96%E7%95%A5%E7%9A%84%E8%AE%BE%E7%BD%AE"><span class="nav-number">2.5.3.</span> <span class="nav-text">拒绝策略的设置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%AF%E5%8A%A8%E5%89%8D%E7%9A%84%E9%A2%84%E7%83%AD"><span class="nav-number">2.5.4.</span> <span class="nav-text">启动前的预热</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E5%87%A0%E4%B8%AA%E9%97%AE%E9%A2%98"><span class="nav-number">2.5.5.</span> <span class="nav-text">需要注意的几个问题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ScheduledThreadPool"><span class="nav-number">3.</span> <span class="nav-text">ScheduledThreadPool</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E5%88%97%E8%A1%A8-1"><span class="nav-number">3.1.</span> <span class="nav-text">函数列表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">执行任务模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E6%AC%A1%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.2.1.</span> <span class="nav-text">单次执行任务</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%91%A8%E6%9C%9F%E6%89%A7%E8%A1%8C%E4%BB%BB%E5%8A%A1"><span class="nav-number">3.2.2.</span> <span class="nav-text">周期执行任务</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%BB%E5%8A%A1%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6"><span class="nav-number">3.3.</span> <span class="nav-text">任务触发机制</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ForkJoinPool"><span class="nav-number">4.</span> <span class="nav-text">ForkJoinPool</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#work-stealing%E6%9C%BA%E5%88%B6"><span class="nav-number">4.1.</span> <span class="nav-text">work-stealing机制</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -1102,7 +1163,7 @@ void setExecuteExistingDelayedTasksAfterShutdownPolicy(boolean value)<span aria-
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1115,7 +1176,7 @@ void setExecuteExistingDelayedTasksAfterShutdownPolicy(boolean value)<span aria-
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">269</span>
+        <span class="site-state-item-count">271</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

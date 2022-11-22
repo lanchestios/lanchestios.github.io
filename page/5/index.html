@@ -189,6 +189,99 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/08/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-6-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%8C%BA/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/08/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-6-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%8C%BA/" class="post-title-link" itemprop="url">数据密集型应用 分区</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-10-08 16:55:55" itemprop="dateCreated datePublished" datetime="2021-10-08T16:55:55+08:00">2021-10-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-11-22 12:12:54" itemprop="dateModified" datetime="2022-11-22T12:12:54+08:00">2022-11-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Data-Intensive-Applications/" itemprop="url" rel="index"><span itemprop="name">Data-Intensive Applications</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在第五章中，我们讨论了复制——即数据在不同节点上的副本，对于非常大的数据集，或非常高的吞吐量，仅仅进行复制是不够的：我们需要将数据进行<strong>分区（partitions）</strong>，也称为<strong>分片（sharding）</strong><sup><a href="#fn_i" id="reffn_i">i</a></sup>。</p>
+<blockquote id="fn_i">
+<sup>i</sup>. 正如本章所讨论的，分区是一种有意将大型数据库分解成小型数据库的方式。它与 <strong>网络分区（network partitions, netsplits）</strong> 无关，这是节点之间网络故障的一种。我们将在第八章讨论这些错误。<a href="#reffn_i" title="Jump back to footnote [i] in the text."> &#8617;</a>
+</blockquote>
+<blockquote>
+<p><strong>术语澄清</strong></p>
+<p>上文中的<strong>分区(partition)</strong>，在MongoDB，Elasticsearch和Solr Cloud中被称为<strong>分片(shard)</strong>，在HBase中称之为<strong>区域(Region)</strong>，Bigtable中则是 <strong>表块（tablet）</strong>，Cassandra和Riak中是<strong>虚节点（vnode)</strong>，Couchbase中叫做<strong>虚桶(vBucket)</strong>。但是<strong>分区(partitioning)</strong> 是最约定俗成的叫法。</p>
+</blockquote>
+<p>通常情况下，每条数据（每条记录，每行或每个文档）属于且仅属于一个分区。有很多方法可以实现这一点，本章将进行深入讨论。实际上，每个分区都是自己的小型数据库，尽管数据库可能支持同时进行多个分区的操作。</p>
+<p>分区主要是为了<strong>可伸缩性</strong>。不同的分区可以放在不共享集群中的不同节点上（请参阅第二部分关于无共享架构。因此，大数据集可以分布在多个磁盘上，并且查询负载可以分布在多个处理器上。</p>
+<p>对于在单个分区上运行的查询，每个节点可以独立执行对自己的查询，因此可以通过添加更多的节点来扩大查询吞吐量。大型，复杂的查询可能会跨越多个节点并行处理，尽管这也带来了新的困难。</p>
+<p>分区数据库在20世纪80年代由Teradata和NonStop SQL【1】等产品率先推出，最近因为NoSQL数据库和基于Hadoop的数据仓库重新被关注。有些系统是为事务性工作设计的，有些系统则用于分析（请参阅“<a href="ch3.md#事务处理还是分析">事务处理还是分析</a>”）：这种差异会影响系统的运作方式，但是分区的基本原理均适用于这两种工作方式。</p>
+<p>在本章中，我们将首先介绍分割大型数据集的不同方法，并观察索引如何与分区配合。然后我们将讨论<a href="#分区再平衡">分区再平衡（rebalancing）</a>，如果想要添加或删除集群中的节点，则必须进行再平衡。最后，我们将概述数据库如何将请求路由到正确的分区并执行查询。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/10/08/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-6-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%8C%BA/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
     <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/08/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-5-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%A4%8D%E5%88%B6/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -220,7 +313,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:54" itemprop="dateModified" datetime="2022-11-22T12:12:54+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -310,7 +403,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -406,7 +499,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:54" itemprop="dateModified" datetime="2022-11-22T12:12:54+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -489,7 +582,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:54" itemprop="dateModified" datetime="2022-11-22T12:12:54+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -580,7 +673,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -671,7 +764,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -752,7 +845,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -833,7 +926,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:53" itemprop="dateModified" datetime="2022-11-22T12:12:53+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -914,7 +1007,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
+                <time title="Modified: 2022-11-22 12:12:54" itemprop="dateModified" datetime="2022-11-22T12:12:54+08:00">2022-11-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -941,87 +1034,6 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2021/09/06/Spring-SpringMVC%E7%BB%84%E4%BB%B6%E8%A7%A3%E6%9E%90/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Wang Zihao">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lanchester Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/" class="post-title-link" itemprop="url">架构设计 秒杀系统设计方案</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-09-03 16:15:21" itemprop="dateCreated datePublished" datetime="2021-09-03T16:15:21+08:00">2021-09-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-11-08 14:56:58" itemprop="dateModified" datetime="2022-11-08T14:56:58+08:00">2022-11-08</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>简易描述了秒杀系统的设计思路。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/09/03/SE-%E7%A7%92%E6%9D%80%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1%E6%96%B9%E6%A1%88/#more" rel="contents">
                 Read more &raquo;
               </a>
             </div>
@@ -1110,7 +1122,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">135</span>
+          <span class="site-state-item-count">136</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1123,7 +1135,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">269</span>
+        <span class="site-state-item-count">271</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
