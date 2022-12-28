@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="ElasticSearch 提供的聚合分析功能有指标聚合（metrics aggregations）、桶聚合（bucket aggregations）、管道聚合（pipeline aggregations）和矩阵聚合（matrix aggregations）四大类。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ElasticSearch 聚合操作">
+<meta property="og:url" content="http://example.com/2022/12/28/ElasticSearch-%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="ElasticSearch 提供的聚合分析功能有指标聚合（metrics aggregations）、桶聚合（bucket aggregations）、管道聚合（pipeline aggregations）和矩阵聚合（matrix aggregations）四大类。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-12-28T04:11:20.000Z">
+<meta property="article:modified_time" content="2022-12-28T04:23:08.518Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="ElasticSearch">
+<meta property="article:tag" content="Aggregation">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2022/12/28/ElasticSearch-%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>ElasticSearch 聚合操作 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/12/28/ElasticSearch-%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          ElasticSearch 聚合操作
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-12-28 12:11:20 / Modified: 12:23:08" itemprop="dateCreated datePublished" datetime="2022-12-28T12:11:20+08:00">2022-12-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/ElasticSearch/" itemprop="url" rel="index"><span itemprop="name">ElasticSearch</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>ElasticSearch 提供的聚合分析功能有指标聚合（metrics aggregations）、桶聚合（bucket aggregations）、管道聚合（pipeline aggregations）和矩阵聚合（matrix aggregations）四大类。</p>
+<span id="more"></span>
+<h1 id="聚合方式"><a href="#聚合方式" class="headerlink" title="聚合方式"></a>聚合方式</h1><p>聚合可以有多种用法。</p>
+<h2 id="直接聚合"><a href="#直接聚合" class="headerlink" title="直接聚合"></a>直接聚合</h2><p>直接聚合指的是聚合时的 DSL 没有 query 子句，是直接对索引内的所有文档进行聚合。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">POST &#x2F;hotel&#x2F;_search
+&#123;   
+	&quot;size&quot;: 0, 
+	&quot;aggs&quot;: &#123;   
+	  	...
+	&#125; 
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="先查询后聚合"><a href="#先查询后聚合" class="headerlink" title="先查询后聚合"></a>先查询后聚合</h2><p>参加聚合的文档必须匹配 query 查询后进行聚合。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+&#123; 
+	&quot;size&quot;: 0, 
+	&quot;query&quot;: &#123;  &#x2F;&#x2F;指定查询query逻辑
+	  	...
+	&#125;,  
+	&quot;aggs&quot;: &#123;   
+		...
+	&#125; 
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="前过滤器"><a href="#前过滤器" class="headerlink" title="前过滤器"></a>前过滤器</h2><p>有时需要对聚合条件进一步地过滤，但是又不能影响当前的查询条件。例如用户进行酒店搜索时的搜索条件是天津的酒店，但是聚合时需要将非满房的酒店平均价格进行聚合并展示给用户。此时不能变更用户的查询条件，需要在聚合子句中添加过滤条件。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+&#123; 
+	&quot;size&quot;: 0,
+	&quot;query&quot;: &#123;        &#x2F;&#x2F;指定查询的query逻辑
+		&quot;term&quot;: &#123;  
+			&quot;city&quot;: &quot;天津&quot;
+		&#125;
+	&#125;, 
+	&quot;aggs&quot;: &#123; 
+		&quot;my_agg&quot;: &#123; 
+			&quot;filter&quot;: &#123;   &#x2F;&#x2F;指定过滤器逻辑
+				&quot;term&quot;: &#123; 
+					&quot;full_room&quot;: false
+				&#125;
+			&#125;,
+			&quot;aggs&quot;: &#123;     &#x2F;&#x2F;指定聚合逻辑      
+				&quot;my_avg&quot;: &#123;
+					&quot;avg&quot;: &#123;
+						&quot;field&quot;: &quot;price&quot;
+					&#125;
+				&#125;
+			&#125;
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="后过滤器"><a href="#后过滤器" class="headerlink" title="后过滤器"></a>后过滤器</h2><p>在有些场景中，需要根据条件进行数据查询，但是聚合的结果集不受影响。例如在酒店搜索场景中，用户的查询词为“假日”，此时应该展现全国各地标题中带有“假日”的酒店。但是用户身在北京，只希望给用户展示北京的酒店的平均价格，这时可以使用 ES 提供的后过滤器功能。该过滤器是在查询和聚合之后进行过滤的，因此它的过滤条件对聚合没有影响。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;size&quot;: 0,   
+	&quot;query&quot;: &#123;         &#x2F;&#x2F;指定查询的query逻辑  
+		&quot;match&quot;: &#123;      
+			&quot;title&quot;: &quot;假日&quot;    
+	    &#125;
+	&#125;, 
+	&quot;post_filter&quot;: &#123;   &#x2F;&#x2F;指定后过滤器逻辑   
+		&quot;term&quot;: &#123;      
+		    &quot;city&quot;: &quot;北京&quot; 
+		&#125;
+	&#125;,
+	&quot;aggs&quot;: &#123;          &#x2F;&#x2F;指定聚合逻辑
+	  	&quot;my_agg&quot;: &#123;
+	    	&quot;avg&quot;: &#123;  
+		      	&quot;field&quot;: &quot;price&quot;,
+		        &quot;missing&quot;:200 
+			&#125;
+	    &#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="指标聚合操作"><a href="#指标聚合操作" class="headerlink" title="指标聚合操作"></a>指标聚合操作</h1><h2 id="统计值聚合"><a href="#统计值聚合" class="headerlink" title="统计值聚合"></a>统计值聚合</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>计算值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>avg</td>
+<td>计算平均值</td>
+</tr>
+<tr>
+<td>max</td>
+<td>计算最大值</td>
+</tr>
+<tr>
+<td>min</td>
+<td>计算最小值</td>
+</tr>
+<tr>
+<td>sum</td>
+<td>计算加和值</td>
+</tr>
+<tr>
+<td>state</td>
+<td>计算最大值、最小值、平均值及加和值</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>以 avg 为例</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+&#123;   
+	&quot;size&quot;: 0,             &#x2F;&#x2F;设置size的意图是不显示命中的文档
+	&quot;aggs&quot;: &#123; 
+	  	&quot;my_agg&quot;: &#123;          &#x2F;&#x2F;聚合名称 
+	    	&quot;avg&quot;: &#123; 
+		      	&quot;field&quot;: &quot;price&quot; &#x2F;&#x2F;计算文档的平均价格  
+			&#125;
+	    &#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="非空值聚合"><a href="#非空值聚合" class="headerlink" title="非空值聚合"></a>非空值聚合</h2><p>统计字段非空值的个数</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;size&quot;: 0,
+	&quot;aggs&quot;: &#123; 
+	  	&quot;my_agg&quot;: &#123;  
+	    	&quot;value_count&quot;: &#123;                &#x2F;&#x2F;统计price字段中非空值的个数         
+	    		&quot;field&quot;: &quot;price&quot;
+	      &#125;
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>需要指出的是，如果判断的字段是数组类型，则 value_count 统计的是符合条件的所有文档中该字段数组中非空元素个数的总和，而不是数组的个数总和。因此在遇到 price 数组中有两个非空值元素时，count 值加 2。</p>
+<h1 id="桶聚合"><a href="#桶聚合" class="headerlink" title="桶聚合"></a>桶聚合</h1><h2 id="聚合方式-1"><a href="#聚合方式-1" class="headerlink" title="聚合方式"></a>聚合方式</h2><h3 id="单维度桶聚合"><a href="#单维度桶聚合" class="headerlink" title="单维度桶聚合"></a>单维度桶聚合</h3><p>最简单的桶聚合是单维度桶聚合，指的是按照一个维度对文档进行分组聚合。在桶聚合时，聚合的桶也需要匹配，匹配的方式有 terms、filter、ranges 等。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0, 
+	&quot;aggs&quot;: &#123;
+	  	&quot;my_agg&quot;: &#123;
+	    	&quot;terms&quot;: &#123;  
+		      	&#x2F;&#x2F;按照城市进行聚合 
+		        &quot;field&quot;: &quot;city&quot;
+		    &#125;
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="多维度桶嵌套聚合"><a href="#多维度桶嵌套聚合" class="headerlink" title="多维度桶嵌套聚合"></a>多维度桶嵌套聚合</h3><p>在某些业务需求中，不仅需要一个维度的桶聚合，而且还可能有多维度桶嵌套聚合的需求。例如在搜索酒店时，可能需要统计各个城市的满房和非满房状态下的酒店平均价格。ES 支持嵌套桶聚合，进行嵌套时，可以使用 aggs 子句进行子桶的继续嵌套，指标放在最里面的子桶内。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+&#123;  
+	&quot;size&quot;: 0,
+	&quot;aggs&quot;: &#123;  
+	  	&quot;group_city&quot;: &#123;     &#x2F;&#x2F;多维度桶名称 
+		    &quot;terms&quot;: &#123;  
+		      	&quot;field&quot;: &quot;city&quot;
+		    &#125;,
+		    &quot;aggs&quot;: &#123;         &#x2F;&#x2F;单维度桶  
+		      	&quot;group_full_room&quot;: &#123; 
+		        	&quot;terms&quot;: &#123;  
+			          	&quot;field&quot;: &quot;full_room&quot;
+			        &#125;,
+				    &quot;aggs&quot;: &#123;    &#x2F;&#x2F;聚合指标   
+			          	&quot;my_sum&quot;: &#123;  
+			            	&quot;avg&quot;: &#123; 
+				              	&quot;field&quot;: &quot;price&quot;,
+				                &quot;missing&quot;: 200
+				            &#125;
+			            &#125;
+			        &#125;
+		        &#125;
+		    &#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="聚合类型"><a href="#聚合类型" class="headerlink" title="聚合类型"></a>聚合类型</h2><h3 id="terms-聚合"><a href="#terms-聚合" class="headerlink" title="terms 聚合"></a>terms 聚合</h3><p>根据匹配条件分桶。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0, 
+	&quot;aggs&quot;: &#123;
+	  	&quot;my_agg&quot;: &#123;
+	    	&quot;terms&quot;: &#123;  
+		      	&#x2F;&#x2F;按照城市进行聚合 
+		        &quot;field&quot;: &quot;city&quot;
+		    &#125;
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="ranges-聚合"><a href="#ranges-聚合" class="headerlink" title="ranges 聚合"></a>ranges 聚合</h3><p>ranges 聚合匹配的是数值字段，表示按照数值范围进行分组。用户可以在 ranges 中添加分组，每个分组用 from 和 to 表示分组的起止数值。注意该分组包含起始数值，不包含终止数值。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0,
+	&quot;aggs&quot;: &#123; 
+	  	&quot;my_agg&quot;: &#123; 
+	    	&quot;range&quot;: &#123; 
+		      	&quot;field&quot;: &quot;price&quot;, 
+		      	&#x2F;&#x2F;多个范围桶
+		        &quot;ranges&quot;: [
+		        	&#123;
+			          	&quot;to&quot;: 200        &#x2F;&#x2F;不指定from，默认from为0
+			        &#125;,
+			        &#123; 
+			          	&quot;from&quot;: 200,
+			            &quot;to&quot;: 500 
+			        &#125;,
+			        &#123; 
+			          	&quot;from&quot;: 500      &#x2F;&#x2F;不指定to，默认to为该字段最大值     
+			        &#125;
+		        ]
+	        &#125;
+	    &#125;
+    &#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="histogram-聚合"><a href="#histogram-聚合" class="headerlink" title="histogram 聚合"></a>histogram 聚合</h3><h4 id="histogram-直方图聚合"><a href="#histogram-直方图聚合" class="headerlink" title="histogram 直方图聚合"></a>histogram 直方图聚合</h4><p>根据指定的间隔构造存储桶。 属于每个间隔的值将形成一个间隔存储桶。</p>
+<pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /hotel/_search
+&#123;
+	"size": 0, 
+	"query": &#123;
+		"range": &#123;
+			"createTime": &#123;
+				"gte": "2022-12-21 00:00:00",
+				"lte": "2022-12-21 12:00:00"
+			&#125;
+		&#125;
+	&#125;, 
+	"aggs": &#123;
+		"histogram_agg": &#123;
+			"histogram": &#123;
+				"field": "money",
+				"interval": 200
+			&#125;
+		&#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>上述分区理论上应为 0-200、200-400 … 没有目标落在0-200、200-400 区间内。 因此，第一个存储区从 400-600 间隔开始。 因此，值最小的文档将确定最小存储桶（最小 key 的存储桶）。 相应地，具有最高值的文档将确定最大存储桶（具有最高 key 的存储桶）。</p>
+<p>我们可以使用 <code>extended_bounds</code> 设置来强制直方图聚合，以根据特定的最小值开始构建其存储桶，并继续构建存储桶直至达到最大值（即使不再有文档）。 假设有如下情况：</p>
+<ol>
+<li>数据存在于 200-600 之间，<code>extended_bounds</code> 设置为 0-800，展示结果为 0-800</li>
+<li>数据存在于 0-600 之间，<code>extended_bounds</code> 设置为 0-200，展示结果为 0-600<br>即其区间取值为数据区间与 <code>extended_bounds</code> 设置区间的交集，因此在实际使用中，可以将查询过滤范围和 <code>extended_bounds</code> 区间保持一致。</li>
+</ol>
+<p><code>min_doc_count</code> 也会影响存储桶的区间。有如下几种情况：</p>
+<ol>
+<li>当设置为大于 0 时，使用 <code>extended_bounds</code>，仅会输出满足最小文档计数的桶</li>
+<li>当设计为 0 时，返回所有桶</li>
+</ol>
+<h4 id="date-histogram-时间直方图聚合"><a href="#date-histogram-时间直方图聚合" class="headerlink" title="date_histogram 时间直方图聚合"></a>date_histogram 时间直方图聚合</h4><p>这个聚合类似于正常的直方图，但只能与日期或日期范围值一起使用。 与直方图聚合聚合的主要区别在于，可以使用日期/时间表达式指定间隔。 基于时间的数据需要特殊的支持，因为基于时间的间隔并不总是固定的长度。</p>
+<pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /hotel/_search
+&#123;
+	"size": 0, 
+	"query": &#123;
+		"range": &#123;
+			"createTime": &#123;
+				"gte": "2022-12-21 00:00:00",
+				"lte": "2022-12-21 12:00:00"
+			&#125;
+		&#125;
+	&#125;, 
+	"aggs": &#123;
+		"histogram_agg": &#123;
+			"date_histogram": &#123;
+				"field": "createTime",
+				"fixed_interval": "1h"
+			&#125;
+		&#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>fixed_interval (时间间隔) 的可用表达式：</strong></p>
+<ul>
+<li>year（1y）年</li>
+<li>quarter（1q）季度</li>
+<li>month（1M）月份</li>
+<li>week（1w）星期</li>
+<li>day（1d）天</li>
+<li>hour（1h）小时</li>
+<li>minute（1m）分钟</li>
+<li>second（1s）秒</li>
+</ul>
+<h3 id="地理距离聚合"><a href="#地理距离聚合" class="headerlink" title="地理距离聚合"></a>地理距离聚合</h3><p>使用地理距离聚合，您可以定义一个原点和到该点的一组距离范围。然后，聚合将评估每个 geo_point 值到原点的距离，并确定文档属于哪个范围。如果文档的 geo_point 值与原点之间的距离落入该存储桶的距离范围内，则该文档被视为属于该存储桶。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+&#123;
+	&quot;size&quot;: 0,
+	&quot;aggs&quot;: &#123;
+	  	&quot;my_agg&quot;: &#123; 
+	    	&quot;geo_distance&quot;: &#123;
+		      	&quot;field&quot;: &quot;location&quot;,
+		        &quot;origin&quot;: &#123;    &#x2F;&#x2F;指定聚合的中心点经纬度
+			        &quot;lat&quot;:  39.915143,
+			        &quot;lon&quot;: 116.4039
+		        &#125;,
+		        &quot;unit&quot;: &quot;km&quot;,  &#x2F;&#x2F;指定聚合时的距离计量单位
+		        &quot;ranges&quot;: [    &#x2F;&#x2F;指定每一个聚合桶的距离范围 
+			        &#123;  
+			          	&quot;to&quot;: 3 
+			        &#125;,
+			        &#123;
+			          	&quot;from&quot;: 3,
+			            &quot;to&quot;:10
+			        &#125;,
+			        &#123; 
+			          	&quot;from&quot;: 10
+			        &#125;
+		        ]
+		    &#125;
+	    &#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="IP-范围聚合"><a href="#IP-范围聚合" class="headerlink" title="IP 范围聚合"></a>IP 范围聚合</h3><p>Elasticsearch 还具有对 IP 范围的内置支持。 IP聚合的工作方式与其他范围聚合类似。</p>
+<p>让我们为 IP 地址创建索引映射，以说明此聚合的工作方式：</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">PUT &#x2F;ips
+&#123;
+	&quot;mappings&quot;: &#123;
+	    &quot;properties&quot;: &#123;
+		    &quot;ip_addr&quot;: &#123;
+		        &quot;type&quot;: &quot;ip&quot;
+		    &#125;
+	    &#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>当索引中包含一些数据时，让我们创建一个IP范围聚合：</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET ips&#x2F;_search
+&#123;
+	&quot;size&quot;: 0,
+	&quot;aggs&quot;: &#123;
+	    &quot;ip_ranges&quot;: &#123;
+		    &quot;ip_range&quot;: &#123;
+		        &quot;field&quot;: &quot;ip_addr&quot;,
+				&quot;ranges&quot;: [
+					&#123;
+						&quot;to&quot;: &quot;172.16.0.4&quot;
+					&#125;,
+					&#123;
+						&quot;from&quot;: &quot;172.16.0.4&quot;
+					&#125;
+				]
+		    &#125;
+	    &#125;
+	&#125;
+&#125;
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="聚合排序"><a href="#聚合排序" class="headerlink" title="聚合排序"></a>聚合排序</h1><p>ES 对于聚合结果的默认排序规则有时并非是我们期望的。可以使用 ES 提供的 sort 子句进行自定义排序，有多种排序方式供用户选择：可以按照聚合后的文档计数的大小进行排序；可以按照聚合后的某个指标进行排序；还可以按照每个组的名称进行排序。</p>
+<h2 id="按文档计数排序"><a href="#按文档计数排序" class="headerlink" title="按文档计数排序"></a>按文档计数排序</h2><pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0, 
+	&quot;aggs&quot;: &#123; 
+	  	&quot;group_city&quot;: &#123;
+	    	&quot;terms&quot;: &#123;
+		      	&quot;field&quot;: &quot;city&quot;,
+			    &quot;order&quot;: &#123;    &#x2F;&#x2F;按照文档计数进行升序排列       
+		        	&quot;_count&quot;: &quot;asc&quot;
+		        &#125;
+		    &#125;
+	    &#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="按聚合指标排序"><a href="#按聚合指标排序" class="headerlink" title="按聚合指标排序"></a>按聚合指标排序</h2><pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0,  
+	&quot;aggs&quot;: &#123;    
+	  	&quot;group_city&quot;: &#123;
+	    	&quot;terms&quot;: &#123;  
+		      	&quot;field&quot;: &quot;city&quot;, 
+		        &quot;order&quot;: &#123;       &#x2F;&#x2F;按照聚合指标进行升序排列 
+			        &quot;my_avg&quot;: &quot;asc&quot;
+		        &#125;
+		    &#125;,
+		    &quot;aggs&quot;: &#123;  
+		    	&quot;my_avg&quot;: &#123;        &#x2F;&#x2F;定义聚合指标    
+		      	&quot;avg&quot;: &#123;  
+				    &quot;field&quot;: &quot;price&quot;, 
+			        &quot;missing&quot;: 200  
+		        &#125;
+		      &#125;
+		    &#125;
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="按分组Key排序"><a href="#按分组Key排序" class="headerlink" title="按分组Key排序"></a>按分组Key排序</h2><pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0, 
+	&quot;aggs&quot;: &#123; 
+	  	&quot;group_city&quot;: &#123;  
+	    	&quot;terms&quot;: &#123;  
+	      	&quot;field&quot;: &quot;city&quot;, 
+	        &quot;order&quot;: &#123;     &#x2F;&#x2F;按照分桶key的自然顺序升序排列 
+	        	&quot;_key&quot;: &quot;asc&quot; 
+	        &#125;
+	      &#125;,
+	      &quot;aggs&quot;: &#123;
+	      	&quot;my_avg&quot;: &#123;    &#x2F;&#x2F;定义聚合指标  
+	        	&quot;avg&quot;: &#123; 
+	          	&quot;field&quot;: &quot;price&quot;, 
+	            &quot;missing&quot;: 200
+	          &#125;
+	        &#125;
+	      &#125;
+	    &#125;
+    &#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="聚合分页"><a href="#聚合分页" class="headerlink" title="聚合分页"></a>聚合分页</h1><h2 id="Top-hits-聚合"><a href="#Top-hits-聚合" class="headerlink" title="Top hits 聚合"></a>Top hits 聚合</h2><p>Top hits 聚合指的是聚合时在每个分组内部按照某个规则选出前 N 个文档进行展示。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;size&quot;: 0,
+	&quot;query&quot;: &#123; 
+	  	&quot;match&quot;: &#123; 
+	    	&quot;title&quot;: &quot;金都&quot;
+	    &#125;
+	&#125;,
+	&quot;aggs&quot;: &#123; 
+		&quot;group_city&quot;: &#123;      &#x2F;&#x2F;按照城市进行桶聚合  
+			&quot;terms&quot;: &#123;
+				&quot;field&quot;: &quot;city&quot;
+			&#125;,
+		    &quot;aggs&quot;: &#123; 
+				&quot;my_avg&quot;: &#123;  
+					&quot;top_hits&quot;: &#123;  &#x2F;&#x2F;指定返回每个桶的前3个文档
+						&quot;size&quot;: 3
+					&#125;
+			    &#125;
+		    &#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Collapse-聚合"><a href="#Collapse-聚合" class="headerlink" title="Collapse 聚合"></a>Collapse 聚合</h2><p>当在索引中有大量数据命中时，Top hits 聚合存在效率问题，并且需要用户自行排序。针对上述问题，ES 推出了 Collapse 聚合，即用户可以在 collapse 子句中指定分组字段，匹配 query 的结果按照该字段进行分组，并在每个分组中按照得分高低展示组内的文档。当用户在 query 子句外指定 from 和 size 时，将作用在 Collapse 聚合之后，即此时的分页是作用在分组之后的。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;from&quot;: 0,    &#x2F;&#x2F;指定分页的起始位置 
+	&quot;size&quot;: 5,    &#x2F;&#x2F;指定每页返回的数量
+	&quot;query&quot;: &#123;    &#x2F;&#x2F;指定查询的query逻辑 
+	    &quot;match&quot;: &#123;       
+	    	&quot;title&quot;: &quot;金都&quot;  
+	    &#125;
+	&#125;, 
+	&quot;collapse&quot;: &#123; &#x2F;&#x2F;指定按照城市进行Collapse聚合   
+		&quot;field&quot;: &quot;city&quot;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/ElasticSearch/" rel="tag"># ElasticSearch</a>
+              <a href="/tags/Aggregation/" rel="tag"># Aggregation</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/11/22/Spring-Config-Log4j%E6%97%A5%E5%BF%97/" rel="prev" title="Spring Log4j">
+      <i class="fa fa-chevron-left"></i> Spring Log4j
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E8%81%9A%E5%90%88"><span class="nav-number">1.1.</span> <span class="nav-text">直接聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%88%E6%9F%A5%E8%AF%A2%E5%90%8E%E8%81%9A%E5%90%88"><span class="nav-number">1.2.</span> <span class="nav-text">先查询后聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.3.</span> <span class="nav-text">前过滤器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8E%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.4.</span> <span class="nav-text">后过滤器</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8C%87%E6%A0%87%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C"><span class="nav-number">2.</span> <span class="nav-text">指标聚合操作</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%9F%E8%AE%A1%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.1.</span> <span class="nav-text">统计值聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%9E%E7%A9%BA%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.2.</span> <span class="nav-text">非空值聚合</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.</span> <span class="nav-text">桶聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F-1"><span class="nav-number">3.1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E7%BB%B4%E5%BA%A6%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.1.1.</span> <span class="nav-text">单维度桶聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E7%BB%B4%E5%BA%A6%E6%A1%B6%E5%B5%8C%E5%A5%97%E8%81%9A%E5%90%88"><span class="nav-number">3.1.2.</span> <span class="nav-text">多维度桶嵌套聚合</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E7%B1%BB%E5%9E%8B"><span class="nav-number">3.2.</span> <span class="nav-text">聚合类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#terms-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.1.</span> <span class="nav-text">terms 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ranges-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.2.</span> <span class="nav-text">ranges 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#histogram-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.</span> <span class="nav-text">histogram 聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#histogram-%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.1.</span> <span class="nav-text">histogram 直方图聚合</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#date-histogram-%E6%97%B6%E9%97%B4%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.2.</span> <span class="nav-text">date_histogram 时间直方图聚合</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E8%81%9A%E5%90%88"><span class="nav-number">3.2.4.</span> <span class="nav-text">地理距离聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IP-%E8%8C%83%E5%9B%B4%E8%81%9A%E5%90%88"><span class="nav-number">3.2.5.</span> <span class="nav-text">IP 范围聚合</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%8E%92%E5%BA%8F"><span class="nav-number">4.</span> <span class="nav-text">聚合排序</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%96%87%E6%A1%A3%E8%AE%A1%E6%95%B0%E6%8E%92%E5%BA%8F"><span class="nav-number">4.1.</span> <span class="nav-text">按文档计数排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E8%81%9A%E5%90%88%E6%8C%87%E6%A0%87%E6%8E%92%E5%BA%8F"><span class="nav-number">4.2.</span> <span class="nav-text">按聚合指标排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E5%88%86%E7%BB%84Key%E6%8E%92%E5%BA%8F"><span class="nav-number">4.3.</span> <span class="nav-text">按分组Key排序</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E5%88%86%E9%A1%B5"><span class="nav-number">5.</span> <span class="nav-text">聚合分页</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Top-hits-%E8%81%9A%E5%90%88"><span class="nav-number">5.1.</span> <span class="nav-text">Top hits 聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Collapse-%E8%81%9A%E5%90%88"><span class="nav-number">5.2.</span> <span class="nav-text">Collapse 聚合</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">137</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">272</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
