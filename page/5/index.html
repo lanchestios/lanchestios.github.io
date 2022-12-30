@@ -189,6 +189,94 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/11/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-8-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E7%9A%84%E9%BA%BB%E7%83%A6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/11/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-8-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E7%9A%84%E9%BA%BB%E7%83%A6/" class="post-title-link" itemprop="url">数据密集型应用 分布式系统的麻烦</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-10-11 18:48:44" itemprop="dateCreated datePublished" datetime="2021-10-11T18:48:44+08:00">2021-10-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Data-Intensive-Applications/" itemprop="url" rel="index"><span itemprop="name">Data-Intensive Applications</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>最近几章中反复出现的主题是，系统如何处理错误的事情。例如，我们讨论了<strong>副本故障切换</strong>（“<a href="ch5.md#处理节点宕机">处理节点中断</a>”），<strong>复制延迟</strong>（“<a href="ch5.md#复制延迟问题">复制延迟问题</a>”）和事务控制（“<a href="ch7.md#弱隔离级别">弱隔离级别</a>”）。当我们了解可能在实际系统中出现的各种边缘情况时，我们会更好地处理它们。</p>
+<p>但是，尽管我们已经谈了很多错误，但之前几章仍然过于乐观。现实更加黑暗。我们现在将悲观主义最大化，假设任何可能出错的东西<strong>都会</strong>出错<sup><a href="#fn_i" id="reffn_i">i</a></sup>。（经验丰富的系统运维会告诉你，这是一个合理的假设。如果你问得好，他们可能会一边治疗心理创伤一边告诉你一些可怕的故事）</p>
+<blockquote id="fn_i">
+<sup>i</sup>. 除了一个例外：我们将假定故障是非拜占庭式的（请参阅“<a href="#拜占庭故障">拜占庭故障</a>”）。<a href="#reffn_i" title="Jump back to footnote [i] in the text."> &#8617;</a>
+</blockquote>
+<p>使用分布式系统与在一台计算机上编写软件有着根本的区别，主要的区别在于，有许多新颖和刺激的方法可以使事情出错【1,2】。在这一章中，我们将了解实践中出现的问题，理解我们能够依赖，和不可以依赖的东西。</p>
+<p>最后，作为工程师，我们的任务是构建能够完成工作的系统（即满足用户期望的保证），尽管一切都出错了。 在<a href="ch9.md">第九章</a>中，我们将看看一些可以在分布式系统中提供这种保证的算法的例子。 但首先，在本章中，我们必须了解我们面临的挑战。</p>
+<p>本章对分布式系统中可能出现的问题进行彻底的悲观和沮丧的总结。 我们将研究网络的问题（“<a href="#不可靠的网络">不可靠的网络</a>”）; 时钟和时序问题（“<a href="#不可靠的时钟">不可靠的时钟</a>”）; 我们将讨论他们可以避免的程度。 所有这些问题的后果都是困惑的，所以我们将探索如何思考一个分布式系统的状态，以及如何推理发生的事情（“<a href="#知识、真相与谎言">知识、真相与谎言</a>”）。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/10/11/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-8-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E7%9A%84%E9%BA%BB%E7%83%A6/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
     <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/11/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-7-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E4%BA%8B%E5%8A%A1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -220,7 +308,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -313,7 +401,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -406,7 +494,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -496,7 +584,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -592,7 +680,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -675,7 +763,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -766,7 +854,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -857,7 +945,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -938,7 +1026,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
+                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -965,87 +1053,6 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Wang Zihao">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lanchester Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/" class="post-title-link" itemprop="url">Spring 类型转换框架 Editor 和 Converter</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-09-10 11:01:00" itemprop="dateCreated datePublished" datetime="2021-09-10T11:01:00+08:00">2021-09-10</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-28 12:23:08" itemprop="dateModified" datetime="2022-12-28T12:23:08+08:00">2022-12-28</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>Spring 类型转换框架经过了几个版本的演进，由 PropertyEditor Framework 转变为 Converter Framework + Formatter Framework 的形式，其为 SpringMVC 的字段转换提供了丰富的功能，保证了在 Web 字段处理的安全、高效进行。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/09/10/Spring-%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2%E6%A1%86%E6%9E%B6Editor%E5%92%8CConverter/#more" rel="contents">
                 Read more &raquo;
               </a>
             </div>
@@ -1134,7 +1141,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">137</span>
+          <span class="site-state-item-count">138</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1147,7 +1154,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">272</span>
+        <span class="site-state-item-count">273</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="ElasticSearch 提供的搜索功能有单条件查询、复合查询、全文查询、地理位置查询四大类，而且提供了搜索建议和一些辅助功能。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="ElasticSearch 搜索操作">
+<meta property="og:url" content="http://example.com/2022/12/30/ElasticSearch-2-%E6%90%9C%E7%B4%A2%E6%93%8D%E4%BD%9C/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="ElasticSearch 提供的搜索功能有单条件查询、复合查询、全文查询、地理位置查询四大类，而且提供了搜索建议和一些辅助功能。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-12-30T06:55:30.000Z">
+<meta property="article:modified_time" content="2022-12-30T06:57:56.589Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="ElasticSearch">
+<meta property="article:tag" content="Search">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2022/12/30/ElasticSearch-2-%E6%90%9C%E7%B4%A2%E6%93%8D%E4%BD%9C/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>ElasticSearch 搜索操作 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/12/30/ElasticSearch-2-%E6%90%9C%E7%B4%A2%E6%93%8D%E4%BD%9C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          ElasticSearch 搜索操作
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2022-12-30 14:55:30 / Modified: 14:57:56" itemprop="dateCreated datePublished" datetime="2022-12-30T14:55:30+08:00">2022-12-30</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/ElasticSearch/" itemprop="url" rel="index"><span itemprop="name">ElasticSearch</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>ElasticSearch 提供的搜索功能有单条件查询、复合查询、全文查询、地理位置查询四大类，而且提供了搜索建议和一些辅助功能。</p>
+<span id="more"></span>
+<h1 id="查询全部"><a href="#查询全部" class="headerlink" title="查询全部"></a>查询全部</h1><pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123; 
+	  	&quot;match_all&quot;: &#123;
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="单条件查询"><a href="#单条件查询" class="headerlink" title="单条件查询"></a>单条件查询</h1><h2 id="Term-查询"><a href="#Term-查询" class="headerlink" title="Term 查询"></a>Term 查询</h2><p>term 查询是结构化精准查询的主要查询方式，用于查询待查字段和查询值是否完全匹配。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123; 
+  	&quot;term&quot;: &#123; 
+    	&quot;$&#123;FIELD&#125;&quot;: &#123;   &#x2F;&#x2F;搜索字段名称
+      	&quot;value&quot;: &quot;$&#123;VALUE&#125;&quot;  &#x2F;&#x2F;搜索值 
+      &#125;
+    &#125;
+  &#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p>FIELD 的数据类型可以是数值型、布尔型、日期型、数组型及关键字等</p>
+</blockquote>
+<h2 id="Terms-查询"><a href="#Terms-查询" class="headerlink" title="Terms 查询"></a>Terms 查询</h2><p>terms 查询是 term 查询的扩展形式，用于查询一个或多个值与待查字段是否完全匹配。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET  &#x2F;$&#123;index_name&#125;&#x2F;_search  
+
+&#123;   
+	&quot;query&quot;: &#123;  
+  	&quot;terms&quot;: &#123;
+  	  &#x2F;&#x2F;指定查询字段，多个值之间用逗号分隔
+    	&quot;FIELD&quot;: [&quot;VALUE1&quot;,&quot;VALUE2&quot;, … ]     
+    &#125;
+  &#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Range-查询"><a href="#Range-查询" class="headerlink" title="Range 查询"></a>Range 查询</h2><p>range 查询用于范围查询，一般是对数值型和日期型数据的查询。使用 range 进行范围查询时，用户可以按照需求中是否包含边界数值进行选项设置，可供组合的选项如下：</p>
+<ul>
+<li>gt：大于</li>
+<li>lt：小于</li>
+<li>gte：大于或等于</li>
+<li>lte：小于或等于</li>
+</ul>
+<pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /$&#123;index_name&#125;/_search 
+
+&#123;   
+	"query": &#123;    
+		"range": &#123;        
+	    	"price": &#123;     //指定字段为price，此处包含边界值
+		      	"gte": 300,
+		        "lte": 500
+			&#125;
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Exists-查询"><a href="#Exists-查询" class="headerlink" title="Exists 查询"></a>Exists 查询</h2><p>在某些场景下，我们希望找到某个字段不为空的文档，则可以用 exists 搜索。</p>
+<p>字段不为空的条件有：</p>
+<ul>
+<li>值存在且不是 null</li>
+<li>值不是空数组</li>
+<li>值是数组，但不是[null]</li>
+</ul>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123;    
+		&quot;exists&quot;: &#123;          
+			&#x2F;&#x2F;查询tag字段不为空的文档
+		    &quot;field&quot;: &quot;tag&quot;     
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="复合查询（Bool-查询）"><a href="#复合查询（Bool-查询）" class="headerlink" title="复合查询（Bool 查询）"></a>复合查询（Bool 查询）</h1><p>复合搜索，顾名思义是一种在一个搜索语句中包含一种或多种搜索子句的搜索。</p>
+<p>布尔查询是常用的复合查询，它把多个子查询组合成一个布尔表达式，这些子查询之间的逻辑关系是“与”，即所有子查询的结果都为 true 时布尔查询的结果才为真。布尔查询还可以按照各个子查询的具体匹配程度对文档进行打分计算。布尔查询支持的子查询有四种，各子查询的名称和功能如下表所示。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>子查询名称</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>must</td>
+<td>必须匹配该查询条件</td>
+</tr>
+<tr>
+<td>should</td>
+<td>可以匹配该查询条件</td>
+</tr>
+<tr>
+<td>must not</td>
+<td>必须不匹配该查询条件</td>
+</tr>
+<tr>
+<td>filter</td>
+<td>必须匹配过滤条件，不进行打分计算</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="Must-查询"><a href="#Must-查询" class="headerlink" title="Must 查询"></a>Must 查询</h2><p>当查询中包含 must 查询时，相当于逻辑查询中的“与”查询。命中的文档必须匹配该子查询的结果，并且 ES 会将该子查询与文档的匹配程度值加入总得分里。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123;  
+	  	&quot;bool&quot;: &#123;
+	  		&#x2F;&#x2F;must查询，数组内可封装各类子查询
+	    	&quot;must&quot;: [                         
+	    		&#123;                     
+		        	&quot;term&quot;: &#123; 
+			          	&quot;city&quot;: &#123; &quot;value&quot;: &quot;北京&quot; &#125;
+			        &#125;
+		        &#125;,
+		        &#123;
+		        	&quot;range&quot;: &#123; 
+			          	&quot;price&quot;: &#123;  
+			            	&quot;gte&quot;: 350,
+				            &quot;lte&quot;: 400
+			            &#125;
+			        &#125;
+		        &#125;
+		    ]
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Should-查询"><a href="#Should-查询" class="headerlink" title="Should 查询"></a>Should 查询</h2><p>当查询中包含 should 查询时，表示当前查询为“或”查询。命中的文档可以匹配该查询中的一个或多个子查询的结果，并且 ES 会将该查询与文档的匹配程度加入总得分里。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search
+&#123; 
+	&quot;query&quot;: &#123;
+	  	&quot;bool&quot;: &#123; 
+	  		&#x2F;&#x2F;shoud查询，数组内可封装各类子查询
+	    	&quot;should&quot;: [      
+				&#123;                         
+					&quot;term&quot;: &#123; 
+						&quot;city&quot;: &#123; &quot;value&quot;: &quot;北京&quot; &#125; 
+					&#125;
+				&#125;,
+				&#123;                        
+					&quot;term&quot;: &#123;
+						&quot;city&quot;: &#123; &quot;value&quot;: &quot;天津&quot; &#125;
+					&#125;
+				&#125;
+			]
+	    &#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Must-Not-查询"><a href="#Must-Not-查询" class="headerlink" title="Must Not 查询"></a>Must Not 查询</h2><p>当查询中包含 must not 查询时，表示当前查询为“非”查询。命中的文档不能匹配该查询中的一个或多个子查询的结果，ES 会将该查询与文档的匹配程度加入总得分里。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search
+&#123; 
+	&quot;query&quot;: &#123;
+		&quot;bool&quot;: &#123; 
+			&#x2F;&#x2F;must_not查询，数组内可封装各类子查询
+			&quot;must_not&quot;: [      
+				&#123;                         
+					&quot;term&quot;: &#123; 
+						&quot;city&quot;: &#123; &quot;value&quot;: &quot;北京&quot; &#125; 
+					&#125;
+				&#125;,
+				&#123;                        
+					&quot;term&quot;: &#123;
+						&quot;city&quot;: &#123; &quot;value&quot;: &quot;天津&quot; &#125;
+					&#125;
+				&#125;
+			]
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Filter-查询"><a href="#Filter-查询" class="headerlink" title="Filter 查询"></a>Filter 查询</h2><p>filter 查询即过滤查询，该查询是布尔查询里非常独特的一种查询。其他布尔查询关注的是查询条件和文档的匹配程度，并按照匹配程度进行打分；而 filter 查询关注的是查询条件和文档是否匹配，不进行相关的打分计算，但是会对部分匹配结果进行缓存。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;$&#123;index_name&#125;&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123; 
+		&quot;bool&quot;: &#123;
+			&#x2F;&#x2F; filter查询，数组内可封装各类子查询
+			&quot;filter&quot;: [                  
+				&#123;                
+					&quot;term&quot;: &#123; &quot;city&quot;: &quot;北京&quot; &#125;        
+				&#125;,
+				&#123;                    
+					&quot;term&quot;: &#123; &quot;full_room&quot;: false &#125;
+				&#125;
+			]
+		&#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p><strong>Filter 查询原理</strong></p>
+<p>假设当前有五个文档。</p>
+<p>ES 对 city 字段的倒排索引结构如下表：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>关键词</th>
+<th>文档</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>北京</td>
+<td>doc1,doc5</td>
+</tr>
+<tr>
+<td>天津</td>
+<td>doc2,doc4</td>
+</tr>
+<tr>
+<td>上海</td>
+<td>doc3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>ES 对于是否满房字段倒排的索引结构如下表：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>关键词</th>
+<th>文档</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>true</td>
+<td>doc1,doc2,doc5</td>
+</tr>
+<tr>
+<td>false</td>
+<td>doc3,doc4</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>当 ES 执行过滤条件时，会查询缓存中是否有 city 字段值为“北京”对应的 bitset 数据，如果没有则构建并放入缓存。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>城市字段</th>
+<th>bitset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>北京</td>
+<td>1,0,0,0,1</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>满房字段</th>
+<th>bitset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>True</td>
+<td>1,1,0,0,1</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>接下来 ES 会遍历查询条件的 bitset 数组，按照文档命中与否进行文档过滤。当一个请求中有多个 filter 查询条件时，ES 会构建多个 bitset 数组。为提升效率，ES 会从最稀疏的数组开始遍历，因为遍历稀疏的数组可以过滤掉更多的文档。</p>
+<p>遍历计算完成后，得到匹配所有过滤条件的文档，即 doc1 和 doc5。</p>
+<p>filter cache 会跟踪每一个 filter 查询，ES 筛选一部分 filter 查询的 bitset 进行缓存。首先，这些过滤条件要在最近 256 个查询中出现过；其次，这些过滤条件的次数必须超过某个阈值。</p>
+<p>另外，filter cache 是有自动更新机制的，即如果有新增文档或者文档被修改过，那么filter cache 对应的过滤条件中的 bitset 将被更新。例如城市为“北京”过滤条件对应的 bitset 为 [1,0,0,0,1]，如果文档 4 的城市被修改为“北京”，则“北京”过滤条件对应的 bitset 会被自动更新为 [1,0,0,1,1]。</p>
+<p>filter 查询带来的效益远不止这些，使用 filter 查询的子句是不计算分数的，这可以减少不小的时间开销。</p>
+</blockquote>
+<h1 id="全文查询"><a href="#全文查询" class="headerlink" title="全文查询"></a>全文查询</h1><p>不同于结构化查询，全文搜索首先对查询词进行分析，然后根据查询词的分词结果构建查询。这里所说的全文指的是文本类型数据（text类型）。结构化搜索关注的是数据是否匹配，全文搜索关注的是匹配的程度；结构化搜索一般用于精确匹配，而全文搜索用于部分匹配。</p>
+<h2 id="Match-查询"><a href="#Match-查询" class="headerlink" title="Match 查询"></a>Match 查询</h2><p>match 查询是全文搜索的主要代表。对于最基本的 match 搜索来说，只要分词中的一个或者多个在文档中存在即可。</p>
+<p>在默认情况下，match 查询使用的是标准分词器。该分词器比较适用于英文，如果是中文则按照字进行切分，因此默认的分词器不适合做中文搜索。例如搜索“金都酒店”，查询词先被分词器切分为“金”“都”“酒”“店”，因此，只要文档中包含这 4 个字中的任何一个字，都会被搜索到。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123;     
+		&quot;match&quot;: &#123;            
+			&quot;title&quot;: &#123;
+				&quot;query&quot;: &quot;金都酒店&quot;  
+			&#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>我们也可以设置 operator 参数来决定分词后的词集合是进行“与”匹配还是“或”匹配。</p>
+<p><strong>“与”匹配</strong></p>
+<p>全文必须包含所有分词组合</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;       
+	&quot;query&quot;: &#123;     
+		&quot;match&quot;: &#123;     
+			&quot;title&quot;:&#123;
+				&quot;query&quot;: &quot;金都&quot;,
+				&#x2F;&#x2F;查询词之间的匹配结果为“与”关系
+				&#x2F;&#x2F;或操作符是 or &#x2F; 与操作符是 and
+				&quot;operator&quot;:&quot;and&quot;          
+			&#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>“或”匹配</strong></p>
+<p>全文包含分词组合</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;       
+	&quot;query&quot;: &#123;     
+		&quot;match&quot;: &#123;     
+			&quot;title&quot;:&#123;
+				&quot;query&quot;: &quot;金都&quot;,
+				&#x2F;&#x2F;查询词之间的匹配结果为“或”关系
+				&quot;operator&quot;:&quot;or&quot;          
+			&#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>有时搜索多个关键字，关键词和文档在某一个比例上匹配即可，如果使用“与”操作过于严苛，如果使用“或”操作又过于宽松。这时可以采用 minimum_should_match 参数，该参数叫作最小匹配参数，其值为一个数值，意义为可以匹配上的词的个数。在一般情况下将其设置为一个百分数，因为在真实场景中并不能精确控制具体的匹配数量。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+
+&#123;   
+	&quot;query&quot;: &#123; 
+  	&quot;match&quot;: &#123; 
+    	&quot;title&quot;: &#123;  &#x2F;&#x2F;match搜索条件
+      	&quot;query&quot;: &quot;金都&quot;, 
+        &quot;operator&quot;: &quot;or&quot;, 
+        &quot;minimum_should_match&quot;: &quot;80%&quot;  &#x2F;&#x2F;设置最小匹配度为80%    
+      &#125;
+    &#125;
+  &#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="MultiMatch-查询"><a href="#MultiMatch-查询" class="headerlink" title="MultiMatch 查询"></a>MultiMatch 查询</h2><p>有时用户需要在多个字段中查询关键词，除了使用布尔查询封装多个 match 查询之外，可替代的方案是使用 multi_match。可以在 multi_match 的 query 子句中组织数据匹配规则，并在 fields 子句中指定需要搜索的字段列表。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search
+
+&#123;   
+	&quot;query&quot;: &#123;
+		&quot;multi_match&quot;: &#123;  
+			&#x2F;&#x2F;匹配关键字为“假日”
+			&quot;query&quot;: &quot;假日&quot;,    
+			&#x2F;&#x2F;设置匹配的字段为title和amenities
+			&quot;fields&quot;: [&quot;title&quot;, &quot;amenities&quot;]
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="MatchPharse-查询"><a href="#MatchPharse-查询" class="headerlink" title="MatchPharse 查询"></a>MatchPharse 查询</h2><p>match_phrase 用于匹配短语，与 match 查询不同的是，match_phrase 用于搜索确切的短语或邻近的词语。</p>
+<p>例如搜索“金都酒店”，查询词先被分词器切分为“金都” “酒店”，使用 match_phrase 则要求全文匹配时 “金都” “酒店” 必须按顺序相邻，此时 “金都精选酒店” 不会被查询命中。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123;
+		&quot;match_phrase&quot;: &#123; 
+			&quot;title&quot;: &quot;文雅酒店&quot; 
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>match_phrase 也支持设置匹配距离，如果两词间隔 slop 参数定义的长度，也能被命中。</p>
+<p>例如将 slop 设置为 2，上述例子可以被命中。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123; 
+	&quot;query&quot;: &#123;  
+		&quot;match_phrase&quot;: &#123;  
+			&quot;title&quot;: &#123;  
+				&quot;query&quot;: &quot;文雅酒店&quot;, 
+				&quot;slop&quot;: 2   &#x2F;&#x2F;将“文雅”和“酒店”之间的最大匹配距离设置为2       
+			&#125;     
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="地理位置查询"><a href="#地理位置查询" class="headerlink" title="地理位置查询"></a>地理位置查询</h1><p>ES 为用户提供了基于地理位置的搜索功能。它主要支持两种类型的地理查询：一种是地理点（geo_point），即经纬度查询，另一种是地理形状查询（geo_shape），即支持点、线、圆形和多边形查询等。</p>
+<h2 id="GeoDistance-查询"><a href="#GeoDistance-查询" class="headerlink" title="GeoDistance 查询"></a>GeoDistance 查询</h2><pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;query&quot;: &#123;
+		&quot;geo_distance&quot;: &#123; 
+			&quot;distance&quot;: &quot;5km&quot;,     &#x2F;&#x2F;设置距离范围为5km
+			&quot;location&quot;: &#123;          &#x2F;&#x2F;设置中心点经纬度 
+				&quot;lat&quot;: &quot;39.915143&quot;,  &#x2F;&#x2F;设置纬度
+				&quot;lon&quot;: &quot;116.4039&quot;    &#x2F;&#x2F;设置经度 
+			&#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="GeoBoundingBox-查询"><a href="#GeoBoundingBox-查询" class="headerlink" title="GeoBoundingBox 查询"></a>GeoBoundingBox 查询</h2><p>geo_shape 查询提供的是矩形内的搜索，需要用户给出左上角的顶点地理坐标和右下角的顶点地理坐标。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123; 
+		&quot;geo_bounding_box&quot;: &#123; 
+			&quot;location&quot;: &#123;
+				&quot;top_left&quot;: &#123;        &#x2F;&#x2F;设置左上角的顶点坐标   
+					&quot;lat&quot;: &quot;39.922821&quot;, 
+					&quot;lon&quot;: &quot;116.457044&quot;
+				&#125;,
+				&quot;bottom_right&quot;: &#123;    &#x2F;&#x2F;设置右下角的顶点坐标   
+					&quot;lat&quot;: &quot;39.907104&quot;, 
+					&quot;lon&quot;: &quot;116.479466&quot; 
+				&#125;
+			&#125;
+		&#125; 
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="GeoPolygon-查询"><a href="#GeoPolygon-查询" class="headerlink" title="GeoPolygon 查询"></a>GeoPolygon 查询</h2><p>geo_polygon 比 geo_shape 提供的地理范围功能更加灵活，它支持多边形内的文档搜索，使用该查询需要提供多边形所有顶点的地理坐标。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123; 
+		&quot;geo_polygon&quot;: &#123;
+			&quot;location&quot;: &#123; 
+				&quot;points&quot;: [   
+					&#123;   &#x2F;&#x2F;设置三角形的第1个顶点坐标 
+						&quot;lat&quot;: &quot;39.959829&quot;,
+						&quot;lon&quot;: &quot;116.417088&quot; 
+					&#125;,
+					&#123;   &#x2F;&#x2F;设置三角形的第2个顶点坐标    
+						&quot;lat&quot;: &quot;39.960272&quot;,     
+						&quot;lon&quot;: &quot;116.432035&quot;    
+					&#125;,        
+					&#123;   &#x2F;&#x2F;设置三角形的第3个顶点坐标         
+						&quot;lat&quot;: &quot;39.965802&quot;,     
+						&quot;lon&quot;: &quot;116.421399&quot;       
+					&#125;        
+				]
+			&#125;
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="搜索建议"><a href="#搜索建议" class="headerlink" title="搜索建议"></a>搜索建议</h1><p>ES 中 Completion Suggester，其对应的字段类型需要定义为 completion 类型。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">PUT &#x2F;hotel_sug 
+&#123; 
+	&quot;mappings&quot;: &#123;  
+  	&quot;properties&quot;: &#123; 
+    	&quot;query_word&quot;: &#123;
+	      	&quot;type&quot;: &quot;completion&quot;
+      &#125;
+    &#125;
+  &#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>使用以下查询方式查询建议内容。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel_sug&#x2F;_search 
+&#123; 
+	&quot;suggest&quot;: &#123;    
+		&quot;hotel_zh_sug&quot;: &#123;   &#x2F;&#x2F;定义搜索建议名称 
+			&quot;prefix&quot;: &quot;如家&quot;,  &#x2F;&#x2F;设置搜索建议的前缀 
+			&quot;completion&quot;: &#123;   &#x2F;&#x2F;设置搜索建议对应的字段名称
+				&quot;field&quot;: &quot;query_word&quot;
+			&#125;
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p>需要注意的是，ES 提供的 Completion Suggester 功能使用的索引结构不是倒排索引，而是在内存中构建 FST（Finite StateTransducers）。构建该数据结构是有比较大的内存存储成本的，因此在生产环境中向索引中添加数据时一定要关注 ES 节点的内存消耗，避免数据量过大造成 ES 节点内存耗尽从而影响集群服务。</p>
+</blockquote>
+<h1 id="匹配打分"><a href="#匹配打分" class="headerlink" title="匹配打分"></a>匹配打分</h1><h2 id="Constant-Score-查询"><a href="#Constant-Score-查询" class="headerlink" title="Constant Score 查询"></a>Constant Score 查询</h2><p>如果不想让检索词频率 TF（Term Frequency）对搜索结果排序有影响，只想过滤某个文本字段是否包含某个词，可以使用 Constant Score 将查询语句包装起来。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;   
+	&quot;query&quot;: &#123;    
+		&quot;constant_score&quot;: &#123;    &#x2F;&#x2F;满足条件即打分为1       
+			&quot;filter&quot;: &#123;         
+				&quot;match&quot;: &#123;        
+					&#x2F;&#x2F;查询设施中包含“停车场”的文档      
+					&quot;amenities&quot;: &quot;停车场&quot;
+				&#125;
+			&#125;
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>通过结果可以看到，使用 Constant Score 搜索时，命中的酒店文档对应的 amenities 字段都包含有“停车场”一词。但是不论该词在文档中出现多少次，这些文档的得分都是一样的，值为 1.0。</p>
+<p>在 Constant Score 搜索中，参数 boost 可以控制命中文档的得分，默认值为 1.0。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;query&quot;: &#123;    
+		&quot;constant_score&quot;: &#123;
+			&#x2F;&#x2F;设置Constant Score查询命中文档的得分为2.0
+			&quot;boost&quot;: 2.0,                   
+			&quot;filter&quot;: &#123;       
+				&quot;match&quot;: &#123;         
+					&quot;amenities&quot;: &quot;停车场&quot; 
+				&#125;
+			&#125;
+		&#125;
+	&#125;
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Function-Score-查询"><a href="#Function-Score-查询" class="headerlink" title="Function Score 查询"></a>Function Score 查询</h2><p>当使用 ES 进行搜索时，命中的文档默认按照相关度进行排序。有些场景下用户需要干预该“相关度”，此时就可以使用 Function Score 查询。使用时，用户必须定义一个查询以及一个或多个函数，这些函数为每个文档计算一个新分数。</p>
+<h2 id="二次打分"><a href="#二次打分" class="headerlink" title="二次打分"></a>二次打分</h2><p>Query Rescore 工作的阶段是在原始查询打分之后，它支持对打分后 Top-N 的文档集合执行第二次查询和打分。通过设置 window_size 参数可以控制在每个分片上进行二次打分查询的文档数量，在默认情况下 window_size 的值为 10。在默认情况下，文档的最终得分等于原查询和 rescore 查询的分数之和。当然，还可以使用参数对这两部分的权重进行控制。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;query&quot;: &#123;  
+		&quot;range&quot;: &#123; 
+			&quot;price&quot;: &#123; &quot;gte&quot;: 300 &#125;
+		&#125;
+	&#125;, 
+	&quot;rescore&quot;: &#123;  
+		&quot;query&quot;: &#123;
+			&quot;rescore_query&quot;: &#123;  &#x2F;&#x2F;对返回的文档进行二次打分  
+				&quot;match&quot;: &#123;
+					&quot;title&quot;: &quot;金都&quot;  
+				&#125;
+			&#125;
+		&#125;,
+		&quot;window_size&quot;: 3      &#x2F;&#x2F;对每个分片的前3个文档进行二次打分  
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h1 id="辅助功能"><a href="#辅助功能" class="headerlink" title="辅助功能"></a>辅助功能</h1><h2 id="返回指定字段"><a href="#返回指定字段" class="headerlink" title="返回指定字段"></a>返回指定字段</h2><p>在 ES 中，通过 <code>_source</code> 子句可以设定返回结果的字段。<code>_source</code> 指向一个 JSON 数组，数组中的元素是希望返回的字段名称。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;   
+	&quot;_source&quot;: [&quot;title&quot;,&quot;city&quot;],    &#x2F;&#x2F;设定只返回title和city字段  
+	&quot;query&quot;: &#123;     &#x2F;&#x2F;查询条件     
+		&quot;term&quot;: &#123;       
+			&quot;city&quot;: &#123;         
+				&quot;value&quot;: &quot;北京&quot; 
+			&#125;
+	    &#125;
+	&#125;
+&#125;   <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="结果计数"><a href="#结果计数" class="headerlink" title="结果计数"></a>结果计数</h2><p>ES 提供了 <code>_count</code> API功能，在该 API 中，用户提供 query 子句用于结果匹配，ES 会返回匹配的文档条数。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_count 
+&#123;  
+	&quot;query&quot;: &#123;       &#x2F;&#x2F;计数的查询条件  
+		&quot;term&quot;: &#123;
+			&quot;city&quot;: &#123;
+				&quot;value&quot;: &quot;北京&quot; 
+			&#125;
+		&#125;
+	&#125;
+&#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="结果分页"><a href="#结果分页" class="headerlink" title="结果分页"></a>结果分页</h2><p>在默认情况下，ES 返回前 10 个搜索匹配的文档。用户可以通过设置 from 和 size 来定义搜索位置和每页显示的文档数量，from 表示查询结果的起始下标，默认值为 0，size 表示从起始下标开始返回的文档个数，默认值为 10。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;from&quot;: 0,  &#x2F;&#x2F;设置搜索的起始位置  
+	&quot;size&quot;: 20, &#x2F;&#x2F;设置搜索返回的文档个数  
+	&quot;query&quot;: &#123;  &#x2F;&#x2F;搜索条件
+	  	&quot;term&quot;: &#123;
+	    	&quot;city&quot;: &#123; &quot;value&quot;: &quot;北京&quot; &#125;
+	    &#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>在默认情况下，用户最多可以取得 10 000 个文档，如果请求超过该值，ES 返回如下报错信息：</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>   
+  <span class="token property">"error"</span> <span class="token operator">:</span> <span class="token punctuation">&#123;</span>     
+    <span class="token property">"root_cause"</span> <span class="token operator">:</span> <span class="token punctuation">[</span>      
+      <span class="token punctuation">&#123;</span><span class="token comment">//请求数量过多的报错信息         </span>
+        <span class="token property">"type"</span> <span class="token operator">:</span> <span class="token string">"illegal_argument_exception"</span><span class="token punctuation">,</span>         
+        <span class="token property">"reason"</span> <span class="token operator">:</span> <span class="token string">"Result window is too large, from + size must be less than  or equal to: [10000] but was [10001]. See the scroll api for a more efficient  way to request large data sets. This limit can be set by changing the  [index.max_result_window] index level setting."</span>       
+      <span class="token punctuation">&#125;</span>     
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>    
+    … 
+  <span class="token punctuation">&#125;</span><span class="token punctuation">,</span>   
+  <span class="token property">"status"</span> <span class="token operator">:</span> <span class="token number">400</span> 
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>对于普通的搜索应用来说，size 设为 10000 已经足够用了。如果确实需要返回多于 10000 条的数据，可以适当修改 <code>max_result_window</code> 的值。</p>
+<blockquote>
+<p><strong>ES 为什么不适合深翻页？</strong></p>
+<p>作为一个分布式搜索引擎，一个 ES 索引的数据分布在多个分片中，而这些分片又分配在不同的节点上。一个带有分页的搜索请求往往会跨越多个分片，每个分片必须在内存中构建一个长度为 <code>from+size</code> 的、按照得分排序的有序队列，用以存储命中的文档。然后这些分片对应的队列数据都会传递给协调节点，协调节点将各个队列的数据进行汇总，需要提供一个长度为 <code>number_of_shards *（from+size）</code> 的队列用以进行全局排序，然后再按照用户的请求从 from 位置开始查找，找到 size 个文档后进行返回。</p>
+<p>当深翻页的请求过多时会增加各个分片所在节点的内存和 CPU 消耗。尤其是协调节点，随着页码的增加和并发请求的增多，该节点需要对这些请求涉及的分片数据进行汇总和排序，过多的数据会导致协调节点资源耗尽而停止服务。</p>
+</blockquote>
+<h2 id="结果排序"><a href="#结果排序" class="headerlink" title="结果排序"></a>结果排序</h2><p>ES 提供了 sort 子句可以对数据进行排序。使用 sort 子句一般是按照字段信息进行排序，不受相关性影响，而且打分步骤需要耗费一定的硬件资源和时间，因此默认情况下，不对文档进行打分。使用 sort 排序分为两种类别，一种是按照字段值的大小进行排序，另一种是按照给定地理坐标的距离远近进行排序。</p>
+<h3 id="按普通字段值排序"><a href="#按普通字段值排序" class="headerlink" title="按普通字段值排序"></a>按普通字段值排序</h3><p>使用 sort 子句对字段值进行排序时需要指定排序的字段。ES 默认是按照字段值进行升序排序，可以设置 order 参数为 asc 或 desc，指定按照字段值进行升序或者降序排序。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123;              
+		&quot;match&quot;: &#123; &quot;title&quot;: &quot;金都&quot; &#125;
+	&#125;, 
+	&quot;sort&quot;: [   
+		&#123;                 
+			&#x2F;&#x2F;按照价格降序排列  
+			&quot;price&quot;: &#123; &quot;order&quot;: &quot;desc&quot; &#125;
+		&#125;
+	]
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>使用 sort 对搜索结果排序后，在每个文档的 <code>_source</code> 信息下面多出了一个 sort 信息，该信息中显示了当前文档排序字段的值。另外，文档的 <code>_score</code> 值和 max_score 都为 null，这说明在默认情况下 ES 查询时使用 sort 对结果排序是不计算分数的。</p>
+<h3 id="按地理距离排序"><a href="#按地理距离排序" class="headerlink" title="按地理距离排序"></a>按地理距离排序</h3><p>ES 提供的基于地理位置的查询功能，使用 geo_distance 查询，配合 sort 可以指定另一种排序规则，即按照文档坐标与指定坐标的距离对结果进行排序。使用时，需要在 sort 内部指定排序名称为 geo_distanc，并指定目的地坐标。除了可以指定升序或者降序排列外，还可以指定排序结果中 sort 子句中的距离的计量单位，默认值为 km 即千米。在进行距离计算时，系统默认使用的算法为 arc，该算法的特点是计算精准但是耗费时间较长，用户可以使用 distance_type 参数选择另一种计算速度快但经度略差的算法，名称为 plane。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;  
+	&quot;query&quot;: &#123;     
+		&quot;geo_distance&quot;: &#123;  
+			&quot;distance&quot;: &quot;5km&quot;,
+			&quot;location&quot;: &#123;          
+				&quot;lat&quot;: &quot;39.915143&quot;,
+				&quot;lon&quot;: &quot;116.4039&quot;
+			&#125;
+		&#125;
+	&#125;,  
+	&quot;sort&quot;: [                           
+		&#x2F;&#x2F;设置排序逻辑     
+		&#123; 
+			&quot;_geo_distance&quot;: &#123; 
+				&quot;location&quot;: &#123;         
+					&#x2F;&#x2F;设置排序的中心点坐标 
+					&quot;lat&quot;: &quot;39.915143&quot;,
+					&quot;lon&quot;: &quot;116.4039&quot; 
+				&#125;,
+				&quot;order&quot;: &quot;asc&quot;,     &#x2F;&#x2F;按距离由近到远进行排序
+				&quot;unit&quot;: &quot;km&quot;,       &#x2F;&#x2F;排序所使用的距离的计量单位  
+				&quot;distance_type&quot;: &quot;plane&quot;  &#x2F;&#x2F;排序所使用的距离计算算法  
+			&#125;
+		&#125;
+	]
+&#125;   <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="查询时设置权重"><a href="#查询时设置权重" class="headerlink" title="查询时设置权重"></a>查询时设置权重</h2><h3 id="boost"><a href="#boost" class="headerlink" title="boost"></a>boost</h3><p>在 ES 中可以通过查询的 boost 值对某个查询设定其权重。在默认情况下，所有查询的 boost 值为 1。但是当设置某个查询的 boost 为 2 时，不代表匹配该查询的文档评分是原来的 2 倍，而是代表匹配该查询的文档得分相对于其他文档得分被提升了。</p>
+<p><strong>boost 值的设置只限定在 term 查询和类 match 查询中</strong>，其他类型的查询不能使用 boost 设置。boost 值没有特别约束，因为它代表的是一个相对值。当该值在 0～1 时表示对权重起负向作用，当该值大于 1 时表示对权重起正向作用。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;query&quot;: &#123; 
+		&quot;bool&quot;: &#123; 
+			&quot;should&quot;: [   
+				&#123;
+					&quot;match&quot;: &#123; 
+						&quot;title&quot;:&#123;     
+							&quot;query&quot;: &quot;金都&quot;, 
+							&quot;boost&quot;: 2                  
+						&#125;
+					&#125;
+				&#125;,
+				&#123; 
+					&quot;match&quot;: &#123;
+						&quot;title&quot;: &#123; 
+							&quot;query&quot;: &quot;文雅&quot; 
+						&#125;
+					&#125;
+				&#125;
+			]
+		&#125;
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="boosting"><a href="#boosting" class="headerlink" title="boosting"></a>boosting</h3><p>boosting 给 range 查询提供了设置权重的能力。</p>
+<p>ES 的 boosting 查询分为两部分，一部分是 positive 查询，代表正向查询，另一部分是 negative 查询，代表负向查询。可以通过 negative_boost 参数设置负向查询的权重系数，该值的范围为 0～1。最终的文档得分为：<code>正向匹配值 + 负向匹配值 × negative_boost</code>。</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
+&#123;
+	&quot;query&quot;: &#123; 
+	  	&quot;boosting&quot;: &#123;
+	    	&quot;positive&quot;: &#123;
+		      	&quot;match&quot;: &#123;  
+		        	&quot;title&quot;: &#123; &quot;query&quot;: &quot;金都&quot; &#125;
+		        &#125;
+			&#125;,
+		    &quot;negative&quot;: &#123;           
+		      	&quot;range&quot;: &#123; 
+		        	&quot;price&quot;: &#123; 
+			          	&quot;lte&quot;: 200
+		        	&#125; 
+		        &#125;
+		    &#125;,
+			&quot;negative_boost&quot;: 0.2   &#x2F;&#x2F;设置降低的权重值   
+	    &#125;
+	&#125;
+&#125;   <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/ElasticSearch/" rel="tag"># ElasticSearch</a>
+              <a href="/tags/Search/" rel="tag"># Search</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2022/12/28/ElasticSearch-3-%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C/" rel="prev" title="ElasticSearch 聚合操作">
+      <i class="fa fa-chevron-left"></i> ElasticSearch 聚合操作
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%A8%E9%83%A8"><span class="nav-number">1.</span> <span class="nav-text">查询全部</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%95%E6%9D%A1%E4%BB%B6%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.</span> <span class="nav-text">单条件查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Term-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.1.</span> <span class="nav-text">Term 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Terms-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.2.</span> <span class="nav-text">Terms 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Range-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.3.</span> <span class="nav-text">Range 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exists-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.4.</span> <span class="nav-text">Exists 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A4%8D%E5%90%88%E6%9F%A5%E8%AF%A2%EF%BC%88Bool-%E6%9F%A5%E8%AF%A2%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">复合查询（Bool 查询）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.1.</span> <span class="nav-text">Must 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Should-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.2.</span> <span class="nav-text">Should 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-Not-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.3.</span> <span class="nav-text">Must Not 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Filter-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.4.</span> <span class="nav-text">Filter 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%A8%E6%96%87%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.</span> <span class="nav-text">全文查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Match-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.</span> <span class="nav-text">Match 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MultiMatch-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.2.</span> <span class="nav-text">MultiMatch 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MatchPharse-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.3.</span> <span class="nav-text">MatchPharse 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E4%BD%8D%E7%BD%AE%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.</span> <span class="nav-text">地理位置查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoDistance-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.1.</span> <span class="nav-text">GeoDistance 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoBoundingBox-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.2.</span> <span class="nav-text">GeoBoundingBox 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoPolygon-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.3.</span> <span class="nav-text">GeoPolygon 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%90%9C%E7%B4%A2%E5%BB%BA%E8%AE%AE"><span class="nav-number">6.</span> <span class="nav-text">搜索建议</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8C%B9%E9%85%8D%E6%89%93%E5%88%86"><span class="nav-number">7.</span> <span class="nav-text">匹配打分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Constant-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.1.</span> <span class="nav-text">Constant Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Function-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.2.</span> <span class="nav-text">Function Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E6%AC%A1%E6%89%93%E5%88%86"><span class="nav-number">7.3.</span> <span class="nav-text">二次打分</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BE%85%E5%8A%A9%E5%8A%9F%E8%83%BD"><span class="nav-number">8.</span> <span class="nav-text">辅助功能</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%94%E5%9B%9E%E6%8C%87%E5%AE%9A%E5%AD%97%E6%AE%B5"><span class="nav-number">8.1.</span> <span class="nav-text">返回指定字段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E8%AE%A1%E6%95%B0"><span class="nav-number">8.2.</span> <span class="nav-text">结果计数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.</span> <span class="nav-text">结果分页</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.</span> <span class="nav-text">结果排序</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E6%99%AE%E9%80%9A%E5%AD%97%E6%AE%B5%E5%80%BC%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.1.</span> <span class="nav-text">按普通字段值排序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.2.</span> <span class="nav-text">按地理距离排序</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E6%97%B6%E8%AE%BE%E7%BD%AE%E6%9D%83%E9%87%8D"><span class="nav-number">8.5.</span> <span class="nav-text">查询时设置权重</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#boost"><span class="nav-number">8.5.1.</span> <span class="nav-text">boost</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#boosting"><span class="nav-number">8.5.2.</span> <span class="nav-text">boosting</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">138</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">26</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">273</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
