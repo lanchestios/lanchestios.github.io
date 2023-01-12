@@ -189,6 +189,94 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/12/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-9-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%85%B1%E8%AF%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2021/10/12/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-9-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%85%B1%E8%AF%86/" class="post-title-link" itemprop="url">数据密集型应用 一致性与共识</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2021-10-12 17:45:55" itemprop="dateCreated datePublished" datetime="2021-10-12T17:45:55+08:00">2021-10-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Data-Intensive-Applications/" itemprop="url" rel="index"><span itemprop="name">Data-Intensive Applications</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>正如<a href="ch8.md">第八章</a>所讨论的，分布式系统中的许多事情可能会出错。处理这种故障的最简单方法是简单地让整个服务失效，并向用户显示错误消息。如果无法接受这个解决方案，我们就需要找到容错的方法—— 即使某些内部组件出现故障，服务也能正常运行。</p>
+<p>在本章中，我们将讨论构建容错分布式系统的算法和协议的一些例子。我们将假设<a href="ch8.md">第八章</a>的所有问题都可能发生：网络中的数据包可能会丢失、重新排序、重复递送或任意延迟；时钟只是尽其所能地近似；且节点可以暂停（例如，由于垃圾收集）或随时崩溃。</p>
+<p>构建容错系统的最好方法，是找到一些带有实用保证的通用抽象，实现一次，然后让应用依赖这些保证。这与<a href="ch7.md">第七章</a>中的事务处理方法相同：通过使用事务，应用可以假装没有崩溃（原子性），没有其他人同时访问数据库（隔离），存储设备是完全可靠的（持久性）。即使发生崩溃，竞态条件和磁盘故障，事务抽象隐藏了这些问题，因此应用不必担心它们。</p>
+<p>现在我们将继续沿着同样的路线前进，寻求可以让应用忽略分布式系统部分问题的抽象概念。例如，分布式系统最重要的抽象之一就是<strong>共识（consensus）</strong>：<strong>就是让所有的节点对某件事达成一致</strong>。正如我们在本章中将会看到的那样，要可靠地达成共识，且不被网络故障和进程故障所影响，是一个令人惊讶的棘手问题。</p>
+<p>一旦达成共识，应用可以将其用于各种目的。例如，假设你有一个单主复制的数据库。如果主库挂掉，并且需要故障切换到另一个节点，剩余的数据库节点可以使用共识来选举新的领导者。正如在“<a href="ch5.md#处理节点宕机">处理节点宕机</a>”中所讨论的那样，重要的是只有一个领导者，且所有的节点都认同其领导。如果两个节点都认为自己是领导者，这种情况被称为<strong>脑裂（split brain）</strong>，它经常会导致数据丢失。正确实现共识有助于避免这种问题。</p>
+<p>在本章后面的“<a href="#分布式事务与共识">分布式事务与共识</a>”中，我们将研究解决共识和相关问题的算法。但首先，我们首先需要探索可以在分布式系统中提供的保证和抽象的范围。</p>
+<p>我们需要了解可以做什么和不可以做什么的范围：在某些情况下，系统可以容忍故障并继续工作；在其他情况下，这是不可能的。我们将深入研究什么可能而什么不可能的限制，既通过理论证明，也通过实际实现。我们将在本章中概述这些基本限制。</p>
+<p>分布式系统领域的研究人员几十年来一直在研究这些主题，所以有很多资料—— 我们只能介绍一些皮毛。在本书中，我们没有空间去详细介绍形式模型和证明的细节，所以我们将坚持非正式的直觉。如果你有兴趣，参考文献可以提供更多的深度。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/10/12/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-9-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%85%B1%E8%AF%86/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
     <link itemprop="mainEntityOfPage" href="http://example.com/2021/10/11/%E6%95%B0%E6%8D%AE%E5%AF%86%E9%9B%86%E5%9E%8B%E5%BA%94%E7%94%A8-8-%E5%88%86%E5%B8%83%E5%BC%8F%E6%95%B0%E6%8D%AE%E7%B3%BB%E7%BB%9F-%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E7%9A%84%E9%BA%BB%E7%83%A6/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -220,7 +308,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -308,7 +396,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -401,7 +489,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -494,7 +582,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -584,7 +672,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -680,7 +768,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -763,7 +851,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -854,7 +942,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -945,7 +1033,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
+                <time title="Modified: 2023-01-12 18:32:13" itemprop="dateModified" datetime="2023-01-12T18:32:13+08:00">2023-01-12</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -972,87 +1060,6 @@
           <!--noindex-->
             <div class="post-button">
               <a class="btn" href="/2021/09/23/Spring-SpringMVC%E5%BC%82%E6%AD%A5%E8%AF%B7%E6%B1%82/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Wang Zihao">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Lanchester Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/" class="post-title-link" itemprop="url">SpringMVC 参数绑定工具 DataBinder</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2021-09-11 17:27:00" itemprop="dateCreated datePublished" datetime="2021-09-11T17:27:00+08:00">2021-09-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2022-12-30 14:57:56" itemprop="dateModified" datetime="2022-12-30T14:57:56+08:00">2022-12-30</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>数据绑定这个概念在任何一个成型的框架中都是特别重要的，它能让框架更多的自动化，更好容错性以及更高的编码效率。它提供的能力是：把字符串形式的参数转换成服务端真正需要的类型的转换（当然还包含校验）。对 Spring 中的数据绑定场景，Controller 中只需要使用 Model 对象就能完成 request 到 Model 对象的自动数据自动绑定，完全屏蔽了 Servlet 的 API。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2021/09/11/Spring-SpringMVC%E5%8F%82%E6%95%B0%E7%BB%91%E5%AE%9A%E5%B7%A5%E5%85%B7DataBinder/#more" rel="contents">
                 Read more &raquo;
               </a>
             </div>
@@ -1141,7 +1148,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">138</span>
+          <span class="site-state-item-count">139</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1181,7 +1188,7 @@
 <div class="copyright">
   
   &copy; 
-  <span itemprop="copyrightYear">2022</span>
+  <span itemprop="copyrightYear">2023</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>
