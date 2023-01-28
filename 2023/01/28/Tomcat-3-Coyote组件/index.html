@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Catalina 是 Tomcat 提供的 Servlet 容器实现，它负责处理来自客户端的请求并输岀响应。但是仅有 Servlet 容器服务器是无法对外提供服务的，还需要由链接器接收来自客户端的请求，并按照既定协议（如HTTP）进行解析，然后交由 Servlet 容器处理。可以说，Servlet 容器和链接器是 Tomcat 最核心的两个组件，它们是构成一款 Java 应用服务器的基础。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Tomcat Coyote组件">
+<meta property="og:url" content="http://example.com/2023/01/28/Tomcat-3-Coyote%E7%BB%84%E4%BB%B6/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Catalina 是 Tomcat 提供的 Servlet 容器实现，它负责处理来自客户端的请求并输岀响应。但是仅有 Servlet 容器服务器是无法对外提供服务的，还需要由链接器接收来自客户端的请求，并按照既定协议（如HTTP）进行解析，然后交由 Servlet 容器处理。可以说，Servlet 容器和链接器是 Tomcat 最核心的两个组件，它们是构成一款 Java 应用服务器的基础。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Tomcat/Catalina和Coyote请求处理.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/链接器整体内容.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/简化的Connector请求处理过程.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/HTTP请求处理.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/升级协议类图.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/基于AJP协议的请求处理.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP请求消息格式.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/响应消息的格式.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP支持的请求及响应消息类型.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/基于AJP协议的请求处理过程.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP支持的HTTPMethod编码.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP支持的HTTP请求头编码.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP支持的HTTP请求属性编码.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP支持的HTTP响应头编码.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/HTTP2Frame结构.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/HTTP11转换为HTTP2示意图.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/Stream传输示意图.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/Stream生命周期.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/NIOEndpoint请求处理.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/NioEndpoint事件变化.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/Nio2Endpoint请求处理.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AprEndpoint的处理过程.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/HTTP三种IO处理方法.png">
+<meta property="og:image" content="http://example.com/images/Tomcat/AJP三种IO处理方法.png">
+<meta property="article:published_time" content="2023-01-28T07:30:43.000Z">
+<meta property="article:modified_time" content="2023-01-28T07:29:15.222Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="HTTP">
+<meta property="article:tag" content="Tomcat">
+<meta property="article:tag" content="Coyote">
+<meta property="article:tag" content="AJP">
+<meta property="article:tag" content="HTTP&#x2F;2.0">
+<meta property="article:tag" content="IO">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Tomcat/Catalina和Coyote请求处理.png">
+
+<link rel="canonical" href="http://example.com/2023/01/28/Tomcat-3-Coyote%E7%BB%84%E4%BB%B6/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Tomcat Coyote组件 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/01/28/Tomcat-3-Coyote%E7%BB%84%E4%BB%B6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Tomcat Coyote组件
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-01-28 15:30:43 / Modified: 15:29:15" itemprop="dateCreated datePublished" datetime="2023-01-28T15:30:43+08:00">2023-01-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Tomcat/" itemprop="url" rel="index"><span itemprop="name">Tomcat</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Catalina 是 Tomcat 提供的 Servlet 容器实现，它负责处理来自客户端的请求并输岀响应。但是仅有 Servlet 容器服务器是无法对外提供服务的，还需要由链接器接收来自客户端的请求，并按照既定协议（如HTTP）进行解析，然后交由 Servlet 容器处理。可以说，Servlet 容器和链接器是 Tomcat 最核心的两个组件，它们是构成一款 Java 应用服务器的基础。</p>
+<span id="more"></span>
+<h1 id="Coyote-简介"><a href="#Coyote-简介" class="headerlink" title="Coyote 简介"></a>Coyote 简介</h1><p>Coyote 是 Tomcat 链接器框架的名称，是 Tomcat 服务器提供的供客户端访问的外部接口。客户端通过 Coyote 与服务器建立链接、发送请求并接收响应。</p>
+<p>Coyote 封装了底层的网络通信（Socket 请求及响应处理），为 Catalina 容器提供了统一的接口，使 Catalina 容器与具体的请求协议及 IO 方式解耦。Coyote 将 Socket 输入转换为 Request 对象，交由 Catalina 容器进行处理，处理请求完成后，Catalina 通过 Coyote 提供的 Response 对象将结果写人输出流。</p>
+<p>Coyote 作为独立的模块，只负责具体协议和 IO 的处理，与 Servlet 规范实现没有直接关系，因此即便是 Request 和 Response 对象也并未实现 Servlet 规范对应的接口，而是在 Catalina 中将它们进一步封装为 ServletRequest 和 ServletResponse。</p>
+<p>Coyote 与 Catalina 的交互如下图所示。</p>
+<p><img src="/images/Tomcat/Catalina和Coyote请求处理.png" alt=""></p>
+<ul>
+<li><p>Coyote中，Tomcat支持的传输协议</p>
+<ul>
+<li><p>HTTP/1.1 协议</p>
+<p>  绝大多数 Web 应用采用的访问协议，主要用于 Tomcat 单独运行（不与web服务器集成）的情况。</p>
+</li>
+<li><p>AJP 协议</p>
+<p>  用于和 Web 服务器（如 Apache Http Server）集成，以实现针对静态资源的优化以及集群部署，当前支持AJP/1.3。</p>
+</li>
+<li><p>HTTP/2.0 协议</p>
+<p>  下一代 HTTP 协议，自 Tomcat8.5 以及 9.0 版本开始支持。截至目前，主流浏览器的最新版本均已支持HTTP2.0。</p>
+</li>
+</ul>
+</li>
+<li><p>针对 HTTP 和 AJP 协议，Coyote 又按照 IO 方式分别提供了不同的选择方案</p>
+<ul>
+<li>BIO：（自8.5版本起， Tomcat移除了对BIO的支持）</li>
+<li>NIO：采用 Java NIO 类库实现。</li>
+<li>NIO2：采用 JDK7 最新的 NIO2 类库实现。</li>
+<li>APR：采用 APR（Apache 可移植运行库）实现。APR 是使用 C/C++ 编写的本地库，如果选择该方案，需要单独安装 APR 库。</li>
+</ul>
+</li>
+</ul>
+<p>在 8.0 之前， Tomcat 默认采用的 IO 方式为 BIO，之后改为 NIO。无论 NIO、NIO2 还是 APR 在性能方面均优于以往的 BIO。如果采用 APR，甚至可以达到接近于 Apache Http Server 的响应性能。</p>
+<p>在 Coyote 中，HTTP 2.0 的处理方式与 HTTP/1.1 和 AJP 不同，采用一种升级协议的方式实现，这也是由 HTTP/2.0 的传输方案所决定的。</p>
+<h1 id="Web请求处理"><a href="#Web请求处理" class="headerlink" title="Web请求处理"></a>Web请求处理</h1><h2 id="主要概念"><a href="#主要概念" class="headerlink" title="主要概念"></a>主要概念</h2><p>链接器的整体内容（Connector依赖关系）如下图所示</p>
+<p><img src="/images/Tomcat/链接器整体内容.png" alt=""></p>
+<p><code>AbstractEndPoint.Handler</code> 的引用位于 AbstractEndPoint 各个实现类。</p>
+<p>在 Connector 中有如下几个核心概念。</p>
+<p><strong>Endpoint</strong></p>
+<p>Coyote 通信端点，即通信监听的接口，是具体的 Socket 接收处理类，是对传输层的抽象。Tomcat 并没有 Endpoint 接口，而是提供了一个抽象类 AbstractEndpoint。根据 I/O 方式的不同，提供了 NioEndpoint（NIO）、AprEndpoint（APR）以及 Nio2Endpoint（NIO2）3个实现（8.0及之前版本还有 JloEndpoint（BlO））</p>
+<p><strong>Processor</strong></p>
+<p>Coyote 协议处理接口，负责构造 Request 和 Response 对象，并通过 Adapter 将其提交到 Catalina 容器处理，是对应用层的抽象。 Processor 是单线程的，Tomcat 在同一次链接中复用 Processor。Tomcat 按照协议的不同提供了3个实现类：Http11Processor（HTTP/1.1）、AjpProcessor（AJP）、StreamProcessor（HTTP/2.0）。除此之外，它还提供了两个用于升级协议处理的实现：UpgradeProcessorInternal 和 UpgradeProcessorExternal，前者用于处理内部支持的升级协议（如 HTTP2.0 和 WebSocket。至于 UpgradeProcessorInternal 是如何与 StreamProcessor 配合完成 HTTP2.0 处理的，请参见4.2.3节），后者用于处理外部扩展的升级协议支持。</p>
+<p><strong>ProtocolHandler</strong></p>
+<p>Coyote 协议接口，通过封装 Endpoint 和 Processor，实现针对具体协议的处理功能。 Tomcat 按照协议和 IO 提供了6个实现类：Http11NioProtocol、Http11AprProtocol、Http11Nio2Protocol、AjpNioProtocol、AjpAprProtocol、AprNio2Protocol。我们在<code>$CATALINA_BASE/conf/server.xml</code>中设置链接器时，至少要指定具体的 ProtocolHandler（当然，也可以指定协议名称。如“HTTP/1.1”，如果服务器安装了APR，那么将使用 HttpAprProtocol 否则使用 HttpNioProtocol，Tomcat7 以及之前版本则会是 Http11Protocol）</p>
+<p><strong>UpgradeProtocol</strong></p>
+<p>Tomcat 采用 UpgradeProtocol 接口表示 HTTP 升级协议，当前只提供了个实现（Http2Protocol）用于处理HTTP/2.0。它根据请求创建一个用于升级处理的令牌 UpgradeToken，该令牌中包含了具体的 HTTP 升级处理器 HttpUpgradeHandler，HTTP/2.0 的处理器实现为 Http2UpgradeHandler。Tomcat 中的 WebSocket 是通过 UpgradeToken 机制实现的，此部分在 4.2.3 节以及 11.4 节均有详细讲解。</p>
+<h2 id="请求处理"><a href="#请求处理" class="headerlink" title="请求处理"></a>请求处理</h2><p>Connector请求处理如下图。</p>
+<p><img src="/images/Tomcat/简化的Connector请求处理过程.png" alt=""></p>
+<p>自 8.5 版本开始，Tomcat 增加了 UpgradeProtocol 以支持 HTTP 升级协议处理（之前版本采用另一种机制以支持 WebSocket，此处不再赘述）用以支持HTTP2.0。</p>
+<p>HTTP 请求的处理过程如下图。</p>
+<p><img src="/images/Tomcat/HTTP请求处理.png" alt=""></p>
+<p>以上两张图从接口层面描述了 Connector 的请求处理，接下来让我们看一下它的详细过程（以HTTP为例）</p>
+<ol>
+<li>当 Connector 启动时，会同时启动其持有的 Endpoint 实例。Endpoint 并行运行多个线程（由属性 acceptorThreadCount 确定，每个线程运行一个 AbstractEndpoint.Acceptor 实例。在 AbstractEndpoint.Acceptor 实例中监听端口通信（I/O方式不同，具体的处理方式也不同），而且只要 Endpoint 处于运行状态，始终循环监听。</li>
+<li>当监听到请求时， Acceptor 将 Socket 封装为 SocketWrapper 实例（此时并未读取数据），并交由一个  SocketProcessor 对象处理（此过程也由线程池异步处理）。此部分根据 I/O 方式的不同处理会有所不同，如 NIO 采用轮询的方式检测 SelectionKey 是否就绪。如果就绪，则获取一个有效的 SocketProcessor 对象并提交线程池处理。</li>
+<li>SocketProcessor 是一个线程池 Worker 实例，每一个 I/O 方式均有自己的实现。它首先判断 Socket 的状态（如完成SSL握手），然后提交到 ConnectionHandler 处理。</li>
+<li>由上图可以知道，ConnectionHandler 是 AbstractProtocol 的一个内部类，主要用于为链接选择一个合适的 Processor 实现以进行请求处理。</li>
+</ol>
+<p>为了提升性能，它针对每个有效的链接都会缓存其 Processor 对象。不仅如此，当前链接关闭时，其 Processor 对象还会被释放到一个回收队列（升级协议不会回收），这样后续链接可以重置并重复利用，以减少对象构造。</p>
+<p>因此，在处理请求时，它首先会从缓存中获取当前链接的 Processor 对象。如果不存在，则尝试根据协商协议构造 Processor（如HTTP2.0请求）。如果不存在协商协议（如HTTP/1.1请求）则从回收队列中获取一个已释放的 Processor 对象使用。如果回收队列中没有可用的对象，那么由具体的协议创建一个 Processor 使用（同时注册到缓存）。</p>
+<p>然后， ConnectionHandler 调用<code>Processor.process()</code>方法进行请求处理。如果不是协议协商的请求（如普通的 HTTP1.1 请求或者 AJP 请求），那么 Processor 则会直接调用<code>CoyoteAdapter.service()</code> 方法将其提交到 Catalina 容器处理。如果是协议协商请求，Processor 会返回 SocketState.UPGRADING，由 ConnectionHandler 进行协议升级。</p>
+<blockquote>
+<p>注意：无论 HTTP/2.0 还是 WebSocket，在建立链接时会首先通过 HTTP/1.1 进行协议协商，此时服务器接收到的是带有特殊请求头的 HTTP/1.1 链接，因此仍由 Http11Processor 处理，它对于协议协商的请求会返回 SocketState.UPGRADING，并由 ConnectionHandler 进行具体的升级处理。</p>
+</blockquote>
+<ol>
+<li><p>协议升级时， ConnectionHandler 会从当前 Processor 得到一个 UpgradeToken 对象（如果没有，则默认为HTTP/2），并构造一个升级 Processor 实例（如果是 Tomcat 支持的协议（如 HTTP/2 和 WebSocket）则会是 UpgradeProcessorInternal，否则是 UpgradeProcessorExternal）替换当前的Processor，并将当前的 Processor 释放回收。替换后，该链接的后续处理将由升级 Processor 完成。</p>
+</li>
+<li><p>通过 UpgradeToken 中 HttpUpgradeHandler 对象的 <code>init()</code> 方法进行初始化，以便准备开始启用新协议。</p>
+<p> 在 ConnectionHandler 中还包含了其他 Socket 状态的处理，此处不再赘述。在 Connector 的请求处理过程中，Tomcat 通过支持请求监听、请求处理的多线程并发以提升服务器请求处理速度。</p>
+</li>
+</ol>
+<h2 id="协议升级"><a href="#协议升级" class="headerlink" title="协议升级"></a>协议升级</h2><p>在 8.5 版本，Tomcat 重构了协议升级的实现方案，以支持 HTTP/2.0，而且 WebSocket 也改由新的升级方案实现。尽管 HTTP/2.0 与 WebSocket 底层的升级方案是一致的，但是它们对协议协商的判断机制却是不同的。具体如下图所示。</p>
+<p><img src="/images/Tomcat/升级协议类图.png" alt=""></p>
+<p>在 Servlet 规范3.1中，首先通过 WebConnection 接口表示一个用于升级请求的链接。Tomcat 中的 UpgradeProcessorExternal 和 UpgradeProcessorInternal 类均实现了该接口。其次，又通过 HttpUpgradeHandler 接口表示升级协议的处理过程，Tomcat 目前只提供了 HTTP/2.0（Http2UpgradeHandler）和 WebSocket（WsHttpUpgradeHandler）两种协议的支持。如果阅读代码你会发现，尽管 Tomcat 提供了 WebConnection 实现，但它仅仅是对 HttpUpgradeHandler 的一个简单代理，至于升级协议的初始化、数据读写均由 HttpUpgradeHandler 完成。</p>
+<p>对于升级协议，Tomcat 通过一个 UpgradeToken 对象维护与其相关的信息，如当前 Web 应用上下文（StandardContext）、对象实例管理器（用于实例化对象）以及当前使用的 HttpUpgradeHandler 实例。无论 HTTP/2.0 还是 WebSocket，均是先构造一个 UpgradeToken 对象，然后根据它创建 UpgradeProcessorInternal 实例，并替换当前的 Http11Processor 以完成协议升级。当前链接的后续处理均由 UpgradeProcessorInternal 维护的 HttpUpgradeHandler 完成。</p>
+<p>从下图我们可以看出，HTTP/2.0 与 WebSocket 链接的处理采用了一致的 API 实现，但是它们的初始化方式却是不同的。</p>
+<p>HTTP2.0 通过 8.5 新增的 UpgradeProtocol 接口创建 HttpUpgradeHandler 以及 UpgradeToken，而 WebSocket 则是通过过滤器 WsFilter 判断当前请求是否为 WebSocket 升级请求，如果是，则调用当前请求的<code>upgrade()</code>方法构造 UpgradeToken 并传递给 Http11Processor。</p>
+<p>也就是说，对于第一次协议协商的过程，HTTP/2.0是由链接器直接处理的，并未提交到 Servlet 容器，而 WebSocket 则提交到了 Servlet 容器。</p>
+<p>由于 HTTP/2.0 是多路复用的协议，也就是多个 HTTP 请求通过一个链接完成。因此对于Http2UpgradeHandler，会将每次请求响应交给 StreamProcessor 处理。而 StreamProcessor 则会将请求提交到 Servlet 容器。</p>
+<h1 id="HTTP"><a href="#HTTP" class="headerlink" title="HTTP"></a>HTTP</h1><h2 id="配置方式"><a href="#配置方式" class="headerlink" title="配置方式"></a>配置方式</h2><p>Tomcat 在默认配置下即支持 HTTP/1.1，不需要另行配置。我们可以在 <code>$CATALINA_BASE/conf/server.xml</code> 中找到相关配置</p>
+<pre class="line-numbers language-XML" data-language="XML"><code class="language-XML">&lt;Connector port&#x3D;&quot;8080&quot; protocol&#x3D;&quot;http&#x2F;1.1&quot; connectionTimeout&#x3D;&quot;20000&quot; redirectport&#x3D;&quot;84437&quot;&#x2F;&gt;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<ul>
+<li><p>protocol</p>
+<p>  值为“http/1.1”，表示当前链接器支持的协议为HTTP/1.1。采用此种方式配置， Tomcat会自动检测当前服务器是否安装了APR。如果安装了APR，那么 Tomcat 将自动使用 APR 处理 HTTP（即 Http11AprProtocol），否则使用 NIO（Tomcat7 以及之前版本为 BIO）。除此之外，我们还可以明确指定协议处理类，此时 Tomcat 的检测将不再生效。如下所示，我们指定采用 NIO 处理 HTTP 请求。</p>
+  <pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8080<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.coyote.http11.Http11NioProtocol<span class="token punctuation">"</span></span> <span class="token attr-name">connectionTimeout</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>20000<span class="token punctuation">"</span></span> <span class="token attr-name">redirectport</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>84437<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+</li>
+<li><p>port </p>
+<p>  分配的端口号</p>
+</li>
+<li><p>connectionTimeout</p>
+<p>  表示 Connector 接收到链接后的等待超时时间，单位为毫秒，默认为20秒。</p>
+</li>
+<li><p>redirectPort</p>
+<p>  表示如果当前 Connector 支持 non-SSL 请求，并且接收到请求内容中存在一个一致的<code>&lt;security- constraint&gt;</code>需要 SSL 传输，Catalina 会自动将请求重定向到该属性指定的端口。Tomcat 默认指定的端口为8443。</p>
+</li>
+<li><p>maxThreads</p>
+<p>  Tomcat 是一款多线程 Servlet 容器，主要通过线程池来管理性能。maxThreads 用于指定 Connector 创建的请求处理线程的最大数目。增大该属性可提高并发能力但会占用更多的资源，如设置过高反而会降低性能，甚至导致 Tomcat 崩溃。</p>
+</li>
+<li><p>maxSpareThreads</p>
+<p>  Tomcat 允许的空闲线程的最大数目，超出的空闲线程将被直接关闭。将该属性设置为较大值对性能并无益处，默认值（50）已经可以满足大多数Web应用的需要。</p>
+</li>
+<li><p>minSpareThreads</p>
+<p>  Tomcat 允许的空闲线程的最小数目，也是启动时 Connector 创建的线程数目。如果空闲线程数小于该值，Tomcat 将创建新的线程。将该属性设置为较大值对性能并无益处，因为会占用额外的系统资源。默认值（4）可以满足大多数 Web 应用的需要。但是对于存在突发情况的 Web 应用，可以适当调大该值。</p>
+</li>
+<li><p>tcpNoDelay</p>
+<p>  将该属性设置为 true，会启用 Socket 的 TCP_NO_DELAY 选项。它会禁用 Nagle 算法，该算法通过降低网络发送包的数量提升网络利用率。在非交互式 Web 应用环境中该算法会缩短响应时间。但是在交互式 Web 应用环境中则会加大响应时间，因为它会将小包拼接为大包再进行发送，从而导致响应延迟。</p>
+</li>
+<li><p>maxKeepAliveRequest</p>
+<p>  用于控制 HTTP 请求的“keep-alive”行为，以启用持续链接（即多个请求通过同一个HTTP链接发送）该属性指定 HTTP 链接在被服务器关闭之前处理的请求最大数目。Tomcat 的默认值为 100，如果设置为 1 表示禁用该特性。因此，该属性会提升单个客户端的请求效率，尤其当一个 Web 页面包含多个HTTP请求时（减少了新建链接的开销），但同时会影响到服务器整体的吞吐量（链接持续时间过长，使服务器容易达到最大链接数，此时其他客户端的请求只能等待，甚至被直接拒绝。这种情况下，我们可以适当调低 keepAliveTimeout 的值）</p>
+</li>
+<li><p>socketBuffer</p>
+<p>  用于指定 Socket 输出缓冲的大小，单位为字节。</p>
+</li>
+<li><p>enableLookups</p>
+<p>  设置为 false，会禁用 <code>request.getRemoteHost()</code> 方法的 DNS 查询，从而提升响应性能（减少 DNS 查询耗时）。</p>
+</li>
+</ul>
+<p>当然只是仅仅一部分属性，详情见第六章和第十章。</p>
+<h1 id="AJP"><a href="#AJP" class="headerlink" title="AJP"></a>AJP</h1><p>除了HTTP，Tomcat 还支持 AJP 协议，以便于 ApacheHttpServer 等 Web 服务器集成。</p>
+<h2 id="基础知识"><a href="#基础知识" class="headerlink" title="基础知识"></a>基础知识</h2><p>为了满足负载均衡、静态资源优化、遗留系统集成（如集成 PHP Web应用）等应用部署要求，我们习惯于在 Servlet 容器的前端部署专门的 Web 服务器，如 ApacheHttpServer。由于增加了 Web 服务器的请求转发处理，虽然此时的单独请求性能必定低于直链 Servlet 容器的情况（增加了一层请求转发），但是整体性能却要大大好于直链。这主要有两个原因：</p>
+<ol>
+<li>通过 Web 服务器的负载均衡机制，可以大大降低单台服务器的负载，从而提升请求处理效率；</li>
+<li>充分利用 Web 服务器在静态资源处理上的性能优势，提升 Web 应用静态资源处理速度（尤其对于静态资源较多的 Web 应用）</li>
+</ol>
+<p>因此出于性能方面的考虑，要尽可能提高 Web 服务器与 Servlet 容器之间数据传输的效率，以减少由此带来的额外开销。服务器在传输可读性文本时，一种更好的方式是采用二进制格式进行传输，这样会大大降低每次请求发送的数据包的大小。此外，由于 Web 服务器与 Servlet 容器通过 TCP 链接通信。为了减少昂贵的  Socket 创建过程，Web 服务器也会试图与 Servlet 容器保持持久的 TCP 链接，在多个请求响应周期之间复用同一个链接。只要链接被分配给一个特定的请求，它将不会被用于其他请求，直到请求处理周期终止。换句话说，请求不能通过链接实现多路复用（这简化了链接两端的编码工作，但是也会导致需要同时打开更多的链接）。</p>
+<p>AJP 便是按照以上思想设计实现的一种通信协议。采用 AJP 协议时。客户端与服务器的交互如下图。</p>
+<p><img src="/images/Tomcat/基于AJP协议的请求处理.png" alt=""></p>
+<p>AJP（ Apache JServ Protocol）是 Alexei Kosut 创建的定向包（packet-oriented）通信协议，采用二进制格式传输可读文本。AJP 1.0 版本发布于1997年，同年 Alexei Kosut 开发了第一个实现，并把它包含在 Apache JServ Servlet Engine 0.9（Tomcat 前身，Servlet 容器参考实现）版本中，其对应的 Web 服务器端的实现为 mod_jserv0.9a（Apache Http Server 模块，即现在的 mod_jk）。</p>
+<p>从该协议的命名不难看出，其最初的目标便是用于 Apache HTTP Server（Web服务器）与 Apache JServ 之间的通信，以提升 Web 服务器与应用服务器集成时的通信性能。</p>
+<p>当前 AJP 协议最新版本为 1.3（1998年曾尝试推出 2.0 版本，但时至今日可用的最新版本仍为 1.3）。至今除 Apache、Tomcat外，Lighttpd（1.5x）、Nginx、IIS 等流行的 Web 服务器以及 Jetty、JBoss AS/WildLy 等 Servlet 容器/应用服务器均已支持 AJP 协议。</p>
+<p>在 AJP 协议下，Web 服务器打开一个与 Servlet 容器的链接后，该链接只可处于以下两种状态。</p>
+<ul>
+<li>空闲：没有请求正在通过该链接处理。</li>
+<li>已分配：链接正在处理一个特定请求。</li>
+</ul>
+<p>一旦链接被分配用于处理一个特定的请求，请求的基本信息（如HTTP头）将会以高度精简的格式通过链接发送。如果存在请求体，它将会以单独的包紧随其后进行发送。</p>
+<h3 id="AJP消息包结构"><a href="#AJP消息包结构" class="headerlink" title="AJP消息包结构"></a>AJP消息包结构</h3><p>AJP 消息包分为请求消息（由 Web 服务器发送到 Servlet 容器）和响应消息（由 Servlet 容器发送到 Web 服务器），消息包最大为 8KB。</p>
+<blockquote>
+<p>需要注意消息包大小限制。当请求体超过限制时，AJP 协议会将其拆分为多条消息进行发送。但是，如果请求头的大小超出消息包上限（如 Cookie 信息过多），AJP协议则无法处理，此时只能使用 HTTP 协议。一旦出现此种情况，应合理评估应用系统，以确定是否可以将此部分剥离，单独采用 HTTP 协议集成，而其余功能采用AJP协议。</p>
+</blockquote>
+<p>请求消息的格式如下表</p>
+<p><img src="/images/Tomcat/AJP请求消息格式.png" alt=""></p>
+<p>响应消息的格式如下表</p>
+<p><img src="/images/Tomcat/响应消息的格式.png" alt=""></p>
+<p>AJP支持的请求及响应消息类型如下表</p>
+<p><img src="/images/Tomcat/AJP支持的请求及响应消息类型.png" alt=""></p>
+<p>出于安全考虑，对于 Shutdown 请求，Servlet 容器只有在请求来自其部署的机器时才会实际执行关闭操作。</p>
+<p>Web 服务器在发送 Forward Request 后会立即发送第一个Data包。</p>
+<p>基于上述消息类型，在一次 HTTP 请求过程中，Web 服务器与 Servlet 容器交互如下图。</p>
+<p><img src="/images/Tomcat/基于AJP协议的请求处理过程.png" alt=""></p>
+<p>在 AJP 协议中，每种请求响应消息拥有不同的结构，我们以 Forward Request 请求和 Send Headers、Send Body Chunk 响应为例进行说明。</p>
+<blockquote>
+<p>注意</p>
+<p>AJP 1.3 消息中支持4种数据类型：字节、布尔、整型和字符串。</p>
+<ul>
+<li>字节：占用单字节。</li>
+<li>布尔：占用单字节，1表示true，0表示false。</li>
+<li>整型：0~32768的数字，占用两个字节存储，高位字节优先。</li>
+<li>字符串：可变长字符串，最大长度为32768。编码时，先将字符串长度写到两个字节中，然后字符串信息紧随其后（包括结束符“\0”）。注意，编码长度不包含结尾的“0”。</li>
+</ul>
+</blockquote>
+<h3 id="Forward-Request结构"><a href="#Forward-Request结构" class="headerlink" title="Forward Request结构"></a>Forward Request结构</h3><p>Forward Request请求消息包结构如下所示：</p>
+<pre class="line-numbers language-markdown" data-language="markdown"><code class="language-markdown">AJP13_FORWARD_REQUEST:=
+	prefix_code		(byte) 0X02 = JK_AJP13_FORWARD_REQUEST
+    method 			(byte) 
+    protocol		(string)
+    reg_url			(string)
+    remote_addr		(string)
+    remote_host		(string)
+    server_name		(string)
+    server_port		(integer)
+    is_ssl			(boolean)
+    num_headers		(integer)
+    request_headers	<span class="token italic"><span class="token punctuation">*</span><span class="token content">(req_header_name req_header_value)
+    attributes		</span><span class="token punctuation">*</span></span>(attribute_name attribute_value)
+    request_terminator (byte)0xFF<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>首字节（prefix_code）表示消息类型编码，因此对于 Forward Request 来说，该字节固定为“2”。</p>
+<p>第二个字节（method）表示 HTTP 请求 Method 的编码，具体如下表</p>
+<p><img src="/images/Tomcat/AJP支持的HTTPMethod编码.png" alt=""></p>
+<p>protocol（请求协议）、reg_uri（请求URI）、remote_addr（远程地址）、remote_host（远程主机）、server_name（服务器名称）、server_port（服务器端口号）、is_ssl（是否为SSL），这些属性均是自描述的，不再详细说明。</p>
+<p>请求头由两个属性描述，首先 num_headers 存储请求中头信息的数目。其次 request_headers 存储具体的头信息的键值对。通用的头名称以整数编码形式存储，非通用头名称，以字符串形式存储。值为普通的字符串，紧随请求头名称之后。</p>
+<p>通用头名称编码如下表。</p>
+<p><img src="/images/Tomcat/AJP支持的HTTP请求头编码.png" alt=""></p>
+<p>Servlet 容器解析时，可以先尝试读取前两个字节，如果第一个字节为 “0xA0”，那么前两个字节即为请求头名称的编码（如果将所有请求头按编码顺序存储到一个数组中，第二个字节可以直接作为请求头名称在数组中的位置，以简化查询）。否则前两个字节为头名称字符串长度，并继续读取后续字节作为请求头名称。</p>
+<p>当然，这种设计基于的前提是请求头名称的长度不会超过0x9999（0xA000-1），虽然有些随意，但却是合理的。</p>
+<p>请求属性由 attributes 描述（因为 Forward Request 不包含请求体数据，所以不需要额外字节来描述 attributes 的数目，请求头之后的所有数据均可认为是 attributes）。</p>
+<p>与请求头类似，请求属性也以键值对形式存储。键为属性编码，除 are_done外，其他属性值均为字符串。are_done 没有对应的属性值，其编码为特殊字符，用以表示 attributes 以及当前请求包的结束。</p>
+<p>当前支持的请求属性编码如下表。</p>
+<p><img src="/images/Tomcat/AJP支持的HTTP请求属性编码.png" alt=""></p>
+<p>在具体实现中，context、servlet_path 两个属性并未使用，不再详细说明。</p>
+<p>remote_user、auth_type 用于 HTTP 请求认证。</p>
+<p>query_string、ssl_cert、ssl_cipher、ssl_session 分别对应于 HTTP 请求中相应的内容，如果你了解 HTTP 协议，那么这些名称的具体含义不难理解。</p>
+<p>jvm_route 用于支持粘性会话主要用于集群环境，具体使用参见第7章和第8章。</p>
+<p>req_attribute 用于支持扩展请求属性的发送，所有扩展属性名和属性值以一个字符串的形式存储到 req_attribute 的值中。</p>
+<h3 id="Send-Headers-结构"><a href="#Send-Headers-结构" class="headerlink" title="Send Headers 结构"></a>Send Headers 结构</h3><p>Send Headers 响应消息包结构如下所示</p>
+<pre class="line-numbers language-markdown" data-language="markdown"><code class="language-markdown">AJP13_SEND_HEADERS :=
+	prefix_code			4
+	http_status_code	(integer)
+	http_status_msg		(string)
+	num_headers			(integer)
+	response_headers	*(res_header_name header_value)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>prefix_code 固定为 4，表示响应消息类型为”Send Headers”。http_status_code 和 http_status_msg 表示 HTTP 响应码和描述。</p>
+<p>响应头的结构与 Forward Request 中的请求头结构相同，支持的响应头编码如下表。</p>
+<p><img src="/images/Tomcat/AJP支持的HTTP响应头编码.png" alt=""></p>
+<h3 id="Send-Body-Chunk-结构"><a href="#Send-Body-Chunk-结构" class="headerlink" title="Send Body Chunk 结构"></a>Send Body Chunk 结构</h3><p>Send Body Chunk 响应消息包结构如下所示</p>
+<pre class="line-numbers language-markdown" data-language="markdown"><code class="language-markdown">AJP13_SEND_BODY_CHUNK :=
+	prefix_code		3
+	chunk_length	(integer)
+	chunk			*(byte)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>prefix_code 固定为3，表示 Send Body Chunk 响应消息。chunk_length 表示响应体数据长度，chunk表示具体的响应体数据。</p>
+<h2 id="配置方式-1"><a href="#配置方式-1" class="headerlink" title="配置方式"></a>配置方式</h2><p>Tomcat 在默认情况下即支持 AJP/1.3，不需要我们另行配置。我们可以在 <code>$CATALINA_BASE/conf/server.xml</code> 中找到相关内容，如下所示：</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8009<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>AJP/1.3<span class="token punctuation">"</span></span> <span class="token attr-name">redirectPort</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>84437<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>从配置可知，AJP 请求的处理端口为 8009，我们可以通过修改 port 属性，将其修改为希望分配的端口。</p>
+<p>其次，属性 protocol 为 “AJP/1.3” 表示当前链接器支持的协议为 AJP/1.3。与 HTTP 协议配置类似，采用此种方式，Tomcat 会自动检测当前服务器是否安装了 APR。如果安装了 APR，那么 Tomcat 将自动使用 APR 处理 AJP（即 AjpAprProtocol），否则使用 NIO（ Tomcat7以及之前版本为BIO）。除此之外，我们还可以明确指定协议处理类，此时 Tomcat 的检测将不再生效。如下所示，我们指定采用NIO处理AJP请求。</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8009<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.coyote.ajp.AjpNioProtocol<span class="token punctuation">"</span></span> <span class="token attr-name">redirectPort</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>84437<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h1 id="HTTP-2-0"><a href="#HTTP-2-0" class="headerlink" title="HTTP/2.0"></a>HTTP/2.0</h1><p>自 8.5 版本开始，Tomcat 增加了对 HTTP/2.0 的支持。在本节中，我们将简单介绍 HTTP/2.0 的发展、基本知识及其配置使用方式。</p>
+<h2 id="基础知识-1"><a href="#基础知识-1" class="headerlink" title="基础知识"></a>基础知识</h2><p>谈到 HTTP/2.0，我们就不得不先说一下 SPDY 协议。SPDY 是 Google 开发的用于传输 Web 内容的开放网络协议，可以说是 HTTP/2.0 的母体。SPDY 通过巧妙地控制 HTTP 通信，以达到降低 Web 页面加载延迟和提高 Web 安全的目标。SPDY 通过压缩、多路复用、优先级来实现降低延迟，但是这依赖于网络和 Web 应用部署条件的组合。</p>
+<p>SPDY 的设计目标是降低 Web 页面加载时间。通过优先级和多路复用，SPDY 使得只需要建立一个 TCP 链接即可传送网页内容及图片等资源。SPDY 中广泛应用了 TLS 加密，传输内容也均以 GZIP 或 DEFLATE 格式压缩（与 HTTP 不同，HTTP 的头部并不会被压缩）。另外，除了像 HTTP 网页服务器被动等待浏览器发起请求外，SPDY 网页服务器还可以主动向浏览器推送内容。</p>
+<p>SPDY 并不是用于取代 HTTP 协议的，它修改了 HTTP 请求和响应在网络上的传输方式。这意味着只需增加一个 SPDY 传输层，现有所有服务端应用均不需要做任何的修改。SPDY 是 HTTP 和 HTTPS 协议的有效隧道。当通过 SPDY 发送时，HTTP 请求会被处理、标记简化和压缩。例如，每个 SPDY 端点会持续跟踪在之前请求中已经发送的 HTTP 报文头部，从而避免重复发送还未改变的头部，未发送的报文数据部分将在压缩后发送。</p>
+<p>考虑到 SPDY 已获得的实现者（如Mozilla、Nginx）的支持以及与 HTTP/1.1 相比获得的性能提升，HTTPbis 工作小组最终决定采用 SPDY/2 作为 HTTP/2 的基础，而且 SPDY/4 已经与 HTTP/2 草稿非常接近。</p>
+<p>2015年2月，Google 宣布，随着 HTTP/2 标准的正式批准，他们将不再支持 SPDY，而且2016年完全移除 Chrome 浏览器对 SPDY 的支持。Tomcat 在 8.0 的最初几个版本中，增加了对 SPDY/2 协议的支持，以用于实验目的。随着在8.5版本中对 HTTP/2.0 的支持，SPDY/2 的相关功能已经移除。</p>
+<p>虽然 HTTP/2.0 托体于 SPDY/2，但是仍有与 SPDY 不同之处，主要有以下两点。</p>
+<ul>
+<li>HTTP/2.0 支持明文传输，而 SPDY 强制使用 HTTPS。</li>
+<li>HTTP/2.0 消息头的压缩算法采用 HPACK，而 SPDY 采用 DELEFT。</li>
+</ul>
+<p>与 HTTP/1.1 相比，HTTP/2.0 在传输方面进行了如下重要改进。</p>
+<ul>
+<li>采用二进制格式传输数据而非 HTTP/1.1 的文本格式。</li>
+<li>HTTP/2.0 对消息头采用了HPACK压缩，提升了传输效率。</li>
+<li>基于帧和流的多路复用，真正实现了基于一个链接的多请求并发处理。</li>
+<li>支持服务器推送。</li>
+</ul>
+<p>在 HTTP/2.0 中，一个基本的协议单元是帧（Frame）。帧在 HTTP/2.0 中的概念可以理解为数据包之于 TCP 的概念。按照用途不同，分为不同类型的帧，如 HEADERS 和 DATA 帧用于 HTTP 的请求和响应，而如 SETTINGS、WINDOW_UPDATE、PUSH_PROMISE 等则用于支持 HTTP/2.0 的特性。</p>
+<p>一个 Frame 由9字节定长头以及变长的 Payload 组成，具体格式如下图。</p>
+<p><img src="/images/Tomcat/HTTP2Frame结构.png" alt=""></p>
+<ul>
+<li>Length：24位，表示 Frame Payload 部分的长度。</li>
+<li>Type：8位，表示 Frame 的类型。帧类型决定了帧的格式和语义。</li>
+<li>Flags：8位，每一位是一个布尔标记，用于特定的帧类型。对于每个类型的帧，这些标记都被赋予了特殊的语义。例如发送最后一个 DATA 类型的 Frame 时，就会将 Flags 最后一位设置1，表示 END_STREAM。说明当前 Frame 是流的最后一个数据包。</li>
+<li>R：1位预留位，未明确定义语义。</li>
+<li>Stream Identifier：Frame 所属流的标识。标识 0 作为预留值用于链接初始化，而非某个 Frame。</li>
+<li>Frame Payload：Frame 的有效荷载，每种类型的帧的 Payload 格式和语义均不相同。不论是HTTP Header 还是 Body，在 HTTP/2.0 中，都会被存储到 Frame Payload 中，组成 Frame 进行发送。它们通过 Frame Header 中的 Type 进行区分。</li>
+</ul>
+<p><img src="/images/Tomcat/HTTP11转换为HTTP2示意图.png" alt=""></p>
+<p>Stream（流）是客户端与服务器之间通过 HTTP/2.0 链接交换的独立的、双向的帧序列，我们可以将流视为一个完整的处理过程（请求响应）。流的概念的提出是为了实现 HTTP 请求的多路复用，它具有以下特征</p>
+<ul>
+<li>一个HTTP/2.0链接可以并发地打开多个流，并可以从多个流的任意端点交换帧。</li>
+<li>流可以创建并被客户端/服务器单边或共享使用。</li>
+<li>流可以被任意端点关闭。</li>
+<li>同一个流中的帧按顺序发送，接收者按照接收顺序进行处理。</li>
+<li>流通过一个整数唯一标识，由初始化流的端点分配。</li>
+<li>流是相互独立的，因此一个流的阻塞或停止的请求响应并不会影响其他流的处理。</li>
+</ul>
+<p>我们可以通过下图示意流通过HTTP/2.0链接传输的过程。</p>
+<p><img src="/images/Tomcat/Stream传输示意图.png" alt=""></p>
+<p>流将一次请求过程拆分为有序的更细粒度的帧，便拥有自己的生命周期和状态转换，我们每发送或者接收帧都会导致流状态的变化，从而可以确保流按照既定的规则和顺序接收帧。流的生命周期如下图。图展示了流的状态转换以及导致状态转换的帧类型以及标记， CONTINUATION 帧不会导致流的状态转换，只作为它跟随的 HEADERS 或者 PUSH_PROMISE 的一部分，并未在图中体现。</p>
+<p><img src="/images/Tomcat/Stream生命周期.png" alt=""></p>
+<p>采用流进行多路复用会导致 TCP 资源竞争，HTTP2.0 通过流控制确保流之间不会严重影响彼此。除此之外，通过引入优先级机制，可以使端点告知对端它希望对端在管理并发流时如何分配资源，以便给予指定流更多的资源支持。不仅如此，通过指定流之间的依赖关系，也可以影响资源的分配。</p>
+<p>如果你希望进一步了解 SPDY 和 HTTP/2.0 可以查看以下资源。</p>
+<ul>
+<li>SPDY协议规范：<a target="_blank" rel="noopener" href="http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draf3。">http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draf3。</a></li>
+<li>HTTP/2协议规范：<a target="_blank" rel="noopener" href="http://httpwg.org/specs/rfc7540.html。">http://httpwg.org/specs/rfc7540.html。</a></li>
+</ul>
+<h2 id="配置方法"><a href="#配置方法" class="headerlink" title="配置方法"></a>配置方法</h2><p>由前面的讲解可知，在 Tomcat 中，通过 UpgradeProtocol 接口提供 HTTP/2.0 升级支持。因此，若要为HTTP 链接器开启 HTTP/2.0 支持，只需要添加如下配置即可</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8080<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>http/1.1<span class="token punctuation">"</span></span> <span class="token attr-name">connectionTimeout</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>20000<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>UpgradeProtocol</span> <span class="token attr-name">classname</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.coyote.http2.Http2Protocol<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>Connector</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p>HTTP2.0 同时支持 TLS（h2）和非TLS（h2c）。如果希望使用 TLS，那么需要为链接器添加证书信息。由于 JDK8 的 TLS 实现不支持 ALPN，因此我们需要采用基于 OpenSSL 的 TLS 实现，同时指定链接器的 sslImplementationName 属性，如下所示：</p>
+<pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8443<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>http/1.1<span class="token punctuation">"</span></span> <span class="token attr-name">maxThreads</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>150<span class="token punctuation">"</span></span> <span class="token attr-name">SSLEnabled</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>true<span class="token punctuation">"</span></span> <span class="token attr-name">sslImplementationName</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.tomcat.util.net.openssl.OpenSSLImplementation<span class="token punctuation">"</span></span><span class="token punctuation">></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>UpgradeProtocol</span> <span class="token attr-name">classname</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.coyote.http2.Http2protocol<span class="token punctuation">"</span></span><span class="token punctuation">/></span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>SSLHostConfig</span><span class="token punctuation">></span></span>
+    	&lt;Certificate certificateKeyFile="conf/key.pem"
+                     certificateFile="conf/cert.pem"
+                     certificateChainFile-"conf/chain.pem"
+                     type="RSA"/>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>SSLHostConfig</span><span class="token punctuation">></span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>Connector</span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>当然，如果你使用的是 Http11AprProtocol，则不需要指定 sslImplementationName，因为 Http11AprProtocol 默认采用的便是 OpenSSL。</p>
+<h1 id="IO"><a href="#IO" class="headerlink" title="IO"></a>IO</h1><p>谈到应用系统性能，通常我们会考虑如下几个方面（限于软件层面，未涵盖硬件）。</p>
+<ul>
+<li>数据库IO、数据文件存储、分区、配置（如 ORACLE 的默认优化规则）等。</li>
+<li>应用系统功能算法、缓存、并发、SOL访问等。</li>
+<li>应用服务器性能。</li>
+</ul>
+<p>对于应用服务器性能，又可细分为以下几个方面</p>
+<ul>
+<li>请求处理的并发程度，当前主流服务器均采用异步的方式处理客户端请求，Tomcat 采用 JDK5 的线程池进行请求分发处理。我们前面讲到 HTTP 链接器的 maxThreads 便是用于控制链接器的并发程度，也是我们性能调优重点关注的属性配置。</li>
+<li>减少网络传输的数据量，提高网络利用率，如 AJP 以二进制方式传输和 SPDY 对 HTTP 协议的优化。</li>
+<li>降低新建网络链接的开销，以实现链接在多个请求之间的复用。如 HTTP 链接器的 maxKeepAliveRequest 属性和 AJP 链接器的持久性链接。</li>
+<li>选择合适的 I/O 方式，以提升 I/O 效率。Java最早的 I/O 方式为 BlO，即阻塞式I/O，仅适用于链接数目较小且固定的架构。无论 JDK1.4 引入的 NIO，还是 JDK7 引入的 NIO2（即AIO）以及 Apache 提供的 APR 均可以有效地提高 I/O 性能。</li>
+</ul>
+<p>在 8.5 版本之前（8.0版本之后），Tomcat 同时支持 BIO、NIO、NIO2、APR 这4种IO方式，其中 NIO2 为8.0版本新增。自8.5版本开始， Tomcat移除了对BIO的支持。</p>
+<h2 id="BIO"><a href="#BIO" class="headerlink" title="BIO"></a>BIO</h2><p>JioEndpoint 启动过程如下</p>
+<ol>
+<li>根据 IP地址（多 IP 的情况）及端口创建 ServerSocket 实例。</li>
+<li>如果 Connector 没有配置共享线程池，创建请求处理线程池。</li>
+<li>根据 acceptorThreadCount 配置的数量，创建并启动 <code>org.apache.tomcat.util.net.JIoEndpoint.Acceptor</code> 线程。Acceptor 实现了 Runnable 接口，负责轮询接收客户端请求 <code>Socket.accept()</code>。这些线程是单独启动的，并未放到线程池中，因此不会影响请求并发处理。 Acceptor 还会检测 Endpoint 状态（如果处于暂停状态，则等待）以及最大链接数。</li>
+<li>当接收到客户端请求后，创建 SocketProcessor 对象（同样也实现了 Runnable 接口），并提交到线程池处理。</li>
+<li>SocketProcessor 并未直接处理 Socket，而是将其交由具体的协议处理类，如 <code>org.apache.coyote.http11.Http11Processor</code> 用于处理 BIO 方式下的 HTTP 协议。在 Http11Processor 中根据 Socket 构造具体的输入、输出缓冲对象。</li>
+<li>此外，JioEndpoint 还构造了一个单独线程用于检测超时请求。</li>
+</ol>
+<p>可见，Tomcat 对于接收请求（Acceptor）和处理请求（Processor）均采用异步处理。异步接收可以保证服务器同时接收来自多个客户端的请求，而异步处理请求则可以避免请求处理过程阻塞服务器接收新请求。通过这种机制，Tomcat 可以做到尽快接收请求并将其放入处理线程池。同时对于持续的链接（如文件上传）会放到一个单独的“等待请求集合”（线程安全）以实现超时检测。</p>
+<h2 id="NIO"><a href="#NIO" class="headerlink" title="NIO"></a>NIO</h2><p>由于 <code>Selector.select()</code> 方法是阻塞的，因此 Tomcat 采用轮询的方式进行处理，轮询线程称为 Poller。每个 Poller 维护了一个 Selector 实例以及一个 PollerEvent 事件队列。每当接收到新的链接时，会将获得的 SocketChannel 对象封装为 <code>org.apache.tomcat.util.net.NioChannel</code>，并将其注册到 Poller（创建一个 PollerEvent 实例，添加到事件队列）。</p>
+<p>Poller 运行时，首先将新添加到队列中的 PollerEvent 取出，并将 SocketChannel 的读事件注册到 Poller 持有的 Selector 上，然后执行<code>Selector.select()</code>。当捕获到读事件时，构造 SocketProcessor，并提交到线程池进行请求处理。</p>
+<p>为了提升对象的利用率，NioEndpoint 分别为 NioChannel 和 PollerEvent 对象创建了缓存队列。当需要 NioChannel 和 PollerEvent 对象时，会检测缓存队列中是否存在可用的对象，如果存在则从队列中取出对象并重置，如果不存在则新建。</p>
+<p><img src="/images/Tomcat/NIOEndpoint请求处理.png" alt=""></p>
+<ul>
+<li>与示例不同， NioEndpoint 中 ServerSocketChannel 是阻塞的。因此，仍采用多线程并发接收客户端链接。</li>
+<li>NioEndpoint 根据 pollerThreadCount 配置的数量创建 Poller 线程。与 Acceptor 相同，Poller 线程也是单独启动，不会占用请求处理的线程池。默认 Poller 线程个数与 JVM 可使用的处理器个数相关，上限为 2。</li>
+<li>Accepor 接收到新的链接后，将获得的 SocketChannel 置为非阻塞，构造 NioChannel 对象按照轮转法（Round-Robin）获取 Poller 实例，并将 NioChannel 注册到 PollerEvent事件队列。</li>
+<li>Poller 负责为 SocketChannel 注册读事件。接收到读事件后，由 SocketProcessor 完成客户端请求处理。SocketProcessor的处理过程具体可参见4.2节中的说明。</li>
+</ul>
+<p>Poller 在将 SocketProcessor 添加到请求处理线程池之前，会将接收到读事件的 SocketChannel 从 Poller 维护的 Selector 上取消注册，避免当前 Socket 多线程同时处理。而读写过程中的事件处理则是由 NioSelectorPool 完成的，事件变化如下图。</p>
+<p><img src="/images/Tomcat/NioEndpoint事件变化.png" alt=""></p>
+<p>NioSelectorPool 提供了一个 Selector 池，用于获取有效的 Selector 供 SocketChannel 读写使用。它由 NioEndpoint 维护，可以通过系统属性 <code>org.apache.tomcat.util.net.NioSelectorShared</code> 配置是否在SocketChannel 之间共享 Selector，如果为 true 则所有 SocketChannel 均共享一个 Selector 实例，否则每一个 SocketChannel 使用不同的 Selector，NioSelectorPool 池维护的 Selector 实例数上限由属性 maxSelectors确定。</p>
+<p>通过此种方式， Tomcat 将每个 SocketChannel 的事件分散注册到不同的 Selector 对象中，避免了因大量 SocketChannel 集中注册事件到同一个 Selector 对象而影响服务器性能。</p>
+<p>NioSelectorPool 读信息分为阻塞和非阻塞两种方式。</p>
+<ul>
+<li>在阻塞模式下，如果第一次读取不到数据，则会在 NioSelectorPool提供的 Selector 对象上注册读事件，并循环调用<code>Selector.select</code>，超时等待读事件。如果读事件就绪，则进行数据读取。</li>
+<li>在非阻塞模式下，如果读不到数据，则直接返回。</li>
+</ul>
+<p>同样，在 NioEndpoint中，写信息也分为阻塞和非阻塞两种方式。</p>
+<ul>
+<li>在阻塞模式下，如果第一次写数据没有成功，则会在 NioSelectorPool 提供的 Selector 对象上注册写事件，并循环调用<code>Selector.select()</code>方法，超时等待写事件。如果写事件就绪，则会进行写数据操作。</li>
+<li>在非阻塞模式下，写数据之前不会监听写事件。如果没有成功，则直接返回。</li>
+</ul>
+<p>综上可知，Tomcat 在阻塞方式下读写时并没有立即监听读写事件，而是当第一次操作没有成功时再进行注册。这实际上是一种乐观设计，即假设网络大多数情况下是正常的。</p>
+<blockquote>
+<p>注意</p>
+<p>默认情况下，NioSelectorPool 配置为共享 Selector，并且是阻塞模式，此时读写操作通过 NioBlockingSelector 类完成。NioBlockingSelector维护了一个轮询线程（Block Poller），当第一次读写不成功时，会在 BlockPoller 注册读写事件（注册到共享 Selector 上），其事件注册的过程类似于 Poller。</p>
+</blockquote>
+<h2 id="NIO2"><a href="#NIO2" class="headerlink" title="NIO2"></a>NIO2</h2><p>NIO2 是 JDK7 新增的文件及网络 IO 特性，它继承自 NIO，同时添加了众多特性及功能改进其中最重要的即是对异步IO（AIO）的支持。</p>
+<ol>
+<li><p>通道</p>
+<p> 在AIO中，通道必须实现接口 <code>java.nio.channels.AsynchronousChannel</code>（继承自<code>java.nio.channels.Channel</code>）。JDK7提供了3个通道实现类： <code>java.nio.channels.AsynchronousFileChannel</code> 用于文件IO，<code>java.nio.channels.AsynchronousServerSocketChannel</code> 和<code>java.nio.channels.AsynchronousSocketChannel</code> 用于网络I/O。</p>
+</li>
+<li><p>缓冲区</p>
+<p> AIO 仍通过操作缓冲区完成数据的读写操作。</p>
+</li>
+<li><p>Future 和 CompletionHandler</p>
+<p> AIO 操作存在两种操作方式：Future 和 CompletionHandler。我们可以使用其中任何一种来完成IO操作。</p>
+<p> 首先，AIO 使用了 Java 并发包的 API，无论接收 Socket 请求还是读写操作，均可以返回一个 <code>java.util.concurrent.Future</code> 对象来表示IO处于等待状态。通过 Future 的方法，我们可以检测操作是否完成（isDone）、等待完成并取得操作结果（get）等。当接收请求（accept）结束时，Future.get 返回值为 AsynchronousSocketChannel；读写操作时（read/write），Future.get 返回值为读写操作结果。</p>
+<p> 除了 Future 外，接收请求以及读写操作还支持指定一个 <code>java.nio.channels.CompletionHandler&lt;V,A&gt;</code> 接口（此时不再返回 Future 对象），当 I/O 操作完成时，会调用接口的 completed() 方法，当操作失败时，则会调用 <code>failed()</code> 方法。</p>
+<p> 比较两种操作方式，Future 方式需要我们自己监测 I/O 操作状态或者直接通过 Future.get() 方法等待 I/O 操作结束，而 CompletionHandler 方式则由 JDK 监测 I/O 状态，我们只需要实现每种操作状态的处理即可。在实际应用中，我们可以只采用 Future 方式或者 CompletionHandler 方式，也可以两者混合使用（具体见示例）。</p>
+</li>
+<li><p>异步通道组</p>
+<p> AIO 新引入了异步通道组（Asynchronous Channel Group）的概念，每个异步通道均属于一个指定的异步通道组，同一个通道组内的通道共享一个线程池。线程池内的线程接收指令来执行 I/O 事件并将结果分发到 CompletionHandler。异步通道组包括线程池以及所有通道工作线程共享的资源。通道生命周期受所属通道组影响，当通道组关闭后，通道也随之关闭。</p>
+<p> 在实际开发中，除了可以手动创建异步通道组外，JVM还维护了一个系统范围的通道组实例，作为默认通道组。如果创建通道时未指定通道组或者指定的通道组为空，那么将会使用默认通道组。</p>
+</li>
+</ol>
+<p>默认通道组通过两个系统属性进行配置。首先是 <code>java.nio.channels.DefaultThreadPool.threadFactory</code>，该属性值为具体的 <code>java.util.concurrent.ThreadFactory</code> 类，由系统类加载器加载并实例化，用于创建默认通道组线程池的线程。其次为 <code>java.nio.channels.DefaultThreadPool.initialSize</code>，用于指定线程池的初始化大小。</p>
+<p>如果默认通道组不能满足需要，我们还可以通过 AsynchronousChannelGroup 的下列 3 个方法来创建自定义的通道组。</p>
+<p>withFixedThreadPool 用于创建固定大小的线程池，固定大小的线程池适合简单的场景：一个线程等待 I/O 事件、完成 I/O 事件、执行 CompletionHandler（内核将事件直接分发到这些线程）当 CompletionHandler 正常终止，线程将返回线程池并等待下一个事件。但是如果 CompletionHandler 未能及时完成，它将会阻塞处理线程。如果所有线程均在 CompletionHandler 内部阻塞，整个应用将会被阻塞。此时所有新事件均会排队等待，直到有一个线程变为有效。最糟糕的场景是没有线程被释放，内核将不再执行任何操作。这个问题避免的方法是在 CompletionHandler 内部不采用阻塞或者长时间的操作，也可以使用一个缓存线程池或者超时时间来避免这个问题。</p>
+<p>withCachedThreadPool 用于创建缓存线程池。异步通道组提交事件到线程池，线程池只是简单地执行 CompletionHandler 的方法。此时大家会有疑问，如果线程池只是简单地执行 CompletionHandler 的方法，那么是谁执行具体的IO操作？答案是隐藏线程池。这是一组独立的线程用于等待 I/O 事件。更准确地讲，内核 I/O 操作由一个或者多个不可见的内部线程处理并将事件分发到缓存线程池，缓存线程池依次执行 CompletionHandler。隐藏线程池非常重要，因为它显著降低了应用程序阻塞的可能性（解决了固定大小线程池的问题），确保內核能够完成 IO 操作。但是它仍存在一个问题，由于缓存线程池需要无边界的队列，这将使队列无限制地增长并最终导致 OutOfMemoryError。因此仍需要注意避免 CompletionHandler 中的阻塞以及长时间操作。</p>
+<p>withThreadPool 用于根据指定的 <code>java.util.concurrent.ExecutorService</code> 创建线程池。ExecutorService 执行提交的任务并分发完成结果。采用该方法需要格外小心，当配置 ExecutorService 时，至少需要做两件事情：支持直接切换或者无边界队列，永远不要允许执行 <code>execute()</code> 方法的线程直接执行任务。</p>
+<p>接下来我们分别看一下采用 Future 和 CompletionHandler 方式的 AIO 示例，并基于此探讨 Tomcat 的 AIO 使用。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Nio2Client</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">AsynchronousSocketChannel</span> channel<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">CharBuffer</span> charBuffer<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">CharsetDecoder</span> decoder <span class="token operator">=</span> <span class="token class-name">Charset</span><span class="token punctuation">.</span><span class="token function">defaultCharset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">newDecoder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">BufferedReader</span> clientInput <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">BufferedReader</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">InputStreamReader</span><span class="token punctuation">(</span><span class="token class-name">System</span><span class="token punctuation">.</span>in<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        channel <span class="token operator">=</span> <span class="token class-name">AsynchronousSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>channel<span class="token punctuation">.</span><span class="token function">isOpen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_RCVBUF<span class="token punctuation">,</span> <span class="token number">128</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_SNDBUF<span class="token punctuation">,</span> <span class="token number">128</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_KEEPALIVE<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">Void</span> connect <span class="token operator">=</span> channel<span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>
+                    <span class="token keyword">new</span> <span class="token class-name">InetSocketAddress</span><span class="token punctuation">(</span><span class="token string">"127.0.0.1"</span><span class="token punctuation">,</span> <span class="token number">8080</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>connect <span class="token operator">!=</span> <span class="token keyword">null</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span><span class="token string">"连接服务器失败！"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span><span class="token string">"通道未打开！"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"输入客户端请求："</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">String</span> request <span class="token operator">=</span> clientInput<span class="token punctuation">.</span><span class="token function">readLine</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//发送客户端请求</span>
+        channel<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//创建读取的缓冲区</span>
+        <span class="token class-name">ByteBuffer</span> buffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">allocateDirect</span><span class="token punctuation">(</span><span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//读取服务端响应</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span>channel<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            buffer<span class="token punctuation">.</span><span class="token function">flip</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            charBuffer <span class="token operator">=</span> decoder<span class="token punctuation">.</span><span class="token function">decode</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">String</span> response <span class="token operator">=</span> charBuffer<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">trim</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"服务端响应："</span> <span class="token operator">+</span> response<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>buffer<span class="token punctuation">.</span><span class="token function">hasRemaining</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span>
+                buffer<span class="token punctuation">.</span><span class="token function">compact</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                buffer<span class="token punctuation">.</span><span class="token function">clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token comment">//读取并发送下一次请求</span>
+            request <span class="token operator">=</span> clientInput<span class="token punctuation">.</span><span class="token function">readLine</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Nio2Client</span> client <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Nio2Client</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        client<span class="token punctuation">.</span><span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        client<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Nio2Server</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">ExecutorService</span> taskExecutor<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">AsynchronousServerSocketChannel</span> serverChannel<span class="token punctuation">;</span>
+
+    <span class="token keyword">class</span> <span class="token class-name">Worker</span> <span class="token keyword">implements</span> <span class="token class-name">Callable</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">private</span> <span class="token class-name">CharBuffer</span> charBuffer<span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">CharsetDecoder</span> decoder <span class="token operator">=</span> <span class="token class-name">Charset</span><span class="token punctuation">.</span><span class="token function">defaultCharset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">newDecoder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">AsynchronousSocketChannel</span> channel<span class="token punctuation">;</span>
+
+        <span class="token class-name">Worker</span><span class="token punctuation">(</span><span class="token class-name">AsynchronousSocketChannel</span> channel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>channel <span class="token operator">=</span> channel<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">call</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">final</span> <span class="token class-name">ByteBuffer</span> buffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">allocateDirect</span><span class="token punctuation">(</span><span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">//读取请求</span>
+            <span class="token keyword">while</span> <span class="token punctuation">(</span>channel<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                buffer<span class="token punctuation">.</span><span class="token function">flip</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                charBuffer <span class="token operator">=</span> decoder<span class="token punctuation">.</span><span class="token function">decode</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">String</span> request <span class="token operator">=</span> charBuffer<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">trim</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"客户端请求："</span> <span class="token operator">+</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">ByteBuffer</span> outBuffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span><span class="token string">"请求收到"</span><span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token comment">//将响应输出到客户端</span>
+                channel<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>outBuffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>buffer<span class="token punctuation">.</span><span class="token function">hasRemaining</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    buffer<span class="token punctuation">.</span><span class="token function">compact</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                    buffer<span class="token punctuation">.</span><span class="token function">clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+            channel<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">return</span> <span class="token string">"OK"</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//创建 ExecutorService</span>
+        taskExecutor <span class="token operator">=</span> <span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">newCachedThreadPool</span><span class="token punctuation">(</span><span class="token class-name">Executors</span><span class="token punctuation">.</span><span class="token function">defaultThreadFactory</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//创建 AsynchronousServerSocketChannel</span>
+        serverChannel <span class="token operator">=</span> <span class="token class-name">AsynchronousServerSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>serverChannel<span class="token punctuation">.</span><span class="token function">isOpen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_RCVBUF<span class="token punctuation">,</span> <span class="token number">4</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_REUSEADDR<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">//绑定端口</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">bind</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">InetSocketAddress</span><span class="token punctuation">(</span><span class="token string">"127.0.0.1"</span><span class="token punctuation">,</span> <span class="token number">8080</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span><span class="token string">"通道未打开"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"等待客户端请求……"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token comment">//接收客户端请求Future</span>
+            <span class="token class-name">Future</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">AsynchronousSocketChannel</span><span class="token punctuation">></span></span> future <span class="token operator">=</span> serverChannel<span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token comment">//等待并得到请求通道</span>
+                <span class="token class-name">AsynchronousSocketChannel</span> channel <span class="token operator">=</span> future<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token comment">//提交到线程池进行请求处理</span>
+                taskExecutor<span class="token punctuation">.</span><span class="token function">submit</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Worker</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">System</span><span class="token punctuation">.</span>err<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"服务器关闭！"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                taskExecutor<span class="token punctuation">.</span><span class="token function">shutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token operator">!</span>taskExecutor<span class="token punctuation">.</span><span class="token function">isShutdown</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">;</span>
+                <span class="token keyword">break</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">Nio2Server</span> server <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Nio2Server</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span><span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>我们看到，服务端通过一个循环来接收客户端请求，并且接收过程是阻塞的（<code>Future.get</code>）接收到客户端请求后，将其提交到线程池处理，因此请求读写是非阻塞的。</p>
+<p>再看一下基于 CompletionHandler 的示例（此示例并不是完全使用 Completion Handler，而是与 Future 混合使用）</p>
+<p>与 Future 方式中的 <code>Future.get()</code> 方法可以阻塞当前线程不同， CompletionHandler 完全是异步的，因此我们在最后增加了主线程等待的处理。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">NioClient</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">class</span> <span class="token class-name">ClientCompletionHandler</span> <span class="token keyword">implements</span> <span class="token class-name">CompletionHandler</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Void</span><span class="token punctuation">,</span> <span class="token class-name">Void</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">private</span> <span class="token class-name">AsynchronousSocketChannel</span> channel<span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">CharBuffer</span> charBuffer<span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">CharsetDecoder</span> decoder <span class="token operator">=</span> <span class="token class-name">Charset</span><span class="token punctuation">.</span><span class="token function">defaultCharset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">newDecoder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">BufferedReader</span> clientInput <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">BufferedReader</span><span class="token punctuation">(</span>
+                <span class="token keyword">new</span> <span class="token class-name">InputStreamReader</span><span class="token punctuation">(</span><span class="token class-name">System</span><span class="token punctuation">.</span>in<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">ClientCompletionHandler</span><span class="token punctuation">(</span><span class="token class-name">AsynchronousSocketChannel</span> channel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>channel <span class="token operator">=</span> channel<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">completed</span><span class="token punctuation">(</span><span class="token class-name">Void</span> result<span class="token punctuation">,</span> <span class="token class-name">Void</span> attachment<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"输入客户端请求："</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">String</span> request <span class="token operator">=</span> clientInput<span class="token punctuation">.</span><span class="token function">readLine</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                channel<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token class-name">ByteBuffer</span> buffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">allocateDirect</span><span class="token punctuation">(</span><span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token comment">//读取响应数据</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span>channel<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    buffer<span class="token punctuation">.</span><span class="token function">flip</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    charBuffer <span class="token operator">=</span> decoder<span class="token punctuation">.</span><span class="token function">decode</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>charBuffer<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>buffer<span class="token punctuation">.</span><span class="token function">hasRemaining</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        buffer<span class="token punctuation">.</span><span class="token function">compact</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                        buffer<span class="token punctuation">.</span><span class="token function">clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+
+                    request <span class="token operator">=</span> clientInput<span class="token punctuation">.</span><span class="token function">readLine</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    channel<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span>request<span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                e<span class="token punctuation">.</span><span class="token function">printStackTrace</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    channel<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">IOException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    e<span class="token punctuation">.</span><span class="token function">printStackTrace</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">failed</span><span class="token punctuation">(</span><span class="token class-name">Throwable</span> exc<span class="token punctuation">,</span> <span class="token class-name">Void</span> attachment<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token punctuation">&#125;</span>
+
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">AsynchronousSocketChannel</span> channel <span class="token operator">=</span> <span class="token class-name">AsynchronousSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>channel<span class="token punctuation">.</span><span class="token function">isOpen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_RCVBUF<span class="token punctuation">,</span> <span class="token number">128</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_SNDBUF<span class="token punctuation">,</span> <span class="token number">128</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_KEEPALIVE<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            channel<span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">InetSocketAddress</span><span class="token punctuation">(</span><span class="token string">"127.0.0.1"</span><span class="token punctuation">,</span> <span class="token number">8080</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">ClientCompletionHandler</span><span class="token punctuation">(</span>channel<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">5000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+        <span class="token punctuation">&#125;</span><span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">RuntimeException</span><span class="token punctuation">(</span><span class="token string">"通道未打开！"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">NioClient</span> client <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NioClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        client<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">NioServer</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">AsynchronousServerSocketChannel</span> serverChannel<span class="token punctuation">;</span>
+
+    <span class="token keyword">class</span> <span class="token class-name">ServerCompletionHandler</span> <span class="token keyword">implements</span> <span class="token class-name">CompletionHandler</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">AsynchronousSocketChannel</span><span class="token punctuation">,</span> <span class="token class-name">Void</span><span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+
+        <span class="token keyword">private</span> <span class="token class-name">AsynchronousServerSocketChannel</span> serverChannel<span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">ByteBuffer</span> buffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">allocateDirect</span><span class="token punctuation">(</span><span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">CharBuffer</span> charBuffer<span class="token punctuation">;</span>
+        <span class="token keyword">private</span> <span class="token class-name">CharsetDecoder</span> decoder <span class="token operator">=</span> <span class="token class-name">Charset</span><span class="token punctuation">.</span><span class="token function">defaultCharset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">newDecoder</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">public</span> <span class="token class-name">ServerCompletionHandler</span><span class="token punctuation">(</span><span class="token class-name">AsynchronousServerSocketChannel</span> serverChannel<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token keyword">this</span><span class="token punctuation">.</span>serverChannel <span class="token operator">=</span> serverChannel<span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">completed</span><span class="token punctuation">(</span><span class="token class-name">AsynchronousSocketChannel</span> result<span class="token punctuation">,</span> <span class="token class-name">Void</span> attachment<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">while</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    buffer<span class="token punctuation">.</span><span class="token function">flip</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    charBuffer <span class="token operator">=</span> decoder<span class="token punctuation">.</span><span class="token function">decode</span><span class="token punctuation">(</span>buffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token class-name">String</span> request <span class="token operator">=</span> charBuffer<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">trim</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"客户端请求："</span> <span class="token operator">+</span> request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token class-name">ByteBuffer</span> outBuffer <span class="token operator">=</span> <span class="token class-name">ByteBuffer</span><span class="token punctuation">.</span><span class="token function">wrap</span><span class="token punctuation">(</span><span class="token string">"请求收到"</span><span class="token punctuation">.</span><span class="token function">getBytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    result<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>outBuffer<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token keyword">if</span> <span class="token punctuation">(</span>buffer<span class="token punctuation">.</span><span class="token function">hasRemaining</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                        buffer<span class="token punctuation">.</span><span class="token function">compact</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+                        buffer<span class="token punctuation">.</span><span class="token function">clear</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">&#125;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">Exception</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+            <span class="token punctuation">&#125;</span> <span class="token keyword">finally</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">try</span> <span class="token punctuation">&#123;</span>
+                    result<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span><span class="token class-name">IOException</span> e<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                    e<span class="token punctuation">.</span><span class="token function">printStackTrace</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">&#125;</span>
+            <span class="token punctuation">&#125;</span>
+
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">failed</span><span class="token punctuation">(</span><span class="token class-name">Throwable</span> exc<span class="token punctuation">,</span> <span class="token class-name">Void</span> attachment<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token comment">//创建 AsynchronousServerSocketChannel</span>
+        serverChannel <span class="token operator">=</span> <span class="token class-name">AsynchronousServerSocketChannel</span><span class="token punctuation">.</span><span class="token keyword">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>serverChannel<span class="token punctuation">.</span><span class="token function">isOpen</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_RCVBUF<span class="token punctuation">,</span> <span class="token number">4</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">setOption</span><span class="token punctuation">(</span><span class="token class-name">StandardSocketOptions</span><span class="token punctuation">.</span>SO_REUSEADDR<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            serverChannel<span class="token punctuation">.</span><span class="token function">bind</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">InetSocketAddress</span><span class="token punctuation">(</span><span class="token string">"127.0.0.1"</span><span class="token punctuation">,</span> <span class="token number">8080</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span><span class="token string">"等待客户端请求"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        serverChannel<span class="token punctuation">.</span><span class="token function">accept</span><span class="token punctuation">(</span><span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token keyword">new</span> <span class="token class-name">ServerCompletionHandler</span><span class="token punctuation">(</span>serverChannel<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            <span class="token class-name">Thread</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">5000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">void</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> args<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+        <span class="token class-name">NioServer</span> server <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NioServer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span><span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        server<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>在服务端代码中，只有接收客户端请求的代码采用了 CompletionHandler 的方式，而且我们提供了一个实现类 ServerCompletionHandler，在 completed 方法中完成接收请求和发送响应的操作<br>（仍采用 Future 的方式），在 failed 方法中处理操作失败的情况。同样我们在最后增加了主线程等待的处理。</p>
+<p>当然，我们也可以将示例完全采用 Completion Handler的方式实现，只需要在读写操作时采用附带 CompletionHandler 参数的 read 和 write 方法即可。</p>
+<p>需要注意的一个细节是，在 ServerCompletionHandler 中，无论是完成还是失败，一旦接收请求的处理返回，我们需要立即执行 accept 方法，以便准备接收下一个请求（具体参见 ServerCompletionHandler），由于是异步处理，这并不会阻塞当前请求的读写操作。而且这步操作越早越好（示例中是首行代码），以避免当前的读写操作阻塞接收新请求。</p>
+<p>比较 Future 方式和 CompletionHandler 方式，我们可以发现，如果希望支持多客户端链接， Future方式的服务端需要自己维护线程池用于并发，而 CompletionHandler，方式则不需要，因此后者要简单一些。但是由于前者可以直接拿到 Future 对象，因此处理相对灵活一些。</p>
+<p>Tomcat AIO 的使用可以参见 Nio2Endpoint。与 BIO、NIO 类似，Tomcat 仍使用 Acceptor 线程池的方式接收客户端请求。在 Acceptor 中，采用 Future方式进行请求接收。此外， Tomcat 分别采用 Future方式实现阻塞读写，采用 CompletionHandler 方式实现非阻塞读写。</p>
+<p>Nio2Endpoint 的处理过程如下图所示</p>
+<ul>
+<li>Nio2Endpoint 创建异步通道时，指定了自定义异步通道组，并且使用的是请求处理线程池。</li>
+<li>Nio2Endpoint 中接收请求仍采用多线程处理，以 Future 的方式阻塞调用。</li>
+<li>当接收到请求后，构造 Nio2SocketWrapper 以及 SocketProcessor 并提交到请求处理线程池，最终由 Http11Nio2Processor（HTTP协议）完成请求处理。</li>
+<li>Nio2Endpoint 通过 Nio2Channel 封装了 AsynchronousSocketChannel 和读写 ByteBuffer，并提供了 Nio2Channel 缓存以实现 ByteBuffer 的重复利用。当接收到客户端请求后，Nio2Endpoint 先从缓存中查找可用的 Nio2Channel 如果存在，则使用当前的 AsynchronousSocketChannel 进行重置，否则创建新的 Nio2Channel 实例。</li>
+<li>Nio2Endpoint 只有在读取请求头时采用非阻塞方式，即 CompletionHandler。在读取请求体和写响应时均采用阻塞方式，即 Future。</li>
+</ul>
+<p><img src="/images/Tomcat/Nio2Endpoint请求处理.png" alt=""></p>
+<h2 id="APR"><a href="#APR" class="headerlink" title="APR"></a>APR</h2><p>APR（ Apache Portable Runtime），即 Apache可移植运行库。正如官网所言，APR的使命是创建和维护一套软件库，以便在不同操作系统（ Windows、Linux等）底层实现的基础上提供统一的 API。通过 APR 的 API，程序开发者可以在开发阶段不必考虑平台的差异性，也不必关心程序的最终构建环境。减少程序开发者编写特殊代码区分不同操作系统以避免系统缺陷或者利用系统特性的工作。</p>
+<p>APR 为应用程序开发提供统一的API，对于某些操作系统不支持的功能，APR则进行模拟实现，因此采用 APR 可以真正做到跨平台应用开发。</p>
+<p>APR最早是 Apache Http Server 的一部分，后来 Apache 基金会考虑到其通用性，将其作为独立的项目进行维护。</p>
+<p>APR提供的主要功能模块包括：内存分配及内存池、原子操作、文件I/O、锁、内存映射、哈希表、网络I/O、轮询、进程及线程操作，等等。全部模块列表可参见：<code>http://apr.apacheorg/docs/apr/1.5/modules.html</code> 通过采用APR，Tomcat 可以获得高度可扩展性以及优越的性能，并且可以更好地与本地服务器技术集成，从而可以使 Tomcat 作为一款通用的 Web 服务器使用，而不仅仅作为轻量级应用服务器。在这种情况下，Java 将不再是一门侧重于后端的编程语言，也可以更多地用于成熟的Web服务器平台。</p>
+<p>Tomcat 启动时，会自动检测系统是否安装了APR，如果已安装，则自动采用APR进行 IO 处理（除非已指定 Connector 的 protocol 属性为具体的协议类）</p>
+<p>在 Tomcat 使用APR需要安装以下3个本地组件：</p>
+<ul>
+<li>APR库</li>
+<li>APR JNI封装包（ Tomcat 使用）</li>
+<li>OpenSSL</li>
+</ul>
+<p><strong>AprEndpoint</strong></p>
+<p> Tomcat 中 APR 的实现可以参见 AprEndpoint。首先，它与其他 endpoint 实现遵循了一致的接口定义，其次，它与 NioEndpoint 类似，采用轮询的方式处理请求（正确地说是 NioEndpoint 模仿了Apr的轮询方式）</p>
+<p>AprEndpoint的处理过程如下图。</p>
+<p><img src="/images/Tomcat/AprEndpoint的处理过程.png" alt=""></p>
+<p>与其他 Endpoint 相比， AprEndpoint 启动时除了创建 Socket、绑定地址及端口、创建SSL上下文环境，还会进行操作系统层级设置。如创建内存池、对于 Unix 和 Windows 系统设置 Socket重用标识（ SO_REUSEADDR）、设置延迟接收 Socket 的标识（ TCP_DEFER_ACCEPT）而且除了接收请求的线程池和异步超时线程外，还要创建轮询线程和 Sendfile 线程。</p>
+<p>AprEndpoint 的 Acceptor 线程以阻塞形式监听请求链接，当有新的请求链接时，它会构造一个SocketWithOptionsProcessor 对象并提交到请求处理线程池。该对象会判断是否设置了 TCP_DEFER_ACCEPT 标识。如果是，直接调用 Handler（负责构造具体的协议处理类，具体参见3.5节以及4.2节的讲解）处理请求；否则，将当前 Socket 添加到 Poller 线程的轮询队列，Poller 线程轮询检测 Socket 的状态，并根据检测结果构造 SocketProcessor 对象并提交到请求处理线程池。 SocketProcessor 对象直接调用 Handler 进行请求处理。</p>
+<p>之所以如此设计，是因为如果设置了 TCP_DEFER_ACCEPT 标识，只有数据到达后，服务端才会 Accept 请求，此时在 SocketWithOptionsProcessor中可以直接处理请求，而不必再轮询检测状态。如果没有设置该标识，则需要轮询检测数据是否到达，此时需要将准备好的请求提交到线程池处理，以避免阻塞轮询线程。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>HTTP三种IO处理方法</p>
+<p><img src="/images/Tomcat/HTTP三种IO处理方法.png" alt=""></p>
+<p>实际上，每种 IO 实现方案不仅受限于 IO 技术本身，也与 Servlet 规范的相关约束有关，如 NIO 和 NIO2 的读请求体以及写响应。</p>
+<p><img src="/images/Tomcat/AJP三种IO处理方法.png" alt=""></p>
+<p>总的来说，AJP 协议的性能要优于HTTP协议，因此在 Web 服务器与 Tomcat 集成时，可优先使用 AJP 协议。</p>
+<p>AJP 采用二进制传输可读性文本，并且在 Web 服务器与 Tomcat 之间保持持久性 TCP 链接，这使得 AJP 占用更少的带宽，并且链接开销要小得多。但是由于 AJP 采用持久性链接，因此有效链接数较 HTTP 要多。</p>
+<p>当然，某些 Web 服务器并不支持 AJP 协议，此时在集成时只能选择 HTTP 协议。</p>
+<p>对于 IO 选择，要依赖于具体业务场景下的性能测试结果（简单性能测试仅可作为参考，并不足以成为选择依据），通常情况下 APR 和 NIO2 的性能要优于 NIO 和 BIO，尤其是 APR，由于调用本地库，其性能接近于系统原生处理速度。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/HTTP/" rel="tag"># HTTP</a>
+              <a href="/tags/Tomcat/" rel="tag"># Tomcat</a>
+              <a href="/tags/Coyote/" rel="tag"># Coyote</a>
+              <a href="/tags/AJP/" rel="tag"># AJP</a>
+              <a href="/tags/HTTP-2-0/" rel="tag"># HTTP/2.0</a>
+              <a href="/tags/IO/" rel="tag"># IO</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/28/Tomcat-2-Catalina%E7%BB%84%E4%BB%B6/" rel="prev" title="Tomcat Catalina组件">
+      <i class="fa fa-chevron-left"></i> Tomcat Catalina组件
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Coyote-%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">Coyote 简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Web%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">Web请求处理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E8%A6%81%E6%A6%82%E5%BF%B5"><span class="nav-number">2.1.</span> <span class="nav-text">主要概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.2.</span> <span class="nav-text">请求处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E5%8D%87%E7%BA%A7"><span class="nav-number">2.3.</span> <span class="nav-text">协议升级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP"><span class="nav-number">3.</span> <span class="nav-text">HTTP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F"><span class="nav-number">3.1.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#AJP"><span class="nav-number">4.</span> <span class="nav-text">AJP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86"><span class="nav-number">4.1.</span> <span class="nav-text">基础知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AJP%E6%B6%88%E6%81%AF%E5%8C%85%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.1.</span> <span class="nav-text">AJP消息包结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Forward-Request%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.2.</span> <span class="nav-text">Forward Request结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Headers-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.3.</span> <span class="nav-text">Send Headers 结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Body-Chunk-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.4.</span> <span class="nav-text">Send Body Chunk 结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F-1"><span class="nav-number">4.2.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP-2-0"><span class="nav-number">5.</span> <span class="nav-text">HTTP&#x2F;2.0</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86-1"><span class="nav-number">5.1.</span> <span class="nav-text">基础知识</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E6%B3%95"><span class="nav-number">5.2.</span> <span class="nav-text">配置方法</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#IO"><span class="nav-number">6.</span> <span class="nav-text">IO</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#BIO"><span class="nav-number">6.1.</span> <span class="nav-text">BIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO"><span class="nav-number">6.2.</span> <span class="nav-text">NIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO2"><span class="nav-number">6.3.</span> <span class="nav-text">NIO2</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#APR"><span class="nav-number">6.4.</span> <span class="nav-text">APR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">6.5.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">142</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">284</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
