@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Jackson 是一个简单的、功能强大的、基于 Java 的应用库。它可以很方便完成 Java 对象和 Json 对象进行互转。Jackson社区相对比较活跃，更新速度也比较快。 Jackson库有如下几大特性：   高性能且稳定：低内存占用，对大&#x2F;小JSON串，大&#x2F;小对象的解析表现均很优秀 流行度高：是很多流行框架的默认选择 容易使用：提供高层次的 API，极大简化了日常使用案例 无需自己手动创">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JSON Jackson序列化库 注解篇">
+<meta property="og:url" content="http://example.com/2023/01/16/JSON-Jackson%E5%BA%8F%E5%88%97%E5%8C%96%E5%BA%93-%E6%B3%A8%E8%A7%A3%E7%AF%87/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Jackson 是一个简单的、功能强大的、基于 Java 的应用库。它可以很方便完成 Java 对象和 Json 对象进行互转。Jackson社区相对比较活跃，更新速度也比较快。 Jackson库有如下几大特性：   高性能且稳定：低内存占用，对大&#x2F;小JSON串，大&#x2F;小对象的解析表现均很优秀 流行度高：是很多流行框架的默认选择 容易使用：提供高层次的 API，极大简化了日常使用案例 无需自己手动创">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-01-16T09:50:04.000Z">
+<meta property="article:modified_time" content="2023-01-28T03:30:47.596Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Annotation">
+<meta property="article:tag" content="JSON">
+<meta property="article:tag" content="Jackson">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2023/01/16/JSON-Jackson%E5%BA%8F%E5%88%97%E5%8C%96%E5%BA%93-%E6%B3%A8%E8%A7%A3%E7%AF%87/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>JSON Jackson序列化库 注解篇 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/01/16/JSON-Jackson%E5%BA%8F%E5%88%97%E5%8C%96%E5%BA%93-%E6%B3%A8%E8%A7%A3%E7%AF%87/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          JSON Jackson序列化库 注解篇
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-01-16 17:50:04" itemprop="dateCreated datePublished" datetime="2023-01-16T17:50:04+08:00">2023-01-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-01-28 11:30:47" itemprop="dateModified" datetime="2023-01-28T11:30:47+08:00">2023-01-28</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/JSON/" itemprop="url" rel="index"><span itemprop="name">JSON</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Jackson 是一个简单的、功能强大的、基于 Java 的应用库。它可以很方便完成 Java 对象和 Json 对象进行互转。Jackson社区相对比较活跃，更新速度也比较快。</p>
+<p>Jackson库有如下几大特性： </p>
+<ol>
+<li>高性能且稳定：低内存占用，对大/小JSON串，大/小对象的解析表现均很优秀</li>
+<li>流行度高：是很多流行框架的默认选择</li>
+<li>容易使用：提供高层次的 API，极大简化了日常使用案例</li>
+<li>无需自己手动创建映射：内置了绝大部分序列化时和 Java 类型的映射关系</li>
+<li>干净的 JSON：创建的 JSON 具有干净、紧凑、体积小等特点</li>
+<li>无三方依赖：仅依赖于 JDK</li>
+<li>Spring生态加持：Jackson 是 Spring 家族的默认 JSON/XML 解析器</li>
+</ol>
+<span id="more"></span>
+<h1 id="通用注解"><a href="#通用注解" class="headerlink" title="通用注解"></a>通用注解</h1><h2 id="JsonIgnore"><a href="#JsonIgnore" class="headerlink" title="JsonIgnore"></a>JsonIgnore</h2><blockquote>
+<p>方法、字段上均可使用</p>
+</blockquote>
+<p>指定被注解的变量或者方法不参与序列化和反序列化操作。</p>
+<h2 id="JsonIgnoreProperties"><a href="#JsonIgnoreProperties" class="headerlink" title="JsonIgnoreProperties"></a>JsonIgnoreProperties</h2><blockquote>
+<p>类上可用</p>
+</blockquote>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>value</td>
+<td>忽略指定字段</td>
+</tr>
+<tr>
+<td>ignoreUnknown</td>
+<td>忽略JSON内有但POJO内没有的字段</td>
+<td>默认会报错</td>
+</tr>
+<tr>
+<td>allowGetters</td>
+<td>开放 value 中指定字段的 get 权限</td>
+</tr>
+<tr>
+<td>allowSetters</td>
+<td>开放 value 中指定字段的 set 权限</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="JsonIgnoreType"><a href="#JsonIgnoreType" class="headerlink" title="JsonIgnoreType"></a>JsonIgnoreType</h2><blockquote>
+<p>类上可用</p>
+</blockquote>
+<p>忽略该类型的序列化/反序列化操作。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>   
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>  
+  
+  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">User</span> buyer<span class="token punctuation">;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">User</span> seller<span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@JsonIgnoreType</span>  
+    <span class="token annotation punctuation">@Data</span>    
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token keyword">class</span> <span class="token class-name">User</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>  
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>    <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">OrderTb</span> tb <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OrderTb</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+tb<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+tb<span class="token punctuation">.</span><span class="token function">setBuyer</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Buyer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token class-name">String</span> w <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">writerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">writeValueAsString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 最终序列化为 &#123;"id":1&#125;</span>
+
+<span class="token string">"&#123;\"id\":\"1\"&#125;"</span>
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonAutoDetect"><a href="#JsonAutoDetect" class="headerlink" title="JsonAutoDetect"></a>JsonAutoDetect</h2><blockquote>
+<p>类上可用</p>
+</blockquote>
+<p>指定getter、setter、is-getter、字段的可见性，用来序列化/反序列化时是否包含某种访问权限的字段。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>getterVisibility</td>
+<td>getter可见性</td>
+</tr>
+<tr>
+<td>isGetterVisibility</td>
+<td>is-getter可见性</td>
+<td></td>
+</tr>
+<tr>
+<td>setterVisibility</td>
+<td>setter可见性</td>
+</tr>
+<tr>
+<td>creatorVisibility</td>
+<td>开放 value 中指定字段的 set 权限</td>
+</tr>
+<tr>
+<td>fieldVisibility</td>
+<td>字段可见性</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>枚举</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ANY</td>
+<td>私有、默认、保护、公共 四种权限都可见</td>
+</tr>
+<tr>
+<td>NON_PRIVATE</td>
+<td>默认、保护、公共 三种权限都可见</td>
+</tr>
+<tr>
+<td>PROTECTED_AND_PUBLIC</td>
+<td>保护、公共 两种权限都可见</td>
+</tr>
+<tr>
+<td>PUBLIC_ONLY</td>
+<td>仅 公共 权限可见</td>
+</tr>
+<tr>
+<td>NONE</td>
+<td>都不可见</td>
+</tr>
+<tr>
+<td>DEFAULT</td>
+<td>从父配置中获取</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="JsonTypeInfo-Todo"><a href="#JsonTypeInfo-Todo" class="headerlink" title="JsonTypeInfo (Todo)"></a>JsonTypeInfo (Todo)</h2><blockquote>
+<p>字段、方法、参数、类可用</p>
+</blockquote>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>use</td>
+<td></td>
+</tr>
+<tr>
+<td>include</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>property</td>
+<td>插入额外信息的名称(不设置采用默认值)</td>
+</tr>
+<tr>
+<td>defaultImpl</td>
+<td></td>
+</tr>
+<tr>
+<td>visible</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="多态序列化反序列化场景"><a href="#多态序列化反序列化场景" class="headerlink" title="多态序列化反序列化场景"></a>多态序列化反序列化场景</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token comment">//@JsonTypeInfo(use = Id.CLASS)  </span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Shape</span> <span class="token punctuation">&#123;</span>  
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@Data</span>  
+<span class="token annotation punctuation">@EqualsAndHashCode</span><span class="token punctuation">(</span>callSuper <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">)</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Circle</span> <span class="token keyword">extends</span> <span class="token class-name">Shape</span> <span class="token punctuation">&#123;</span>  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> radius<span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span>
+
+<span class="token annotation punctuation">@Data</span>  
+<span class="token annotation punctuation">@EqualsAndHashCode</span><span class="token punctuation">(</span>callSuper <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">)</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Rectangle</span> <span class="token keyword">extends</span> <span class="token class-name">Shape</span> <span class="token punctuation">&#123;</span>  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> width<span class="token punctuation">;</span>  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> height<span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Circle</span> circle <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Circle</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+circle<span class="token punctuation">.</span><span class="token function">setName</span><span class="token punctuation">(</span><span class="token string">"circle"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+circle<span class="token punctuation">.</span><span class="token function">setRadius</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+<span class="token class-name">Rectangle</span> rectangle <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Rectangle</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+rectangle<span class="token punctuation">.</span><span class="token function">setName</span><span class="token punctuation">(</span><span class="token string">"rectangle"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+rectangle<span class="token punctuation">.</span><span class="token function">setHeight</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+rectangle<span class="token punctuation">.</span><span class="token function">setWidth</span><span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+<span class="token class-name">ObjectMapper</span> mapper <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ObjectMapper</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+<span class="token class-name">String</span> circleJson <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">writer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">writeValueAsString</span><span class="token punctuation">(</span>circle<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// &#123;"name":"circle","radius":10&#125;</span>
+<span class="token class-name">String</span> rectangleJson <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">writer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">writeValueAsString</span><span class="token punctuation">(</span>rectangle<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// &#123;"name":"rectangle","width":5,"height":2&#125;</span>
+
+<span class="token class-name">Shape</span> circleObj <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">readerFor</span><span class="token punctuation">(</span><span class="token class-name">Shape</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readValue</span><span class="token punctuation">(</span>circleJson<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token class-name">Shape</span> rectangleObj <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">readerFor</span><span class="token punctuation">(</span><span class="token class-name">Shape</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readValue</span><span class="token punctuation">(</span>rectangleJson<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>circleObj<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token class-name">System</span><span class="token punctuation">.</span>out<span class="token punctuation">.</span><span class="token function">println</span><span class="token punctuation">(</span>rectangleObj<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>反序列化时会因为字段未填充报错。</p>
+<p>在父类定义上面加上 <code>@JsonTypeInfo(use = Id.CLASS)</code> 注解之后，序列化的输出结果如下</p>
+<pre class="line-numbers language-json" data-language="json"><code class="language-json"><span class="token punctuation">&#123;</span>
+	<span class="token property">"@class"</span><span class="token operator">:</span><span class="token string">"com.example.springdemo.Circle"</span><span class="token punctuation">,</span>
+	<span class="token property">"name"</span><span class="token operator">:</span><span class="token string">"circle"</span><span class="token punctuation">,</span>
+	<span class="token property">"radius"</span><span class="token operator">:</span><span class="token number">10</span>
+<span class="token punctuation">&#125;</span> 
+<span class="token punctuation">&#123;</span>
+	<span class="token property">"@class"</span><span class="token operator">:</span><span class="token string">"com.example.springdemo.Rectangle"</span><span class="token punctuation">,</span>
+	<span class="token property">"name"</span><span class="token operator">:</span><span class="token string">"rectangle"</span><span class="token punctuation">,</span>
+	<span class="token property">"width"</span><span class="token operator">:</span><span class="token number">5</span><span class="token punctuation">,</span>
+	<span class="token property">"height"</span><span class="token operator">:</span><span class="token number">2</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><code>@JsonTypeInfo</code> 注解不仅可以加在父类的定义上面，也可以加到包含父类的成员变量上面。当在集合类型（List，Map，Array）上使用时，它将应用于元素，而不是集合本身。<br><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@JsonTypeInfo</span><span class="token punctuation">(</span>use <span class="token operator">=</span> <span class="token class-name">Id</span><span class="token punctuation">.</span>CLASS<span class="token punctuation">)</span> 
+<span class="token keyword">private</span> <span class="token class-name">List</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Shape</span><span class="token punctuation">></span></span> shapes<span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre></p>
+<p>反序列化后，Shape 类型可正常类型转换为子类。</p>
+<h1 id="序列化相关注解"><a href="#序列化相关注解" class="headerlink" title="序列化相关注解"></a>序列化相关注解</h1><h2 id="JsonGetter"><a href="#JsonGetter" class="headerlink" title="JsonGetter"></a>JsonGetter</h2><blockquote>
+<p>方法可用</p>
+</blockquote>
+<p>根据指定的 Value 值，序列化对应的 getter 方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@JsonGetter</span><span class="token punctuation">(</span><span class="token string">"orderSeq"</span><span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token class-name">Integer</span> <span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+    <span class="token keyword">return</span> id<span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 将 id 字段序列化为 orderSeq</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonAnyGetter"><a href="#JsonAnyGetter" class="headerlink" title="JsonAnyGetter"></a>JsonAnyGetter</h2><blockquote>
+<p>方法、字段可用</p>
+</blockquote>
+<p>将 Map 中的 KV，直接映射成该类的属性。 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">String</span> orderSeq<span class="token punctuation">;</span>
+
+	<span class="token annotation punctuation">@JsonIgnore</span>
+	<span class="token annotation punctuation">@JsonAnyGetter</span> 
+    <span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">Object</span><span class="token punctuation">></span></span> properties<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">ObjectMapper</span> mapper <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ObjectMapper</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+<span class="token class-name">OrderTb</span> tb <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OrderTb</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+tb<span class="token punctuation">.</span><span class="token function">setProperties</span><span class="token punctuation">(</span><span class="token class-name">Collections</span><span class="token punctuation">.</span><span class="token function">singletonMap</span><span class="token punctuation">(</span><span class="token string">"orderSeq"</span><span class="token punctuation">,</span> <span class="token string">"150204"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token class-name">String</span> w <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">writerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">writeValueAsString</span><span class="token punctuation">(</span>tb<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// &#123;"orderSeq":null, "orderSeq":"150204"&#125; </span>
+<span class="token comment">// 如果Map中Key和POJO字段重复则会序列化出两个字段，且字段生成的优先级低，读取时覆盖优先级高的。</span>
+<span class="token class-name">OrderTb</span> r <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">readerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readValue</span><span class="token punctuation">(</span>w<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// OrderTb(orderSeq=150204)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonPropertyOrder"><a href="#JsonPropertyOrder" class="headerlink" title="JsonPropertyOrder"></a>JsonPropertyOrder</h2><blockquote>
+<p>类上可用</p>
+</blockquote>
+<p>指定序列化输出顺序。</p>
+<h2 id="JsonFormat"><a href="#JsonFormat" class="headerlink" title="JsonFormat"></a>JsonFormat</h2><blockquote>
+<p>字段、方法、参数可用</p>
+</blockquote>
+<p>指定序列化日期的格式。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span> 
+    <span class="token annotation punctuation">@JsonFormat</span><span class="token punctuation">(</span>pattern <span class="token operator">=</span> <span class="token string">"yyyy-MM-dd HH:mm:ss"</span><span class="token punctuation">,</span> timezone <span class="token operator">=</span> <span class="token string">"GMT+8"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">private</span> <span class="token class-name">Date</span> time<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonRawValue"><a href="#JsonRawValue" class="headerlink" title="JsonRawValue"></a>JsonRawValue</h2><p>使用该注解的字段或者方法，都会被序列化，但是序列化结果是原始值。（一般用来序列化本身就是JSON字符串的内容）</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@JsonRawValue</span>  
+    <span class="token keyword">private</span> <span class="token class-name">String</span> orderSeq<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">OrderTb</span> tb <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OrderTb</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+tb<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+tb<span class="token punctuation">.</span><span class="token function">setOrderSeq</span><span class="token punctuation">(</span><span class="token string">"150204"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>   
+
+<span class="token class-name">String</span> s <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">writerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">writeValueAsString</span><span class="token punctuation">(</span>tb<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 最终序列化为 &#123;"id":1,"orderSeq":1111&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonValue"><a href="#JsonValue" class="headerlink" title="JsonValue"></a>JsonValue</h2><blockquote>
+<p>方法、字段可用</p>
+</blockquote>
+<p>在序列化类时，直接返回对应字段或方法内容。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>
+
+	<span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>
+	
+	<span class="token annotation punctuation">@JsonValue</span>  
+	<span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">toJson</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+	    <span class="token keyword">return</span> <span class="token string">"json value annotation test"</span><span class="token punctuation">;</span>  
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 最终序列化为 json value annotation test</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="序列化枚举类型场景"><a href="#序列化枚举类型场景" class="headerlink" title="序列化枚举类型场景"></a>序列化枚举类型场景</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">enum</span> <span class="token class-name">TargetTypeEnum</span> <span class="token keyword">implements</span> <span class="token class-name">Enumerator</span><span class="token punctuation">&#123;</span>
+    <span class="token function">INNER_H5</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span><span class="token string">"内置H5"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token function">INNER_APP</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span><span class="token string">"内置APP模块"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token function">OUTER_APP</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span><span class="token string">"三方APP"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token function">OUTER_H5</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">,</span><span class="token string">"三方H5"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	
+	<span class="token annotation punctuation">@JsonValue</span>
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> code<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> desc<span class="token punctuation">;</span>
+    
+    <span class="token class-name">TargetTypeEnum</span><span class="token punctuation">(</span><span class="token keyword">int</span> code<span class="token punctuation">,</span><span class="token class-name">String</span> desc<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>code<span class="token operator">=</span>code<span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>desc<span class="token operator">=</span>desc<span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token comment">// 在被序列化时会被直接序列化为Code值</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonSerialize"><a href="#JsonSerialize" class="headerlink" title="JsonSerialize"></a>JsonSerialize</h2><p>用于在Java对象指定一个字段的自定义序列化器。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>using</td>
+<td></td>
+</tr>
+<tr>
+<td>contentUsing</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>keyUsing</td>
+<td></td>
+</tr>
+<tr>
+<td>nullsUsing</td>
+<td></td>
+</tr>
+<tr>
+<td>as</td>
+<td></td>
+</tr>
+<tr>
+<td>keyAs</td>
+<td></td>
+</tr>
+<tr>
+<td>contentAs</td>
+<td></td>
+</tr>
+<tr>
+<td>typing</td>
+<td></td>
+</tr>
+<tr>
+<td>converter</td>
+<td></td>
+</tr>
+<tr>
+<td>contentConverter</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="反序列化相关注解"><a href="#反序列化相关注解" class="headerlink" title="反序列化相关注解"></a>反序列化相关注解</h1><h2 id="JsonSetter"><a href="#JsonSetter" class="headerlink" title="JsonSetter"></a>JsonSetter</h2><blockquote>
+<p>字段、方法、参数 可用</p>
+</blockquote>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>value</td>
+<td>从json中定义参数接收内容</td>
+</tr>
+<tr>
+<td>nulls</td>
+<td>字段反序列化时为空策略</td>
+<td></td>
+</tr>
+<tr>
+<td>contentNulls</td>
+<td>字段是包装类型如(Map,Collection,array)时，内容反序列化时为空策略</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>nulls 以及 contentNulls 可以指定以下空值处理策略</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>枚举</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SET</td>
+<td></td>
+</tr>
+<tr>
+<td>SKIP</td>
+<td>跳过反序列化对应内容</td>
+</tr>
+<tr>
+<td>FAIL</td>
+<td>对应字段反序列化时为null会报错</td>
+</tr>
+<tr>
+<td>AS_EMPTY</td>
+<td>对应字段反序列化时为null会填充空字符串或空的结构体</td>
+</tr>
+<tr>
+<td>DEFAULT</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="JsonAnySetter"><a href="#JsonAnySetter" class="headerlink" title="JsonAnySetter"></a>JsonAnySetter</h2><blockquote>
+<p>方法、字段可用</p>
+</blockquote>
+<p>POJO 类中有的字段会被反序列化到对应位置，其他字段会被 SET 到指定的 Map 中。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@JsonAnySetter</span>  
+    <span class="token keyword">private</span> <span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">></span></span> properties <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashMap</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">OrderTb</span> r <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">readerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readValue</span><span class="token punctuation">(</span><span class="token string">"&#123;\"id\":\"1\",\"orderSeq\": 150204&#125;"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 最终反序列化为 OrderTb(id=1, properties=&#123;orderSeq=150204&#125;)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonProperty-Todo"><a href="#JsonProperty-Todo" class="headerlink" title="JsonProperty (Todo)"></a>JsonProperty (Todo)</h2><blockquote>
+<p>方法、字段上均可使用</p>
+</blockquote>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>value</td>
+<td>转换序列化、反序列化时的名称</td>
+</tr>
+<tr>
+<td>namespace</td>
+<td></td>
+</tr>
+<tr>
+<td>required</td>
+<td></td>
+</tr>
+<tr>
+<td>index</td>
+<td>改变序列化后在JSON中放置的顺序</td>
+</tr>
+<tr>
+<td>defaultValue</td>
+<td></td>
+</tr>
+<tr>
+<td>access</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="JsonAlias"><a href="#JsonAlias" class="headerlink" title="JsonAlias"></a>JsonAlias</h2><blockquote>
+<p>方法、字段上均可使用</p>
+</blockquote>
+<p>反序列化时可以让 Bean 的属性接收多个 JSON 字段的名称。</p>
+<h2 id="JacksonInject"><a href="#JacksonInject" class="headerlink" title="JacksonInject"></a>JacksonInject</h2><p>反序列化时可以让 Bean 的属性接收提前设置好的默认值。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">ObjectMapper</span> mapper <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ObjectMapper</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// 可以按照指定值和指定class的形式映射默认值</span>
+<span class="token class-name">InjectableValues<span class="token punctuation">.</span>Std</span> injects <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Std</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// 将默认 defaultBuyer 为 key 的值设置为 Amy</span>
+injects<span class="token punctuation">.</span><span class="token function">addValue</span><span class="token punctuation">(</span><span class="token string">"defaultBuyer"</span><span class="token punctuation">,</span> <span class="token string">"Amy"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token comment">// 将默认 String 类型的值设置为 default string</span>
+injects<span class="token punctuation">.</span><span class="token function">addValue</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span> <span class="token string">"default string"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+mapper<span class="token punctuation">.</span><span class="token function">setInjectableValues</span><span class="token punctuation">(</span>injects<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Data</span>  
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">OrderTb</span> <span class="token punctuation">&#123;</span>  
+ 
+    <span class="token keyword">private</span> <span class="token class-name">Integer</span> id<span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@JacksonInject</span><span class="token punctuation">(</span><span class="token string">"defaultBuyer"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">private</span> <span class="token class-name">String</span> buyer<span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@JacksonInject</span>  
+    <span class="token keyword">private</span> <span class="token class-name">String</span> seller<span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">OrderTb</span> s <span class="token operator">=</span> mapper<span class="token punctuation">.</span><span class="token function">readerFor</span><span class="token punctuation">(</span><span class="token class-name">OrderTb</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readValue</span><span class="token punctuation">(</span><span class="token string">"&#123;\"id\":\"1\"&#125;"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+<span class="token comment">// 最终反序列化为 OrderTb(id=1, buyer=Amy, seller=default string)</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h2 id="JsonDeserialize"><a href="#JsonDeserialize" class="headerlink" title="JsonDeserialize"></a>JsonDeserialize</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>解释</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>using</td>
+<td></td>
+</tr>
+<tr>
+<td>contentUsing</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>keyUsing</td>
+<td></td>
+</tr>
+<tr>
+<td>as</td>
+<td></td>
+</tr>
+<tr>
+<td>keyAs</td>
+<td></td>
+</tr>
+<tr>
+<td>contentAs</td>
+<td></td>
+</tr>
+<tr>
+<td>builder</td>
+<td></td>
+</tr>
+<tr>
+<td>converter</td>
+<td></td>
+</tr>
+<tr>
+<td>contentConverter</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="未调研注解"><a href="#未调研注解" class="headerlink" title="未调研注解"></a>未调研注解</h1><p>JsonBackReference<br>JsonClassDescription<br>JsonCreator<br>JsonEnumDefaultValue<br>JsonFilter<br>JsonIdentityInfo<br>JsonIdentityReference<br>JsonInclude<br>JsonIncludeProperties<br>JsonKey<br>JsonManagedReference<br>JsonMerge<br>JsonPropertyDescription<br>JsonRootName<br>JsonSubTypes<br>JsonTypeId<br>JsonTypeName<br>JsonView<br>JacksonStdImpl<br>JsonAppend<br>JsonNaming<br>JsonPOJOBuilder<br>JsonTypeIdResolver<br>JsonTypeResolver<br>JsonValueInstantiator</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Annotation/" rel="tag"># Annotation</a>
+              <a href="/tags/JSON/" rel="tag"># JSON</a>
+              <a href="/tags/Jackson/" rel="tag"># Jackson</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/12/Spring-Cache%20%E7%BC%93%E5%AD%98%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/" rel="prev" title="Spring 缓存解决方案">
+      <i class="fa fa-chevron-left"></i> Spring 缓存解决方案
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/01/28/Tomcat-2-Catalina%E7%BB%84%E4%BB%B6/" rel="next" title="Tomcat Catalina组件">
+      Tomcat Catalina组件 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%9A%E7%94%A8%E6%B3%A8%E8%A7%A3"><span class="nav-number">1.</span> <span class="nav-text">通用注解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonIgnore"><span class="nav-number">1.1.</span> <span class="nav-text">JsonIgnore</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonIgnoreProperties"><span class="nav-number">1.2.</span> <span class="nav-text">JsonIgnoreProperties</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonIgnoreType"><span class="nav-number">1.3.</span> <span class="nav-text">JsonIgnoreType</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonAutoDetect"><span class="nav-number">1.4.</span> <span class="nav-text">JsonAutoDetect</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonTypeInfo-Todo"><span class="nav-number">1.5.</span> <span class="nav-text">JsonTypeInfo (Todo)</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E6%80%81%E5%BA%8F%E5%88%97%E5%8C%96%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E5%9C%BA%E6%99%AF"><span class="nav-number">1.5.1.</span> <span class="nav-text">多态序列化反序列化场景</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BA%8F%E5%88%97%E5%8C%96%E7%9B%B8%E5%85%B3%E6%B3%A8%E8%A7%A3"><span class="nav-number">2.</span> <span class="nav-text">序列化相关注解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonGetter"><span class="nav-number">2.1.</span> <span class="nav-text">JsonGetter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonAnyGetter"><span class="nav-number">2.2.</span> <span class="nav-text">JsonAnyGetter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonPropertyOrder"><span class="nav-number">2.3.</span> <span class="nav-text">JsonPropertyOrder</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonFormat"><span class="nav-number">2.4.</span> <span class="nav-text">JsonFormat</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonRawValue"><span class="nav-number">2.5.</span> <span class="nav-text">JsonRawValue</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonValue"><span class="nav-number">2.6.</span> <span class="nav-text">JsonValue</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BA%8F%E5%88%97%E5%8C%96%E6%9E%9A%E4%B8%BE%E7%B1%BB%E5%9E%8B%E5%9C%BA%E6%99%AF"><span class="nav-number">2.6.1.</span> <span class="nav-text">序列化枚举类型场景</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonSerialize"><span class="nav-number">2.7.</span> <span class="nav-text">JsonSerialize</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8F%8D%E5%BA%8F%E5%88%97%E5%8C%96%E7%9B%B8%E5%85%B3%E6%B3%A8%E8%A7%A3"><span class="nav-number">3.</span> <span class="nav-text">反序列化相关注解</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonSetter"><span class="nav-number">3.1.</span> <span class="nav-text">JsonSetter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonAnySetter"><span class="nav-number">3.2.</span> <span class="nav-text">JsonAnySetter</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonProperty-Todo"><span class="nav-number">3.3.</span> <span class="nav-text">JsonProperty (Todo)</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonAlias"><span class="nav-number">3.4.</span> <span class="nav-text">JsonAlias</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JacksonInject"><span class="nav-number">3.5.</span> <span class="nav-text">JacksonInject</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#JsonDeserialize"><span class="nav-number">3.6.</span> <span class="nav-text">JsonDeserialize</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9C%AA%E8%B0%83%E7%A0%94%E6%B3%A8%E8%A7%A3"><span class="nav-number">4.</span> <span class="nav-text">未调研注解</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">141</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">276</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
