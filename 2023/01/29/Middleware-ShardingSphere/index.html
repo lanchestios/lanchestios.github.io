@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Apache ShardingSphere 是一款分布式的数据库生态系统， 可以将任意数据库转换为分布式数据库，并通过数据分片、弹性伸缩、加密等能力对原有数据库进行增强。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Middleware 数据库增强 ShardingSphere">
+<meta property="og:url" content="http://example.com/2023/01/29/Middleware-ShardingSphere/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Apache ShardingSphere 是一款分布式的数据库生态系统， 可以将任意数据库转换为分布式数据库，并通过数据分片、弹性伸缩、加密等能力对原有数据库进行增强。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/ShardingSphereJDBC架构.png">
+<meta property="og:image" content="http://example.com/images/SE/ShardingSphereProxy架构.png">
+<meta property="og:image" content="http://example.com/images/SE/ShardingSphereSideCar架构.png">
+<meta property="og:image" content="http://example.com/images/SE/ShardingSphere混合架构.png">
+<meta property="og:image" content="http://example.com/images/SE/ShardingSphere架构对比.png">
+<meta property="article:published_time" content="2023-01-29T09:40:28.000Z">
+<meta property="article:modified_time" content="2023-01-30T05:43:10.781Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Distributed System">
+<meta property="article:tag" content="ShardingSphere">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="分库分表">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/ShardingSphereJDBC架构.png">
+
+<link rel="canonical" href="http://example.com/2023/01/29/Middleware-ShardingSphere/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Middleware 数据库增强 ShardingSphere | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/01/29/Middleware-ShardingSphere/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Middleware 数据库增强 ShardingSphere
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-01-29 17:40:28" itemprop="dateCreated datePublished" datetime="2023-01-29T17:40:28+08:00">2023-01-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-01-30 13:43:10" itemprop="dateModified" datetime="2023-01-30T13:43:10+08:00">2023-01-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Apache ShardingSphere 是一款分布式的数据库生态系统， 可以将任意数据库转换为分布式数据库，并通过数据分片、弹性伸缩、加密等能力对原有数据库进行增强。</p>
+<span id="more"></span>
+<h1 id="架构简介"><a href="#架构简介" class="headerlink" title="架构简介"></a>架构简介</h1><h2 id="ShardingSphere-JDBC"><a href="#ShardingSphere-JDBC" class="headerlink" title="ShardingSphere-JDBC"></a>ShardingSphere-JDBC</h2><p>ShardingSphere-JDBC 定位为轻量级 Java 框架，在 Java 的 JDBC 层提供的额外服务。 它使用客户端直连数据库，以 Jar 包形式提供服务，无需额外部署和依赖，可理解为增强版的 JDBC 驱动，完全兼容 JDBC 和各种 ORM 框架。</p>
+<p><img src="/images/SE/ShardingSphereJDBC架构.png" alt=""></p>
+<h2 id="ShardingSphere-Proxy"><a href="#ShardingSphere-Proxy" class="headerlink" title="ShardingSphere-Proxy"></a>ShardingSphere-Proxy</h2><p>ShardingSphere-Proxy 定位为透明化的数据库代理端，提供封装了数据库二进制协议的服务端版本，用于完成对异构语言的支持。 目前提供 MySQL 和 PostgreSQL（兼容 openGauss 等基于 PostgreSQL 的数据库）版本，它可以使用任何兼容 MySQL/PostgreSQL 协议的访问客户端（如：MySQL Command Client, Navicat 等）操作数据。</p>
+<p><img src="/images/SE/ShardingSphereProxy架构.png" alt=""></p>
+<h2 id="ShardingSphere-SideCar"><a href="#ShardingSphere-SideCar" class="headerlink" title="ShardingSphere-SideCar"></a>ShardingSphere-SideCar</h2><p>ShardingSphere-SideCar 定位为 Kubernetes 的云原生数据库代理，以 Sidecar 的形式代理所有对数据库的访问。 通过无中心、零侵入的方案提供与数据库交互的的啮合层，即 Database Mesh，又可称数据网格。</p>
+<p>​Database Mesh 的关注重点在于如何将分布式的数据访问应用与数据库有机串联起来，它更加关注的是交互，是将杂乱无章的应用与数据库之间的交互有效的梳理。使用 Database Mesh，访问数据库的应用和数据库终将形成一个巨大的网格体系，应用和数据库只需在网格体系中对号入座即可，它们都是被啮合层所治理的对象。</p>
+<p><img src="/images/SE/ShardingSphereSideCar架构.png" alt=""></p>
+<h2 id="混合架构"><a href="#混合架构" class="headerlink" title="混合架构"></a>混合架构</h2><p>Sharding-JDBC 采用无中心化架构，适用于 Java 开发的高性能的轻量级 OLTP 应用；Sharding-Proxy 提供静态入口以及异构语言的支持，适用于 OLAP 应用以及对分片数据库进行管理和运维的场景。</p>
+<p>​ShardingSphere 是多接入端共同组成的生态圈。 通过混合使用 Sharding-JDBC 和 Sharding-Proxy，并采用同一注册中心统一配置分片策略，能够灵活的搭建适用于各种场景的应用系统，架构师可以更加自由的调整适合于当前业务的最佳系统架构。</p>
+<p><img src="/images/SE/ShardingSphere混合架构.png" alt=""></p>
+<h2 id="架构对比"><a href="#架构对比" class="headerlink" title="架构对比"></a>架构对比</h2><p><img src="/images/SE/ShardingSphere架构对比.png" alt=""></p>
+<h1 id="ShardingSphere-JDBC-1"><a href="#ShardingSphere-JDBC-1" class="headerlink" title="ShardingSphere-JDBC"></a>ShardingSphere-JDBC</h1><h2 id="基本配置"><a href="#基本配置" class="headerlink" title="基本配置"></a>基本配置</h2><p><strong>引入Maven依赖</strong></p>
+<pre class="line-numbers language-maven" data-language="maven"><code class="language-maven">&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.shardingsphere&lt;&#x2F;groupId&gt;
+    &lt;artifactId&gt;sharding-jdbc-spring-boot-starter&lt;&#x2F;artifactId&gt;
+    &lt;version&gt;4.1.1&lt;&#x2F;version&gt;
+&lt;&#x2F;dependency&gt;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>配置数据源</strong></p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># 配置真实数据源(自定义命名后,以逗号分隔)</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.names</span><span class="token punctuation">=</span><span class="token value attr-value">ds0,ds1</span>
+
+<span class="token comment"># 配置第 1 个数据源 ds0</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds0.type</span><span class="token punctuation">=</span><span class="token value attr-value">com.zaxxer.hikari.HikariDataSource</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds0.driver-class-name</span><span class="token punctuation">=</span><span class="token value attr-value">com.mysql.jdbc.Driver</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds0.jdbc-url</span><span class="token punctuation">=</span><span class="token value attr-value">jdbc:mysql://localhost:3306/ds0</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds0.username</span><span class="token punctuation">=</span><span class="token value attr-value">root</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds0.password</span><span class="token punctuation">=</span><span class="token value attr-value">123456</span>
+
+<span class="token comment"># 配置第 2 个数据源 ds1</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds1.type</span><span class="token punctuation">=</span><span class="token value attr-value">com.zaxxer.hikari.HikariDataSource</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds1.driver-class-name</span><span class="token punctuation">=</span><span class="token value attr-value">com.mysql.jdbc.Driver</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds1.jdbc-url</span><span class="token punctuation">=</span><span class="token value attr-value">jdbc:mysql://localhost:3306/ds1</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds1.username</span><span class="token punctuation">=</span><span class="token value attr-value">root</span>
+<span class="token key attr-name">spring.shardingsphere.datasource.ds1.password</span><span class="token punctuation">=</span><span class="token value attr-value">123456</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="数据分片"><a href="#数据分片" class="headerlink" title="数据分片"></a>数据分片</h2><p>数据分片在 ShardingSphere 中指代水平分片。水平分片又称为横向拆分。 相对于垂直分片，它不再将数据根据业务逻辑分类，而是通过某个字段（或某几个字段），根据某种规则将数据分散至多个库或表中，每个分片仅包含数据的一部分。 例如：根据主键分片，偶数主键的记录放入 0 库（或表），奇数主键的记录放入 1 库（或表）。</p>
+<h3 id="挑战"><a href="#挑战" class="headerlink" title="挑战"></a>挑战</h3><p>虽然数据分片解决了性能、可用性以及单点备份恢复等问题，但分布式的架构在获得了收益的同时，也引入了新的问题。</p>
+<p>面对如此散乱的分片之后的数据，应用开发工程师和数据库管理员对数据库的操作变得异常繁重就是其中的重要挑战之一。 他们需要知道数据需要从哪个具体的数据库的子表中获取。</p>
+<p>另一个挑战则是，能够正确的运行在单节点数据库中的 SQL，在分片之后的数据库中并不一定能够正确运行。 例如，分表导致表名称的修改，或者分页、排序、聚合分组等操作的不正确处理。</p>
+<p>跨库事务也是分布式的数据库集群要面对的棘手事情。 合理采用分表，可以在降低单表数据量的情况下，尽量使用本地事务，善于使用同库不同表可有效避免分布式事务带来的麻烦。 在不能避免跨库事务的场景，有些业务仍然需要保持事务的一致性。 而基于 XA 的分布式事务由于在并发度高的场景中性能无法满足需要，并未被互联网巨头大规模使用，他们大多采用最终一致性的柔性事务代替强一致事务。</p>
+<h3 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h3><p><strong>分片表配置</strong></p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token key attr-name">spring.shardingsphere.rules.sharding.tables.&lt;table-name>.actual-data-nodes</span><span class="token punctuation">=</span> <span class="token value attr-value"># 由数据源名 + 表名组成，以小数点分隔。多个表以逗号分隔，支持inline表达式。缺省表示使用已知数据源与逻辑表名称生成数据节点，用于广播表（即每个库中都需要一个同样的表用于关联查询，多为字典表）或只分库不分表且所有库的表结构完全一致的情况</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p><strong>分库策略</strong></p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># 分库策略，缺省表示使用默认分库策略，以下的分片策略只能选其一</span>
+<span class="token key attr-name">spring.shardingsphere.rules.sharding.tables.&lt;table-name>.database-strategy.&lt;strategy-name>.&lt;properties></span><span class="token punctuation">=</span> <span class="token value attr-value"># 省略</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p>ShardingSphere 定义了四种策略：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>特性</th>
+<th>关联算法实现类</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>inline</td>
+<td>不支持范围查询</td>
+<td></td>
+</tr>
+<tr>
+<td>standard</td>
+<td>支持单Key范围查询</td>
+<td>PreciseShardingAlgorithm 分片算法, RangeShardingAlgorithm 范围查询算法</td>
+</tr>
+<tr>
+<td>complex</td>
+<td>支持多Key范围查询</td>
+<td>ComplexKeysShardingAlgorithm 分片&amp;范围查询算法</td>
+</tr>
+<tr>
+<td>hint</td>
+<td>手动指定使用库</td>
+<td>HintShardingAlgorithm 定位算法</td>
+</tr>
+</tbody>
+</table>
+</div>
+<blockquote>
+<p>注意：数据库表名和字段名不能和 SQL 关键字相同，否则 ShardingSphere 会报错。如果不通过 ShardingSphere 连接，有可能没有此类问题（数据库中间件自动加了 `column` 处理）</p>
+</blockquote>
+<p>算法类型的详情，请参见<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/user-manual/shardingsphere-jdbc/configuration/built-in-algorithm/sharding">内置分片算法列表</a>。</p>
+<blockquote>
+<p>分库分表可以将基因算法用作生成主键，其原理比较简单，举例说明。例如想将同一个用户的订单数据都放入同一个库/表中，可以将用户ID取模后并入雪花算法生成的订单号中，再对订单号取模确定入库/表的位置。</p>
+</blockquote>
+<p><strong>分表策略</strong></p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># 分表策略，除限定名不同，其他规则同分库策略</span>
+<span class="token key attr-name">spring.shardingsphere.rules.sharding.tables.&lt;table-name>.table-strategy.&lt;strategy-name>.&lt;properties></span><span class="token punctuation">=</span> <span class="token value attr-value"># 省略</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p><strong>分布式序列策略</strong></p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># 分布式序列列名称</span>
+<span class="token key attr-name">spring.shardingsphere.sharding.tables.&lt;table-name>.key-generator.column</span><span class="token punctuation">=</span> <span class="token value attr-value"># 主键名称 </span>
+<span class="token comment"># 分布式序列算法名称</span>
+<span class="token key attr-name">spring.shardingsphere.sharding.tables.&lt;table-name>.key-generator.type</span><span class="token punctuation">=</span> <span class="token value attr-value"># 算法名称，包含：SNOWFLAKE、UUID</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>算法类型的详情，请参见<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/user-manual/shardingsphere-jdbc/configuration/built-in-algorithm/keygen">内置分布式序列算法列表</a>。</p>
+<h2 id="读写分离"><a href="#读写分离" class="headerlink" title="读写分离"></a>读写分离</h2><p>面对日益增加的系统访问量，数据库的吞吐量面临着巨大瓶颈。 对于同一时刻有大量并发读操作和较少写操作类型的应用系统来说，将数据库拆分为主库和从库，主库负责处理事务性的增删改操作，从库负责处理查询操作，能够有效的避免由数据更新导致的行锁，使得整个系统的查询性能得到极大的改善。</p>
+<p>通过一主多从的配置方式，可以将查询请求均匀的分散到多个数据副本，能够进一步的提升系统的处理能力。 使用多主多从的方式，不但能够提升系统的吞吐量，还能够提升系统的可用性，可以达到在任何一个数据库宕机，甚至磁盘物理损坏的情况下仍然不影响系统的正常运行。</p>
+<p>与将数据根据分片键打散至各个数据节点的水平分片不同，读写分离则是根据SQL语义的分析，将读操作和写操作分别路由至主库与从库。</p>
+<p>读写分离的数据节点中的数据内容是一致的，而水平分片的每个数据节点的数据内容却并不相同。将水平分片和读写分离联合使用，能够更加有效的提升系统性能。</p>
+<h3 id="挑战-1"><a href="#挑战-1" class="headerlink" title="挑战"></a>挑战</h3><p>读写分离虽然可以提升系统的吞吐量和可用性，但同时也带来了数据不一致的问题。 这包括多个主库之间的数据一致性，以及主库与从库之间的数据一致性的问题。 并且，读写分离也带来了与数据分片同样的问题，它同样会使得应用开发和运维人员对数据库的操作和运维变得更加复杂。 下图展现了将数据分片与读写分离一同使用时，应用程序与数据库集群之间的复杂拓扑关系。</p>
+<h3 id="配置-1"><a href="#配置-1" class="headerlink" title="配置"></a>配置</h3><pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># spring.shardingsphere.datasource.names= # 省略数据源配置，请参考使用手册</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.readwrite-splitting.data-sources.&lt;readwrite-splitting-data-source-name>.write-data-source-name</span><span class="token punctuation">=</span> <span class="token value attr-value"># 写数据源名称</span>
+<span class="token key attr-name">spring.shardingsphere.rules.readwrite-splitting.data-sources.&lt;readwrite-splitting-data-source-name>.read-data-source-names</span><span class="token punctuation">=</span> <span class="token value attr-value"># 读数据源名称，多个从数据源用逗号分隔</span>
+<span class="token key attr-name">spring.shardingsphere.rules.readwrite-splitting.data-sources.&lt;readwrite-splitting-data-source-name>.load-balancer-name</span><span class="token punctuation">=</span> <span class="token value attr-value"># 负载均衡算法名称</span>
+
+<span class="token comment"># 负载均衡算法配置</span>
+<span class="token key attr-name">spring.shardingsphere.rules.readwrite-splitting.load-balancers.&lt;load-balance-algorithm-name>.type</span><span class="token punctuation">=</span> <span class="token value attr-value"># 负载均衡算法类型</span>
+<span class="token key attr-name">spring.shardingsphere.rules.readwrite-splitting.load-balancers.&lt;load-balance-algorithm-name>.props.xxx</span><span class="token punctuation">=</span> <span class="token value attr-value"># 负载均衡算法属性配置</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>算法类型的详情，请参见<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/user-manual/shardingsphere-jdbc/configuration/built-in-algorithm/load-balance">内置负载均衡算法列表</a>。 查询一致性路由的详情，请参见<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/features/readwrite-splitting/use-norms">使用规范</a>。</p>
+<h2 id="数据加密"><a href="#数据加密" class="headerlink" title="数据加密"></a>数据加密</h2><p>安全控制一直是治理的重要环节，数据加密属于安全控制的范畴。 无论对互联网公司还是传统行业来说，数据安全一直是极为重视和敏感的话题。 数据加密是指对某些敏感信息通过加密规则进行数据的变形，实现敏感隐私数据的可靠保护。 涉及客户安全数据或者一些商业性敏感数据，如身份证号、手机号、卡号、客户号等个人信息按照相关部门规定，都需要进行数据加密。</p>
+<p>对于数据加密的需求，在现实的业务场景中一般分为两种情况：</p>
+<ol>
+<li><p>新业务上线，安全部门规定需将涉及用户敏感信息，例如银行、手机号码等进行加密后存储到数据库，在使用的时候再进行解密处理。因为是全新系统，因而没有存量数据清洗问题，所以实现相对简单。</p>
+</li>
+<li><p>已上线业务，之前一直将明文存储在数据库中。相关部门突然需要对已上线业务进行加密整改。这种场景一般需要处理 3 个问题：</p>
+<ul>
+<li>历史数据需要如何进行加密处理，即洗数。</li>
+<li>如何能在不改动业务 SQL 和逻辑情况下，将新增数据进行加密处理，并存储到数据库；在使用时，再进行解密取出。</li>
+<li>如何较为安全、无缝、透明化地实现业务系统在明文与密文数据间的迁移。</li>
+</ul>
+</li>
+</ol>
+<h3 id="挑战-2"><a href="#挑战-2" class="headerlink" title="挑战"></a>挑战</h3><p>在真实业务场景中，相关业务开发团队则往往需要针对公司安全部门需求，自行实行并维护一套加解密系统。 而当加密场景发生改变时，自行维护的加密系统往往又面临着重构或修改风险。 此外，对于已经上线的业务，在不修改业务逻辑和 SQL 的情况下，透明化、安全低风险地实现无缝进行加密改造也相对复杂。</p>
+<h3 id="配置-2"><a href="#配置-2" class="headerlink" title="配置"></a>配置</h3><pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># spring.shardingsphere.datasource.names= # 省略数据源配置，请参考使用手册</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.tables.&lt;table-name>.query-with-cipher-column</span><span class="token punctuation">=</span> <span class="token value attr-value"># 该表是否使用加密列进行查询</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.tables.&lt;table-name>.columns.&lt;column-name>.cipher-column</span><span class="token punctuation">=</span> <span class="token value attr-value"># 加密列名称</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.tables.&lt;table-name>.columns.&lt;column-name>.assisted-query-column</span><span class="token punctuation">=</span> <span class="token value attr-value"># 查询列名称</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.tables.&lt;table-name>.columns.&lt;column-name>.plain-column</span><span class="token punctuation">=</span> <span class="token value attr-value"># 原文列名称</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.tables.&lt;table-name>.columns.&lt;column-name>.encryptor-name</span><span class="token punctuation">=</span> <span class="token value attr-value"># 加密算法名称</span>
+
+<span class="token comment"># 加密算法配置</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.encryptors.&lt;encrypt-algorithm-name>.type</span><span class="token punctuation">=</span> <span class="token value attr-value"># 加密算法类型</span>
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.encryptors.&lt;encrypt-algorithm-name>.props.xxx</span><span class="token punctuation">=</span> <span class="token value attr-value"># 加密算法属性配置</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.encrypt.queryWithCipherColumn</span><span class="token punctuation">=</span> <span class="token value attr-value"># 是否使用加密列进行查询。在有原文列的情况下，可以使用原文列进行查询</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>算法类型的详情，请参见<a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/user-manual/shardingsphere-jdbc/configuration/built-in-algorithm/encrypt">内置加密算法列表</a>。</p>
+<h2 id="影子库"><a href="#影子库" class="headerlink" title="影子库"></a>影子库</h2><p>在基于微服务的分布式应用架构下，业务需要多个服务是通过一系列的服务、中间件的调用来完成，所以单个服务的压力测试已经不能代表真实场景。 在测试环境中，如果重新搭建一整套与生产环境类似的压测环境，成本太高，并且往往无法模拟线上环境的体量以及复杂度。 这种场景下，业内通常选择全链路压测的方式，即在生产环境进行压测，这样所获得的测试结果能够较为准确地反应系统真实容量水平和性能。</p>
+<h3 id="挑战-3"><a href="#挑战-3" class="headerlink" title="挑战"></a>挑战</h3><p>全链路压测是一项复杂而庞大的工作。需要各个微服务、中间件之间配合与调整，以应对不同流量以及压测标识的透传。通常会搭建一整套压测平台以适用不同测试计划。 在数据库层面需要做好数据隔离，为了保证生产数据的可靠性与完整性，需要将压测产生的数据路由到压测环境数据库，防止压测数据对生产数据库中真实数据造成污染。 这就要求业务应用在执行 SQL 前，能够根据透传的压测标识，做好数据分类，将相应的 SQL 路由到与之对应的数据源。</p>
+<h3 id="配置-3"><a href="#配置-3" class="headerlink" title="配置"></a>配置</h3><pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># spring.shardingsphere.datasource.names= # 省略数据源配置，请参考使用手册</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.enable</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子库开关。 可选值：true/false，默认为false</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.data-sources.shadow-data-source.source-data-source-name</span><span class="token punctuation">=</span> <span class="token value attr-value"># 生产数据源名称</span>
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.data-sources.shadow-data-source.shadow-data-source-name</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子数据源名称</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.tables.&lt;table-name>.data-source-names</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子表关联影子数据源名称列表（多个值用","隔开）</span>
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.tables.&lt;table-name>.shadow-algorithm-names</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子表关联影子算法名称列表（多个值用","隔开）</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.defaultShadowAlgorithmName</span><span class="token punctuation">=</span> <span class="token value attr-value"># 默认影子算法名称，选配项。</span>
+
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.shadow-algorithms.&lt;shadow-algorithm-name>.type</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子算法类型</span>
+<span class="token key attr-name">spring.shardingsphere.rules.shadow.shadow-algorithms.&lt;shadow-algorithm-name>.props.xxx</span><span class="token punctuation">=</span> <span class="token value attr-value"># 影子算法属性配置</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="影子算法"><a href="#影子算法" class="headerlink" title="影子算法"></a>影子算法</h3><p>目前提供 2 种类型影子算法。 由于影子算法和业务实现紧密相关，因此并未提供默认的影子算法。</p>
+<ul>
+<li>列影子算法</li>
+</ul>
+<blockquote>
+<p> 对应 ColumnShadowAlgorithm，适用于用户压测过程中，对压测执行链路上执行的SQL涉及的某个字段的值满足一定匹配条件的场景。</p>
+<p> 优点：用户只需要控制流量数据不需要修改代码和SQL就可以完成测试。<br> 不足：仅支持DML语句</p>
+</blockquote>
+<ul>
+<li>注解影子算法</li>
+</ul>
+<blockquote>
+<p> 对应 NoteShadowAlgorithm，适用于用户压测过程中，对压测执行链路上执行的SQL不能确定涉及字段的值的场景。</p>
+<p> 优点：用户可以不确定链路上执行SQL细节，只要知道那个SQL执行即可。<br> 不足：用户需要改代码或者SQL</p>
+</blockquote>
+<h3 id="绑定表"><a href="#绑定表" class="headerlink" title="绑定表"></a>绑定表</h3><p>指分片规则一致的一组分片表。 使用绑定表进行多表关联查询时，必须使用分片键进行关联，否则会出现笛卡尔积关联或跨库关联，从而影响查询效率。 例如：<code>t_order</code> 表和 <code>t_order_item</code> 表，均按照 <code>order_id</code> 分片，并且使用 <code>order_id</code> 进行关联，则此两张表互为绑定表关系。 绑定表之间的多表关联查询不会出现笛卡尔积关联，关联查询效率将大大提升。 举例说明，如果 SQL 为：</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order o <span class="token keyword">JOIN</span> t_order_item i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>在不配置绑定表关系时，假设分片键 order_id 将数值 10 路由至第 0 片，将数值 11 路由至第 1 片，那么路由后的 SQL 应该为 4 条，它们呈现为笛卡尔积：</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_0 o <span class="token keyword">JOIN</span> t_order_item_0 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_0 o <span class="token keyword">JOIN</span> t_order_item_1 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_1 o <span class="token keyword">JOIN</span> t_order_item_0 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_1 o <span class="token keyword">JOIN</span> t_order_item_1 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>在配置绑定表关系，并且使用 <code>order_id</code> 进行关联后，路由的 SQL 应该为 2 条：</p>
+<pre class="line-numbers language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_0 o <span class="token keyword">JOIN</span> t_order_item_0 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> i<span class="token punctuation">.</span><span class="token operator">*</span> <span class="token keyword">FROM</span> t_order_1 o <span class="token keyword">JOIN</span> t_order_item_1 i <span class="token keyword">ON</span> o<span class="token punctuation">.</span>order_id<span class="token operator">=</span>i<span class="token punctuation">.</span>order_id <span class="token keyword">WHERE</span> o<span class="token punctuation">.</span>order_id <span class="token operator">in</span> <span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p>其中 <code>t_order</code> 表由于指定了分片条件，ShardingSphere 将会以它作为整个绑定表的主表。 所有路由计算将会只使用主表的策略，那么 <code>t_order_item</code> 表的分片计算将会使用 <code>t_order</code> 的条件。</p>
+<p>配置方法如下</p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token key attr-name">spring.shardingsphere.sharding.binding-tables</span><span class="token punctuation">=</span><span class="token value attr-value">t_order, t_order_item</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h3 id="广播表"><a href="#广播表" class="headerlink" title="广播表"></a>广播表</h3><p>指所有的分片数据源中都存在的表，表结构及其数据在每个数据库中均完全一致。 适用于数据量不大且需要与海量数据的表进行关联查询的场景，例如：字典表。</p>
+<p>配置方式如下：</p>
+<pre class="line-numbers language-properties" data-language="properties"><code class="language-properties"><span class="token comment"># 广播表, 其主节点是ds0</span>
+<span class="token key attr-name">spring.shardingsphere.sharding.broadcast-tables</span><span class="token punctuation">=</span><span class="token value attr-value">t_config</span>
+<span class="token key attr-name">spring.shardingsphere.sharding.tables.t_config.actual-data-nodes</span><span class="token punctuation">=</span><span class="token value attr-value">ds$->&#123;0&#125;.t_config</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h3 id="自动分片"><a href="#自动分片" class="headerlink" title="自动分片"></a>自动分片</h3><p><a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/blog/cn/material/oct_12_6_autotable_your_butler-like_sharding_configuration_tool/">分片利器 AutoTable：为用户带来「管家式」分片配置体验 · ShardingSphere - 博客 (apache.org)</a></p>
+<h2 id="弹性伸缩"><a href="#弹性伸缩" class="headerlink" title="弹性伸缩"></a>弹性伸缩</h2><p><a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/features/scaling/">弹性伸缩 :: ShardingSphere (apache.org)</a></p>
+<h2 id="分布式治理"><a href="#分布式治理" class="headerlink" title="分布式治理"></a>分布式治理</h2><p><a target="_blank" rel="noopener" href="https://shardingsphere.apache.org/document/5.0.0/cn/features/governance/">分布式治理 :: ShardingSphere (apache.org)</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Distributed-System/" rel="tag"># Distributed System</a>
+              <a href="/tags/ShardingSphere/" rel="tag"># ShardingSphere</a>
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E5%88%86%E5%BA%93%E5%88%86%E8%A1%A8/" rel="tag"># 分库分表</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/28/Tomcat-3-Coyote%E7%BB%84%E4%BB%B6/" rel="prev" title="Tomcat Coyote组件">
+      <i class="fa fa-chevron-left"></i> Tomcat Coyote组件
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">架构简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ShardingSphere-JDBC"><span class="nav-number">1.1.</span> <span class="nav-text">ShardingSphere-JDBC</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ShardingSphere-Proxy"><span class="nav-number">1.2.</span> <span class="nav-text">ShardingSphere-Proxy</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ShardingSphere-SideCar"><span class="nav-number">1.3.</span> <span class="nav-text">ShardingSphere-SideCar</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B7%B7%E5%90%88%E6%9E%B6%E6%9E%84"><span class="nav-number">1.4.</span> <span class="nav-text">混合架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84%E5%AF%B9%E6%AF%94"><span class="nav-number">1.5.</span> <span class="nav-text">架构对比</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#ShardingSphere-JDBC-1"><span class="nav-number">2.</span> <span class="nav-text">ShardingSphere-JDBC</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E6%9C%AC%E9%85%8D%E7%BD%AE"><span class="nav-number">2.1.</span> <span class="nav-text">基本配置</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%88%86%E7%89%87"><span class="nav-number">2.2.</span> <span class="nav-text">数据分片</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%91%E6%88%98"><span class="nav-number">2.2.1.</span> <span class="nav-text">挑战</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE"><span class="nav-number">2.2.2.</span> <span class="nav-text">配置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%BB%E5%86%99%E5%88%86%E7%A6%BB"><span class="nav-number">2.3.</span> <span class="nav-text">读写分离</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%91%E6%88%98-1"><span class="nav-number">2.3.1.</span> <span class="nav-text">挑战</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-1"><span class="nav-number">2.3.2.</span> <span class="nav-text">配置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%8A%A0%E5%AF%86"><span class="nav-number">2.4.</span> <span class="nav-text">数据加密</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%91%E6%88%98-2"><span class="nav-number">2.4.1.</span> <span class="nav-text">挑战</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-2"><span class="nav-number">2.4.2.</span> <span class="nav-text">配置</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BD%B1%E5%AD%90%E5%BA%93"><span class="nav-number">2.5.</span> <span class="nav-text">影子库</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%91%E6%88%98-3"><span class="nav-number">2.5.1.</span> <span class="nav-text">挑战</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE-3"><span class="nav-number">2.5.2.</span> <span class="nav-text">配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BD%B1%E5%AD%90%E7%AE%97%E6%B3%95"><span class="nav-number">2.5.3.</span> <span class="nav-text">影子算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%91%E5%AE%9A%E8%A1%A8"><span class="nav-number">2.5.4.</span> <span class="nav-text">绑定表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B9%BF%E6%92%AD%E8%A1%A8"><span class="nav-number">2.5.5.</span> <span class="nav-text">广播表</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E5%88%86%E7%89%87"><span class="nav-number">2.5.6.</span> <span class="nav-text">自动分片</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%B9%E6%80%A7%E4%BC%B8%E7%BC%A9"><span class="nav-number">2.6.</span> <span class="nav-text">弹性伸缩</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E6%B2%BB%E7%90%86"><span class="nav-number">2.7.</span> <span class="nav-text">分布式治理</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">143</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">286</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
