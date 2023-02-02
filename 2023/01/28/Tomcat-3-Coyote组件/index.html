@@ -32,6 +32,12 @@
 <meta property="og:image" content="http://example.com/images/Tomcat/简化的Connector请求处理过程.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/HTTP请求处理.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/升级协议类图.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTP通用首部字段.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTP请求首部字段.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTP响应首部字段.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTP实体首部字段.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTPCookie-1.png">
+<meta property="og:image" content="http://example.com/images/源码笔记-网络编程/HTTPCookie-2.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/基于AJP协议的请求处理.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/AJP请求消息格式.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/响应消息的格式.png">
@@ -52,7 +58,7 @@
 <meta property="og:image" content="http://example.com/images/Tomcat/HTTP三种IO处理方法.png">
 <meta property="og:image" content="http://example.com/images/Tomcat/AJP三种IO处理方法.png">
 <meta property="article:published_time" content="2023-01-28T07:30:43.000Z">
-<meta property="article:modified_time" content="2023-01-30T05:43:10.804Z">
+<meta property="article:modified_time" content="2023-02-02T06:57:36.833Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="HTTP">
 <meta property="article:tag" content="Tomcat">
@@ -255,7 +261,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2023-01-30 13:43:10" itemprop="dateModified" datetime="2023-01-30T13:43:10+08:00">2023-01-30</time>
+                <time title="Modified: 2023-02-02 14:57:36" itemprop="dateModified" datetime="2023-02-02T14:57:36+08:00">2023-02-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -355,7 +361,247 @@
 <p>HTTP2.0 通过 8.5 新增的 UpgradeProtocol 接口创建 HttpUpgradeHandler 以及 UpgradeToken，而 WebSocket 则是通过过滤器 WsFilter 判断当前请求是否为 WebSocket 升级请求，如果是，则调用当前请求的<code>upgrade()</code>方法构造 UpgradeToken 并传递给 Http11Processor。</p>
 <p>也就是说，对于第一次协议协商的过程，HTTP/2.0是由链接器直接处理的，并未提交到 Servlet 容器，而 WebSocket 则提交到了 Servlet 容器。</p>
 <p>由于 HTTP/2.0 是多路复用的协议，也就是多个 HTTP 请求通过一个链接完成。因此对于Http2UpgradeHandler，会将每次请求响应交给 StreamProcessor 处理。而 StreamProcessor 则会将请求提交到 Servlet 容器。</p>
-<h1 id="HTTP"><a href="#HTTP" class="headerlink" title="HTTP"></a>HTTP</h1><h2 id="配置方式"><a href="#配置方式" class="headerlink" title="配置方式"></a>配置方式</h2><p>Tomcat 在默认配置下即支持 HTTP/1.1，不需要另行配置。我们可以在 <code>$CATALINA_BASE/conf/server.xml</code> 中找到相关配置</p>
+<h1 id="HTTP"><a href="#HTTP" class="headerlink" title="HTTP"></a>HTTP</h1><h2 id="基础知识"><a href="#基础知识" class="headerlink" title="基础知识"></a>基础知识</h2><p>超文本传输协议（HyperText Transfer Protocol,HTTP）是一种用于分布式、协作式和超媒体信息系统的应用层协议。简单来说，HTTP 定义了客户端和服务端相互通信的标准。在HTTP1.1及以后版本中，可以通过一个TCP连接连续发送多个请求和响应。另外在HTTP1.1中，请求和响应可以分为多个块发送。这样有更好的扩展性。</p>
+<h3 id="HTTP请求报文"><a href="#HTTP请求报文" class="headerlink" title="HTTP请求报文"></a>HTTP请求报文</h3><p>![[/images/Tomcat/HTTP协议.png]]</p>
+<h3 id="HTTP报文首部"><a href="#HTTP报文首部" class="headerlink" title="HTTP报文首部"></a>HTTP报文首部</h3><p>HTTP协议的请求和响应报文中必定包含HTTP首部。首部内容为客户端和服务器分别处理请求和响应提供所需要的信息。对于客户端用户来说，这些信息中的大部分内容都无须亲自查看。</p>
+<ul>
+<li>HTTP请求报文<br>   在请求中，HTTP报文由方法、URI、HTTP版本、HTTP首部字段等部分构成。</li>
+<li>HTTP响应报文<br>   在响应中，HTTP报文由HTTP版本、状态码、HTTP首部字段3部分构成。</li>
+</ul>
+<h4 id="HTTP报文首部字段"><a href="#HTTP报文首部字段" class="headerlink" title="HTTP报文首部字段"></a>HTTP报文首部字段</h4><p>首部字段以<code>key: value</code>的形式储存，其分为四种HTTP首部字段类型：</p>
+<ul>
+<li><p>通用首部字段</p>
+<p>   请求报文和响应报文两方都会使用的首部。</p>
+</li>
+<li><p>请求首部字段<br>   从客户端向服务器端发送请求报文时使用的首部。补充了请求的附加内容、客户端信息、响应内容相关优先级等信息。</p>
+</li>
+<li><p>响应首部字段<br>   从服务器向客户端返回响应报文时使用的首部。补充了响应的附加内容，也会要求客户端附加额外的内容信息。</p>
+</li>
+<li><p>实体首部字段<br>   针对请求报文和响应报文的实体部分使用的首部。补充了资源内容更新时间等与实体相关的信息。</p>
+</li>
+</ul>
+<p><strong>通用首部字段</strong></p>
+<p><img src="/images/源码笔记-网络编程/HTTP通用首部字段.png" alt=""></p>
+<p><strong>请求首部字段</strong></p>
+<p><img src="/images/源码笔记-网络编程/HTTP请求首部字段.png" alt=""></p>
+<p><strong>响应首部字段</strong></p>
+<p><img src="/images/源码笔记-网络编程/HTTP响应首部字段.png" alt=""></p>
+<p><strong>实体首部字段</strong></p>
+<p><img src="/images/源码笔记-网络编程/HTTP实体首部字段.png" alt=""></p>
+<p>HTTP首部字段将定义成缓存代理和非缓存代理的行为，分成2种类型。</p>
+<ul>
+<li><p>端到端首部（End-to-end Header）<br>  分在此类别中的首部会转发给请求/响应对应的最终接收目标，且必须保存在由缓存生成的响应中，另外规定它必须被转发。</p>
+</li>
+<li><p>逐跳首部（Hop-by-hop Header）<br>  分在此类别中的首部只对本次转发有效，会因通过缓存或代理而不再转发。HTTP/1.1和之后版本中，如果要使用hop-by-hop首部，需提供Connection首部字段。</p>
+<p>  下面列举了 HTTP/1.1 中的逐跳首部字段。除这 8 个首部字段之外，其他所有字段都属于端到端首部。</p>
+<ul>
+<li>Connection</li>
+<li>Keep-Alive</li>
+<li>Proxy-Authenticate</li>
+<li>Proxy-Authorization</li>
+<li>Trailer</li>
+<li>TE</li>
+<li>Transfer-Encoding</li>
+<li>Upgrade</li>
+</ul>
+</li>
+</ul>
+<h4 id="HTTP-1-1-通用首部字段"><a href="#HTTP-1-1-通用首部字段" class="headerlink" title="HTTP/1.1 通用首部字段"></a>HTTP/1.1 通用首部字段</h4><ul>
+<li><p>Cache-Control  用来操作缓存的工作机制</p>
+<ul>
+<li><p>Public指令  </p>
+<p>  明确表明其他用户也可利用缓存</p>
+</li>
+<li><p>Private指令</p>
+<p>  响应只以特定的用户作为对象。缓存服务器会对该特定用户提供资源缓存的服务，对于其他用户发送过来的请求，代理服务器则不会返回缓存。</p>
+</li>
+<li><p>no-cache指令<br>  为了防止从缓存中返回过期的资源。客户端发送的请求中如果包含no-cache指令，则表示客户端将不会接收缓存过的响应。于是，“中间”的缓存服务器必须把客户端请求转发给服务器。如果服务器返回的响应中包含no-cache指令，那么缓存服务器不能对资源进行缓存。源服务器以后也不再对缓存服务器请求中提出的资源有效性进行确认，且禁止其对响应资源进行缓存操作。</p>
+</li>
+<li><p>no-store指令<br>  暗示请求或响应中包含机密信息。因此，该指令规定缓存不能在本地存储或响应的任一部分。</p>
+</li>
+<li><p>s-maxage指令<br>  和max-age指令相同。不同点是s-maxage只适用于供多位用户使用的公共缓存服务器。</p>
+</li>
+<li><p>max-age指令<br>  当客户端发送的请求中包含max-age指令时，如果判断缓存资源的缓存时间数值比指定时间的数值更小，那么客户端就接收缓存的资源。当指定max-age值为0，那么缓存服务器通常需要将请求转发给源服务器。</p>
+<p>  应用HTTP/1.1版本的缓存服务器遇到同时存在Expires首部字段的情况时，会优先处理max-age指令，而忽略掉Expires首部字段。而HTTP/1.0版本的缓存服务器的情况却相反，max-age会被忽略掉。</p>
+</li>
+<li><p>min-fresh指令<br>  要求缓存服务器返回至少还未过指定时间的缓存资源。</p>
+</li>
+<li><p>max-stale指令<br>  使用max-stale可指示缓存资源，即使过期也照常接收。如果指令未指定参数值，那么无论经过多久，客户端都会接收响应；如果指令中指定了具体数值，那么即使过期，只要仍处于max-stale指定的时间内，仍旧会被客户端接收。</p>
+</li>
+<li><p>only-if-cached指令<br>  表示客户端仅在缓存服务器本地缓存目标资源的情况下才会要求其返回。</p>
+</li>
+<li><p>must-revalidated指令<br>  代理会向源服务器再次验证即将返回的响应缓存目前是否仍然有效。使用must-revalidate指令会忽略请求的max-stale指令。</p>
+</li>
+<li><p>proxy-revalidate指令<br>  要求所有的缓存服务器在接收到客户端带有该指令的请求返回响应之前，必须再次验证缓存的有效性。</p>
+</li>
+<li><p>no-transform指令<br>  规定无论是在请求还是响应中，缓存都不能改变实体主体的媒体类型。这样做可防止缓存或代理压缩图片等类似操作。</p>
+</li>
+</ul>
+</li>
+<li><p>Connection<br>  控制不再转发给代理的首部字段，管理持久连接</p>
+<p>  <code>Connection: keep-alive</code></p>
+<p>  HTTP1.0会为每个请求打开一个新连接。实际上，一个典型Web会话中打开和关闭所有连接所花费的时间远远大于实际传输数据的时间，特别是有很多小文档的会话。对于使用SSL或TLS的加密HTTPS连接，这个问题尤其严重，因为建立一个安全socket的握手过程比建立常规的socket需要做更多工作。</p>
+<p>  HTTP1.1和以后版本中，服务器不必在发送响应后就关闭连接。可以保持连接打开，在同一 Socket 上等待来自客户端的新请求。可以在一个TCP连接上连续发送多个请求和响应。不过，服务器响应之后，客户端请求的锁步模式还是一样的。</p>
+</li>
+<li><p>Date<br>  表明创建HTTP报文的时间和日期。</p>
+</li>
+<li><p>Pragma<br>  Pragma是Http/1.1之前版本的历史遗留字段，仅作为与HTTP/1.0向后兼容而定义。如 Pragma: no-cache。</p>
+<p>  该首部字段属于通用首部字段，但只用在客户端发送的请求中。客户端会要求所有的中间服务器不返回缓存的资源。所有的中间服务器如果都能以HTTP/1.1为基准，那直接采用<code>Cache-Control: no-cache</code>指定缓存的处理方式是最为理想的。但要整体掌握全部中间服务器使用的HTTP协议版本却是不现实的。因此，发送的请求会同时包含下面两个首部字段。<code>Cache-Control: no-cach; Pragma: no-cache</code></p>
+</li>
+<li><p>Trailer<br>  该字段会事先说明在报文主体后记录了哪些首部字段。该首部字段可应用在HTTP/1.1版本分块传输编码时。</p>
+</li>
+<li><p>Transfer-Encoding<br>  规定了传输报文主体时采用的编码方式。</p>
+</li>
+<li><p>Upgrade<br>  用于检测HTTP协议及其他协议是否可使用更高的版本进行通信，其参数值可以用来指定一个完全不同的通信协议。</p>
+</li>
+<li><p>Via<br>  追踪客户端与服务器之间的请求和响应报文的传输路径。</p>
+</li>
+<li><p>Warning<br>  通常会告知用户一些与缓存相关的问题的警告。 <code>Warning : [警告码][警告的主机:端口号] &quot;[警告内容]&quot; ([日期时间])</code></p>
+</li>
+</ul>
+<h4 id="请求首部字段"><a href="#请求首部字段" class="headerlink" title="请求首部字段"></a>请求首部字段</h4><p>请求首部字段是从客户端往服务器端发送请求报文中所使用的字段，用于补充请求的附加信息、客户端信息、对响应内容相关的优先级等内容。</p>
+<ul>
+<li><p>Accept<br>  Accept首部字段可通知服务器，用户代理能够处理的媒体类型及媒体类型的相对优先级。可使用type/subtype这种形式，一次指定多种媒体类型。</p>
+<p>  若想给显示的媒体类型增加优先级，则使用q=来额外表示权重值，用分号（;）进行分隔。权重值q的范围是0～1（可精确到小数点后3位）,且1为最大值。不指定权重值q时，默认权重为q=1.0。</p>
+</li>
+<li><p>Accept-Charset<br>  Accept-Charset首部字段可用来通知服务器用户代理支持的字符集及字符集的相对优先顺序。另外，可一次性指定多种字符集。与首部字段Accept相同的是可用权重q值来表示相对优先级。</p>
+</li>
+<li><p>Accept-Encoding<br>  用来告知服务器用户代理支持的内容编码及内容编码的优先级顺序。可一次性指定多种内容编码。</p>
+</li>
+<li><p>Accept-Language<br>  用来告知服务器用户代理能够处理的自然语言集，以及自然语言集的相对优先级。</p>
+</li>
+<li><p>Authorization<br>  用来告知服务器，用户代理的认证信息。通常，想要通过服务器认证的用户代理会在接收到返回的401状态码响应后，把首部字段Authorization加入请求中。</p>
+</li>
+<li><p>Expert<br>  客户端使用首部字段Expect来告知服务器，期望出现的某种特定的行为。</p>
+</li>
+<li><p>From<br>  首部字段From用来告知服务器使用用户代理的用户的电子邮件地址。通常，其使用目的就是为了显示搜索引擎等用户代理的负责人的电子邮件联系方式。</p>
+</li>
+<li><p>Host<br>  首部字段Host会告知服务器，请求的资源所处的互联网主机名和端口号。Host首部字段在HTTP/1.1规范内是唯一一个必须被包含在请求内的首部字段。若服务器未设定主机名，那直接发送一个空值即可，如 Host:</p>
+</li>
+<li><p>If-Match<br>  形如If-xxx这种样式的请求首部字段，都可称为条件请求。服务器接收到附带条件的请求后，只有判断指定条件为真时，才会执行请求。服务器会对比If-Match的字段值和资源的ETag值，仅当两者一致时，才会执行请求。反之，则返回状态码412Precondition Failed的响应。</p>
+</li>
+<li><p>If-Modified-Since<br>  会告知服务器若If-Modified-Since字段值早于资源的更新时间，则希望能处理该请求。</p>
+</li>
+<li><p>If-None-Match<br>  和If-Match作用相反。用于指定If-None-Match作用相反。用于指定If-None-Match字段值的实体标记（ETag）值与请求资源的ETag不一致时，它就告知服务器处理该请求。</p>
+</li>
+<li><p>If-Range<br>  它告知服务器若指定的If-Range字段值（ETag值或者时间）和请求资源的ETag值或时间相一致时，则作为范围请求处理。反之，则返回全体资源。</p>
+</li>
+<li><p>If-Unmodified-Since<br>  首部字段If-Unmodified-Since和首部字段If-Modified-Since的作用相反。它的作用是告知服务器，指定的请求资源只有在字段值指定的日期时间之后，未发生更新的情况下，才能处理请求。</p>
+</li>
+<li><p>Max-Forwards<br>  该字段以十进制整数形式指定可经过的服务器最大数目。服务器在往下一个服务器转发请求之前，Max-Forwards的值减1后重新赋值。当服务器接收到Max-Forwards值为0的请求时，则不再进行转发，而是直接返回响应。</p>
+</li>
+<li><p>Proxy-Authorization<br>  接收到从代理服务器发来的认证质询时，客户端会发送包含首部字段Proxy-Authorization的请求，以告知服务器认证所需要的信息。</p>
+</li>
+<li><p>Range<br>  对于只需获取部分资源的范围请求，包含首部字段Range即可告知服务器资源的指定范围。</p>
+</li>
+<li><p>Referer<br>  告知服务器请求的原始资源的URI。</p>
+</li>
+<li><p>TE<br>  告知服务器客户端能够处理响应的传输编码方式及相对优先级。它和首部字段Accept-Encoding的功能很相像，但是用于传输编码。</p>
+</li>
+<li><p>User-Agent<br>  首部字段User-Agent会将创建请求的浏览器和用户代理名称等信息传达给服务器。</p>
+</li>
+</ul>
+<h4 id="响应首部字段"><a href="#响应首部字段" class="headerlink" title="响应首部字段"></a>响应首部字段</h4><p>响应首部字段是由服务器端向客户端返回响应报文中所使用的字段，用于补充响应的附加信息、服务器信息，以及对客户端的附加要求等信息。</p>
+<ul>
+<li>Accept-Ranges<br>  用来告知客户端服务器是否能处理范围请求，以指定获取服务器端某个部分的资源。</li>
+<li>Age<br>  能告知客户端，源服务器在多久前创建了响应。字段值的单位为秒。</li>
+<li>ETag<br>  能告知客户端实体标识。它是一种可将资源以字符串形式做唯一性标识的方式。服务器会为每份资源分配对应的ETag值。</li>
+<li>Location<br>  可以将响应接收方引导至某个与请求URI位置不同的资源。</li>
+<li>Proxy-Authenticate<br>  会把代理服务器所要求的认证信息发送给客户端。</li>
+<li>Retry-After<br>  告知客户端应该在多久之后再次发送请求。单位秒</li>
+<li>Server<br>  告知客户端当前服务器上安装的HTTP服务器应用程序的信息。</li>
+<li>Vary<br>  可对缓存进行控制。源服务器会向代理服务器传达关于本地缓存使用方法的命令。<br>  从代理服务器接收到源服务器返回包含Vary指定项的响应之后，若再要进行缓存，仅对请求中含有相同Vary指定首部字段的请求返回进行缓存。即使对相同资源发起请求，但由于Vary指定的首部字段不相同，因此必须从源服务器重新获取资源。</li>
+<li>WWW-Authenticate<br>  用于HTTP访问认证。它会告知客户端适用于访问请求URI所指定资源的认证方案和带参数提示的质询。</li>
+</ul>
+<h4 id="实体首部字段"><a href="#实体首部字段" class="headerlink" title="实体首部字段"></a>实体首部字段</h4><p>是包含在请求报文和响应报文中的实体部分所使用的首部，用于补充内容的更新时间等与实体相关的信息。</p>
+<ul>
+<li>Allow<br>  用于通知客户端能够支持Request-URI指定资源的所有HTTP方法。当服务器接收到不支持的HTTP方法时，会以状态码405 Method Not Allowed作为响应返回。与此同时，还会把所有能支持的HTTP方法写入首部字段Allow后返回。</li>
+<li>Content-Encoding<br>  会告知客户端服务器对实体的主体部分选用的内容编码方式。内容编码是指在不丢失实体信息的前提下所进行的压缩。</li>
+<li>Content-Language<br>  告知客户端，实体主体使用的自然语言。</li>
+<li>Content-Length<br>  表明了实体主体部分的大小。对实体主体进行内容编码传输时，不能再使用Content-Length</li>
+<li>Content-Location<br>  给出与报文主体部分相对应的URI。和首部字段Location不同，Content-Location表示的是报文主体返回资源对应的URI。</li>
+<li>Content-MD5<br>  首部字段Content-MD5是一串由MD5算法生成的值，其目的在于检查报文主体在传输过程中是否保持完整，以及确认传输到达。</li>
+<li>Content-Range<br>  针对范围请求时，返回响应时使用的首部字段Content-Range,能告知客户端作为响应返回的实体的哪一部分符合范围请求，字段值以字节为单位，表示当前发送部分及整个实体部分。</li>
+<li>Content-Type<br>  说明了实体主体内对象的媒体类型。和首部字段Accept一样，字段值用type/subtype形式赋值。</li>
+<li>Expires<br>  会将资源失效的日期告知客户端。</li>
+<li>Last-Modified<br>  指明资源最终修改的时间。</li>
+</ul>
+<h4 id="为Cookie服务的首部字段"><a href="#为Cookie服务的首部字段" class="headerlink" title="为Cookie服务的首部字段"></a>为Cookie服务的首部字段</h4><ul>
+<li><p>Set-Cookie<br>  当服务器准备开始管理客户端的状态时，会事先告知各种信息。</p>
+<p>  <img src="/images/源码笔记-网络编程/HTTPCookie-1.png" alt=""></p>
+<p>  <img src="/images/源码笔记-网络编程/HTTPCookie-2.png" alt=""></p>
+</li>
+<li><p>Cookie<br>  告知服务器，当客户端想获得HTTP状态管理支持时，就会在请求中包含从服务器接收到的Cookie。接收到多个Cookie时，同样可以以多个Cookie形式发送。</p>
+</li>
+</ul>
+<h4 id="其他首部字段"><a href="#其他首部字段" class="headerlink" title="其他首部字段"></a>其他首部字段</h4><p>HTTP首部字段是可以自行扩展的。所以在Web服务器和浏览器的应用上，会出现各种非标准的首部字段。</p>
+<ul>
+<li>X-Frame-Options<br>  属于HTTP响应首部，用于控制网站内容在其他Web网站的Frame标签内的显示问题。其主要目的是为了防止点击劫持攻击。</li>
+<li>X-XSS-Protection<br>  属于HTTP响应首部，它是针对跨站脚本攻击的一种对策，用于控制浏览器XSS防护机制的开关。<br>  0.将XSS过滤设置成无效状态<br>  1.将XSS过滤设置成有效状态</li>
+<li>DNT<br>  属于HTTP请求首部，其中DNT是Do Not Track的简称，意为拒绝个人信息被收集，是表示拒绝被精准广告追踪的一种方法。<br>  0.同意被追踪<br>  1.拒绝被追踪</li>
+<li>P3P<br>  属于HTTP相应首部，通过利用P3P技术，可以让Web网站上的个人隐私变成一种仅供程序可理解的形式，以达到保护用户隐私的目的。</li>
+</ul>
+<h3 id="HTTP方法"><a href="#HTTP方法" class="headerlink" title="HTTP方法"></a>HTTP方法</h3><p>有4个HTTP方法，来标识可以完成的操作：GET、POST、PUT、DELETE</p>
+<p>特殊场合下还会用到：</p>
+<ul>
+<li><p>HEAD</p>
+<p>  相当于GET，只返回资源的首部，而不返回具体数据。常用于检查文件的修改日期，查看本地缓存中存储的文件副本是否仍然有效。</p>
+</li>
+<li><p>OPTIONS</p>
+<p>  允许客户端询问服务器可以如何处理一个指定的资源。</p>
+</li>
+<li><p>TRACE</p>
+<p>  回显客户端请求来进行调试，特别是代理服务器工作不正常时。</p>
+</li>
+</ul>
+<p>不同的服务器还可能识别其他非标准的方法，包括COPY和MOVE，不过Java不支持这些方法。</p>
+<h3 id="HTTP1-1-响应码"><a href="#HTTP1-1-响应码" class="headerlink" title="HTTP1.1 响应码"></a>HTTP1.1 响应码</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>响应码</th>
+<th>表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1XX</td>
+<td>提供信息的响应（请求已接收，继续处理）</td>
+</tr>
+<tr>
+<td>2XX</td>
+<td>提示成功</td>
+</tr>
+<tr>
+<td>3XX</td>
+<td>重定向</td>
+</tr>
+<tr>
+<td>4XX</td>
+<td>客户端错误</td>
+</tr>
+<tr>
+<td>5XX</td>
+<td>服务器错误</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="MIME媒体类型"><a href="#MIME媒体类型" class="headerlink" title="MIME媒体类型"></a>MIME媒体类型</h3><p>MIME类型分为两级：类型（type）和子类型（subtype）。</p>
+<ul>
+<li>text/* : 人可读的文字*</li>
+<li>image/* : 图片</li>
+<li>model/* : 3D模型，如VRML文件</li>
+<li>audio/* : 声音</li>
+<li>video/* : 移动的图片，可能包括声音</li>
+<li>application/* : 二进制数据</li>
+<li>message/* : 协议特定的信封，如email消息和HTTP响应</li>
+<li>multipart/* : 多个文档和资源的容器</li>
+</ul>
+<p>每个类型分别有很多不同的子类型。可以在 <code>http://www.iana.org/assignments/media-types/</code> 访问已注册的MIME类型最新列表。另外，可以自由定义非标准的定制类型和子类型，只要它们以x-开头。例如， Flash文件通常会指定为 <code>application/x-shockwave-flash</code> 类型。</p>
+<p>最后，请求以一个空行结束，也就是说，包括两个回车换行对 <code>\r\n\r\n</code>。</p>
+<p>一旦服务器看到这个空行，它就开始通过同一个连接向客户端发送它的响应。这个响应以一个状态行开始，后面是一个首部，这个首部采用请求首部同样的”key-value”语法描述响应，然后是一个空行，最后是所请求的资源。</p>
+<h2 id="配置方式"><a href="#配置方式" class="headerlink" title="配置方式"></a>配置方式</h2><p>Tomcat 在默认配置下即支持 HTTP/1.1，不需要另行配置。我们可以在 <code>$CATALINA_BASE/conf/server.xml</code> 中找到相关配置</p>
 <pre class="line-numbers language-XML" data-language="XML"><code class="language-XML">&lt;Connector port&#x3D;&quot;8080&quot; protocol&#x3D;&quot;http&#x2F;1.1&quot; connectionTimeout&#x3D;&quot;20000&quot; redirectport&#x3D;&quot;84437&quot;&#x2F;&gt;<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 <ul>
 <li><p>protocol</p>
@@ -395,7 +641,7 @@
 </ul>
 <p>当然只是仅仅一部分属性，详情见第六章和第十章。</p>
 <h1 id="AJP"><a href="#AJP" class="headerlink" title="AJP"></a>AJP</h1><p>除了HTTP，Tomcat 还支持 AJP 协议，以便于 ApacheHttpServer 等 Web 服务器集成。</p>
-<h2 id="基础知识"><a href="#基础知识" class="headerlink" title="基础知识"></a>基础知识</h2><p>为了满足负载均衡、静态资源优化、遗留系统集成（如集成 PHP Web应用）等应用部署要求，我们习惯于在 Servlet 容器的前端部署专门的 Web 服务器，如 ApacheHttpServer。由于增加了 Web 服务器的请求转发处理，虽然此时的单独请求性能必定低于直链 Servlet 容器的情况（增加了一层请求转发），但是整体性能却要大大好于直链。这主要有两个原因：</p>
+<h2 id="基础知识-1"><a href="#基础知识-1" class="headerlink" title="基础知识"></a>基础知识</h2><p>为了满足负载均衡、静态资源优化、遗留系统集成（如集成 PHP Web应用）等应用部署要求，我们习惯于在 Servlet 容器的前端部署专门的 Web 服务器，如 ApacheHttpServer。由于增加了 Web 服务器的请求转发处理，虽然此时的单独请求性能必定低于直链 Servlet 容器的情况（增加了一层请求转发），但是整体性能却要大大好于直链。这主要有两个原因：</p>
 <ol>
 <li>通过 Web 服务器的负载均衡机制，可以大大降低单台服务器的负载，从而提升请求处理效率；</li>
 <li>充分利用 Web 服务器在静态资源处理上的性能优势，提升 Web 应用静态资源处理速度（尤其对于静态资源较多的 Web 应用）</li>
@@ -492,7 +738,7 @@
 <p>其次，属性 protocol 为 “AJP/1.3” 表示当前链接器支持的协议为 AJP/1.3。与 HTTP 协议配置类似，采用此种方式，Tomcat 会自动检测当前服务器是否安装了 APR。如果安装了 APR，那么 Tomcat 将自动使用 APR 处理 AJP（即 AjpAprProtocol），否则使用 NIO（ Tomcat7以及之前版本为BIO）。除此之外，我们还可以明确指定协议处理类，此时 Tomcat 的检测将不再生效。如下所示，我们指定采用NIO处理AJP请求。</p>
 <pre class="line-numbers language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>Connector</span> <span class="token attr-name">port</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>8009<span class="token punctuation">"</span></span> <span class="token attr-name">protocol</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>org.apache.coyote.ajp.AjpNioProtocol<span class="token punctuation">"</span></span> <span class="token attr-name">redirectPort</span><span class="token attr-value"><span class="token punctuation attr-equals">=</span><span class="token punctuation">"</span>84437<span class="token punctuation">"</span></span><span class="token punctuation">></span></span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
 <h1 id="HTTP-2-0"><a href="#HTTP-2-0" class="headerlink" title="HTTP/2.0"></a>HTTP/2.0</h1><p>自 8.5 版本开始，Tomcat 增加了对 HTTP/2.0 的支持。在本节中，我们将简单介绍 HTTP/2.0 的发展、基本知识及其配置使用方式。</p>
-<h2 id="基础知识-1"><a href="#基础知识-1" class="headerlink" title="基础知识"></a>基础知识</h2><p>谈到 HTTP/2.0，我们就不得不先说一下 SPDY 协议。SPDY 是 Google 开发的用于传输 Web 内容的开放网络协议，可以说是 HTTP/2.0 的母体。SPDY 通过巧妙地控制 HTTP 通信，以达到降低 Web 页面加载延迟和提高 Web 安全的目标。SPDY 通过压缩、多路复用、优先级来实现降低延迟，但是这依赖于网络和 Web 应用部署条件的组合。</p>
+<h2 id="基础知识-2"><a href="#基础知识-2" class="headerlink" title="基础知识"></a>基础知识</h2><p>谈到 HTTP/2.0，我们就不得不先说一下 SPDY 协议。SPDY 是 Google 开发的用于传输 Web 内容的开放网络协议，可以说是 HTTP/2.0 的母体。SPDY 通过巧妙地控制 HTTP 通信，以达到降低 Web 页面加载延迟和提高 Web 安全的目标。SPDY 通过压缩、多路复用、优先级来实现降低延迟，但是这依赖于网络和 Web 应用部署条件的组合。</p>
 <p>SPDY 的设计目标是降低 Web 页面加载时间。通过优先级和多路复用，SPDY 使得只需要建立一个 TCP 链接即可传送网页内容及图片等资源。SPDY 中广泛应用了 TLS 加密，传输内容也均以 GZIP 或 DEFLATE 格式压缩（与 HTTP 不同，HTTP 的头部并不会被压缩）。另外，除了像 HTTP 网页服务器被动等待浏览器发起请求外，SPDY 网页服务器还可以主动向浏览器推送内容。</p>
 <p>SPDY 并不是用于取代 HTTP 协议的，它修改了 HTTP 请求和响应在网络上的传输方式。这意味着只需增加一个 SPDY 传输层，现有所有服务端应用均不需要做任何的修改。SPDY 是 HTTP 和 HTTPS 协议的有效隧道。当通过 SPDY 发送时，HTTP 请求会被处理、标记简化和压缩。例如，每个 SPDY 端点会持续跟踪在之前请求中已经发送的 HTTP 报文头部，从而避免重复发送还未改变的头部，未发送的报文数据部分将在压缩后发送。</p>
 <p>考虑到 SPDY 已获得的实现者（如Mozilla、Nginx）的支持以及与 HTTP/1.1 相比获得的性能提升，HTTPbis 工作小组最终决定采用 SPDY/2 作为 HTTP/2 的基础，而且 SPDY/4 已经与 HTTP/2 草稿非常接近。</p>
@@ -1038,7 +1284,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Coyote-%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">Coyote 简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Web%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">Web请求处理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E8%A6%81%E6%A6%82%E5%BF%B5"><span class="nav-number">2.1.</span> <span class="nav-text">主要概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.2.</span> <span class="nav-text">请求处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E5%8D%87%E7%BA%A7"><span class="nav-number">2.3.</span> <span class="nav-text">协议升级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP"><span class="nav-number">3.</span> <span class="nav-text">HTTP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F"><span class="nav-number">3.1.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#AJP"><span class="nav-number">4.</span> <span class="nav-text">AJP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86"><span class="nav-number">4.1.</span> <span class="nav-text">基础知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AJP%E6%B6%88%E6%81%AF%E5%8C%85%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.1.</span> <span class="nav-text">AJP消息包结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Forward-Request%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.2.</span> <span class="nav-text">Forward Request结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Headers-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.3.</span> <span class="nav-text">Send Headers 结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Body-Chunk-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.4.</span> <span class="nav-text">Send Body Chunk 结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F-1"><span class="nav-number">4.2.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP-2-0"><span class="nav-number">5.</span> <span class="nav-text">HTTP&#x2F;2.0</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86-1"><span class="nav-number">5.1.</span> <span class="nav-text">基础知识</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E6%B3%95"><span class="nav-number">5.2.</span> <span class="nav-text">配置方法</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#IO"><span class="nav-number">6.</span> <span class="nav-text">IO</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#BIO"><span class="nav-number">6.1.</span> <span class="nav-text">BIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO"><span class="nav-number">6.2.</span> <span class="nav-text">NIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO2"><span class="nav-number">6.3.</span> <span class="nav-text">NIO2</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#APR"><span class="nav-number">6.4.</span> <span class="nav-text">APR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">6.5.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Coyote-%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">Coyote 简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Web%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">Web请求处理</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E8%A6%81%E6%A6%82%E5%BF%B5"><span class="nav-number">2.1.</span> <span class="nav-text">主要概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E5%A4%84%E7%90%86"><span class="nav-number">2.2.</span> <span class="nav-text">请求处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E5%8D%87%E7%BA%A7"><span class="nav-number">2.3.</span> <span class="nav-text">协议升级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP"><span class="nav-number">3.</span> <span class="nav-text">HTTP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86"><span class="nav-number">3.1.</span> <span class="nav-text">基础知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#HTTP%E8%AF%B7%E6%B1%82%E6%8A%A5%E6%96%87"><span class="nav-number">3.1.1.</span> <span class="nav-text">HTTP请求报文</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HTTP%E6%8A%A5%E6%96%87%E9%A6%96%E9%83%A8"><span class="nav-number">3.1.2.</span> <span class="nav-text">HTTP报文首部</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#HTTP%E6%8A%A5%E6%96%87%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.1.</span> <span class="nav-text">HTTP报文首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#HTTP-1-1-%E9%80%9A%E7%94%A8%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.2.</span> <span class="nav-text">HTTP&#x2F;1.1 通用首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.3.</span> <span class="nav-text">请求首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%93%8D%E5%BA%94%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.4.</span> <span class="nav-text">响应首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E4%BD%93%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.5.</span> <span class="nav-text">实体首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%B8%BACookie%E6%9C%8D%E5%8A%A1%E7%9A%84%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.6.</span> <span class="nav-text">为Cookie服务的首部字段</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%B6%E4%BB%96%E9%A6%96%E9%83%A8%E5%AD%97%E6%AE%B5"><span class="nav-number">3.1.2.7.</span> <span class="nav-text">其他首部字段</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HTTP%E6%96%B9%E6%B3%95"><span class="nav-number">3.1.3.</span> <span class="nav-text">HTTP方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HTTP1-1-%E5%93%8D%E5%BA%94%E7%A0%81"><span class="nav-number">3.1.4.</span> <span class="nav-text">HTTP1.1 响应码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MIME%E5%AA%92%E4%BD%93%E7%B1%BB%E5%9E%8B"><span class="nav-number">3.1.5.</span> <span class="nav-text">MIME媒体类型</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F"><span class="nav-number">3.2.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#AJP"><span class="nav-number">4.</span> <span class="nav-text">AJP</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86-1"><span class="nav-number">4.1.</span> <span class="nav-text">基础知识</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AJP%E6%B6%88%E6%81%AF%E5%8C%85%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.1.</span> <span class="nav-text">AJP消息包结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Forward-Request%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.2.</span> <span class="nav-text">Forward Request结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Headers-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.3.</span> <span class="nav-text">Send Headers 结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Send-Body-Chunk-%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.4.</span> <span class="nav-text">Send Body Chunk 结构</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E5%BC%8F-1"><span class="nav-number">4.2.</span> <span class="nav-text">配置方式</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP-2-0"><span class="nav-number">5.</span> <span class="nav-text">HTTP&#x2F;2.0</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86-2"><span class="nav-number">5.1.</span> <span class="nav-text">基础知识</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE%E6%96%B9%E6%B3%95"><span class="nav-number">5.2.</span> <span class="nav-text">配置方法</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#IO"><span class="nav-number">6.</span> <span class="nav-text">IO</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#BIO"><span class="nav-number">6.1.</span> <span class="nav-text">BIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO"><span class="nav-number">6.2.</span> <span class="nav-text">NIO</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NIO2"><span class="nav-number">6.3.</span> <span class="nav-text">NIO2</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#APR"><span class="nav-number">6.4.</span> <span class="nav-text">APR</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">6.5.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 

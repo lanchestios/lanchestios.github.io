@@ -37,7 +37,7 @@
 <meta property="og:image" content="http://example.com/2022/07/22/images/JDK/更新对象的引用.png">
 <meta property="og:image" content="http://example.com/2022/07/22/images/JDK/活跃对象移动到新位置.png">
 <meta property="article:published_time" content="2022-07-22T07:52:21.000Z">
-<meta property="article:modified_time" content="2023-01-30T05:43:10.850Z">
+<meta property="article:modified_time" content="2023-02-02T06:57:36.851Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="GC">
@@ -237,7 +237,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2023-01-30 13:43:10" itemprop="dateModified" datetime="2023-01-30T13:43:10+08:00">2023-01-30</time>
+                <time title="Modified: 2023-02-02 14:57:36" itemprop="dateModified" datetime="2023-02-02T14:57:36+08:00">2023-02-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -347,9 +347,19 @@
 <h3 id="更新引用对象的地址-1"><a href="#更新引用对象的地址-1" class="headerlink" title="更新引用对象的地址"></a>更新引用对象的地址</h3><p>在上一步中，我们找到了所有对象的新位置，并通过对象头里面的指针指向新的位置。这一步最主要的工作就是从根集合出发遍历活跃对象，然后把活跃对象和活跃对象中的引用都更新到新的位置。</p>
 <h3 id="移动对象完成压缩-1"><a href="#移动对象完成压缩-1" class="headerlink" title="移动对象完成压缩"></a>移动对象完成压缩</h3><p>第二步中每个线程处理一部分分区，都已经计算好了对象的位置，这一步直接把对象复制到新的位置。</p>
 <h3 id="后处理-1"><a href="#后处理-1" class="headerlink" title="后处理"></a>后处理</h3><p>更新对象头等。</p>
-<h1 id="FGC-过程日志"><a href="#FGC-过程日志" class="headerlink" title="FGC 过程日志"></a>FGC 过程日志</h1><pre class="line-numbers language-none"><code class="language-none">0.458: [Full GC (System.gc())  210M-&gt;388K(8192K), 0.0202676 secs]
-   [Eden: 1024.0K(3072.0K)-&gt;0.0B(4096.0K) Survivors: 1024.0K-&gt;0.0B Heap: 210.5M(239.0M)-&gt;388.7K(8192.0K)], [Metaspace: 3086K-&gt;3086K(1056768K)]
- [Times: user&#x3D;0.01 sys&#x3D;0.01, real&#x3D;0.02 secs] <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h1 id="FGC-过程日志"><a href="#FGC-过程日志" class="headerlink" title="FGC 过程日志"></a>FGC 过程日志</h1><p>如果堆内存空间不足以分配新的对象，或者是 Metasapce 空间使用率达到了设定的阈值，那么就会触发 Full GC——你在使用 G1 的时候应该尽量避免这种情况发生，因为 G1 的 Full GC 是单线程、会 Stop The World，代价非常高。</p>
+<pre class="line-numbers language-none"><code class="language-none">2021-09-24T09:56:34.055+0800: 47.663: 
+[Full GC (Allocation Failure)  11G-&gt;519M(12G), 2.8735228 secs]
+# Full GC 的原因，图示里是 Allocation Failure
+# Full GC 的耗时，图示里是接近 3s
+[
+  Eden: 0.0B(12.0G)-&gt;0.0B(12.0G) 
+  Survivors: 0.0B-&gt;0.0B 
+  Heap: 12.0G(12.0G)-&gt;519.7M(12.0G)
+], 
+[
+  Metaspace: 49287K-&gt;48778K(1093632K)
+]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <h1 id="FGC-参数"><a href="#FGC-参数" class="headerlink" title="FGC 参数"></a>FGC 参数</h1><p><strong>MinHeapFreeRatio</strong></p>
 <p>参数 MinHeapFreeRatio，这个值用于判断是否可以扩展堆空间，增大该值扩展概率变小，减小该值扩展几率变大。</p>
 <p><strong>MaxHeapFreeRatio</strong></p>

@@ -34,7 +34,7 @@
 <meta property="og:image" content="http://example.com/images/JDK/YGC4.png">
 <meta property="og:image" content="http://example.com/images/JDK/YGC5.png">
 <meta property="article:published_time" content="2022-07-22T02:21:40.000Z">
-<meta property="article:modified_time" content="2023-01-30T05:43:10.993Z">
+<meta property="article:modified_time" content="2023-02-02T06:57:36.920Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="JDK">
 <meta property="article:tag" content="GC">
@@ -234,7 +234,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2023-01-30 13:43:10" itemprop="dateModified" datetime="2023-01-30T13:43:10+08:00">2023-01-30</time>
+                <time title="Modified: 2023-02-02 14:57:36" itemprop="dateModified" datetime="2023-02-02T14:57:36+08:00">2023-02-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -306,78 +306,131 @@
 <p><img src="/images/JDK/YGC5.png" alt=""></p>
 <h2 id="释放空间"><a href="#释放空间" class="headerlink" title="释放空间"></a>释放空间</h2><p>Clear CT（清理Card Table），Free CSet（清理回收集合），清空移动前的区域添加到空闲区等等，这些操作一般耗时都很短。</p>
 <h1 id="YGC-过程日志"><a href="#YGC-过程日志" class="headerlink" title="YGC 过程日志"></a>YGC 过程日志</h1><pre class="line-numbers language-none"><code class="language-none">3.378: [GC pause (G1 Evacuation Pause) (young), 0.0015185 secs]
-   [Parallel Time: 0.7 ms, GC Workers: 4] # 并行GC线程
+# JVM启动后的相对时间 3.378 
+# 进行收集的类型 YoungGC 
+# 收集耗费的时间 0.0015185 secs
+   [Parallel Time: 0.7 ms, GC Workers: 4] 
+   # 并行收集任务在运行过程中引发的 STW（Stop The World）时间，从新生代垃圾收集开始到最后一个任务结束，共花费 0.7 ms
       [GC Worker Start (ms): Min: 3378.1, Avg: 3378.3, Max: 3378.6, Diff: 0.5]
       # Min 最早开始的线程时间 Max 最晚开始时间 Avg 平均开始时间 Diff 最早最晚时间差
+      # 理想情况下，希望他们几乎是同时开始，即 diff 趋近于 0。
       [Ext Root Scanning (ms): Min: 0.0, Avg: 0.1, Max: 0.2, Diff: 0.2, Sum: 0.6]
       # 根扫描，包含所有强引用根，类型如下：
       # 1. Java根：Thread、JNI、CLDG
       # 2. JVM根： StringTable、Universe、JNI Handles、ObjectSynchronizer、
       #           FlatProfiler、Management、SystemDictionary、JVMTI
-      # 还会扫描CodeCache Roots处理RSet时的统计值，包含下面的：
+      # 还会扫描 CodeCache Roots 处理 RSet 时的统计值，包含下面的：
       # UpdateRS、ScanRS 和 Code Root Scan
       [Update RS (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
-      # 这个是GC线程更新RSet的时间花费，注意这里的时间和我们在Refine里面处理RSet的时间没关系
-      # 它们是不同线程处理
+      # 每个分区都有自己的 RSet，用来记录其他分区指向当前分区的指针，如果 RSet 有更新，
+      # G1 中会有一个 post-write barrier 管理跨分区的引用——新的被引用的 card 会被标记
+      # 为 dirty，并放入一个日志缓冲区，如果这个日志缓冲区满了会被加入到一个全局的缓冲区，
+      # 在 JVM 运行的过程中还有线程在并发处理这个全局日志缓冲区的 dirty card。
+      # 这个是 GC 线程更新 RSet 的时间花费，且区别于在 Refine 里面处理 RSet 的时间，该
+      # 过程表示允许垃圾收集线程处理本次垃圾收集开始前没有处理好的日志缓冲区，这可以确保当前
+      # 分区的RSet是最新的。
          [Processed Buffers: Min: 0, Avg: 0.2, Max: 1, Diff: 1, Sum: 1]
+         # 表示在 Update RS 这个过程中处理多少个日志缓冲区
       [Scan RS (ms): Min: 0.0, Avg: 0.1, Max: 0.1, Diff: 0.1, Sum: 0.3]
-      # 扫描RSet找到被引用的对象
-      [Code Root Scanning (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0]
+      # 扫描每个新生代分区的RSet并找出有多少指向当前分区的引用来自CSet
+      [Code Root Scanning (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.0
+	  # 扫描代码中的 root节点（局部变量）花费的时间
       [Object Copy (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.1]
-      # 活着的对象复制到新分区花费的时间
+      # 在疏散暂停期间，所有在 CSet 中的分区必须被转移疏散，Object Copy 就负责将当前分区中存活的对象拷贝到新的分区
       [Termination (ms): Min: 0.0, Avg: 0.2, Max: 0.3, Diff: 0.3, Sum: 0.7]
-      # GC线程结束的时间
+      # 当一个垃圾收集线程完成任务时，它就会进入一个临界区，并尝试帮助其他垃圾线程完成任务
+      #（steal outstanding tasks），min 表示该垃圾收集线程什么时候尝试 terminatie，
+      # max表示该垃圾收集回收线程什么时候真正 terminated
          [Termination Attempts: Min: 1, Avg: 1.0, Max: 1, Diff: 0, Sum: 4]
+         # 如果一个垃圾收集线程成功盗取了其他线程的任务，那么它会再次盗取更多的任务或
+         # 再次尝试 terminate，每次重新 terminate 的时候，这个数值就会增加
       [GC Worker Other (ms): Min: 0.0, Avg: 0.0, Max: 0.0, Diff: 0.0, Sum: 0.1]
       # 并行处理时其他处理花费的时间，基本都是释放资源
       [GC Worker Total (ms): Min: 0.1, Avg: 0.4, Max: 0.6, Diff: 0.6, Sum: 1.8]
       # 并行GC花费的时间
       [GC Worker End (ms): Min: 3378.7, Avg: 3378.7, Max: 3378.8, Diff: 0.1]
-      # GC线程结束的时间信息
+      # GC线程结束的时间信息，min表示最早结束的垃圾收集线程结束时该JVM启动后的时间；
+      # max表示最晚结束的垃圾收集线程结束时该JVM启动后的时间。
+      # 理想情况下，你希望它们快速结束，并且最好是同一时间结束。
    
    # 下面是其他任务部分
    [Code Root Fixup: 0.0 ms]
+   # 释放用于管理并行垃圾收集活动的数据结构，应该接近于0，该步骤是线性执行的
    [Code Root Purge: 0.0 ms]
    # 代码扫描属于并行部分，包含了代码的调整和回收
    [Clear CT: 0.1 ms]
-   # 清除卡表的时间
+   # 清除 Card Table 的时间
    [Other: 0.7 ms]
       [Choose CSet: 0.0 ms]
+      # 选择要进行回收的分区放入CSet（G1选择的标准是垃圾最多的分区优先，也就是存活对象率
+      # 最低的分区优先）
       [Ref Proc: 0.5 ms]
-      # 引用处理，发现哪些引用可以被清除
+      # 引用处理，发现哪些引用可以被清除（soft、weak、final、phantom、JNI等等）
       [Ref Enq: 0.0 ms]
-      # 引用重新激活
+      # 遍历所有的引用，将不能回收的放入pending列表
       [Redirty Cards: 0.1 ms]
-      # 重构RSet的花费时间
+      # 在回收过程中被修改的 card 将会被重置为 dirty
       [Humongous Register: 0.0 ms]
-      # 大对象处理时间
+      # JDK8新特性可以让巨型对象在新生代收集的时候被回收，默认开启
+      # 通过 G1ReclaimDeadHumongousObjectsAtYoungGC 设置
       	[Humongous Total: 2]
       	# 有两个大对象
       	[Humongous Candidate: 0]
       	# 可回收大对象0个
       [Humongous Reclaim: 0.1 ms]
+      # 做下列任务的时间：确保巨型对象可以被回收、释放该巨型对象所占的分区，重置分区类型，
+      # 并将分区还到 free 列表，并且更新空闲空间大小
       [Free CSet: 0.1 ms]
+      # 将要释放的分区还回到 free 列表
    [Eden: 304.0M(304.0M)-&gt;0.0B(304.0M) Survivors: 2048.0K-&gt;2048.0K Heap: 304.5M(512.0M)-&gt;529.0K(512.0M)]
- [Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.00 secs] <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+   # 垃圾回收内存的对比
+ [Times: user&#x3D;0.01 sys&#x3D;0.00, real&#x3D;0.00 secs] 
+ # user 垃圾收集线程在新生代垃圾收集过程中消耗的CPU时间，这个时间跟垃圾收集线程的个数有关，可能会比 real time 大很多
+ # sys 内核态线程消耗的CPU时间
+ # real 本次垃圾收集真正消耗的时间<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <blockquote>
 <p><strong>在GC日志的最后稍微提一下日志为什么需要对Code Root扫描和调整？</strong></p>
 <p>Java 代码在满足一定条件之后（比如执行多次），JIT 编译器会把这样的代码进行编译，这样的代码中有直接访问 OOP 对象的语句，因此当对象发生移动之后，必须重新调整代码中对象的引用位置，所以需要对Code Root进行扫描、调整，如果能释放的话还会进行释放。</p>
 </blockquote>
-<p>需要注意的是，如果 GC 日志开头有 <code>[GC pause (G1 Humongous Allocation) (young) (initial-mark)</code> 表示这次的 YGC 发生后，就会开始并发标记。</p>
-<pre class="line-numbers language-none"><code class="language-none">0.140: [GC concurrent-root-region-scan-start]
-# 把YHR中Survivor分区作为根，开始并发标记根扫描
-0.140: [GC concurrent-root-region-scan-end, 0.0003290 secs]
-# 并发标记根扫描结束
-0.140: [GC concurrent-mark-start]
-# 开始并发标记子阶段，从所有根引用（包括Survivor和强根入栈等出发，对整个堆进行标记）
-0.140: [GC concurrent-mark-end, 0.0002506 secs]
-# 标记结束
-0.144: [GC remark, 0.0014324 secs]
-# 开始再标记子阶段，包括再标记、引用处理、类卸载处理信息
-0.145: [GC cleanup 111M-&gt;111M(256M), 0.0005997 secs]
-# 清除处理，回收整个分区垃圾、调整 RSet 以减轻后续GC中RSet根的处理时间<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="并发-GC-过程日志"><a href="#并发-GC-过程日志" class="headerlink" title="并发 GC 过程日志"></a>并发 GC 过程日志</h2><p>需要注意的是，如果 GC 日志开头有 <code>[GC pause (G1 Humongous Allocation) (young) (initial-mark)</code> 表示这次的 YGC 发生后，就会开始并发标记。Concurrent GC 触发条件有很多，但是做的工作都相同，它的日志如下图所示：</p>
+<ol>
+<li>标志着并发垃圾收集阶段的开始：<ul>
+<li><strong>GC pause(G1 Evacuation Pause)(young)(initial-mark)</strong>：为了充分利用 STW 的机会来 trace 所有可达（存活）的对象，initial-mark 阶段是作为新生代垃圾收集中的一部分存在的。initial-mark 设置了两个 TAMS（top-at-mark-start）变量，用来区分存活的对象和在并发标记阶段新分配的对象。在 TAMS 之前的所有对象，在当前周期内都会被视作存活的。</li>
+</ul>
+</li>
+<li>表示第并发标记阶段做的第一个事情：根分区扫描<ul>
+<li><strong>GC concurrent-root-region-scan-start</strong>：根分区扫描开始，根分区扫描主要扫描的是新的 survivor 分区，找到这些分区内的对象指向当前分区的引用，如果发现有引用，则做个记录；</li>
+<li><strong>GC concurrent-root-region-scan-end</strong>：根分区扫描结束，并标明耗时；</li>
+</ul>
+</li>
+<li>表示并发标记阶段<ul>
+<li><strong>GC Concurrent-mark-start</strong>：并发标记阶段开始。（1）并发标记阶段的线程是跟应用线程一起运行的，不会 STW，所以称为并发；并发标记阶段的垃圾收集线程，默认值是 Parallel Thread 个数的 25%，这个值也可以用参数<code>-XX:ConcGCThreads</code>设置；（2）trace 整个堆，并使用位图标记所有存活的对象，因为在 top TAMS 之前的对象是隐式存活的，所以这里只需要标记出那些在 top TAMS 之后、阈值之前的；（3）记录在并发标记阶段的变更，G1 这里使用了 SATB 算法，该算法要求在垃圾收集开始的时候给堆做一个快照，在垃圾收集过程中这个快照是不变的，但实际上肯定有些对象的引用会发生变化，这时候G1使用了 pre-write barrier 记录这种变更，并将这个记录存放在一个SATB缓冲区中，如果该缓冲区满了就会将它加入到一个全局的缓冲区，同时G1有一个线程在并行得处理这个全局缓冲区；（4）在并发标记过程中，会记录每个分区的存活对象占整个分区的大小的比率；</li>
+<li><strong>GC Concurrent-mark-end</strong>：并发标记阶段结束，并标明耗时；</li>
+</ul>
+</li>
+<li>重新标记阶段（<strong>GC Remark</strong>），会 Stop the World<ul>
+<li><strong>Finalize Marking</strong>：Finalizer列表里的Finalizer对象处理，会标明耗时时间；</li>
+<li><strong>GC ref-proc</strong>：引用（soft、weak、final、phantom、JNI等等）处理，会标明耗时时间；</li>
+<li><strong>Unloading</strong>：类卸载，会标明耗时时间；</li>
+<li>除了前面这几个事情，这个阶段最关键的结果是：绘制出当前并发周期中整个堆的最后面貌，剩余的 SATB 缓冲区会在这里被处理，所有存活的对象都会被标记；</li>
+</ul>
+</li>
+<li>清理阶段（<strong>GC Cleanup</strong>），也会 Stop the World<ul>
+<li>计算出最后存活的对象：标记出 initial-mark 阶段后分配的对象；标记出至少有一个存活对象的分区；</li>
+<li>为下一个并发标记阶段做准备，previous 和 next 位图会被清理；</li>
+<li>没有存活对象的老年代分区和巨型对象分区会被释放和清理；</li>
+<li>处理没有任何存活对象的分区的 RSet；</li>
+<li>所有的老年代分区会按照自己的存活率（存活对象占整个分区大小的比例）进行排序，为后面的 CSet 选择过程做准备；</li>
+</ul>
+</li>
+<li>并发清理阶段<ul>
+<li><strong>GC concurrent-cleanup-start</strong>：并发清理阶段启动。完成第 5 步剩余的清理工作；将完全清理好的分区加入到二级 free 列表，等待最终还会到总体的 free 列表；</li>
+<li><strong>GC concurrent-cleanup-end</strong>：并发清理阶段结束，会标明耗时时间</li>
+</ul>
+</li>
+</ol>
 <h1 id="YGC-参数"><a href="#YGC-参数" class="headerlink" title="YGC 参数"></a>YGC 参数</h1><p><strong>ParallelGCThreads</strong></p>
-<p>ParallelGCThreads，默认值为0，表示的是并行执行 GC 的线程个数。G1 可以根据 CPU 的个数自行推断线程数；GC 是 CPU 密集型的任务，通常来说线程个数不应该超过 CPU 核数，一般不用设置该值。</p>
+<p>ParallelGCThreads，默认值为 0，表示的是并行执行 GC 的线程个数。G1 可以根据 CPU 的个数自行推断线程数；GC 是 CPU 密集型的任务，通常来说线程个数不应该超过 CPU 核数，一般不用设置该值。这个参数的值的设置，跟 CPU 有关，如果物理 CPU 支持的线程个数小于 8，则最多设置为 8；如果物理 CPU 支持的线程个数大于 8，则默认值为 <code>8 + ((N - 8) * 5/8)</code>。在非常大的 CPU 或多 CPU 系统上，额外线程的收益递减，因此线性缩放因子减少到 8 个内核以上。</p>
 <p><strong>MaxTenuringThreshold</strong></p>
 <p>在对新生代收集的过程中，如果对象在 YGC 发生了一定次数之后还存活，这意味着对象有很大的概率存活更长的时间，所以通常会把它晋升到老生代。而这个次数可以通过参数 MaxTenuringThreshold 控制，默认值是 15，即发生 15 次 YGC 后，对象仍然存活，存活的对象会晋升到老生代。这个值最大只能是 15。减小该值可以会把对象更早地提升到老生代。这个参数并非能达到绝对控制，比如晋升失败会导致对象原地不动，如果 survival 区不够大，可能直接放到老年代。</p>
 <p><strong>G1RsetScanBlockSize</strong></p>
@@ -485,7 +538,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E7%AE%80%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">YGC 简述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E7%AE%97%E6%B3%95%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">YGC 算法过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#STW"><span class="nav-number">2.1.</span> <span class="nav-text">STW</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E6%94%B6%E9%9B%86%E9%9B%86%E5%90%88"><span class="nav-number">2.2.</span> <span class="nav-text">选择收集集合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89%E6%A0%B9%E5%A4%84%E7%90%86"><span class="nav-number">2.3.</span> <span class="nav-text">（并行）根处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89RSet%E6%89%AB%E6%8F%8F"><span class="nav-number">2.4.</span> <span class="nav-text">（并行）RSet扫描</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89%E5%A4%8D%E5%88%B6"><span class="nav-number">2.5.</span> <span class="nav-text">（并行）复制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redirty"><span class="nav-number">2.6.</span> <span class="nav-text">Redirty</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E7%A9%BA%E9%97%B4"><span class="nav-number">2.7.</span> <span class="nav-text">释放空间</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E8%BF%87%E7%A8%8B%E6%97%A5%E5%BF%97"><span class="nav-number">3.</span> <span class="nav-text">YGC 过程日志</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">YGC 参数</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E7%AE%80%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">YGC 简述</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E7%AE%97%E6%B3%95%E8%BF%87%E7%A8%8B"><span class="nav-number">2.</span> <span class="nav-text">YGC 算法过程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#STW"><span class="nav-number">2.1.</span> <span class="nav-text">STW</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%80%89%E6%8B%A9%E6%94%B6%E9%9B%86%E9%9B%86%E5%90%88"><span class="nav-number">2.2.</span> <span class="nav-text">选择收集集合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89%E6%A0%B9%E5%A4%84%E7%90%86"><span class="nav-number">2.3.</span> <span class="nav-text">（并行）根处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89RSet%E6%89%AB%E6%8F%8F"><span class="nav-number">2.4.</span> <span class="nav-text">（并行）RSet扫描</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%EF%BC%88%E5%B9%B6%E8%A1%8C%EF%BC%89%E5%A4%8D%E5%88%B6"><span class="nav-number">2.5.</span> <span class="nav-text">（并行）复制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redirty"><span class="nav-number">2.6.</span> <span class="nav-text">Redirty</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8A%E6%94%BE%E7%A9%BA%E9%97%B4"><span class="nav-number">2.7.</span> <span class="nav-text">释放空间</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E8%BF%87%E7%A8%8B%E6%97%A5%E5%BF%97"><span class="nav-number">3.</span> <span class="nav-text">YGC 过程日志</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B9%B6%E5%8F%91-GC-%E8%BF%87%E7%A8%8B%E6%97%A5%E5%BF%97"><span class="nav-number">3.1.</span> <span class="nav-text">并发 GC 过程日志</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#YGC-%E5%8F%82%E6%95%B0"><span class="nav-number">4.</span> <span class="nav-text">YGC 参数</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
