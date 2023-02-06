@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="MapStruct 是一个代码生成器，它基于约定优于配置方法极大地简化了 Java bean 类型之间映射的实现。自动生成的映射转换代码只使用简单的方法调用，因此速度快、类型安全而且易于理解阅读，源码仓库 Github 地址 MapStruct。总的来说，有如下三个特点：  基于注解 在编译期自动生成映射转换代码 类型安全、高性能、无依赖性">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Middleware DTO映射 MapStruct">
+<meta property="og:url" content="http://example.com/2023/02/06/Middleware-MapStruct/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="MapStruct 是一个代码生成器，它基于约定优于配置方法极大地简化了 Java bean 类型之间映射的实现。自动生成的映射转换代码只使用简单的方法调用，因此速度快、类型安全而且易于理解阅读，源码仓库 Github 地址 MapStruct。总的来说，有如下三个特点：  基于注解 在编译期自动生成映射转换代码 类型安全、高性能、无依赖性">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-02-06T06:36:00.000Z">
+<meta property="article:modified_time" content="2023-02-06T06:39:42.643Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="MapStruct">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2023/02/06/Middleware-MapStruct/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Middleware DTO映射 MapStruct | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/02/06/Middleware-MapStruct/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Middleware DTO映射 MapStruct
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-02-06 14:36:00 / Modified: 14:39:42" itemprop="dateCreated datePublished" datetime="2023-02-06T14:36:00+08:00">2023-02-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Middleware/" itemprop="url" rel="index"><span itemprop="name">Middleware</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><code>MapStruct</code> 是一个代码生成器，它基于<strong>约定优于配置</strong>方法极大地简化了 <code>Java bean</code> 类型之间映射的实现。自动生成的映射转换代码只使用简单的方法调用，因此速度快、类型安全而且易于理解阅读，源码仓库 <code>Github</code> 地址 <a href="https://link.juejin.cn?target=https%3A%2F%2Fgithub.com%2Fmapstruct%2Fmapstruct" title="https://github.com/mapstruct/mapstruct">MapStruct</a>。总的来说，有如下三个特点：</p>
+<ol>
+<li>基于注解</li>
+<li>在编译期自动生成映射转换代码</li>
+<li>类型安全、高性能、无依赖性</li>
+</ol>
+<span id="more"></span>
+<h1 id="MapStruct-用法"><a href="#MapStruct-用法" class="headerlink" title="MapStruct 用法"></a>MapStruct 用法</h1><h2 id="S-T-字段及类型一致"><a href="#S-T-字段及类型一致" class="headerlink" title="S/T 字段及类型一致"></a>S/T 字段及类型一致</h2><p>在 Source 和 Target 需要映射字段的字段名和类型一致的场景下，只需写如下的 interface 方法 / abstract 方法即可。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapper</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span>factory<span class="token punctuation">.</span></span><span class="token class-name">Mappers</span></span><span class="token punctuation">;</span>
+
+<span class="token annotation punctuation">@Mapper</span>  
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Converter</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Converter</span> INSTANT <span class="token operator">=</span> <span class="token class-name">Mappers</span><span class="token punctuation">.</span><span class="token function">getMapper</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Target</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Source</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="S-T-字段类型不一致"><a href="#S-T-字段类型不一致" class="headerlink" title="S/T 字段类型不一致"></a>S/T 字段类型不一致</h2><p>在 Source 和 Target 需要映射的字段名称或类型不同时，可使用 <code>@Mapping</code> 注解指定映射的 Target 名称及类型。如下，Source 的 Integer 类型的 id，被映射到 Target 中 String 类型的 no。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapper</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span>factory<span class="token punctuation">.</span></span><span class="token class-name">Mappers</span></span><span class="token punctuation">;</span>
+
+<span class="token annotation punctuation">@Mapper</span>  
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Converter</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Converter</span> INSTANT <span class="token operator">=</span> <span class="token class-name">Mappers</span><span class="token punctuation">.</span><span class="token function">getMapper</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    
+    <span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"id"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"no"</span><span class="token punctuation">,</span> resultType <span class="token operator">=</span> <span class="token class-name">String</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span>
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Target</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Source</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="S-T-一对多字段转换"><a href="#S-T-一对多字段转换" class="headerlink" title="S/T 一对多字段转换"></a>S/T 一对多字段转换</h2><p>在一些特殊场景下，一个字段中可能包含多个待映射字段的信息。如下，extra 字段包含 id 和 name 两个字段的信息。可以通过定义解析函数的方式读取完成转换。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapper</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapping</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Named</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span>factory<span class="token punctuation">.</span></span><span class="token class-name">Mappers</span></span><span class="token punctuation">;</span>  
+  
+<span class="token annotation punctuation">@Mapper</span>  
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Converter</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Converter</span> INSTANT <span class="token operator">=</span> <span class="token class-name">Mappers</span><span class="token punctuation">.</span><span class="token function">getMapper</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+    <span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"extra"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"id"</span><span class="token punctuation">,</span> qualifiedByName <span class="token operator">=</span> <span class="token string">"extraId"</span><span class="token punctuation">)</span>
+    <span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"extra"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">,</span> qualifiedByName <span class="token operator">=</span> <span class="token string">"extraName"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Source</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Target</span> target<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+
+    <span class="token annotation punctuation">@Named</span><span class="token punctuation">(</span><span class="token string">"extraId"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">extractId</span><span class="token punctuation">(</span><span class="token class-name">String</span> extra<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">return</span> extra<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">&#125;</span>
+    
+    <span class="token annotation punctuation">@Named</span><span class="token punctuation">(</span><span class="token string">"extraName"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">extractName</span><span class="token punctuation">(</span><span class="token class-name">String</span> extra<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">return</span> extra<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="S-T-多对一字段转换"><a href="#S-T-多对一字段转换" class="headerlink" title="S/T 多对一字段转换"></a>S/T 多对一字段转换</h2><p>Target 增加 String 类型的 extra 字段，可以使用自定义转换方法转换，将多个字段内容融合成一个字段。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapper</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Mapping</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span></span><span class="token class-name">Named</span></span><span class="token punctuation">;</span>  
+<span class="token keyword">import</span> <span class="token import"><span class="token namespace">org<span class="token punctuation">.</span>mapstruct<span class="token punctuation">.</span>factory<span class="token punctuation">.</span></span><span class="token class-name">Mappers</span></span><span class="token punctuation">;</span>
+
+<span class="token annotation punctuation">@Mapper</span>  
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Converter</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Converter</span> INSTANT <span class="token operator">=</span> <span class="token class-name">Mappers</span><span class="token punctuation">.</span><span class="token function">getMapper</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"source"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"extra"</span><span class="token punctuation">,</span> qualifiedByName <span class="token operator">=</span> <span class="token string">"convertToExtra"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Target</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Source</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token annotation punctuation">@Named</span><span class="token punctuation">(</span><span class="token string">"convertToExtra"</span><span class="token punctuation">)</span>  
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">convertToExtra</span><span class="token punctuation">(</span><span class="token class-name">Source</span> source<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">return</span> <span class="token class-name">String</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token string">"%s,%s"</span><span class="token punctuation">,</span> source<span class="token punctuation">.</span><span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> source<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="表达式转换"><a href="#表达式转换" class="headerlink" title="表达式转换"></a>表达式转换</h2><p>根据内嵌代码执行转换</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">,</span> expression <span class="token operator">=</span> <span class="token string">"java(programer.getName().toUpperCase())"</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="日期转换"><a href="#日期转换" class="headerlink" title="日期转换"></a>日期转换</h2><p>将日期类型转换为指定格式字符串。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"beDate"</span><span class="token punctuation">,</span> dateFormat <span class="token operator">=</span> <span class="token string">"yyyy-MM-dd HH:mm:ss"</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="数值转换"><a href="#数值转换" class="headerlink" title="数值转换"></a>数值转换</h2><p>将数值类型转换为指定格式字符串。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"height"</span><span class="token punctuation">,</span> source <span class="token operator">=</span> <span class="token string">"height"</span> <span class="token punctuation">,</span>numberFormat <span class="token operator">=</span> <span class="token string">"#.00"</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="映射切面"><a href="#映射切面" class="headerlink" title="映射切面"></a>映射切面</h2><p>MapStruct 还提供了两个注解 <code>@BeforeMapping</code>、<code>@AfterMapping</code> 用来实现在 mapping 前后的统一操作，常用于操作多态。</p>
+<p><strong>实例</strong>：Human 父类，有 Man 和 Woman 两个子类，然后我们要将这两个子类型 mapping 成 HumanDto。HumanDto 中有个性别的属性，需要根据具体的类型决定。在 mapping 完成后，我们还要将名称修饰一下。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Human</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Man</span> <span class="token keyword">extends</span> <span class="token class-name">Human</span><span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Woman</span> <span class="token keyword">extends</span> <span class="token class-name">Human</span><span class="token punctuation">&#123;</span>
+<span class="token punctuation">&#125;</span>
+
+<span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">HumanDto</span> <span class="token punctuation">&#123;</span>
+    <span class="token keyword">private</span> <span class="token class-name">String</span> name<span class="token punctuation">;</span>
+    <span class="token keyword">private</span> <span class="token class-name">GenderType</span> genderType<span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span>
+<span class="token keyword">public</span> <span class="token keyword">enum</span> <span class="token class-name">GenderType</span> <span class="token punctuation">&#123;</span>
+    MAN<span class="token punctuation">,</span> WOMAN
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>当然我们可以写两个转换方法，一个 Man 到 HumanDto，一个 Woman 到 HumanDto，但是在使用的时候就比较麻烦了，需要传入具体的类型，代码也有重复。这种场景下我们就可以使用这两个注解完美的解决问题。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapper</span><span class="token punctuation">(</span>componentModel <span class="token operator">=</span> <span class="token class-name">MappingConstants<span class="token punctuation">.</span>ComponentModel</span><span class="token punctuation">.</span>SPRING<span class="token punctuation">)</span>
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">HumanConvertor</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@BeforeMapping</span>
+    <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">humanDtoWithGender</span><span class="token punctuation">(</span><span class="token class-name">Human</span> human<span class="token punctuation">,</span> <span class="token annotation punctuation">@MappingTarget</span> <span class="token class-name">HumanDto</span> humanDto<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>human <span class="token keyword">instanceof</span> <span class="token class-name">Man</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            humanDto<span class="token punctuation">.</span><span class="token function">setGenderType</span><span class="token punctuation">(</span><span class="token class-name">GenderType</span><span class="token punctuation">.</span>MAN<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>human <span class="token keyword">instanceof</span> <span class="token class-name">Woman</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            humanDto<span class="token punctuation">.</span><span class="token function">setGenderType</span><span class="token punctuation">(</span><span class="token class-name">GenderType</span><span class="token punctuation">.</span>WOMAN<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@AfterMapping</span>
+    <span class="token keyword">protected</span> <span class="token keyword">void</span> <span class="token function">decorateName</span><span class="token punctuation">(</span><span class="token annotation punctuation">@MappingTarget</span> <span class="token class-name">HumanDto</span> humanDto<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        humanDto<span class="token punctuation">.</span><span class="token function">setName</span><span class="token punctuation">(</span><span class="token class-name">String</span><span class="token punctuation">.</span><span class="token function">format</span><span class="token punctuation">(</span><span class="token string">"【%s】"</span><span class="token punctuation">,</span> humanDto<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">HumanDto</span> <span class="token function">toHumanDto</span><span class="token punctuation">(</span><span class="token class-name">Human</span> human<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="更新对象属性"><a href="#更新对象属性" class="headerlink" title="更新对象属性"></a>更新对象属性</h2><p>MapStruct 提供了另外一种方式来更新一个对象中的属性。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mappings</span><span class="token punctuation">(</span><span class="token punctuation">&#123;</span>                 
+	<span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"id"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"userId"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> 
+	<span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"username"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>  
+	<span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>source <span class="token operator">=</span> <span class="token string">"role.roleName"</span><span class="token punctuation">,</span> target <span class="token operator">=</span> <span class="token string">"roleName"</span><span class="token punctuation">)</span>         
+<span class="token punctuation">&#125;</span><span class="token punctuation">)</span>         
+<span class="token keyword">void</span> <span class="token function">update</span><span class="token punctuation">(</span><span class="token class-name">User</span> user<span class="token punctuation">,</span> <span class="token annotation punctuation">@MappingTarget</span> <span class="token class-name">UserRoleDto</span> userRoleDto<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>通过 @MappingTarget 来指定目标类（谁的属性需要被更新）。@Mapping 还是用来定义属性对应规则。</p>
+<h2 id="自定义类型转换"><a href="#自定义类型转换" class="headerlink" title="自定义类型转换"></a>自定义类型转换</h2><p>定义转换器</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">BoolStrFormat</span> <span class="token punctuation">&#123;</span>  
+    <span class="token keyword">public</span> <span class="token class-name">String</span> <span class="token function">toStr</span><span class="token punctuation">(</span><span class="token class-name">Boolean</span> isDisable<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>isDisable<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+            <span class="token keyword">return</span> <span class="token string">"Y"</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>  
+            <span class="token keyword">return</span> <span class="token string">"N"</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">&#125;</span>    <span class="token punctuation">&#125;</span>  
+    <span class="token keyword">public</span> <span class="token class-name">Boolean</span> <span class="token function">toBool</span><span class="token punctuation">(</span><span class="token class-name">String</span> str<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token string">"Y"</span><span class="token punctuation">.</span><span class="token function">equals</span><span class="token punctuation">(</span>str<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>  
+            <span class="token keyword">return</span> <span class="token boolean">true</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>  
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>  
+        <span class="token punctuation">&#125;</span>    
+	<span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>定义映射器</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapper</span><span class="token punctuation">(</span><span class="token keyword">uses</span> <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token class-name">BoolStrFormat</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">&#125;</span><span class="token punctuation">)</span>  
+<span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token keyword">class</span> <span class="token class-name">Converter</span> <span class="token punctuation">&#123;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">static</span> <span class="token class-name">Converter</span> INSTANT <span class="token operator">=</span> <span class="token class-name">Mappers</span><span class="token punctuation">.</span><span class="token function">getMapper</span><span class="token punctuation">(</span><span class="token class-name">Converter</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+  
+    <span class="token keyword">public</span> <span class="token keyword">abstract</span> <span class="token class-name">Target</span> <span class="token function">convert</span><span class="token punctuation">(</span><span class="token class-name">Source</span> source<span class="token punctuation">)</span><span class="token punctuation">;</span>  
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>这样转换时，Boolean 类型会通过 BoolStrFormat 被转换成特定字符串。</p>
+<h2 id="为转换加缓存"><a href="#为转换加缓存" class="headerlink" title="为转换加缓存"></a>为转换加缓存</h2><p>使用 ThreadLocal 缓存 extra 解析结果。</p>
+<h2 id="其他特性"><a href="#其他特性" class="headerlink" title="其他特性"></a>其他特性</h2><h3 id="多数据源"><a href="#多数据源" class="headerlink" title="多数据源"></a>多数据源</h3><p>多数据源场景下，需显示指定参数名称</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"boyName"</span><span class="token punctuation">,</span> source <span class="token operator">=</span> <span class="token string">"boy.name"</span><span class="token punctuation">)</span>
+<span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"girlName"</span><span class="token punctuation">,</span> source <span class="token operator">=</span> <span class="token string">"girl.name"</span><span class="token punctuation">)</span>
+<span class="token class-name">Couple</span> <span class="token function">toCouple</span><span class="token punctuation">(</span><span class="token class-name">Boy</span> boy<span class="token punctuation">,</span> <span class="token class-name">Girl</span> girl<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h3 id="注入外部依赖"><a href="#注入外部依赖" class="headerlink" title="注入外部依赖"></a>注入外部依赖</h3><p><code>@Mapper</code> 注解有 use 和 import 两种注入方式。import 指通过生成 @Autowire 注解注入指定的类去使用。use 指通过 new 指定对象的实例进行使用。</p>
+<h3 id="忽略映射"><a href="#忽略映射" class="headerlink" title="忽略映射"></a>忽略映射</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">,</span> ignore <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h3 id="设置默认值"><a href="#设置默认值" class="headerlink" title="设置默认值"></a>设置默认值</h3><p>source 值为 null 时给一个默认值。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">,</span> defaultValue <span class="token operator">=</span> <span class="token string">"Amy"</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h3 id="设置常量"><a href="#设置常量" class="headerlink" title="设置常量"></a>设置常量</h3><p>直接给 target 值设置一个常量，而不是从 source 进行转换。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token annotation punctuation">@Mapping</span><span class="token punctuation">(</span>target <span class="token operator">=</span> <span class="token string">"name"</span><span class="token punctuation">,</span> constant <span class="token operator">=</span> <span class="token string">"Sam"</span><span class="token punctuation">)</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MapStruct/" rel="tag"># MapStruct</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/01/29/Middleware-ShardingSphere/" rel="prev" title="Middleware 数据库增强 ShardingSphere">
+      <i class="fa fa-chevron-left"></i> Middleware 数据库增强 ShardingSphere
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#MapStruct-%E7%94%A8%E6%B3%95"><span class="nav-number">1.</span> <span class="nav-text">MapStruct 用法</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#S-T-%E5%AD%97%E6%AE%B5%E5%8F%8A%E7%B1%BB%E5%9E%8B%E4%B8%80%E8%87%B4"><span class="nav-number">1.1.</span> <span class="nav-text">S&#x2F;T 字段及类型一致</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#S-T-%E5%AD%97%E6%AE%B5%E7%B1%BB%E5%9E%8B%E4%B8%8D%E4%B8%80%E8%87%B4"><span class="nav-number">1.2.</span> <span class="nav-text">S&#x2F;T 字段类型不一致</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#S-T-%E4%B8%80%E5%AF%B9%E5%A4%9A%E5%AD%97%E6%AE%B5%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.3.</span> <span class="nav-text">S&#x2F;T 一对多字段转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#S-T-%E5%A4%9A%E5%AF%B9%E4%B8%80%E5%AD%97%E6%AE%B5%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.4.</span> <span class="nav-text">S&#x2F;T 多对一字段转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.5.</span> <span class="nav-text">表达式转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%A5%E6%9C%9F%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.6.</span> <span class="nav-text">日期转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E5%80%BC%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.7.</span> <span class="nav-text">数值转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%98%A0%E5%B0%84%E5%88%87%E9%9D%A2"><span class="nav-number">1.8.</span> <span class="nav-text">映射切面</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9B%B4%E6%96%B0%E5%AF%B9%E8%B1%A1%E5%B1%9E%E6%80%A7"><span class="nav-number">1.9.</span> <span class="nav-text">更新对象属性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%87%AA%E5%AE%9A%E4%B9%89%E7%B1%BB%E5%9E%8B%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.10.</span> <span class="nav-text">自定义类型转换</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E8%BD%AC%E6%8D%A2%E5%8A%A0%E7%BC%93%E5%AD%98"><span class="nav-number">1.11.</span> <span class="nav-text">为转换加缓存</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96%E7%89%B9%E6%80%A7"><span class="nav-number">1.12.</span> <span class="nav-text">其他特性</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E6%95%B0%E6%8D%AE%E6%BA%90"><span class="nav-number">1.12.1.</span> <span class="nav-text">多数据源</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A8%E5%85%A5%E5%A4%96%E9%83%A8%E4%BE%9D%E8%B5%96"><span class="nav-number">1.12.2.</span> <span class="nav-text">注入外部依赖</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BF%BD%E7%95%A5%E6%98%A0%E5%B0%84"><span class="nav-number">1.12.3.</span> <span class="nav-text">忽略映射</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E9%BB%98%E8%AE%A4%E5%80%BC"><span class="nav-number">1.12.4.</span> <span class="nav-text">设置默认值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E5%B8%B8%E9%87%8F"><span class="nav-number">1.12.5.</span> <span class="nav-text">设置常量</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">144</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">287</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
