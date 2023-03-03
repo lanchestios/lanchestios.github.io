@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="全链路压测平台，它的目标是对全公司所有业务，提供单服务、全链路，安全、高效、准确、高覆盖的压测，来帮助业务高效便捷的完成性能测试任务，更精确评估线上服务性能和容量方面风险。  安全：所有压测都是在线上完成的，所以理论上所有的压测对线上用户都是有损的。压测平台将从服务状态，以及压测数据两方面去保证压测的安全性。     高效：较少压测脚本编写成本，数据构造和压测监控成本，尽量自动化完成压测过程的各个">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 全链路压测平台建设">
+<meta property="og:url" content="http://example.com/2023/03/03/SE-%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E5%BB%BA%E8%AE%BE/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="全链路压测平台，它的目标是对全公司所有业务，提供单服务、全链路，安全、高效、准确、高覆盖的压测，来帮助业务高效便捷的完成性能测试任务，更精确评估线上服务性能和容量方面风险。  安全：所有压测都是在线上完成的，所以理论上所有的压测对线上用户都是有损的。压测平台将从服务状态，以及压测数据两方面去保证压测的安全性。     高效：较少压测脚本编写成本，数据构造和压测监控成本，尽量自动化完成压测过程的各个">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/压测落地计划.png">
+<meta property="og:image" content="http://example.com/images/SE/压测痛点.png">
+<meta property="og:image" content="http://example.com/images/SE/Rhino压测平台架构.png">
+<meta property="og:image" content="http://example.com/images/SE/压测平台登录场景定制化.png">
+<meta property="og:image" content="http://example.com/images/SE/整体压测隔离框架.png">
+<meta property="og:image" content="http://example.com/images/SE/压测平台外网压力测试.png">
+<meta property="article:published_time" content="2023-03-03T04:53:00.000Z">
+<meta property="article:modified_time" content="2023-03-03T04:53:56.181Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/压测落地计划.png">
+
+<link rel="canonical" href="http://example.com/2023/03/03/SE-%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E5%BB%BA%E8%AE%BE/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 全链路压测平台建设 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/03/SE-%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E5%BB%BA%E8%AE%BE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 全链路压测平台建设
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-03-03 12:53:00 / Modified: 12:53:56" itemprop="dateCreated datePublished" datetime="2023-03-03T12:53:00+08:00">2023-03-03</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/SE-Software-Engineering/" itemprop="url" rel="index"><span itemprop="name">SE (Software Engineering)</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>全链路压测平台，它的目标是对全公司所有业务，提供单服务、全链路，安全、高效、准确、高覆盖的压测，来帮助业务高效便捷的完成性能测试任务，更精确评估线上服务性能和容量方面风险。</p>
+<ul>
+<li>安全：所有压测都是在线上完成的，所以理论上所有的压测对线上用户都是有损的。压测平台将从服务状态，以及压测数据两方面去保证压测的安全性。    </li>
+<li>高效：较少压测脚本编写成本，数据构造和压测监控成本，尽量自动化完成压测过程的各个阶段。</li>
+<li>准确：精确的压力控制，准确的链路压测监控，精确的压测报告结果，以及性能&amp;容量数据。</li>
+<li>高覆盖：需要支撑公司内不同的业务线的压测需求，如搜索，广告，电商，教育，游戏等等。<span id="more"></span>
+</li>
+</ul>
+<h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>分布式系统单机单接口性能不代表整体，会受限于公共资源。而分布式系统接口受限于性能短板，有时只有在集群压力达到一定值时，才能被发现，严重时可能造成集群雪崩。因此压测成为了稳定性建设的其中一环。</p>
+<p>全链路压测在整个系统稳定性建设中占有核心重要的位置，尤其是针对于日常低流量、有特定时间段的高流量业务场景。全链路压测可以帮助系统性地评估容量和发现隐患，最终可以确保高流量场景下系统的稳定。</p>
+<p>通过对压测实施的具体动作做统一的梳理，在压测各个阶段推进标准化和自动化，尽力提升全流程的执行效率，最终达到常态化的目标，如下图所示：</p>
+<p> <img src="/images/SE/压测落地计划.png" alt=""></p>
+<p>在全链路压测的整个周期中，压测成本、压测安全和压测有效性也是需要一直关注的质量属性。当前压测流程的痛点如下：</p>
+<p><img src="/images/SE/压测痛点.png" alt=""></p>
+<h1 id="全链路压测系统"><a href="#全链路压测系统" class="headerlink" title="全链路压测系统"></a>全链路压测系统</h1><p>Rhino 是一个分布式全链路压测系统，可以通过水平扩展，来实现模拟海量用户真实的业务操作场景，对线上各种业务进行全方位的性能测试。它主要分为控制中心（Rhino Master）模块、压测链路服务模块、监控系统模块、压测引擎模块。</p>
+<blockquote>
+<p>参考字节、美团的全链路压测方案思路</p>
+</blockquote>
+<p><img src="/images/SE/Rhino压测平台架构.png" alt=""></p>
+<h2 id="链路治理"><a href="#链路治理" class="headerlink" title="链路治理"></a>链路治理</h2><p>压测实施的第一步就是明确压测目标，即梳理压测链路、明确压测范围。而为了达成目标，请求调用链检索是非常必要的。</p>
+<p>请求调用链检索，可以梳理服务间的依赖，对所依赖的服务是否具备压测的条件有清晰的认知，也能针对其情况提前制定方案进行服务改造 / Mock 所依赖的服务。也可以提供清晰完整的链路监控，整体把控压测计划的影响并针对性地制定预案。</p>
+<p>调用链检索通常是由日志平台实现的。一个服务在被请求或者请求下游时，都会透传一个 LogID。RPC 框架会打印调用链日志（包括 RPC 日志-调用者日志，Access 日志-被调用者日志），所有日志中都会包含这个 LogID。通过 LogID 将一个请求所经过的所有服务日志串起来，就完成调用链检索。</p>
+<blockquote>
+<p>需要注意的是：线程/进程间信息传递时 LogID 的留存问题</p>
+</blockquote>
+<h2 id="压测前准备"><a href="#压测前准备" class="headerlink" title="压测前准备"></a>压测前准备</h2><h3 id="压测开关"><a href="#压测开关" class="headerlink" title="压测开关"></a>压测开关</h3><p>为了解决线上压测安全问题，需要引入压测开关组件。</p>
+<ul>
+<li>每个服务每个集群，都有一个压测开关。只有打开压测开关时，压测流量才能流入到服务内，否则就会被底层微服务框架直接拒绝，业务层无感。</li>
+<li>在每个 IDC 区域，都会有一个全局的压测总开关。只有打开了这个全局压测开关，压测流量才被允许在这个 IDC 内流转。</li>
+<li>当线上出现压测问题，除了从源头关闭压测流量以外，关闭目标服务的压测开关，也能立即阻断压测流量。</li>
+</ul>
+<p>在压测之前，需要开启整体链路的压测开关的，否则压测流量就会被服务拒绝，导致压测失败。</p>
+<ul>
+<li>一键开启：在压测执行之前，Rhino 平台可以一键开启链接上所有节点的压测开关。</li>
+<li>静默关闭：压测开关到期后，Rhino 会自动静默关闭压测开关，以保证线上服务的安全。</li>
+<li>压测开关开启周知：压测开关开启时，Rhino 平台会自动给对应服务 Owner 推送相关信息，确保服务 Owner 了解相关压测信息，上游会有压测流量会经过其服务。</li>
+</ul>
+<h3 id="服务改造"><a href="#服务改造" class="headerlink" title="服务改造"></a>服务改造</h3><p>在压测之前，需要对服务进行压测验证。对于不满足压测要求(即压测数据隔离)的服务，需要进行压测改造。</p>
+<ul>
+<li>压测验证：对于存储服务，在不打开压测开关的前提下，通过压测请求，发送读写操作都是会被拒绝。如果没有拒绝，说明在操作存储服务时，没有带上压测 Context，需要进行改造。</li>
+<li>压测改造：压测改造是线上全链路压测推进中非常关键，而又非常困难的一个环节。对于已经上线的服务，压测改造还极有可能会引入新的 BUG，所以经常推动起来比较困难。</li>
+</ul>
+<blockquote>
+<p>因此为了解决这些问题，平台有以下几个解决方案：</p>
+<ol>
+<li>尽量减少代码改动，并给出完整的指导手册及代码示例，减少 RD 的工作量，降低代码错误的可能性。</li>
+<li>提供简单便捷的线上线下 HTTP&amp;RPC 的压测请求 Debug 工具，方便代码改动的验证。</li>
+<li>对于新项目，项目开始初期，就将压测改造加入项目开发规范中，减少后期的代码改动。</li>
+</ol>
+</blockquote>
+<h3 id="服务-Mock"><a href="#服务-Mock" class="headerlink" title="服务 Mock"></a>服务 Mock</h3><p>对于调用链中不能压测的服务(敏感服务)，或者第三方服务，为了压测请求的完整性，就需要对这些服务进行 Mock。业界通用的 Mock 方案有：</p>
+<ol>
+<li>修改业务代码，修改服务调用为空转代码。优点：实现成本低。缺点：返回值固定，代码&amp;业务入侵高，推动困难。如要 Mock 位置比较靠下游，超出部门覆盖业务范围，推动就非常麻烦。</li>
+<li>通用 Mock 服务。通用 MockServer，会根据不同用户配置不同 Mock 规则，执行对应的响应延时，并返回对应响应数据。优点：无代码入侵，业务方无感知。缺点：实现成本高。</li>
+</ol>
+<p>可以通过 Service Mesh 和 MockServer 系统来实现了高效的，对业务透明的服务 Mock。</p>
+<p>压测执行前，平台需要向 Service Mesh 注册染色转发规则，并向 Mock 服务注册 Mock 规则。然后在压测流量中注入 Mock 染色标记，才能完成服务 Mock：</p>
+<ul>
+<li>基于 Service Mesh 的染色流量转发。首先需要在压测流量中注入转发染色标记，并在 Service Mesh 中注册对应的转发规则。Service Mesh 检测到染色流量后，就会将其转发到指定的 Mock Server 上。</li>
+<li>基于 Mock Server 的请求规则匹配。首先在 Mock Server 上注册 Mock 规则，以及匹配的 Response 和响应时延。当 Mock Server 接收到请求后，会根据规则进行响应。</li>
+</ul>
+<h2 id="数据及流量构造"><a href="#数据及流量构造" class="headerlink" title="数据及流量构造"></a>数据及流量构造</h2><p>压测实施的第二步就是压测前数据准备。这一步往往占用的人力成本比较大，而在实际的研发中需要找准痛点</p>
+<h3 id="数据构造"><a href="#数据构造" class="headerlink" title="数据构造"></a>数据构造</h3><p>压测过程中数据构造是最重要，也是最为复杂的环节。压测数据的建模，直接影响了压测结果的准确性。</p>
+<ul>
+<li>对于服务性能缺陷扫描、性能调优以及新上线服务、推荐构造 Fake 数据、来压测指定路径（规则生成）。</li>
+<li>对于线上容量规划、性能能力验证以及性能 Diff、推荐使用线上真实流量、使压测结果更贴近真实情况（数仓提供）。</li>
+<li>对于涉及到用户账号，用户登录态保持的情况，推荐使用压测专属测试账号，避免影响线上真实用户（场景定制）。</li>
+</ul>
+<p><strong>规则生成 Fake 数据</strong></p>
+<p>为了高效的构造特定的 Fake 压测数据，Rhino 压测平台提供大量数据构造方式：</p>
+<ol>
+<li>CSV 文件：按列分割数据，字段名取 CSV 文件第一行。数据读取方式是按行递增循环。如果一个压测任务会拆分成多个 Job，那么数据文件也会拆分，避免 Job 之间的数据重复。</li>
+<li>自增：变量类型均为数字类型。每次发压时+1，到最大值后从最小值循环使用。</li>
+<li>随机：变量类型均为数字类型。每次发压时随机生成。</li>
+<li>常量：Constant，可自定义为任意值。</li>
+</ol>
+<p><strong>数仓模拟真实流量</strong></p>
+<p>根据真实流量清洗、校正、生成压测数据</p>
+<p><strong>核心链路场景定制化</strong></p>
+<p>在压测过程中，有些压测请求需要进行登录，并保持会话；此外在很多压测请求中涉及到用户账号信息 UserID，DeviceID 等数据。用户账号的构造问题，一直是压测过程中非常棘手的问题。Rhino 平台打通的用户中心，设置了压测专属的账号服务，完美地解决了压测过程中的登录态，以及测试账号等问题。具体流程如下图。</p>
+<p><img src="/images/SE/压测平台登录场景定制化.png" alt=""></p>
+<h3 id="流量隔离"><a href="#流量隔离" class="headerlink" title="流量隔离"></a>流量隔离</h3><p>流量隔离中需要解决的压测请求隔离，以及压测数据隔离。</p>
+<p>压测请求隔离，主要是通过构建压测环境来解决，如线下压测环境，或泳道化/Set 化建设，将压测请求与线上流程完全隔离。优点是压测请求与线上请求完全隔离，不会影响到线上用户。缺点：机器资源及维护成本高，且压测结果需要经过一定的换算，才能得线上容量，结果准确性存在一定的问题。</p>
+<p>压测数据隔离，主要是通过对压测流量进行染色，让线上服务能识别哪些是压测流量，哪些是正常流量，然后对压测流量进行特殊处理，以达到数据隔离的目的。</p>
+<p>整体压测隔离框架如图。  </p>
+<p><img src="/images/SE/整体压测隔离框架.png" alt=""></p>
+<h4 id="压测数据隔离"><a href="#压测数据隔离" class="headerlink" title="压测数据隔离"></a>压测数据隔离</h4><h5 id="请求链路透传"><a href="#请求链路透传" class="headerlink" title="请求链路透传"></a>请求链路透传</h5><p><strong>压测标记</strong></p>
+<p>压测标记就是最常见的压测流量染色的方式。</p>
+<p>对于 RPC 协议，会在请求的头部中增加一个 Key：Value 的字段作为压测标记。  </p>
+<p>对于 HTTP 和其他协议，会在请求头，自动注入一个 Stress 标记(Key-Value) 。</p>
+<p>压测标记 Key:Value，其中 key 是固定的 Stress_Tag 值，但是每个压测任务都有唯一的 Stress_Value 值，主要用于解决压测数据冲突、性能问题定位。</p>
+<p><strong>压测标记透传</strong></p>
+<p>目前公司内各个基础组件、存储组件，以及 RPC 框架都已经支持了压测标记的透传。其原理是将压测标记的 KV 值存入 Context 中，然后在所有下游请求中都带上该 Context，下游服务可以根据 Context 中压测标记完成对压测流量的处理。在实际业务中，代码改造也非常简单，只需要透传 Context 即可。</p>
+<ul>
+<li>Golang 服务：将压测标记写入 Context 中。</li>
+<li>Python 服务：利用 threading.local() 存储线程 Context。</li>
+<li>Java 服务：利用 ThreadLocal 存储线程 Context。</li>
+</ul>
+<h5 id="数据存储隔离"><a href="#数据存储隔离" class="headerlink" title="数据存储隔离"></a>数据存储隔离</h5><p>线上压测中，最复杂的问题就是压测链路中涉及到写操作，如何避免污染线上数据，并且能保证压测请求保持和线上相同的请求路径。业界有很多解决方案，常见的有影子表，影子库，以及数据偏移，如图。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th></th>
+<th>标记法(uid/单号)</th>
+<th>影子库</th>
+<th>影子表</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>优点</td>
+<td>易于实现，无需中间件</td>
+<td>完全隔离，线上流量 0 影响</td>
+<td>数据清理简单，中间件易支持</td>
+</tr>
+<tr>
+<td>缺点</td>
+<td>数据混入线上表，清理复杂，DB压力严重时影响线上流量</td>
+<td>DB 资源浪费</td>
+<td>DB压力严重时影响线上流量</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>流量打标没打通</td>
+<td>流量全服务打标</td>
+<td>流量全服务打标</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>平台针对不同存储，有不同的解决方案：</strong></p>
+<ul>
+<li>MySQL、MongoDB：影子表。SDK 判断是否是压测流量，若是则根据配置映射至新表名。配置策略有两种，一是读写影子表，二是读线上表、写影子表。</li>
+<li>Redis：Redis Key 加上 Stress 前缀。如 Stress_Tag=Valuex，那么读写 Redis 的 Key=Valuex_Key。这样可以解决多个压测任务数据冲突的问题。压测结束后，只需要对 Prefix=Valuex 做清除或过期操作即可。</li>
+<li>MQ：对于消息队列，平台有两种策略。一是直接丢弃，然后针对消息队列的性能，单独进行压测；二是在 Header 中透传压测标记，Consumer 根据压测标记和业务需求，再做特殊处理。默认走丢弃策略，业务方可根据需求进行配置。</li>
+<li>其他存储，如 ES，ClickHouse 等。压测时，会由路由决定将压测请求打到压测集群、影子库或影子表。</li>
+</ul>
+<h2 id="压测计划"><a href="#压测计划" class="headerlink" title="压测计划"></a>压测计划</h2><h3 id="压测引擎"><a href="#压测引擎" class="headerlink" title="压测引擎"></a>压测引擎</h3><p>压测引擎方面，有开源的压测引擎，也有自研的压测引擎。</p>
+<p>开源压测引擎的优点是维护人多，功能比较丰富，稳定且性能好，缺点就是输入格式固定，定制难度大。此外 Agent 与开源压测引擎之间通常是不同进程，进程通信也存在比较大的问题，不容易控制。如 Gatling 等。而自研压测引擎有更多定制化的空间。</p>
+<p>压测调度的最小单元是压测 Agent，但是实际每个 Agent 中有挂载多种压测引擎的来支撑不同的压测场景。Rhino 平台在压测数据和压测引擎之间增加了一个压测引擎适配层，实现了压测数据与压测引擎的解耦。压测引擎适配层，会根据选择不同的压测引擎，生成不同 Schema 的压测数据，启用不同的引擎来完成压测，而这些对用户是透明的。</p>
+<h3 id="压测执行方式"><a href="#压测执行方式" class="headerlink" title="压测执行方式"></a>压测执行方式</h3><h4 id="最小调度单元"><a href="#最小调度单元" class="headerlink" title="最小调度单元"></a>最小调度单元</h4><p>压测平台中，压测 Agent 就是一个最小调度单元。一次压测任务，通常会拆分成多个子 Job，然后下发到多个 Agent 上来完成。</p>
+<ul>
+<li>最小化容器部署，减少资源浪费。压测对机器资源消耗是非常高的，通常 CPU &amp; Memory 的使用率都在 80%以上。但是没有压测执行时间内，机器资源使用率&lt;5%。如果长期占用大量的资源，将会对机器资源造成极大的浪费。压测 Agent 都采用容器化部署，并且每个容器的资源规格也尽可能小，这样既能满足日常压测需求，也不会占用太多的机器资源。</li>
+<li>独占 Agent，增加压测执行稳定性：单个容器内只启动一个 Agent 进程，单个 Agent 同时只能被一个压测任务占用，避免多任务多进程的干扰和资源竞争，增加压测的稳定性。</li>
+<li>动态扩容，支撑海量 QPS 发压：压测高峰期，压测平台会临时申请机器资源，快速扩容，完成海量 QPS 的支撑。压测完成后，会立即释放机器资源，减少资源浪费。</li>
+</ul>
+<h4 id="智能压力调节"><a href="#智能压力调节" class="headerlink" title="智能压力调节"></a>智能压力调节</h4><ul>
+<li>动态分配压测 Agent：在压测过程，经常出现压测 Agent 的 CPU/Memory 使用率过高(&gt;90%)，导致压力上不去，达不到目标 QPS；或者压测延时过高，压测结果不准确的问题。Rhino 平台在发压的过程中，会实时监控每个压测 Agent 的 CPU/Memory 使用率，当超过阈值时(&gt;90%)，会动态分配额外的 Agent，以降低每个 Agent 的负载，保证压测的稳定性。</li>
+<li>智能调节压力：在压测过程，通常需要不断的调节 QPS 大小，以达到性能压测目标。这过程非常耗费精力和时间。压测平台，可以根据压测任务设定的性能指标，智能调节 QPS 大小，当达到压测目标后，会自动熔断，停止压测。</li>
+</ul>
+<h3 id="压测链路模拟"><a href="#压测链路模拟" class="headerlink" title="压测链路模拟"></a>压测链路模拟</h3><p>压测平台默认将全链路压测分为公网压测和内网压测。公网压测主要是压测 IDC 网络带宽，延时，IDC 网关新建连接、转发等能力；内网压测，主要是压测目标服务，目标集群的性能，容量等。</p>
+<ul>
+<li>对于内网压测，默认都要求同 IDC 内发压，减少网络延时的干扰。</li>
+<li>对于公网压测，压测平台在公司 CDN 节点上都有部署 Agent 节点，利用了 CDN 节点剩余计算能力，完成了公网压测能力的建设。</li>
+</ul>
+<h4 id="同城多机房，异地多机房"><a href="#同城多机房，异地多机房" class="headerlink" title="同城多机房，异地多机房"></a>同城多机房，异地多机房</h4><p>压测平台在各个 IDC 都有部署 Agent 集群。各个 IDC 内服务的压测，默认会就近选择压测 Agent，来减少网络延时对压测结果的干扰，使得压测结果更精准，压测问题定位更简单。</p>
+<h4 id="边缘计算节点-Agent"><a href="#边缘计算节点-Agent" class="headerlink" title="边缘计算节点 Agent"></a>边缘计算节点 Agent</h4><p>除了多机房部署之外，压测平台还在边缘计算节点上也部署了压测 Agent，来模拟各种不同地域不同运营商的流量请求，确保流量来源，流量分布更贴近真实情况。在压测平台上可以选择不同地域不同运营商，从全国各个地区发起压测流量。</p>
+<h3 id="压测监控"><a href="#压测监控" class="headerlink" title="压测监控"></a>压测监控</h3><h4 id="客户端监控"><a href="#客户端监控" class="headerlink" title="客户端监控"></a>客户端监控</h4><p>由于公司监控系统，最小时间粒度是 30s，30s 内的数据会聚合成一个点。这个时间粒度对于压测来说是比较难以接受的。因此，压测平台自己搭建了一套客户端监控系统。</p>
+<ol>
+<li>每个 Request 都会以请求开始时间为基准打一个点。</li>
+<li>单个 Agent 内，会将相同任务相同接口，1s 内的打点数据在本地做一次汇总，上报到 Kafka 中。</li>
+<li>监控服务会消费 Kafka 中的打点数据，将多个 Agent 上报的数据进行再次汇总，然后写入数据库中。</li>
+<li>前端监控报表会实时拉取数据库中监控汇总数据，绘制实时监控曲线。</li>
+</ol>
+<p>在监控数据汇总流程中，对于请求响应时间的 PCT99 计算，是比较难处理的：   </p>
+<ul>
+<li>目前压测平台采用的 T-Digest 算法来计算 1 秒内的 PCT99。  </li>
+<li>整个时间段内的 PCT99 的计算，则是以 PCT &amp; AGV 的方式聚合。即单位时间内通过 T-Digest 计算 PCT99；整个时间段内的 PCT99，则是对所有点的 PCT99 取平均值。</li>
+<li>整体计算方案已与公司服务端监控算法对齐，目的是减少客户端监控与服务端监控之间的 Gap，减少压测结果分析的干扰因素。</li>
+</ul>
+<h4 id="服务端监控"><a href="#服务端监控" class="headerlink" title="服务端监控"></a>服务端监控</h4><p>服务端监控，直接接入了Metric系统。</p>
+<ul>
+<li>在压测过程中，压测平台会提供整条链路上所有节点核心指标的监控大盘，并高亮显示可能存在风险的节点，来提供实时预警。</li>
+<li>对于每个节点也都提供了实时的，详细的监控曲线图。</li>
+<li>对于每个节点默认提供CPU、Memory、QPS和Error_Rate等核心监控指标，用户可以在Rhino平台上修改监控配置，增加其他自定义监控指标。</li>
+</ul>
+<h4 id="性能-Profile"><a href="#性能-Profile" class="headerlink" title="性能 Profile"></a>性能 Profile</h4><p>在压测过程中，Rhino 平台还可以实时采集目标服务进程的性能 Profile，并通过火焰图的方式展示出来，方便用户进行性能问题分析和优化，如图。</p>
+<h2 id="压测熔断"><a href="#压测熔断" class="headerlink" title="压测熔断"></a>压测熔断</h2><p>为了应对线上压测风险，Rhino 平台提供两种熔断方式，来应对压测过程中的突发事件，来降低对线上服务造成的影响。</p>
+<h3 id="基于告警监控的熔断"><a href="#基于告警监控的熔断" class="headerlink" title="基于告警监控的熔断"></a>基于告警监控的熔断</h3><p>每个压测任务，都可以关联调用链中任意服务的告警规则。在压测任务执行过程，Rhino 平台会主动监听告警服务。当调用链中有服务出现了告警，会立即停止压测。对于没有关联的告警，Rhino 平台也会记录下来，便于压测问题定位。</p>
+<h3 id="基于-Metric-的熔断"><a href="#基于-Metric-的熔断" class="headerlink" title="基于 Metric 的熔断"></a>基于 Metric 的熔断</h3><p>自定义监控指标及阈值，到达阈值后，也会自动停止压测。目前支持 CPU、Memory、 上游稳定性、错误日志，以及其他自定义指标。</p>
+<h1 id="压测实践"><a href="#压测实践" class="headerlink" title="压测实践"></a>压测实践</h1><h2 id="重大项目支撑"><a href="#重大项目支撑" class="headerlink" title="重大项目支撑"></a>重大项目支撑</h2><p>公司内重大项目的压测，压测平台都要积极参与，全力支撑的。其中，比较典型的项目有春节红包雨等活动。其流量规模巨大，流量突发性强，业务逻辑和网络架构复杂度高等等，都对压测平台提出不小的挑战。</p>
+<p>在春节红包雨活动中，所有用户流量都经过运营商专线接入到网络边缘的汇聚机房，然后经过过滤和验证后，再转发到核心机房。其中各个 IDC 互为备份，其具体流量路线如图。在这里，不仅要验证后端各服务是否能承载预期流程，还要验证各个专线带宽，各个网关带宽及转发能力，各 IDC 承载能力以及之间带宽等等。</p>
+<p><img src="/images/SE/压测平台外网压力测试.png" alt=""></p>
+<p>为此，我们将整个压测拆分成多个阶段，来简化压测复杂性，也降低压测问题定位的难度：</p>
+<ul>
+<li>通过拨测/CDN 压测来分别验证各个汇聚机房的承载能力，带宽，以及网关性能。</li>
+<li>在各个汇聚机房部署压测 Agent，来模拟用户流量分布，来压测部署在核心机房的后端服务性能。</li>
+<li>单接口单实例压测，单接口单机房压测，场景化全链路单机房压测，场景化全链路全资源压测，分阶段来验证后端服务性能。</li>
+<li>最后会通过全网拨测，来模拟真实春节红包雨高峰期流量，整体验证全系统性能。</li>
+</ul>
+<h2 id="线上流量调度"><a href="#线上流量调度" class="headerlink" title="线上流量调度"></a>线上流量调度</h2><p>压测平台还实现了线上流量的定期调度，以达到线上实例自动压测的目的：</p>
+<ul>
+<li>将线上流量逐步调度到目标实例上，来测试服务实例性能极限，并给出实例性能 Profile，分析出实例性能瓶颈。 </li>
+<li>通过长期的流量调度，来观察服务实例性能变化，以监控服务性能的变化趋势。</li>
+<li>通过不同资源水位下的实例性能，来预估出整个集群容量。完成对服务容量预估，以及线上风险评估。</li>
+<li>基于泳道化的流量调度，可以精确的预估服务集群容量。</li>
+</ul>
+<p>其具体实现方案如下：</p>
+<ul>
+<li>修改负载均衡中目标实例的权重 Weight 值，逐步调大该 Weight 值，将更多流量集中打到目标实例，直到达到设置的停止阈值。</li>
+</ul>
+<h2 id="常态化压测"><a href="#常态化压测" class="headerlink" title="常态化压测"></a>常态化压测</h2><p>常态化压测通过周期定时化的自动化全链路压测，来实现以下目标：</p>
+<ul>
+<li>实时监控线上服务集群容量，防止服务性能劣化。</li>
+<li>实时监控线上链路容量，防止链路性能劣化。</li>
+<li>以无人值守的方式自动执行压测任务，并推送压测结果。</li>
+<li>在压测执行过程中，会根据调用链自动完成压测开关开启，发起压测流量。实时监控服务性能指标，并根据 Metric 及告警监控，自动完成压测熔断，以保证压测安全。</li>
+</ul>
+<h2 id="DevOps-流水线中的压测"><a href="#DevOps-流水线中的压测" class="headerlink" title="DevOps 流水线中的压测"></a>DevOps 流水线中的压测</h2><p>服务在上线时，都会经过预发布、线上小流量灰度、线上全量发布。在这个过程中，我们可以通过线上测试 Case 以及灰度发布，来拦截服务线上功能缺陷。但是对于性能缺陷的拦截，却不够有效。</p>
+<p>从线上故障跟踪系统里就可以发现，由于上线前没有做好性能压测，很多性能缺陷都逃逸到了线上。</p>
+<p>为了拦截各种性能缺陷，压测平台完成了 DevOps 平台的打通。将压测服务在 DevOps 平台上注册成一个原子服务，研发人员可以将压测节点编排在任意流水线的任意位置，实现上线前的例行压测。DevOps 流水线中的压测，不仅可以帮助 RD 发现代码中的性能问题，还能与性能基线进行 Diff，来发现代码性能变坏的味道。</p>
+<h1 id="未来发展"><a href="#未来发展" class="headerlink" title="未来发展"></a>未来发展</h1><h2 id="业务深层次定制化"><a href="#业务深层次定制化" class="headerlink" title="业务深层次定制化"></a>业务深层次定制化</h2><p>通用压测平台基本上能满足业务线日常压测需求。但在日常压测支撑过程中，发现不同业务线在压测时，但是仍然有大量的前置和后继工作需要人工来完成：</p>
+<ul>
+<li>如何更进一步降低业务方压测改造的成本？</li>
+<li>如何减少压测环境数据预置成本？</li>
+<li>如何快速完成压测数据清理？</li>
+<li>如何快速定位出性能问题？</li>
+<li>等等</li>
+</ul>
+<h2 id="压测与容量规划"><a href="#压测与容量规划" class="headerlink" title="压测与容量规划"></a>压测与容量规划</h2><ul>
+<li>业务目前资源是否充足，其具体容量是多少；按照目前业务增长，其机器资源还能支撑多久？</li>
+<li>目前服务资源利用如何，是否可以优化，如何更进一步提升资源利用率，降低机器资源成本？</li>
+<li>某大型活动，需要申请多少资源？是否不需要压测，或者自动化利用线上流量数据，或者利用日常压测数据，就可以给出上述问题的结论？</li>
+</ul>
+<blockquote>
+<p>应用系统的扩容相对比较简单，不需要时直接归还资源。但是 DB 等核心资源的扩容其实并不容易，而且资源不可以归还（数据不不可丢失）。因此，控制好资源的利用率和满足压测需求需要找一个平衡点。</p>
+</blockquote>
+<h2 id="压测与-SRE"><a href="#压测与-SRE" class="headerlink" title="压测与 SRE"></a>压测与 SRE</h2><ul>
+<li>如何保证服务稳定性？</li>
+<li>如何监控服务性能劣化并及时预警，限流、超时、重试以及熔断等服务治理措施配置是否合理？</li>
+<li>如何配合混沌测试进行容灾演练，保证服务稳定性？</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/02/10/MYSQL-6-%E6%97%B6%E5%8C%BA%E9%80%A0%E6%88%90%E7%9A%84%E6%97%B6%E9%97%B4%E9%94%99%E4%BD%8D/" rel="prev" title="MySQL 时区造成的时间错位">
+      <i class="fa fa-chevron-left"></i> MySQL 时区造成的时间错位
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E7%B3%BB%E7%BB%9F"><span class="nav-number">2.</span> <span class="nav-text">全链路压测系统</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%93%BE%E8%B7%AF%E6%B2%BB%E7%90%86"><span class="nav-number">2.1.</span> <span class="nav-text">链路治理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E5%89%8D%E5%87%86%E5%A4%87"><span class="nav-number">2.2.</span> <span class="nav-text">压测前准备</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E5%BC%80%E5%85%B3"><span class="nav-number">2.2.1.</span> <span class="nav-text">压测开关</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E6%94%B9%E9%80%A0"><span class="nav-number">2.2.2.</span> <span class="nav-text">服务改造</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1-Mock"><span class="nav-number">2.2.3.</span> <span class="nav-text">服务 Mock</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%8F%8A%E6%B5%81%E9%87%8F%E6%9E%84%E9%80%A0"><span class="nav-number">2.3.</span> <span class="nav-text">数据及流量构造</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%9E%84%E9%80%A0"><span class="nav-number">2.3.1.</span> <span class="nav-text">数据构造</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%81%E9%87%8F%E9%9A%94%E7%A6%BB"><span class="nav-number">2.3.2.</span> <span class="nav-text">流量隔离</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E6%95%B0%E6%8D%AE%E9%9A%94%E7%A6%BB"><span class="nav-number">2.3.2.1.</span> <span class="nav-text">压测数据隔离</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E9%93%BE%E8%B7%AF%E9%80%8F%E4%BC%A0"><span class="nav-number">2.3.2.1.1.</span> <span class="nav-text">请求链路透传</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E9%9A%94%E7%A6%BB"><span class="nav-number">2.3.2.1.2.</span> <span class="nav-text">数据存储隔离</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E8%AE%A1%E5%88%92"><span class="nav-number">2.4.</span> <span class="nav-text">压测计划</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E5%BC%95%E6%93%8E"><span class="nav-number">2.4.1.</span> <span class="nav-text">压测引擎</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E6%89%A7%E8%A1%8C%E6%96%B9%E5%BC%8F"><span class="nav-number">2.4.2.</span> <span class="nav-text">压测执行方式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%9C%80%E5%B0%8F%E8%B0%83%E5%BA%A6%E5%8D%95%E5%85%83"><span class="nav-number">2.4.2.1.</span> <span class="nav-text">最小调度单元</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%99%BA%E8%83%BD%E5%8E%8B%E5%8A%9B%E8%B0%83%E8%8A%82"><span class="nav-number">2.4.2.2.</span> <span class="nav-text">智能压力调节</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E9%93%BE%E8%B7%AF%E6%A8%A1%E6%8B%9F"><span class="nav-number">2.4.3.</span> <span class="nav-text">压测链路模拟</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%90%8C%E5%9F%8E%E5%A4%9A%E6%9C%BA%E6%88%BF%EF%BC%8C%E5%BC%82%E5%9C%B0%E5%A4%9A%E6%9C%BA%E6%88%BF"><span class="nav-number">2.4.3.1.</span> <span class="nav-text">同城多机房，异地多机房</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BE%B9%E7%BC%98%E8%AE%A1%E7%AE%97%E8%8A%82%E7%82%B9-Agent"><span class="nav-number">2.4.3.2.</span> <span class="nav-text">边缘计算节点 Agent</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E7%9B%91%E6%8E%A7"><span class="nav-number">2.4.4.</span> <span class="nav-text">压测监控</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%A2%E6%88%B7%E7%AB%AF%E7%9B%91%E6%8E%A7"><span class="nav-number">2.4.4.1.</span> <span class="nav-text">客户端监控</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%9B%91%E6%8E%A7"><span class="nav-number">2.4.4.2.</span> <span class="nav-text">服务端监控</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%80%A7%E8%83%BD-Profile"><span class="nav-number">2.4.4.3.</span> <span class="nav-text">性能 Profile</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E7%86%94%E6%96%AD"><span class="nav-number">2.5.</span> <span class="nav-text">压测熔断</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E5%91%8A%E8%AD%A6%E7%9B%91%E6%8E%A7%E7%9A%84%E7%86%94%E6%96%AD"><span class="nav-number">2.5.1.</span> <span class="nav-text">基于告警监控的熔断</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E-Metric-%E7%9A%84%E7%86%94%E6%96%AD"><span class="nav-number">2.5.2.</span> <span class="nav-text">基于 Metric 的熔断</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E5%AE%9E%E8%B7%B5"><span class="nav-number">3.</span> <span class="nav-text">压测实践</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%8D%E5%A4%A7%E9%A1%B9%E7%9B%AE%E6%94%AF%E6%92%91"><span class="nav-number">3.1.</span> <span class="nav-text">重大项目支撑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BA%BF%E4%B8%8A%E6%B5%81%E9%87%8F%E8%B0%83%E5%BA%A6"><span class="nav-number">3.2.</span> <span class="nav-text">线上流量调度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E6%80%81%E5%8C%96%E5%8E%8B%E6%B5%8B"><span class="nav-number">3.3.</span> <span class="nav-text">常态化压测</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DevOps-%E6%B5%81%E6%B0%B4%E7%BA%BF%E4%B8%AD%E7%9A%84%E5%8E%8B%E6%B5%8B"><span class="nav-number">3.4.</span> <span class="nav-text">DevOps 流水线中的压测</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9C%AA%E6%9D%A5%E5%8F%91%E5%B1%95"><span class="nav-number">4.</span> <span class="nav-text">未来发展</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%B7%B1%E5%B1%82%E6%AC%A1%E5%AE%9A%E5%88%B6%E5%8C%96"><span class="nav-number">4.1.</span> <span class="nav-text">业务深层次定制化</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E4%B8%8E%E5%AE%B9%E9%87%8F%E8%A7%84%E5%88%92"><span class="nav-number">4.2.</span> <span class="nav-text">压测与容量规划</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%8B%E6%B5%8B%E4%B8%8E-SRE"><span class="nav-number">4.3.</span> <span class="nav-text">压测与 SRE</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">146</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">288</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
