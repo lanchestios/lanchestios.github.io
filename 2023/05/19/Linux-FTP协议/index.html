@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="File Transfer Protocol (FTP) 是一种标准通信协议，用于在计算机网络上将计算机文件从服务器传输到客户端。FTP 建立在客户端-服务器模型架构之上，在客户端和服务器之间使用独立的控制和数据连接。FTP 用户可以使用明文登录协议验证自己。为了保护用户名和密码并加密内容的安全传输，FTP通常 SSL&#x2F;TLS 或替换为 SSH 文件传输协议 (SFTP)。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux FTP协议">
+<meta property="og:url" content="http://example.com/2023/05/19/Linux-FTP%E5%8D%8F%E8%AE%AE/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="File Transfer Protocol (FTP) 是一种标准通信协议，用于在计算机网络上将计算机文件从服务器传输到客户端。FTP 建立在客户端-服务器模型架构之上，在客户端和服务器之间使用独立的控制和数据连接。FTP 用户可以使用明文登录协议验证自己。为了保护用户名和密码并加密内容的安全传输，FTP通常 SSL&#x2F;TLS 或替换为 SSH 文件传输协议 (SFTP)。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Linux/FTP-主动模式.png">
+<meta property="og:image" content="http://example.com/images/Linux/FTP-被动模式.png">
+<meta property="og:image" content="http://example.com/images/Linux/Linux-FTP协议-主动模式传入内网IP.png">
+<meta property="og:image" content="http://example.com/images/Linux/Linux-FTP协议-主动模式抓包.png">
+<meta property="og:image" content="http://example.com/images/Linux/Linux-FTP协议-被动模式抓包.png">
+<meta property="article:published_time" content="2023-05-19T02:30:45.000Z">
+<meta property="article:modified_time" content="2023-05-19T02:39:45.453Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Linux">
+<meta property="article:tag" content="Socket">
+<meta property="article:tag" content="FTP">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Linux/FTP-主动模式.png">
+
+<link rel="canonical" href="http://example.com/2023/05/19/Linux-FTP%E5%8D%8F%E8%AE%AE/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Linux FTP协议 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/05/19/Linux-FTP%E5%8D%8F%E8%AE%AE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux FTP协议
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-05-19 10:30:45 / Modified: 10:39:45" itemprop="dateCreated datePublished" datetime="2023-05-19T10:30:45+08:00">2023-05-19</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux/" itemprop="url" rel="index"><span itemprop="name">Linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong>File Transfer Protocol</strong> (<strong>FTP</strong>) 是一种标准通信协议，用于在计算机网络上将计算机文件从服务器传输到客户端。FTP 建立在客户端-服务器模型架构之上，在客户端和服务器之间使用独立的控制和数据连接。FTP 用户可以使用明文登录协议验证自己。为了保护用户名和密码并加密内容的安全传输，FTP通常 SSL/TLS 或替换为 SSH 文件传输协议 (SFTP)。<br><span id="more"></span></p>
+<h1 id="通信和数据传输"><a href="#通信和数据传输" class="headerlink" title="通信和数据传输"></a>通信和数据传输</h1><p>FTP 可以以主动或被动模式运行，这决定了数据连接的建立方式。</p>
+<p>FTP 基于 TCP 的服务，并不基于 UDP。因此 FTP 拥有两个端口，一个数据端口（通常是端口 20）和一个控制端口（通常是端口 21）。</p>
+<h2 id="主动模式下的-FTP"><a href="#主动模式下的-FTP" class="headerlink" title="主动模式下的 FTP"></a>主动模式下的 FTP</h2><p>在主动模式 FTP 中，客户端从一个随机的非特权端口 (N &gt; 1023) 连接到 FTP 服务器的命令端口，端口 21。然后，客户端开始监听端口 N+1 并将 FTP 命令发送到 FTP 服务器 <code>PORT N+1</code>。然后，服务器将从其本地数据端口（端口 20）连接回客户端指定的数据端口。</p>
+<p><img src="/images/Linux/FTP-主动模式.png" alt=""></p>
+<ol>
+<li>客户端的命令端口联系服务器的命令端口并发送命令 <code>PORT 1027</code></li>
+<li>然后，服务器将 ACK 发送回客户端的命令端口</li>
+<li>服务器在其本地数据端口上启动到客户端先前指定的数据端口的连接</li>
+<li>客户端发回一个 ACK​​</li>
+</ol>
+<blockquote>
+<p><strong>主动模式 FTP 的客户端上的问题</strong><br>FTP 客户端并不实际连接到服务器的数据端口——它只是告诉服务器它正在监听的端口，然后服务器连接回客户端的指定端口。从客户端防火墙来看，这是一个外部系统启动到内部客户端的连接，它通常需要被阻止的不安全行为。</p>
+</blockquote>
+<h2 id="被动模式下的-FTP"><a href="#被动模式下的-FTP" class="headerlink" title="被动模式下的 FTP"></a>被动模式下的 FTP</h2><p>为了解决服务器发起与客户端连接的问题，开发了一种不同的 FTP 连接方法。这被称为被动模式，或者 <code>PASV</code>，在客户端用来告诉服务器它处于被动模式的命令之后。</p>
+<p>在被动模式 FTP 中，客户端启动到服务器的两个连接，解决了防火墙过滤从服务器到客户端的传入数据端口连接的问题。打开 FTP 连接时，客户端会在本地打开两个随机的非特权端口（N &gt; 1023 和 N+1）。<code>PORT</code> 第一个端口在端口 21 上联系服务器，但客户端不会发出命令并允许服务器连接回其数据端口，而是发出 <code>PASV</code> 命令。这样做的结果是服务器随后打开一个随机的非特权端口 (P &gt; 1023) 并发送 <code>P</code> 回客户端以响应 <code>PASV</code> 命令。客户端然后发起从端口 N+1 到服务器上的端口 P 的连接以传输数据。</p>
+<p><img src="/images/Linux/FTP-被动模式.png" alt=""></p>
+<ol>
+<li>客户端在命令端口上联系服务器并发出命令 <code>PASV</code></li>
+<li>服务器回复 <code>PORT 2024</code>，告诉客户端它正在监听哪个端口以进行数据连接</li>
+<li>客户端启动从其数据端口到指定服务器数据端口的数据连接</li>
+<li>服务器向客户端的数据端口发回一个 ACK​​</li>
+</ol>
+<blockquote>
+<p><strong>被动模式 FTP 的服务端上的问题</strong><br>虽然被动模式 FTP 解决了客户端的许多问题，但它在服务器端带来了一系列问题。最大的问题是需要允许任何远程连接到服务器上的高编号端口。幸运的是，许多 FTP 守护程序（包括流行的 WU-FTPD）允许管理员指定 FTP 服务器将使用的端口范围。</p>
+<p>从服务器端防火墙的角度来看，要支持被动模式 FTP，需要打开以下通信通道：</p>
+<ol>
+<li>来自任何地方的 FTP 服务器的端口 21（客户端发起连接）</li>
+<li>FTP 服务器的端口 21 到端口 &gt; 1023（服务器响应客户端的控制端口）</li>
+<li>来自任何地方的 FTP 服务器的端口 &gt; 1023（客户端启动数据连接到服务器指定的随机端口）</li>
+<li>FTP 服务器的端口 &gt; 1023 到远程端口 &gt; 1023（服务器向客户端的数据端口发送 ACK（和数据））</li>
+</ol>
+</blockquote>
+<h2 id="NAT-和防火墙穿越"><a href="#NAT-和防火墙穿越" class="headerlink" title="NAT 和防火墙穿越"></a>NAT 和防火墙穿越</h2><p>简而言之，PORT 用于让服务器连接到客户端，而 PASV 用于让客户端连接到服务器。由于客户端连接到服务器以建立控制连接，因此客户端应该连接到服务器以建立数据连接似乎是合乎逻辑的，这意味着 PASV 将是首选（同时消除了最大的问题使用 FTP 和防火墙）。迷惑的是，实现者选择在 FTP 规范中指定 PORT 应该是首选，而 PASV 根本不需要由 FTP 客户端程序实现。</p>
+<h3 id="PORT-关于路由设备的问题"><a href="#PORT-关于路由设备的问题" class="headerlink" title="PORT 关于路由设备的问题"></a>PORT 关于路由设备的问题</h3><p>FTP 客户端程序选择使用 PORT 来协商 FTP 数据连接。会引发以下两个问题：</p>
+<ol>
+<li>服务器必须是返回到客户端 IP 地址的连接。对于限制性防火墙，最好禁止所有传入连接，因此使用 PORT 会导致从服务器传入的连接失败。</li>
+<li>当客户端程序使用网络地址转换隐藏在内部网络上的路由设备后面时，当使用 PORT 时，客户端会告诉外部网络上的服务器连接到客户端内部网络上的地址。这基本上会导致在服务端连接客户端时连接直接失败或永久超时。</li>
+</ol>
+<p>解决方案如下：</p>
+<ol>
+<li>客户端用户应将其 FTP 客户端程序配置为使用 PASV 而不是 PORT。如果服务器端有类似的限制性防火墙，使用被动模式可能无法解决问题。</li>
+<li>更好的解决方案是客户端网络的网络管理员使用高质量的网络地址转换软件。设备可以跟踪 FTP 数据连接，当专用网络上的客户端使用带有内部网络地址的“PORT”时，设备应动态重写包含 PORT 和 IP 地址的数据包并更改地址，使其指向路由设备的外部 IP 地址。然后，设备必须将从远程 FTP 服务器传入的连接路由回客户端的内部网络地址。</li>
+</ol>
+<h3 id="PASV-关于防火墙的问题"><a href="#PASV-关于防火墙的问题" class="headerlink" title="PASV 关于防火墙的问题"></a>PASV 关于防火墙的问题</h3><p>当 FTP 服务器位于防火墙后面时，当 FTP 客户端尝试使用被动模式连接到FTP 服务器计算机上的临时端口号（临时随机端口号）时，可能会出现问题。最常见的问题是当 FTP 服务器后面的防火墙很严格时，即防火墙只允许少数几个众所周知的端口号进入，而拒绝访问所有其他端口。</p>
+<p>解决方案如下：</p>
+<ol>
+<li>服务器网络的网络管理员可以将防火墙配置为允许整个临时端口范围。需要打开的临时端口范围取决于运行 FTP 服务器软件的服务器机器的配置 —— 而不是防火墙上的临时端口！</li>
+<li>服务器网络的网络管理员可以查阅防火墙供应商的文档，看看是否可以动态监控 FTP 连接并在检测到被动 FTP 连接时动态打开端口。这类似于智能网络地址转换软件在客户端对 PORT 所做的 —— 监控 FTP 控制连接，当检测到来自 FTP 会话的包含 “PASV” 的数据包时，防火墙会自动打开该端口。</li>
+</ol>
+<h3 id="PASV-关于内部网络上的-FTP-服务器的问题"><a href="#PASV-关于内部网络上的-FTP-服务器的问题" class="headerlink" title="PASV 关于内部网络上的 FTP 服务器的问题"></a>PASV 关于内部网络上的 FTP 服务器的问题</h3><p>当客户端试图访问受路由设备保护的内部网络上的 FTP 服务器时。因为来自 PASV 的服务器响应包括 IP 地址和端口号，如果此 IP 地址对应于专用网络，则客户端将无法连接到该专用地址。</p>
+<p>从上面的 PASV 示例中，我们有：</p>
+<blockquote>
+<p><strong>服务器：</strong>  227进入被动模式（172,16,3,4,204,173）</p>
+</blockquote>
+<p>如果保持不变，客户端将尝试连接到 IP 地址 172.16.3.4 上的端口 52397。如果客户端不在专用内部网络上，则客户端在尝试连接到该地址时会超时，而实际上它应该连接到路由设备的外部 IP 地址。</p>
+<p>解决方案是服务器网络的网络管理员可以查阅路由设备供应商的文档，看看是否可以动态监控FTP连接，并为包含 PASV 响应的数据包动态替换 IP 地址规范。</p>
+<p>当 FTP 服务器回复 PASV 请求时：</p>
+<blockquote>
+<p><strong>服务器：</strong>  227进入被动模式（172,16,3,4,204,173）</p>
+</blockquote>
+<p>路由设备应该像这样重写数据包，假设外部地址是 17.254.0.91：</p>
+<blockquote>
+<p><strong>服务器：</strong>  227进入被动模式（17,254,0,91,204,173）</p>
+</blockquote>
+<p>然后，远程客户端将尝试连接到位于 17.254.0.91:52397 的路由设备。此示例中的路由设备随后将转发远程客户端与 IP 地址为 172.16.3.4 的内部 FTP 服务器之间此连接的所有流量。</p>
+<h3 id="PASV-关于负载平衡路由器后面的-FTP-服务器的问题"><a href="#PASV-关于负载平衡路由器后面的-FTP-服务器的问题" class="headerlink" title="PASV 关于负载平衡路由器后面的 FTP 服务器的问题"></a>PASV 关于负载平衡路由器后面的 FTP 服务器的问题</h3><p>负载平衡路由器可以允许管理员公开单个 IP 地址并在多个相同的从属服务器之间委托连接。这类似于廉价磁盘冗余阵列 (RAID)，只是阵列不是磁盘而是 TCP/IP 服务器。</p>
+<p>负载平衡为 FTP 带来了两个挑战。第一个是每个 FTP 会话都有多个连接，一个控制连接和一个或多个数据连接。要使 PASV 数据连接正常工作，负载平衡器必须能够将连接从客户端发送到处理控制连接的同一个从属服务器。与第一个问题相关的第二个问题是，当从属服务器回复 PASV 响应时，远程客户端必须可以访问 PASV 响应的 IP 地址。</p>
+<p>解决方案如下：</p>
+<ol>
+<li>服务器网络的网络管理员可以给每个从服务器一个有效的外部访问 IP 地址。负载均衡器的外部 IP 地址可以用作首选地址，但是让每个从属服务器都有自己的外部 IP 地址将允许 PASV 数据连接直接连接到从属服务器，而不需要从属服务器的流量通过负载均衡器。这也意味着负载均衡器不需要对 FTP 做任何特殊的自动处理。</li>
+<li>服务器网络的网络管理员可以查阅负载平衡路由器供应商的文档，看看是否可以自动处理 FTP 连接，以便动态重写 PASV 回复以包含负载平衡器的外部 IP 地址。</li>
+<li>如果路由设备不够智能，无法专门处理 FTP 会话，但能够始终将流量从相同的远程客户端 IP 地址转发到相同的内部服务器 IP 地址，那么服务器的网络管理员网络可能能够配置 FTP 服务器软件来欺骗它用于 PASV 回复的地址。</li>
+</ol>
+<p>好消息是负载平衡路由器相对较新，大多数供应商都知道 FTP 和其他协议需要特殊处理。因此，通过负载均衡器的配置，FTP 流量很可能可以从负载均衡器中分流出去。</p>
+<h3 id="防火墙导致有效-FTP-会话过早超时的问题"><a href="#防火墙导致有效-FTP-会话过早超时的问题" class="headerlink" title="防火墙导致有效 FTP 会话过早超时的问题"></a>防火墙导致有效 FTP 会话过早超时的问题</h3><p>路由设备长期以来一直不恰当地删除它们管理的 TCP/IP 连接，主要是因为它们对连接的限制比 TCP/IP 协议本身更大。例如，允许没有未完成的未决确认的 TCP/IP 连接无限期空闲，除非连接的一端或两端同意使用 TCP/IP“保持活动”探测。如果未启用 Keep Alive 探测，则 TCP/IP 连接将永久打开并可用于发送和接收，直到它关闭或重置（例如，当一端的主机重新启动时）。</p>
+<p>由于路由设备通常负责管理许多内部主机的 TCP/IP 连接，因此它需要对其管理的连接数设置合理的限制。因此，它会在可能的时候尝试回收连接，一种常见的方法是在连接上放置一个活动计时器，并在计时器显示连接已“长时间”空闲时删除连接。不幸的是，当连接超时时，如果连接试图恢复活动，路由设备通常会丢弃传入的数据包。发生这种情况时，发送主机的客户端程序将锁定直到超时。如果路由设备足够友好地向发送主机发送一个带有错误消息的回复，而不是丢弃数据包并忽略发送主机，</p>
+<p>由于 FTP 协议使用两个连接，一个用于与客户端通信的控制连接，另一个用于传输数据的连接，因此有两倍的可能性被不耐烦的防火墙超时。发生此问题的最常见实例是在长时间文件传输期间发挥作用。当传输开始时（在控制连接上），控制连接空闲直到传输（在数据连接上）完成。如果路由设备对 FTP 协议没有特殊情况并且数据连接花费的时间超过路由设备的空闲超时时间，则控制连接将超时。这是一个严重的问题，因为客户端程序可能希望继续使用 FTP 会话，例如下载其他文件。</p>
+<p>即使客户端程序计划结束会话，FTP 也要求客户端程序向服务器发送一条消息（“QUIT”），指示应该关闭连接，然后服务器需要回复另一条消息，指示会议正式闭幕。其后果是客户端程序可能会锁定等待对“QUIT”消息的回复，因为防火墙使会话超时，客户端和服务器都不知道服务器将不会收到该消息。针对这种特定情况的解决方案（部分（但不是全部）FTP 客户端程序会这样做）是在对“QUIT”消息的回复上放置一个非常短的超时时间，或者简单地关闭其 FTP 会话结束（这违反了 FTP 协议，但却是事实上的行为，并被普遍接受）。</p>
+<p>这个问题的一般解决方案是路由设备需要对 FTP 协议进行特殊处理，当 FTP 会话的数据连接上有活动时，除了标记数据连接外，还必须将 FTP 会话的控制连接标记为活动作为活跃。不幸的是，截至撰写本文时，此解决方案尚未得到广泛实施。</p>
+<p>另一种解决方案是在控制连接上启用 TCP/IP“保持活动”功能。当应用程序（例如 FTP 客户端或服务器程序）启用此功能时，如果连接空闲了预设时间，TCP/IP 堆栈将自动向另一端的 TCP/IP 堆栈发送心跳消息，如果没有收到回复，连接将在主机上的 TCP 堆栈处正确超时，而不是在防火墙处。这样做的问题是，由于 TCP/IP 协议的遗留行为（几十年前，记住！）发送 Keep Alive 探测之前的默认时间通常设置为几个小时！因此，在默认情况下，在 TCP 堆栈发送心跳消息之前，连接必须空闲几个小时，</p>
+<p>为了使 Keep Alive 功能在实际条件下工作，必须将其配置为在路由设备的空闲超时开始之前开始发送探测。例如，如果防火墙配置为在 15 分钟后丢弃空闲连接，您可能希望您的 Keep Alive 探测器将在 10 分钟不活动后发送。如果连接真的超时，它不会收到对心跳消息的回复，然后将被 TCP 堆栈正确关闭，如果收到心跳回复，防火墙将（应该！）将连接标记为否闲置时间更长。</p>
+<p>只要 FTP 会话的一侧启用 Keep Alive 并将心跳计时器配置为合理的值，就应该可以解决此问题。但令人惊讶的是，配置心跳计时器通常不是一件容易的事，如果它是可配置的话。通常，需要调整操作系统的内核或 TCP 堆栈。应用程序只能启用Keep Alive 模式，而不能指定何时触发。因此，除非操作系统提供配置定时器的机制，并且运行应用程序的机器的系统管理员费心配置定时器，否则启用“Keep Alive”模式的程序不太可能解决问题。</p>
+<h1 id="部署环境时问题排查"><a href="#部署环境时问题排查" class="headerlink" title="部署环境时问题排查"></a>部署环境时问题排查</h1><blockquote>
+<p>初始代码，在本地运行一切正常，直到部署轻舟后测试</p>
+</blockquote>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; FTPClient 基于 common-net 3.3
+FTPClient ftp &#x3D; new FTPClient();  
+ftp.connect(host, 21);  
+ftp.login(username, password);
+ftp.retrieveFile(remoteFilePath, new FileOutputStream(localFilePath));  
+ftp.logout();  
+ftp.disconnect();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>坑1: 忘记设超时时间，默认无限超时</strong></p>
+<p>发现程序运行长时间无响应，通过 arthus 的 <code>thread</code> 或 <code>trace</code> 排查到线程阻塞至监听网络端口。这时反应过来需要设置超时时间。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">FTPClient ftp &#x3D; new FTPClient();  
+ftp.setConnectTimeout(20 * 1000);  
+ftp.setDefaultTimeout(20 * 1000);  
+ftp.setDataTimeout(20 * 1000);  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>但并不解决监听网络端口读取不到东西的问题，后台开始报 <code>IOException: Read Timeout</code>。询问运维公司对出口的端口有限制，只开放 40000-50000 及个别几个其他功能性端口。因此根据 FTPClient 的源代码找出设置活动端口范围的 API，于是代码如下。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">FTPClient ftp &#x3D; new FTPClient();  
+ftp.setConnectTimeout(20 * 1000);  
+ftp.setDefaultTimeout(20 * 1000);  
+ftp.setDataTimeout(20 * 1000);  
+
+ftp.setActivePortRange(40000, 50000);
+
+ftp.connect(host, 21);  
+ftp.login(username, password);
+ftp.retrieveFile(remoteFilePath, new FileOutputStream(localFilePath));  
+ftp.logout();  
+ftp.disconnect();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>坑2: FTP 在连接/登陆后会重置端口范围，需要在登陆后设置</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">FTPClient ftp &#x3D; new FTPClient();  
+ftp.setConnectTimeout(20 * 1000);  
+ftp.setDefaultTimeout(20 * 1000);  
+ftp.setDataTimeout(20 * 1000);  
+ftp.connect(host, 21);  
+ftp.login(username, password);
+
+ftp.setActivePortRange(40000, 50000);
+
+ftp.retrieveFile(remoteFilePath, new FileOutputStream(localFilePath));  
+ftp.logout();  
+ftp.disconnect();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>坑3: 主动模式不可用，因为 PORT 传入的是内网 IP，在 NAT 无特殊解析的情况下，FTP 服务端是无法访问到公司内部的内网 IP 的</strong></p>
+<p><img src="/images/Linux/Linux-FTP协议-主动模式传入内网IP.png" alt=""></p>
+<p>但设置完成后仍然不可用，查询百度百科，发现 FTP 有两种模式，即上述的主动和被动模式。但此时完全不了解原理，改了浅试一下。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">FTPClient ftp &#x3D; new FTPClient();  
+ftp.setConnectTimeout(20 * 1000);  
+ftp.setDefaultTimeout(20 * 1000);  
+ftp.setDataTimeout(20 * 1000);  
+
+ftp.enterLocalPassiveMode();
+
+ftp.connect(host, 21);  
+ftp.login(username, password);
+ftp.setActivePortRange(40000, 50000);
+ftp.retrieveFile(remoteFilePath, new FileOutputStream(localFilePath));  
+ftp.logout();  
+ftp.disconnect();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>其抓包内容如下:</p>
+<p><img src="/images/Linux/Linux-FTP协议-主动模式抓包.png" alt=""></p>
+<p>发现仍然为 PORT 模式。</p>
+<p><strong>坑4: FTP 在连接/登陆后会重置模式，且默认为主动模式，需要在登陆后设置</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">FTPClient ftp &#x3D; new FTPClient();  
+ftp.setConnectTimeout(20 * 1000);  
+ftp.setDefaultTimeout(20 * 1000);  
+ftp.setDataTimeout(20 * 1000);  
+ftp.connect(host, 21);  
+ftp.login(username, password);
+ftp.setActivePortRange(40000, 50000);
+
+ftp.enterLocalPassiveMode();
+
+ftp.retrieveFile(remoteFilePath, new FileOutputStream(localFilePath));  
+ftp.logout();  
+ftp.disconnect();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>坑5: 未知的端口重用，因为没有重试所以最差情况下连续四次失败</strong></p>
+<p><img src="/images/Linux/Linux-FTP协议-被动模式抓包.png" alt=""></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux/" rel="tag"># Linux</a>
+              <a href="/tags/Socket/" rel="tag"># Socket</a>
+              <a href="/tags/FTP/" rel="tag"># FTP</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/03/SE-%E5%85%A8%E9%93%BE%E8%B7%AF%E5%8E%8B%E6%B5%8B%E5%BB%BA%E8%AE%BE/" rel="prev" title="架构设计 全链路压测平台建设">
+      <i class="fa fa-chevron-left"></i> 架构设计 全链路压测平台建设
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%80%9A%E4%BF%A1%E5%92%8C%E6%95%B0%E6%8D%AE%E4%BC%A0%E8%BE%93"><span class="nav-number">1.</span> <span class="nav-text">通信和数据传输</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BB%E5%8A%A8%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84-FTP"><span class="nav-number">1.1.</span> <span class="nav-text">主动模式下的 FTP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A2%AB%E5%8A%A8%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84-FTP"><span class="nav-number">1.2.</span> <span class="nav-text">被动模式下的 FTP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NAT-%E5%92%8C%E9%98%B2%E7%81%AB%E5%A2%99%E7%A9%BF%E8%B6%8A"><span class="nav-number">1.3.</span> <span class="nav-text">NAT 和防火墙穿越</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#PORT-%E5%85%B3%E4%BA%8E%E8%B7%AF%E7%94%B1%E8%AE%BE%E5%A4%87%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.1.</span> <span class="nav-text">PORT 关于路由设备的问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PASV-%E5%85%B3%E4%BA%8E%E9%98%B2%E7%81%AB%E5%A2%99%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.2.</span> <span class="nav-text">PASV 关于防火墙的问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PASV-%E5%85%B3%E4%BA%8E%E5%86%85%E9%83%A8%E7%BD%91%E7%BB%9C%E4%B8%8A%E7%9A%84-FTP-%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.3.</span> <span class="nav-text">PASV 关于内部网络上的 FTP 服务器的问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PASV-%E5%85%B3%E4%BA%8E%E8%B4%9F%E8%BD%BD%E5%B9%B3%E8%A1%A1%E8%B7%AF%E7%94%B1%E5%99%A8%E5%90%8E%E9%9D%A2%E7%9A%84-FTP-%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.4.</span> <span class="nav-text">PASV 关于负载平衡路由器后面的 FTP 服务器的问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%98%B2%E7%81%AB%E5%A2%99%E5%AF%BC%E8%87%B4%E6%9C%89%E6%95%88-FTP-%E4%BC%9A%E8%AF%9D%E8%BF%87%E6%97%A9%E8%B6%85%E6%97%B6%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.5.</span> <span class="nav-text">防火墙导致有效 FTP 会话过早超时的问题</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%83%A8%E7%BD%B2%E7%8E%AF%E5%A2%83%E6%97%B6%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5"><span class="nav-number">2.</span> <span class="nav-text">部署环境时问题排查</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">147</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">28</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">289</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
