@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文针对 Flink 的架构进行分析">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink 架构">
+<meta property="og:url" content="http://example.com/2023/05/27/Flink-1-%E6%9E%B6%E6%9E%84/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文针对 Flink 的架构进行分析">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/有界和无界数据流.png">
+<meta property="og:image" content="http://example.com/images/SE/窗口计算分类.png">
+<meta property="og:image" content="http://example.com/images/SE/事件时间与处理时间关系图.png">
+<meta property="og:image" content="http://example.com/images/SE/Chandy-Lamport算法示意图.png">
+<meta property="og:image" content="http://example.com/images/SE/ABS算法流程.png">
+<meta property="og:image" content="http://example.com/images/SE/Flink集群架构图.png">
+<meta property="article:published_time" content="2023-05-27T06:22:55.000Z">
+<meta property="article:modified_time" content="2023-05-27T06:30:24.497Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/有界和无界数据流.png">
+
+<link rel="canonical" href="http://example.com/2023/05/27/Flink-1-%E6%9E%B6%E6%9E%84/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink 架构 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/05/27/Flink-1-%E6%9E%B6%E6%9E%84/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink 架构
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-05-27 14:22:55 / Modified: 14:30:24" itemprop="dateCreated datePublished" datetime="2023-05-27T14:22:55+08:00">2023-05-27</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文针对 Flink 的架构进行分析<br><span id="more"></span></p>
+<h1 id="DataFlow-模型"><a href="#DataFlow-模型" class="headerlink" title="DataFlow 模型"></a>DataFlow 模型</h1><p>任何一种有广泛实用价值的方法都必须提供简单、强大的工具，可以为具体的使用案例平衡数据的准确性、延迟程度和处理成本。最后，Google 提出了一个统一的模型 —— DataFlow。DataFlow 能够对无界、无序的数据源按数据本身的特征进行窗口计算，得到基于事件发生时间的有序结果，并能在准确性、延迟程度和处理成本之间取得平衡。</p>
+<p>分离数据处理的计算逻辑及对逻辑的物理实现，使得系统对批处理、微批处理、流计算引擎的选择简化为对准确性、延迟程度和处理成本的选择。为解决以上问题，DataFlow 具备以下重要概念。</p>
+<p><strong>1. 无界、有界与流处理、批处理</strong></p>
+<p>在描述无限和有限数据集时，人们更愿意使用无界和有界这样的描述，而不是流处理数据和批处理数据，这是因为流处理和批处理意味着使用特定的执行引擎。如下图所示，在现实场景中，无界数据集可以通过批处理系统反复调度来处理，而设计良好的流处理系统也可以完美地处理有界数据集。从这个角度来看，区分流处理和批处理的实际意义不大，这为后来 Flink 批流一体架构提供了理论基础。</p>
+<p><img src="/images/SE/有界和无界数据流.png" alt=""></p>
+<p><strong>2. 窗口计算</strong></p>
+<p>DataFlow 提供了 3 种窗口计算类型，支持窗口把一个数据集切分为有限的数据片，以便于聚合处理。对于无界的数据，有些操作需要窗口，以定义大多数聚合操作需要的边界；另一些则不需要窗口（如过滤、映射、内链接等）。对于有界的数据，窗口是可选的，不过很多情况下仍然是一种有效的语义概念。</p>
+<p><img src="/images/SE/窗口计算分类.png" alt=""></p>
+<ul>
+<li>固定窗口（fixed）：按固定窗口大小定义，如小时窗口或天窗口。固定窗口一般都是对齐窗口，也就是说，每个窗口包含对应时间范围内的所有数据。有时为了把窗口计算的负荷均匀分摊到整个时间范围内，会在窗口边界时间加上一个随机数，这样窗口就变成了不对齐窗口。</li>
+<li>滑动窗口（sliding）：按窗口大小和滑动周期定义，如小时窗口，每一分钟滑动一次。滑动周期一般小于窗口，也就是窗口有相互重合之处。滑动窗口一般也是对齐的。固定窗口可以看作滑动窗口的一个特例，即窗口大小和滑动周期大小相等。</li>
+<li>会话窗口（session）：会话是在数据的子集上捕捉一段时间内的活动。一般来说，会话窗口按超时时间定义，任何发生在超时时间以内的事件都被认为属于同一个会话。会话窗口是非对齐窗口，在上图中，窗口 2 只包含 Key 1，窗口 3 只包含 Key 2，而窗口 1 和 4 都包含了 Key 3。假设 Key 是用户 ID，两次活动之间的间隔超过了超时时间，则系统需要重新定义一个会话窗口。</li>
+</ul>
+<p><strong>3. 时间域与水位线机制</strong></p>
+<p>如下图所示，将时间域分为两种类型，即事件时间（event time）和处理时间（processing time），其中事件时间指事件发生时的系统时间；处理时间指数据处理管道在处理数据时，一个事件被数据处理系统观察到的时间，即数据处理系统的时间。</p>
+<p><img src="/images/SE/事件时间与处理时间关系图.png" alt=""></p>
+<p>事件时间和处理时间的主要区别在于，事件时间是永远不变的，而事件的处理时间会随着事件在数据管道中被处理而变化。在数据处理过程中，因为系统本身受到一些现实影响（通信延迟、调度算法、处理时长、管道中间数据序列化等），所以会导致这两个时间概念存在差值且动态波动。借助全局数据处理进度的标记或水位线（Watermark），可以有效处理迟到乱序的事件，得到正确的数据处理结果。</p>
+<h1 id="分布式异步快照算法"><a href="#分布式异步快照算法" class="headerlink" title="分布式异步快照算法"></a>分布式异步快照算法</h1><p>基于 DataFlow 模型实现的计算框架虽然能够进行大规模无界乱序数据处理并平衡好准确性、延迟程度和处理成本三者之间的关系，但在数据处理过程中，保障数据一致性同样重要，尤其对于一些数据处理要求比较高的场景。在 Flink 中，通过 checkpoint 机制可以保证数据的一致性。开启 checkpoint 为 Exactly-Once 模式时，能够保证数据不重复或不丢失。Flink 中的 checkpoint 机制由 Chandy 和 Lamport 两位科学家提出。Chandy-Lamport 算法通过抽象分布式系统模型描述了一种简单、直接但是非常有效的分布式快照算法。</p>
+<h2 id="Chandy-Lamport-算法设计"><a href="#Chandy-Lamport-算法设计" class="headerlink" title="Chandy-Lamport 算法设计"></a>Chandy-Lamport 算法设计</h2><p>分布式异步快照算法应用到流式系统中就是确定一个全局快照（global snapshot），当系统出现错误时，将各个节点根据上一次的全局快照恢复整个系统。这里的全局快照我们也可以理解为全局状态（global state）。全局状态在系统进行故障排除（failure recovery）的时候非常有用，它也是分布式计算系统中容错处理的理论基础。对于分布式系统来讲，想要获取全局状态，需要面临如下挑战与问题。</p>
+<ul>
+<li>进程节点只能记录各自的状态，即本地状态信息，通过网络传递信息，形成各个进程之间的全局状态。</li>
+<li>所有的进程不可能在同一时间立即精确记录各自的状态，除非它们能够获取相同的时钟，但显然各节点时钟不可能完全一致。对于普通的机器来讲，晶体振动频率是有偏差的，不存在完全同步的可能性。</li>
+<li>同时做到全局状态过程中持续数据计算，对于 STW（Stop The World，暂停当前所有运行的线程）的做法是没有意义的。</li>
+</ul>
+<p>Chandy-Lamport 算法是如何解决上述问题的呢？为了定义分布式系统的全局状态，首先将分布式系统简化成有限个进程与进程的组合，也就是有向无环图，其中节点是进程，边是 channel，并且这些进程运行在不同的物理机器上。分布式系统的全局状态由进程的状态和 channel 中的信息（message）组成，而这些信息也是分布式异步快照算法需要记录的。下图所示为 Chandy-Lamport 算法示意图，从中可以看出，整个分布式系统的全局状态包括如下 3 个过程。</p>
+<p><img src="/images/SE/Chandy-Lamport算法示意图.png" alt=""></p>
+<ol>
+<li>系统中的任意一个进程发起创建快照操作<ol>
+<li>进程 P1 发起快照操作，记录进程 P1 的状态，同时生产一个标识信息 marker。注意这里的 marker 和进程之间通信的信息不同。</li>
+<li>将 marker 信息通过 output channel 发送给系统的其他进程，上图中是进程 P2</li>
+<li>P1 开始记录所有 input channel 接收到的信息并写入 M1 存储。</li>
+</ol>
+</li>
+<li>系统中其他进程开始逐个创建 snapshot 操作<ol>
+<li>进程 P2 通过 input channel C12 接收 P1 发送的 marker 信息。</li>
+<li>如果 P2 没有记录自己的进程状态，则记录当前进程状态（上图中用深色框表示），同时将 channel C12 置为空，并向 output channel 发送 marker 信息；否则，记录其他 channel 在收到 marker 之前从 input channel 收到的所有信息。</li>
+</ol>
+</li>
+<li>终止并完成当前的快照操作</li>
+</ol>
+<p>在所有进程都收到 marker 信息并记录自己的状态和 channel 消息后，终止整个 snapshot 过程。此时分布式系统本次的 snapshot 操作结束，等待下一次触发和执行。</p>
+<h2 id="异步屏障快照（Asynchronous-Barrier-Snapshotting，ABS）算法改进"><a href="#异步屏障快照（Asynchronous-Barrier-Snapshotting，ABS）算法改进" class="headerlink" title="异步屏障快照（Asynchronous Barrier Snapshotting，ABS）算法改进"></a>异步屏障快照（Asynchronous Barrier Snapshotting，ABS）算法改进</h2><p>2015年，Flink 官方发布了一篇名为 “Lightweight Asynchronous Snapshots for Distributed Dataflows” 的论文，旨在改进 Chandy-Lamport 分布式异步快照算法。该论文主要对 Chandy-Lamport 算法进行了以下两个方面的改进。</p>
+<ul>
+<li>在 Chandy-Lamport 算法中，为了实现全局状态一致，需要停止流处理程序，直到快照完成，这会对系统性能有非常大的影响。</li>
+<li>每次快照的内容包含传输过程中所有的内容，导致每次快照的数据量过大，进而影响系统的整体性能。</li>
+</ul>
+<p>可以看出，Chandy-Lamport 算法虽然能够实现全局状态一致，但或多或少牺牲了程序的性能，因此不太适合在工程上实现。异步屏障快照算法对其进行了改造，并应用在 Flink 项目中，其核心思想是在 input source 节点插入 barrier 事件，替代 Chandy-Lamport 算法中的 marker，通过控制 barrier 事件同步实现快照备份，最终实现 Exactly-Once 语义。</p>
+<p>ABS 算法是 Chandy-Lamport 算法的变体，只是在执行上有些差别。Flink 的论文分别针对有向无环和有向有环两种计算拓扑图提出了不同的算法，后者是在前者基础上进行的修改。在实际应用，尤其是在 Flink 系统中，大多数数据流拓扑都是有向无环图。下图所示为 DAG 的 ABS 算法执行流程，具体说明如下。</p>
+<ol>
+<li>barrier 事件被周期性地注入所有源节点，源节点接收到 barrier 后会立即对自己的状态进行快照操作，然后将 barrier 事件发送到下游的 operator 节点。</li>
+<li>下游的 Transformation Operator 从上游某个 input channel 接收到 barrier 事件后，会立刻阻塞通道，直到接收到所有上游算子对应的 input channel 发送的 barrier 事件。这实际上是 barrier 事件的对齐过程，operator 节点完成 barrier 对齐操作后，会对当前算子的状态进行快照操作，并向所有下游的节点广播 barrier 事件。</li>
+<li>Sink Operator 接收到barrier事件后，也会进行 barrier 对齐操作。在所有 input channel 中的 barrier 事件全部到达 Sink 节点后，Sink 节点会对自己的状态进行快照操作。Sink 节点完成快照操作标志着完成一次系统全局快照，即完成本次 checkpoint 操作。</li>
+</ol>
+<p><img src="/images/SE/ABS算法流程.png" alt=""></p>
+<p>ABS 算法对 Flink 中的 checkpoint 操作进行了系统性的描述，且在 Flink 项目中已经有成熟的落地实现。Chandy-Lamport 算法相对比较理想化，未考虑在工业落地时全局状态获取过程中的性能问题，而 ABS 算法实际上是对 Chandy-Lamport 算法在工业项目中落地实现的补充和优化。</p>
+<h1 id="Flink-架构"><a href="#Flink-架构" class="headerlink" title="Flink 架构"></a>Flink 架构</h1><p>Flink 系统架构主要分为 Libraries &amp; APIs、Core 和 Deploy 三层。</p>
+<h2 id="Libraries-amp-APIs-编程接口"><a href="#Libraries-amp-APIs-编程接口" class="headerlink" title="Libraries &amp; APIs 编程接口"></a>Libraries &amp; APIs 编程接口</h2><p>Libraries 层也被称作 Flink 应用组件层，是根据 API 层的划分，在 API 层之上构建满足了特定应用领域的计算框架，分别对应了面向流处理和面向批处理两类，其中面向流处理支持 CEP（复杂事件处理）、基于类似 SQL 的操作（基于 Table 的关系操作）；面向批处理支持 Flink ML（机器学习库）、Gelly（图处理）。</p>
+<p>APIs 层主要实现了面向流处理对应的 DataStream API，面向批处理对应的 DataSet API。</p>
+<p>Flink 提供了四层抽象的编程接口：</p>
+<ol>
+<li>High-level Language（高级语言）：SQL</li>
+<li>Declarative DSL（定义式编程）：Table API</li>
+<li>Core API（核心接口）：DataStream API / DataSet API</li>
+<li>Low-level API（流、状态、时间）：Statful Stream Processing</li>
+</ol>
+<h2 id="Core-运行时执行引擎"><a href="#Core-运行时执行引擎" class="headerlink" title="Core 运行时执行引擎"></a>Core 运行时执行引擎</h2><p>Core 层提供了 Flink 计算的全部核心实现，例如支持分布式 Stream 作业执行、JobGraph 到 ExecutionGraph 的映射和调度等，为 API 层提供了基础服务。</p>
+<p>用户使用组件栈和接口编写的 Flink 作业最终都会在客户端转换成 JobGraph 对象，然后提交到集群中运行。除了任务的提交和运行之外，运行时还包含资源管理器 ResourceManager 以及负责接收和执行 Task 的 TaskManager，这些服务各司其职，相互合作。运行时提供了不同类型（有界和无界）作业的执行和调度功能，最终将任务拆解成Task执行和调度。同时，运行时兼容了不同类型的集群资源管理器，可以提供不同的部署方式，并统一管理Slot计算资源。第3章将会重点讲解运行时中各个组件的功能及组件之间如何协调。</p>
+<h2 id="Deploy-物理部署层"><a href="#Deploy-物理部署层" class="headerlink" title="Deploy 物理部署层"></a>Deploy 物理部署层</h2><p>Deploy 层支持多种部署模式，包括本地、集群（Standalone、YARN、Kubernetes）及云部署（GCE/EC2）。</p>
+<h1 id="Flink-集群架构"><a href="#Flink-集群架构" class="headerlink" title="Flink 集群架构"></a>Flink 集群架构</h1><p>Flink 集群主要包含3部分：JobManager、TaskManager 和客户端，三者均为独立的 JVM 进程。Flink 集群启动后，会至少启动一个 JobManager 和多个 TaskManager。客户端将任务提交到 JobManager，JobManager 再将任务拆分成 Task 并调度到各个 TaskManager 中执行，最后 TaskManager 将 Task 执行的情况汇报给 JobManager。</p>
+<p>客户端是 Flink 专门用于提交任务的客户端实现，可以运行在任何设备上，并且兼容 Windows、macOS、Linux 等操作系统，只需要运行环境与 JobManager 之间保持网络畅通即可。客户端会在内部运行提交的作业，然后基于作业的代码逻辑构建 JobGraph 结构，最终将 JobGraph 提交到运行时中运行。JobGraph 是客户端和集群运行时之间约定的统一抽象数据结构，也就是说，不管是什么类型的作业，都会通过客户端将提交的应用程序构建成 JobGraph 结构，最后提交到集群上运行。</p>
+<p>JobManager 是整个集群的管理节点，负责接收和执行来自客户端提交的 JobGraph。JobManager 也会负责整个任务的 Checkpoint 协调工作，内部负责协调和调度提交的任务，并将 JobGraph 转换为 ExecutionGraph 结构，然后通过调度器调度并执行 ExecutionGraph 的节点。ExecutionGraph 中的 ExecutionVertex 节点会以Task的形式在TaskManager中执行。</p>
+<p><img src="/images/SE/Flink集群架构图.png" alt=""></p>
+<p>除了对 Job 的调度和管理之外，JobManager 会对整个集群的计算资源进行统一管理，所有 TaskManager 的计算资源都会注册到 JobManager 节点中，然后分配给不同的任务使用。当然，JobManager 还具备非常多的功能，例如 Checkpoint 的触发和协调等。</p>
+<p>TaskManager 作为整个集群的工作节点，主要作用是向集群提供计算资源，每个 TaskManager 都包含一定数量的内存、CPU 等计算资源。这些计算资源会被封装成 Slot 资源卡槽，然后通过主节点中的 ResourceManager 组件进行统一协调和管理，而任务中并行的 Task 会被分配到 Slot 计算资源中。根据底层集群资源管理器的不同，TaskManager 的启动方式及资源管理形式也会有所不同。例如，在基于 Standalone 模式的集群中，所有的 TaskManager 都是按照固定数量启动的；而 YARN、Kubernetes 等资源管理器上创建的 Flink 集群则支持按需动态启动 TaskManager 节点。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/05/27/Network-CORS-%E8%B7%A8%E6%BA%90%E8%B5%84%E6%BA%90%E5%85%B1%E4%BA%AB/" rel="prev" title="CORS 跨源资源共享">
+      <i class="fa fa-chevron-left"></i> CORS 跨源资源共享
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#DataFlow-%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.</span> <span class="nav-text">DataFlow 模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%86%E5%B8%83%E5%BC%8F%E5%BC%82%E6%AD%A5%E5%BF%AB%E7%85%A7%E7%AE%97%E6%B3%95"><span class="nav-number">2.</span> <span class="nav-text">分布式异步快照算法</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Chandy-Lamport-%E7%AE%97%E6%B3%95%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.1.</span> <span class="nav-text">Chandy-Lamport 算法设计</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E6%AD%A5%E5%B1%8F%E9%9A%9C%E5%BF%AB%E7%85%A7%EF%BC%88Asynchronous-Barrier-Snapshotting%EF%BC%8CABS%EF%BC%89%E7%AE%97%E6%B3%95%E6%94%B9%E8%BF%9B"><span class="nav-number">2.2.</span> <span class="nav-text">异步屏障快照（Asynchronous Barrier Snapshotting，ABS）算法改进</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Flink-%E6%9E%B6%E6%9E%84"><span class="nav-number">3.</span> <span class="nav-text">Flink 架构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Libraries-amp-APIs-%E7%BC%96%E7%A8%8B%E6%8E%A5%E5%8F%A3"><span class="nav-number">3.1.</span> <span class="nav-text">Libraries &amp; APIs 编程接口</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Core-%E8%BF%90%E8%A1%8C%E6%97%B6%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E"><span class="nav-number">3.2.</span> <span class="nav-text">Core 运行时执行引擎</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Deploy-%E7%89%A9%E7%90%86%E9%83%A8%E7%BD%B2%E5%B1%82"><span class="nav-number">3.3.</span> <span class="nav-text">Deploy 物理部署层</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Flink-%E9%9B%86%E7%BE%A4%E6%9E%B6%E6%9E%84"><span class="nav-number">4.</span> <span class="nav-text">Flink 集群架构</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">149</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">291</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
