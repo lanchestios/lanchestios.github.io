@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文主要对 Flink Time 和 Window 进行分析。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink 时间与窗口">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-6-%E6%97%B6%E9%97%B4%E5%8F%8A%E7%AA%97%E5%8F%A3/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文主要对 Flink Time 和 Window 进行分析。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/Flink-Time.png">
+<meta property="og:image" content="http://example.com/images/SE/Flink-TimeWindow.png">
+<meta property="og:image" content="http://example.com/images/SE/滚动窗口.png">
+<meta property="og:image" content="http://example.com/images/SE/滑动窗口.png">
+<meta property="og:image" content="http://example.com/images/SE/会话窗口.png">
+<meta property="og:image" content="http://example.com/images/SE/有序的Stream中的Watermark.png">
+<meta property="og:image" content="http://example.com/images/SE/无序的Stream中的Watermark.png">
+<meta property="og:image" content="http://example.com/images/SE/多并行度的Stream中的Watermark.png">
+<meta property="og:image" content="http://example.com/images/SE/多并行度的Stream中的Watermark.png">
+<meta property="article:published_time" content="2023-03-23T09:00:55.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.274Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/Flink-Time.png">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-6-%E6%97%B6%E9%97%B4%E5%8F%8A%E7%AA%97%E5%8F%A3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink 时间与窗口 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-6-%E6%97%B6%E9%97%B4%E5%8F%8A%E7%AA%97%E5%8F%A3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink 时间与窗口
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 17:00:55" itemprop="dateCreated datePublished" datetime="2023-03-23T17:00:55+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文主要对 Flink Time 和 Window 进行分析。<br><span id="more"></span></p>
+<h1 id="Time-时间"><a href="#Time-时间" class="headerlink" title="Time 时间"></a>Time 时间</h1><p>在整个流数据处理的过程中，针对时间信息的处理可以说是非常普遍的，尤其在涉及窗口计算时，会根据设定的 TimeCharacteristic 是事件时间还是处理时间，选择不同的数据方式处理接入的数据。每个 Operator 内部都维系了一个 TimerService，专门用于处理与时间相关的操作。例如获取当前算子中最新的处理时间以及 Watermark、注册不同时间类型的定时器等。</p>
+<p>Flink 数据中的 Time（时间）分为以下 3 种：</p>
+<ol>
+<li>Event Time：事件产生的时间，它通常由事件中的时间戳描述</li>
+<li>Ingestion Time：事件进入Flink的时间</li>
+<li>Processing Time：事件被处理时当前系统的时间</li>
+</ol>
+<p><img src="/images/SE/Flink-Time.png" alt=""></p>
+<blockquote>
+<p>默认情况下，Flink 在 Stream 程序中处理数据使用的时间是 ProcessingTime，想要修改使用时间可以使用 setStreamTimeCharacteristic()。</p>
+</blockquote>
+<p>![[Flink时间概念对比.png]]</p>
+<h2 id="抽取-Timestamp-和生成-Watermark-的方式"><a href="#抽取-Timestamp-和生成-Watermark-的方式" class="headerlink" title="抽取 Timestamp 和生成 Watermark 的方式"></a>抽取 Timestamp 和生成 Watermark 的方式</h2><h3 id="在-SourceFunction-中抽取-Timestamp-和生成-Watermark"><a href="#在-SourceFunction-中抽取-Timestamp-和生成-Watermark" class="headerlink" title="在 SourceFunction 中抽取 Timestamp 和生成 Watermark"></a>在 SourceFunction 中抽取 Timestamp 和生成 Watermark</h3><p>在 SourceFunction 中读取数据元素时，SourceContext 接口中定义了抽取 Timestamp 和生成 Watermark 的方法，如 <code>collectWithTimestamp(T element, long timestamp)</code> 和 <code>emitWatermark(Watermark mark)</code> 方法。如果 Flink 作业基于事件时间的概念，就会使用 StreamSourceContexts.ManualWatermarkContext 处理 Watermark 信息。</p>
+<p><code>WatermarkContext.collectWithTimestamp()</code> 方法直接从 Source 算子接入的数据中抽取事件时间的时间戳信息。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@Override  
+public final void collectWithTimestamp(T element, long timestamp) &#123;  
+    synchronized (checkpointLock) &#123;  
+        processAndEmitWatermarkStatus(WatermarkStatus.ACTIVE);  
+  
+        if (nextCheck !&#x3D; null) &#123;  
+            this.failOnNextCheck &#x3D; false;  
+        &#125; else &#123;  
+            scheduleNextIdleDetectionTask();  
+        &#125;  
+        &#x2F;&#x2F; 抽取 Timestamp 信息
+        processAndCollectWithTimestamp(element, timestamp);  
+    &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>生成 Watermark 主要是通过调用 <code>WatermarkContext.emitWatermark()</code> 方法进行的。生成的 Watermark 首先会更新当前 Source 算子中的 CurrentWatermark，然后将 Watermark 传递给下游的算子继续处理。当下游算子接收到 Watermark 事件后，也会更新当前算子内部的 CurrentWatermark。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@Override  
+public final void emitWatermark(Watermark mark) &#123;  
+    if (allowWatermark(mark)) &#123;  
+        synchronized (checkpointLock) &#123;  
+            processAndEmitWatermarkStatus(WatermarkStatus.ACTIVE);  
+  
+            if (nextCheck !&#x3D; null) &#123;  
+                this.failOnNextCheck &#x3D; false;  
+            &#125; else &#123;  
+                scheduleNextIdleDetectionTask();  
+            &#125;  
+            processAndEmitWatermark(mark);  
+        &#125;    
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>SourceFunction 接口主要调用 <code>WatermarkContext.emitWatermark()</code> 方法生成并输出 Watermark 事件，在 <code>emitWatermark()</code> 方法中会调用 <code>processAndEmitWatermark()</code> 方法将生成的 Watermark 实时发送到下游算子中继续处理。</p>
+<h3 id="通过-DataStream-中的独立算子抽取-Timestamp-和生成-Watermark"><a href="#通过-DataStream-中的独立算子抽取-Timestamp-和生成-Watermark" class="headerlink" title="通过 DataStream 中的独立算子抽取 Timestamp 和生成 Watermark"></a>通过 DataStream 中的独立算子抽取 Timestamp 和生成 Watermark</h3><p>在 DataStream API 中 assignTimestampsAndWatermarks 提供了抽取 Timestamp 和生成 Watermark 的能力，其支持 Watermark 空闲，并且不再区别 periodic 和 punctuated。</p>
+<blockquote>
+<p>当没有新数据到达时，WatermarkGenerator 是无法生成 Watermark 的，这会导致任务无法继续运行。例如 Kafka Topic 有 2 个 Partition，其中一个 Partition 数据量比较少，可能存在长时间没有新数据的情况，这就导致该 Watermark 一直是较早数据产生的。即使另一个 Partition 始终有新数据，那么任务也不会往下运行，因为水印对齐取的是最小值。为了解决这个问题，WatermarkStrategy 提供了 withIdleness 方法，允许传入一个 timeout 的时间。</p>
+</blockquote>
+<p>在 DataStream API 中提供了 3 种与抽取 Timestamp 和生成 Watermark 相关的 Function 接口，分别为TimestampExtractor、AssignerWithPeriodicWatermarks 以及 AssignerWithPunctuatedWatermarks。</p>
+<p>如下图所示，在 TimestampAssigner 接口中定义抽取 Timestamp 的方法。然后分别在 AssignerWithPeriodicWatermarks 和 AssignerWithPunctuatedWatermarks 接口中定义生成 Watermark 的方法。</p>
+<p>AssignerWithPeriodicWatermarks 和 AssignerWithPunctuatedWatermarks 的区别如下所示：</p>
+<ul>
+<li>AssignerWithPeriodicWatermarks：事件时间驱动，会周期性地根据事件时间与当前算子中最大的 Watermark 进行对比，如果当前的 EventTime 大于 Watermark，则触发 Watermark 更新逻辑，将最新的 EventTime 赋予 CurrentWatermark，并将新生成的 Watermark 推送至下游算子。</li>
+<li>AssignerWithPunctuatedWatermarks：特殊事件驱动，主要根据数据元素中的特殊事件生成 Watermark。例如数据中有产生 Watermark 的标记，接入数据元素时就会根据该标记调用相关方法生成 Watermark。</li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/70718596/upgrading-flink-deprecated-function-calls">https://stackoverflow.com/questions/70718596/upgrading-flink-deprecated-function-calls</a></p>
+<p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/344540564">https://zhuanlan.zhihu.com/p/344540564</a></p>
+<h1 id="Window"><a href="#Window" class="headerlink" title="Window"></a>Window</h1><p>Flink 认为 Batch 是 Streaming 的一个特例，因此 Flink 底层引擎是一个流式引擎，在上面实现了流处理和批处理。而 Window 就是从 Streaming 到 Batch 的桥梁。</p>
+<p>通常来讲，Window 就是用来对一个无限的流设置一个有限的集合，从而在有界的数据集上进行操作的一种机制。也可以说，窗口是另一类算子，是 DataStream 的逻辑边界，在第一个元素到达后被创建，在生命周期结束后被销毁，但引擎不会确保及时销毁诸如全局窗口（Global Window）这类与时间无关的窗口。</p>
+<p>除了开窗机制，应用程序还可以定义触发器（Trigger）、迟到生存期、窗口聚合函数（Window Function）及清除器（Evictor）。</p>
+<h2 id="Window-分类"><a href="#Window-分类" class="headerlink" title="Window 分类"></a>Window 分类</h2><h3 id="按操作分类"><a href="#按操作分类" class="headerlink" title="按操作分类"></a>按操作分类</h3><p>窗口分为两大类，即 Keyed Window 和 Non-Keyed Window。在 KeyedStream 上定义 <code>window（...）</code>得到 Keyed Window，在 DataStream 上定义 <code>windowAll（...）</code>得到 Non-Keyed Window。以下是这两类窗口的定义与转换，并不是所有转换应用程序都需要，其中标记为 <code>[…]</code> 的转换是可选的操作：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; Keyed Window 定义与转换
+stream
+	.keyBy(...)
+	.window(...)
+	[.trigger(...)]
+	[.evictor(...)]
+	[.allowedLateness(...)]
+	[.sideOutputLateData(...)]
+	.reduce&#x2F;aggregate&#x2F;...
+	[.getSideOutput(...)]
+&#x2F;&#x2F; Non-Keyed Window 定义与转换
+stream
+	.windowAll(...)
+	[.trigger(...)]
+	[.evictor(...)]
+	[.allowedLateness(...)]
+	[.sideOutputLateData(...)]
+	.reduce&#x2F;aggregate&#x2F;...
+	[.getSideOutput(...)]<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="按边界分类"><a href="#按边界分类" class="headerlink" title="按边界分类"></a>按边界分类</h3><p>对流中的所有元素进行计数是不可能的，因为通常流是无限的（无界的）。因此，流上的聚合需要由 Window 来划定范围，比如 “计算过去的5min” 或者 “最后100个元素的和”。Window 可以由时间（Time Window）（如每30s）或者数据（Count Window）（如每100个元素）驱动。</p>
+<p>DataStream API 提供了 Time 和 Count 的 Window。同时，由于某些特殊的需要，DataStream API 也提供了定制化的 Window 操作，供用户自定义 Window。</p>
+<p><img src="/images/SE/Flink-TimeWindow.png" alt=""></p>
+<p>Window 根据类型可以分为两种：</p>
+<ol>
+<li>Tumbling Window 滚动窗口：滚动窗口的时间长度是固定的，且不同时间区间的窗口不会重叠，可根据事件时间和处理时间定义。除了时间长度，还可以设定窗口的时间对齐方式。</li>
+</ol>
+<p><img src="/images/SE/滚动窗口.png" alt=""></p>
+<ol>
+<li>Sliding Window 滑动窗口：滑动窗口按照滑动步长将时间拆分成固定长度的窗口，当滑动步长小于窗口长度时，相邻窗口间会重叠。</li>
+</ol>
+<p><img src="/images/SE/滑动窗口.png" alt=""></p>
+<ol>
+<li>Session Window 会话窗口：根据相邻元素之间的时间间隔确定会话窗口的边界，其分为固定时间间隔（Static Gap）和动态时间间隔（Dynamic Gap）两种类型，其中动态时间间隔由应用程序编程实现。</li>
+</ol>
+<p><img src="/images/SE/会话窗口.png" alt=""></p>
+<ol>
+<li>Global Window 全局窗口：将相同 key 的所有元素聚在一起，但是这种窗口没有起点也没有终点，因此必须自定义触发器。</li>
+</ol>
+<h3 id="按聚合分类"><a href="#按聚合分类" class="headerlink" title="按聚合分类"></a>按聚合分类</h3><p>Window 聚合操作分为两种：一种是增量聚合，一种是全量聚合。</p>
+<p><strong>增量聚合</strong></p>
+<blockquote>
+<p>增量聚合是指窗口每进入一条数据就计算一次。</p>
+</blockquote>
+<p>常见的增量聚合函数：reduce、aggregate、sum、min、max。</p>
+<p><strong>全量聚合</strong></p>
+<blockquote>
+<p>全量聚合是指在窗口触发的时候才会对窗口内的所有数据进行一次计算。</p>
+</blockquote>
+<p>常见的全量聚合函数：apply、process。</p>
+<h2 id="触发器"><a href="#触发器" class="headerlink" title="触发器"></a>触发器</h2><blockquote>
+<p><code>public abstract class Trigger&lt;T, W extends Window&gt;</code></p>
+</blockquote>
+<p>触发器原型中包括 4 类触发机制，基于事件驱动。</p>
+<ol>
+<li>onElement：窗口每收到一个元素调用一次该方法，返回结果决定是否触发算子函数。</li>
+<li>onProcessingTime：根据注册的处理时间定时器触发，定时时间由参数 time（long time）设定。</li>
+<li>onEventTime：根据注册的事件时间定时器触发，定时时间由参数 time 设定。</li>
+<li>onMerge：两个窗口合并时触发。</li>
+</ol>
+<p>前三类触发机制的结果（TriggerResult）分为以下 4 种情况。</p>
+<ol>
+<li>忽略（CONTINUE）</li>
+<li>触发（FIRE）</li>
+<li>清除（PURGE）：清空窗口内所有元素，窗口被销毁</li>
+<li>触发并清除（FIRE_AND_PURGE）：触发窗口函数，并在函数执行结束后清空窗口内所有元素，窗口被销毁</li>
+</ol>
+<p>Flink 提供几类内置触发器：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>触发器</th>
+<th>介绍</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EventTimeTrigger</td>
+<td>根据事件时间轴上的水印触发</td>
+</tr>
+<tr>
+<td>ProcessingTimeTrigger</td>
+<td>根据处理时间触发</td>
+</tr>
+<tr>
+<td>CountTrigger</td>
+<td>根据窗口内元素的数量触发</td>
+</tr>
+<tr>
+<td>ContinuousEventTimeTrigger</td>
+<td>将事件时间轴分成等间隔的窗格，在每一个窗格内判断水印来决定是否触发</td>
+</tr>
+<tr>
+<td>ContinuousProcessingTimeTrigger</td>
+<td>将处理时间轴分成等间隔的窗格，在每一个窗格内触发一次，但是需要根据相关条件判断是否调用窗口函数</td>
+</tr>
+<tr>
+<td>DeltaTrigger</td>
+<td>根据某种特征是否超过指定的阈值决定是否触发</td>
+</tr>
+<tr>
+<td>PurgingTrigger</td>
+<td>将其他触发器转化成清除触发器，即销毁窗口</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="清除器"><a href="#清除器" class="headerlink" title="清除器"></a>清除器</h2><p>清除器（Evictor）在触发器触发后，窗口函数执行前或执行后清除窗口内元素，相应地，有以下两个方法：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@PublicEvolving  
+public interface Evictor&lt;T, W extends Window&gt; extends Serializable &#123;  
+    &#x2F;&#x2F; 在触发器被触发后，窗口函数执行前清除窗口内元素
+    void evictBefore(  
+            Iterable&lt;TimestampedValue&lt;T&gt;&gt; elements,  
+            int size,  
+            W window,  
+            EvictorContext evictorContext);  
+    &#x2F;&#x2F; 在触发器被触发后，窗口函数执行后清除窗口内元素
+    void evictAfter(  
+            Iterable&lt;TimestampedValue&lt;T&gt;&gt; elements,  
+            int size,  
+            W window,  
+            EvictorContext evictorContext);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>Flink提供三种内置清除器：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>清除器</th>
+<th>介绍</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CountEvictor</td>
+<td>保持窗口内元素数量为预定值</td>
+</tr>
+<tr>
+<td>DeltaEvictor</td>
+<td>根据元素之间的关系，清除超过指定阈值的元素</td>
+</tr>
+<tr>
+<td>TimeEvictor</td>
+<td>根据窗口内元素的时间戳决定清除哪些元素</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h1 id="Time"><a href="#Time" class="headerlink" title="Time"></a>Time</h1><h2 id="Watermark"><a href="#Watermark" class="headerlink" title="Watermark"></a>Watermark</h2><p>在使用 EventTime 处理 Stream 数据的时候会遇到数据乱序的问题，流处理从 Event（事件）产生，流经 Source，再到 Operator，这中间需要一定的时间。虽然大部分情况下，传输到 Operator 的数据都是按照事件产生的时间顺序来的，但是也不排除由于网络延迟等原因而导致乱序的产生，特别是使用 Kafka 的时候，多个分区之间的数据无法保证有序。因此，在进行 Window 计算的时候，不能无限期地等下去，必须要有个机制来保证在特定的时间后，必须触发 Window 进行计算，这个特别的机制就是 Watermark。</p>
+<p>Watermark 是用于处理乱序事件的。</p>
+<h3 id="应用场景"><a href="#应用场景" class="headerlink" title="应用场景"></a>应用场景</h3><p>Watermark 有三种应用场景：</p>
+<p><strong>1.  有序的 Stream 中的 Watermark</strong></p>
+<p><img src="/images/SE/有序的Stream中的Watermark.png" alt=""></p>
+<p><strong>2. 无序的 Stream 中的 Watermark</strong></p>
+<p><img src="/images/SE/无序的Stream中的Watermark.png" alt=""></p>
+<p><strong>3. 多并行度的 Stream 中的 Watermark</strong></p>
+<p><img src="/images/SE/多并行度的Stream中的Watermark.png" alt=""></p>
+<blockquote>
+<p>注意：在多并行度的情况下，Watermark 会有一个对齐机制，这个对齐机制会取所有 Channel 中最小的 Watermark，图中的 14 和 29 这两个 Watermark 的最终取值为 14。</p>
+</blockquote>
+<h3 id="生成方式"><a href="#生成方式" class="headerlink" title="生成方式"></a>生成方式</h3><p>通常情况下，在接收到 Source 的数据后，应该立刻生成 Watermark，但是也可以在应用简单的 Map 或者 Filter 操作后再生成 Watermark。注意：如果指定多次 Watermark，后面指定的值会覆盖前面的值。</p>
+<p>Watermark 的生成方式有两种：</p>
+<p><strong>1. With Periodic Watermarks：周期性地触发 Watermark 的生成和发送</strong></p>
+<p>周期性地触发 Watermark 的生成和发送，默认是 100ms。每隔 N 秒自动向流里注入一个 Watermark，时间间隔由 ExecutionConfig.setAutoWatermarkInterval 决定。每次调用 getCurrentWatermark 方法，如果得到的 Watermark 不为空并且比之前的大，就注入流中。可以定义一个最大允许乱序的时间，这种比较常用。实现 AssignerWithPeriodicWatermarks 接口。</p>
+<p><strong>2. With Punctuated Watermarks：基于事件触发 Watermark 的生成和发送</strong></p>
+<p>基于事件向流里注入一个 Watermark，每一个元素都有机会判断是否生成一个 Watermark。如果得到的 Watermark 不为空并且比之前的大，就注入流中。实现 AssignerWithPunctuatedWatermarks 接口。</p>
+<p><strong>3. With Ascending Watermark：递增式 Watermark 的生成和发送</strong></p>
+<p>在使用 Kafka 作为数据源时，每个分区的消息时间通常是递增的，但 Source 节点从多个消息分区并行拉取数据时这种时间特征会被破坏，这时可以在连接器端创建 Kafka 分区水印（Kafka-partition-aware watermark），以确保多分区消息的升序排列</p>
+<p><img src="/images/SE/多并行度的Stream中的Watermark.png" alt=""></p>
+<blockquote>
+<p>Window 触发的条件：</p>
+<ol>
+<li>Watermark 的时间大于 <code>window_end_time</code></li>
+<li>在窗口时间 <code>[window_start_time, window_end_time)</code> 中有数据存在</li>
+</ol>
+</blockquote>
+<h3 id="延后数据的处理"><a href="#延后数据的处理" class="headerlink" title="延后数据的处理"></a>延后数据的处理</h3><p>针对延迟数据，Flink 有 3 种处理方案：</p>
+<ol>
+<li><p>丢弃（默认）</p>
+<p> 输入的数据所在的窗口已经执行过了，Flink 默认对这些延迟的数据的处理方案就是丢弃。</p>
+</li>
+<li><p>允许数据延迟</p>
+<p> Flink 提供了 allowedLateness 方法，它可以实现对延迟的数据设置一个延迟时间，在指定延迟时间内到达的数据可以触发 Window。且每条延迟时间到达的数据都会触发一次 Window。</p>
+</li>
+<li><p>收集延迟数据</p>
+<p> 通过 sideOutputLateData 函数可以把延迟数据统一收集、统一存储，方便后期排查问题。</p>
+</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-5-%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B%20API%20TODO/" rel="prev" title="Flink 高级能力 API">
+      <i class="fa fa-chevron-left"></i> Flink 高级能力 API
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-7-State%E7%AE%A1%E7%90%86%E4%B8%8E%E6%81%A2%E5%A4%8D/" rel="next" title="Flink State管理与恢复">
+      Flink State管理与恢复 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Time-%E6%97%B6%E9%97%B4"><span class="nav-number">1.</span> <span class="nav-text">Time 时间</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%BD%E5%8F%96-Timestamp-%E5%92%8C%E7%94%9F%E6%88%90-Watermark-%E7%9A%84%E6%96%B9%E5%BC%8F"><span class="nav-number">1.1.</span> <span class="nav-text">抽取 Timestamp 和生成 Watermark 的方式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8-SourceFunction-%E4%B8%AD%E6%8A%BD%E5%8F%96-Timestamp-%E5%92%8C%E7%94%9F%E6%88%90-Watermark"><span class="nav-number">1.1.1.</span> <span class="nav-text">在 SourceFunction 中抽取 Timestamp 和生成 Watermark</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%9A%E8%BF%87-DataStream-%E4%B8%AD%E7%9A%84%E7%8B%AC%E7%AB%8B%E7%AE%97%E5%AD%90%E6%8A%BD%E5%8F%96-Timestamp-%E5%92%8C%E7%94%9F%E6%88%90-Watermark"><span class="nav-number">1.1.2.</span> <span class="nav-text">通过 DataStream 中的独立算子抽取 Timestamp 和生成 Watermark</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Window"><span class="nav-number">2.</span> <span class="nav-text">Window</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Window-%E5%88%86%E7%B1%BB"><span class="nav-number">2.1.</span> <span class="nav-text">Window 分类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E6%93%8D%E4%BD%9C%E5%88%86%E7%B1%BB"><span class="nav-number">2.1.1.</span> <span class="nav-text">按操作分类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E8%BE%B9%E7%95%8C%E5%88%86%E7%B1%BB"><span class="nav-number">2.1.2.</span> <span class="nav-text">按边界分类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E8%81%9A%E5%90%88%E5%88%86%E7%B1%BB"><span class="nav-number">2.1.3.</span> <span class="nav-text">按聚合分类</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A6%E5%8F%91%E5%99%A8"><span class="nav-number">2.2.</span> <span class="nav-text">触发器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B8%85%E9%99%A4%E5%99%A8"><span class="nav-number">2.3.</span> <span class="nav-text">清除器</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Time"><span class="nav-number">3.</span> <span class="nav-text">Time</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Watermark"><span class="nav-number">3.1.</span> <span class="nav-text">Watermark</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF"><span class="nav-number">3.1.1.</span> <span class="nav-text">应用场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%94%9F%E6%88%90%E6%96%B9%E5%BC%8F"><span class="nav-number">3.1.2.</span> <span class="nav-text">生成方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%B6%E5%90%8E%E6%95%B0%E6%8D%AE%E7%9A%84%E5%A4%84%E7%90%86"><span class="nav-number">3.1.3.</span> <span class="nav-text">延后数据的处理</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

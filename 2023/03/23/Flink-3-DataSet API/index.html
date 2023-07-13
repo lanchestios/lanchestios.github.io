@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Flink 中提供了 4 种不同层次的 API：  低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。 核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。 Table API：一般与 DataSet 或者 DataS">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink 批处理API">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-3-DataSet%20API/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Flink 中提供了 4 种不同层次的 API：  低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。 核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。 Table API：一般与 DataSet 或者 DataS">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-03-23T08:00:55.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.332Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-3-DataSet%20API/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink 批处理API | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-3-DataSet%20API/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink 批处理API
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 16:00:55" itemprop="dateCreated datePublished" datetime="2023-03-23T16:00:55+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Flink 中提供了 4 种不同层次的 API：</p>
+<ol>
+<li>低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。</li>
+<li>核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。</li>
+<li>Table API：一般与 DataSet 或者 DataStream 紧密关联，首先通过一个 DataSet 或 DataStream 创建出一个 Table；然后用类似于 filter、join 或者 select 关系型转化操作来转化为一个新的 Table 对象；最后将一个 Table 对象转回一个 DataSet 或 DataStream。与 SQL 不同的是，Table API 的查询不是一个指定的 SQL 字符串，而是调用指定的 API 方法。</li>
+<li>SQL API：Flink 的 SQL 集成是基于 Apache Calcite 的，Apache Calcite 实现了标准的 SQL，使用起来比其他 API 更加灵活，因为可以直接使用 SQL 语句。Table API 和 SQL 可以很容易地结合在一块使用，它们都返回 Table 对象。<span id="more"></span>
+</li>
+</ol>
+<h1 id="概念"><a href="#概念" class="headerlink" title="概念"></a>概念</h1><p>DataSet API 主要分为3块：DataSource、Transformation、Sink。</p>
+<h2 id="DataSource"><a href="#DataSource" class="headerlink" title="DataSource"></a>DataSource</h2><blockquote>
+<p>DataSource 是程序的数据源输入。</p>
+</blockquote>
+<h2 id="Transformation"><a href="#Transformation" class="headerlink" title="Transformation"></a>Transformation</h2><blockquote>
+<p>Transformation 是具体的操作，它对一个或多个输入数据源进行计算处理。</p>
+</blockquote>
+<p>Flink 针对 DataSet 实现了以下算子：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>算子</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Map</td>
+<td>做一对一映射，可变更类型</td>
+</tr>
+<tr>
+<td>FlatMap</td>
+<td>做一对多映射，可变更类型</td>
+</tr>
+<tr>
+<td>MapPartition</td>
+<td>Map 和 FlatMap 转换的对象是元素，而 MapPartition 转换的是 DataSet 的分区</td>
+</tr>
+<tr>
+<td>Filter</td>
+<td>过滤出条件为 true 的元素</td>
+</tr>
+<tr>
+<td>SortPartition</td>
+<td>指定分区排序次序</td>
+</tr>
+<tr>
+<td>Reduce</td>
+<td>根据多个元素生成一个元素。算子内部会保存上一次 Reduce 的中间结果，然后将当前元素值和上一次 Reduce 的中间结果相加，并用相加结果更新中间结果</td>
+</tr>
+<tr>
+<td>GroupReduce</td>
+<td>与Reduce不同的是，GroupReduce可以获取整个分组，通过迭代器访问分组的所有元素</td>
+</tr>
+<tr>
+<td>Aggregations</td>
+<td>聚合</td>
+</tr>
+<tr>
+<td>Union</td>
+<td>将多个数据集合合并成一个数据集合</td>
+</tr>
+<tr>
+<td>Distinct</td>
+<td>根据转换结果去重</td>
+</tr>
+<tr>
+<td>Join</td>
+<td>内连接</td>
+</tr>
+<tr>
+<td>OuterJoin</td>
+<td></td>
+</tr>
+<tr>
+<td>Cross</td>
+<td></td>
+</tr>
+<tr>
+<td>Union</td>
+<td></td>
+</tr>
+<tr>
+<td>First-n</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 id="连接"><a href="#连接" class="headerlink" title="连接"></a>连接</h3><p>连接分为内连接和外连接，外链接又分为左外连接、右外连接和全外连接。</p>
+<p><strong>内连接</strong></p>
+<ol>
+<li>join 函数</li>
+<li>JoinFunction</li>
+<li>FlatJoinFunction</li>
+</ol>
+<p><strong>笛卡尔积</strong></p>
+<ol>
+<li>cross 函数：两个集合 X 和 Y 的笛卡儿积，又称直积，表示为 X×Y。</li>
+</ol>
+<p><strong>拼接</strong></p>
+<ol>
+<li>union 函数：将多个相同类型的数据集拼接在一起</li>
+</ol>
+<h3 id="分区"><a href="#分区" class="headerlink" title="分区"></a>分区</h3><p>另外，Flink 针对 DataSet 提供了一些数据分区规则，具体如下。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>分区规则</th>
+<th>规则名称</th>
+<th>调用方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rebalance</td>
+<td>对数据集进行再平衡、重分区和消除数据倾斜</td>
+<td>DataSet.rebalance()</td>
+</tr>
+<tr>
+<td>Hash-Partition</td>
+<td>根据指定Key的散列值对数据集进行分区</td>
+<td>DataSet.partitionByHash()</td>
+</tr>
+<tr>
+<td>Range-Partition</td>
+<td>根据指定的 Key 对数据集进行范围分区</td>
+<td>DataSet.partitionByRange()</td>
+</tr>
+<tr>
+<td>Custom partitioning</td>
+<td>自定义分区</td>
+<td>DataSet.partitionCustom()</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2 id="Sink"><a href="#Sink" class="headerlink" title="Sink"></a>Sink</h2><blockquote>
+<p>Sink 是程序的输出，它可以把 Transformation 处理之后的数据输出到指定的存储介质中。</p>
+</blockquote>
+<h1 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h1>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-2-DataStream%20API/" rel="prev" title="Flink 流处理API">
+      <i class="fa fa-chevron-left"></i> Flink 流处理API
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-4-SQL&Table%20API%20TODO/" rel="next" title="Flink SQL&Table API">
+      Flink SQL&Table API <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A6%82%E5%BF%B5"><span class="nav-number">1.</span> <span class="nav-text">概念</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#DataSource"><span class="nav-number">1.1.</span> <span class="nav-text">DataSource</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Transformation"><span class="nav-number">1.2.</span> <span class="nav-text">Transformation</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9E%E6%8E%A5"><span class="nav-number">1.2.1.</span> <span class="nav-text">连接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E5%8C%BA"><span class="nav-number">1.2.2.</span> <span class="nav-text">分区</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Sink"><span class="nav-number">1.3.</span> <span class="nav-text">Sink</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8E%9F%E7%90%86"><span class="nav-number">2.</span> <span class="nav-text">原理</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

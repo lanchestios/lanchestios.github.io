@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Flink 针对标准的流处理和批处理提供了两种关系型 API：Table API 和 SQL。Table API 允许用户以一种很直观的方式进行 select、filter 和 join 操作；Flink SQL 支持基于 Apache Calcite 实现的标准 SQL。针对批处理和流处理可以提供相同的处理语义和结果。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink SQL&amp;Table API">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-4-SQL&Table%20API%20TODO/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Flink 针对标准的流处理和批处理提供了两种关系型 API：Table API 和 SQL。Table API 允许用户以一种很直观的方式进行 select、filter 和 join 操作；Flink SQL 支持基于 Apache Calcite 实现的标准 SQL。针对批处理和流处理可以提供相同的处理语义和结果。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-03-23T08:00:56.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.282Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-4-SQL&Table%20API%20TODO/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink SQL&Table API | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-4-SQL&Table%20API%20TODO/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink SQL&Table API
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 16:00:56" itemprop="dateCreated datePublished" datetime="2023-03-23T16:00:56+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Flink 针对标准的流处理和批处理提供了两种关系型 API：Table API 和 SQL。Table API 允许用户以一种很直观的方式进行 select、filter 和 join 操作；Flink SQL 支持基于 Apache Calcite 实现的标准 SQL。针对批处理和流处理可以提供相同的处理语义和结果。</p>
+<span id="more"></span>
+<blockquote>
+<p>如果想使用 Table API 及 SQL，需要添加 flink-table Maven 依赖。</p>
+</blockquote>
+<h3 id="TableEnvironment"><a href="#TableEnvironment" class="headerlink" title="TableEnvironment"></a>TableEnvironment</h3><p>在使用 Table API 和 SQL 之前，需要创建 TableEnvironment。且一个查询中只能绑定一个指定的 TableEnvironment。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//流数据查询 </span>
+<span class="token class-name">StreamExecutionEnvironment</span> sEnv <span class="token operator">=</span> <span class="token class-name">StreamExecutionEnvironment</span><span class="token punctuation">.</span><span class="token function">getExecutionEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token class-name">StreamTableEnvironment</span> sTableEnv <span class="token operator">=</span> <span class="token class-name">TableEnvironment</span><span class="token punctuation">.</span><span class="token function">getTableEnvironment</span><span class="token punctuation">(</span>sEnv<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+
+<span class="token comment">//批数据查询 </span>
+<span class="token class-name">ExecutionEnvironment</span> bEnv <span class="token operator">=</span> <span class="token class-name">ExecutionEnvironment</span><span class="token punctuation">.</span><span class="token function">getExecutionEnvironment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token class-name">BatchTableEnvironment</span> bTableEnv <span class="token operator">=</span> <span class="token class-name">TableEnvironment</span><span class="token punctuation">.</span><span class="token function">getTableEnvironment</span><span class="token punctuation">(</span>bEnv<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="TableSource"><a href="#TableSource" class="headerlink" title="TableSource"></a>TableSource</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//创建一个TableSource</span>
+<span class="token class-name">TableSource</span> csvSource <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CsvTableSource</span><span class="token punctuation">(</span><span class="token string">"/path/to/file"</span><span class="token punctuation">,</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token comment">//注册一个TableSource，称为CvsTable </span>
+tableEnv<span class="token punctuation">.</span><span class="token function">registerTableSource</span><span class="token punctuation">(</span><span class="token string">"CsvTable"</span><span class="token punctuation">,</span> csvSource<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="TableSink"><a href="#TableSink" class="headerlink" title="TableSink"></a>TableSink</h3><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//创建一个TableSink </span>
+<span class="token class-name">TableSink</span> csvSink <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CsvTableSink</span><span class="token punctuation">(</span><span class="token string">"/path/to/file"</span><span class="token punctuation">,</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token comment">//定义字段名称和类型 </span>
+<span class="token class-name">String</span><span class="token punctuation">[</span><span class="token punctuation">]</span> fieldNames <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token string">"a"</span><span class="token punctuation">,</span> <span class="token string">"b"</span><span class="token punctuation">,</span> <span class="token string">"c"</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span> 
+<span class="token class-name">TypeInformation</span><span class="token punctuation">[</span><span class="token punctuation">]</span> fieldTypes <span class="token operator">=</span> <span class="token punctuation">&#123;</span><span class="token class-name">Types</span><span class="token punctuation">.</span>INT<span class="token punctuation">,</span> <span class="token class-name">Types</span><span class="token punctuation">.</span>STRING<span class="token punctuation">,</span> <span class="token class-name">Types</span><span class="token punctuation">.</span>LONG<span class="token punctuation">&#125;</span><span class="token punctuation">;</span> 
+<span class="token comment">//注册一个TableSink，称为CsvSinkTable </span>
+tableEnv<span class="token punctuation">.</span><span class="token function">registerTableSink</span><span class="token punctuation">(</span><span class="token string">"CsvSinkTable"</span><span class="token punctuation">,</span> fieldNames<span class="token punctuation">,</span> fieldTypes<span class="token punctuation">,</span> csvSink<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="Table"><a href="#Table" class="headerlink" title="Table"></a>Table</h3><p><strong>使用 Table API</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//注册一个Orders表 ... </span>
+<span class="token comment">//通过scan操作获取到一个Table对象 </span>
+<span class="token class-name">Table</span> orders <span class="token operator">=</span> tableEnv<span class="token punctuation">.</span><span class="token function">scan</span><span class="token punctuation">(</span><span class="token string">"Orders"</span><span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token comment">//计算所有来自法国的收入 </span>
+<span class="token class-name">Table</span> revenue <span class="token operator">=</span> orders
+	<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token string">"cCountry === 'FRANCE'"</span><span class="token punctuation">)</span>
+	<span class="token punctuation">.</span><span class="token function">groupBy</span><span class="token punctuation">(</span><span class="token string">"cID, cName"</span><span class="token punctuation">)</span>
+	<span class="token punctuation">.</span><span class="token function">select</span><span class="token punctuation">(</span><span class="token string">"cID, cName, revenue.sum AS revSum"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>使用 SQL</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//注册一个Orders表 ... </span>
+<span class="token comment">//计算所有来自法国的收入 </span>
+<span class="token class-name">Table</span> revenue <span class="token operator">=</span> tableEnv<span class="token punctuation">.</span><span class="token function">sqlQuery</span><span class="token punctuation">(</span> 
+<span class="token string">"SELECT cID, cName, SUM(revenue) AS revSum "</span> <span class="token operator">+</span> 
+<span class="token string">"FROM Orders "</span> <span class="token operator">+</span> <span class="token string">"WHERE cCountry = 'FRANCE' "</span> <span class="token operator">+</span> <span class="token string">"GROUP BY cID, cName"</span> <span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="DataStream、DataSet-和-Table-之间的转换"><a href="#DataStream、DataSet-和-Table-之间的转换" class="headerlink" title="DataStream、DataSet 和 Table 之间的转换"></a>DataStream、DataSet 和 Table 之间的转换</h3><h4 id="转换为-Table"><a href="#转换为-Table" class="headerlink" title="转换为 Table"></a>转换为 Table</h4><p><strong>1. 把 DataStream 或 DataSet 注册为 Table 对象</strong></p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">//获取DataStream </span>
+<span class="token class-name">DataStream</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Tuple2</span><span class="token punctuation">&lt;</span><span class="token class-name">Long</span><span class="token punctuation">,</span> <span class="token class-name">String</span><span class="token punctuation">></span><span class="token punctuation">></span></span> stream <span class="token operator">=</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span> 
+<span class="token comment">//把DataStream注册为Table，称为myTable，表中的字段为f0,f1 </span>
+tableEnv<span class="token punctuation">.</span><span class="token function">registerDataStream</span><span class="token punctuation">(</span><span class="token string">"myTable"</span><span class="token punctuation">,</span> stream<span class="token punctuation">)</span><span class="token punctuation">;</span> 
+<span class="token comment">//在注册Table的时候也可以手工指定字段的名称 </span>
+tableEnv<span class="token punctuation">.</span><span class="token function">registerDataStream</span><span class="token punctuation">(</span><span class="token string">"myTable2"</span><span class="token punctuation">,</span> stream<span class="token punctuation">,</span> <span class="token string">"myLong, myString"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p>注意：DataStream 程序的表名不能满足规则 <code>^_DataStreamTable_[0-9]+</code>，DataSet 程序的表名不能满足规则 <code>^_DataSetTable_[0-9]+</code>，这些规则的名字是内部使用的。</p>
+</blockquote>
+<p><strong>2. 将 DataStream 或 DataSet 直接转化为 Table 对象</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;获取DataStream 
+DataStream&lt;Tuple2&lt;Long, String&gt;&gt; stream &#x3D; ... 
+&#x2F;&#x2F;把DataStream转化为Table，使用默认的字段名称f0,f1 
+Table table1 &#x3D; tableEnv.fromDataStream(stream); 
+&#x2F;&#x2F;把DataStream转化为Table，使用指定的字段名称&quot;myLong&quot;, &quot;myString&quot; 
+Table table2 &#x3D; tableEnv.fromDataStream(stream, &quot;myLong, myString&quot;);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h4 id="转换为-Data"><a href="#转换为-Data" class="headerlink" title="转换为 Data"></a>转换为 Data</h4><p>Table 对象转换为 DataStream 或 DataSet 的时候，需要指定 DataStream 或者 DataSet 中数据的类型。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>数据类型</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Row</td>
+<td>通过角标映射字段，支持任意数量的字段，并且支持null值和非类型安全的访问。</td>
+</tr>
+<tr>
+<td>POJO</td>
+<td>Java中的实体类，这个实体类中的字段名称需要和Table中的字段名称保持一致，支持任意数量的字段，支持null值，类型安全的访问。</td>
+</tr>
+<tr>
+<td>Case Class</td>
+<td>通过角标映射字段，不支持null值，类型安全的访问.</td>
+</tr>
+<tr>
+<td>Tuple</td>
+<td>通过角标映射字段，Scala中限制22个字段，Java中限制25个字段，不支持null值，类型安全的访问.</td>
+</tr>
+<tr>
+<td>Atomic Type</td>
+<td>Table必须要有一个字段，不支持null值，类型安全的访问。</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>1. 把 Table 对象转换为 DataStream</strong></p>
+<p>流式查询的结果 Table 会被动态地更新，即每个新的记录到达输入流时结果就会发生变化。因此，转换此动态查询的 DataStream 需要对表的更新进行编码。</p>
+<p>有两种模式可以将 Table 转换为 DataStream：</p>
+<ol>
+<li>Append Mode：这种模式只适用于当动态表仅由 INSERT 更改修改时（仅附加），之前添加的数据不会被更新。</li>
+<li>Retract Mode：可以始终使用此模式，它使用一个 Boolean 标识来编码 INSERT 和 DELETE 更改。</li>
+</ol>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Table中有两个字段(String name, Integer age) 
+Table table &#x3D; ... 
+&#x2F;&#x2F;把Table中的数据转成DataStream&lt;Row&gt; 
+DataStream&lt;Row&gt; dsRow &#x3D; tableEnv.toAppendStream(table, Row.class); 
+&#x2F;&#x2F;或者把Table中的数据转成 DataStream&lt;Tuple2&gt; 
+TupleTypeInfo&lt;Tuple2&lt;String, Integer&gt;&gt; tupleType &#x3D; new TupleTypeInfo&lt;&gt;( Types.STRING(), Types.INT()); 
+DataStream&lt;Tuple2&lt;String, Integer&gt;&gt; dsTuple &#x3D; tableEnv.toAppendStream(table, tupleType); 
+&#x2F;&#x2F;将Table转化成Retract形式的DataStream&lt;Row&gt; 
+&#x2F;&#x2F;一个Retract Stream的类型X为DataStream&lt;Tuple2&lt;Boolean, X&gt;&gt; 
+&#x2F;&#x2F;Boolean字段指定了更改的类型 
+&#x2F;&#x2F;true表示INSERT，false表示DELETE 
+DataStream&lt;Tuple2&lt;Boolean, Row&gt;&gt; retractStream &#x3D; tableEnv.toRetractStream(table, Row.class);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><strong>2. 把 Table 对象转换为 DataSet</strong></p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;Table中有两个字段(String name, Integer age) 
+Table table &#x3D; ... 
+&#x2F;&#x2F;把Table中的数据转成DataSet&lt;Row&gt; 
+DataSet&lt;Row&gt; dsRow &#x3D; tableEnv.toDataSet(table, Row.class); 
+&#x2F;&#x2F;或者把Table中的数据转成DataSet&lt;Tuple2&gt; 
+TupleTypeInfo&lt;Tuple2&lt;String, Integer&gt;&gt; tupleType &#x3D; new TupleTypeInfo&lt;&gt;( Types.STRING(), Types.INT()); 
+DataSet&lt;Tuple2&lt;String, Integer&gt;&gt; dsTuple &#x3D; tableEnv.toDataSet(table, tupleType);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-3-DataSet%20API/" rel="prev" title="Flink 批处理API">
+      <i class="fa fa-chevron-left"></i> Flink 批处理API
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-5-%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B%20API%20TODO/" rel="next" title="Flink 高级能力 API">
+      Flink 高级能力 API <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#TableEnvironment"><span class="nav-number">1.</span> <span class="nav-text">TableEnvironment</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#TableSource"><span class="nav-number">2.</span> <span class="nav-text">TableSource</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#TableSink"><span class="nav-number">3.</span> <span class="nav-text">TableSink</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Table"><span class="nav-number">4.</span> <span class="nav-text">Table</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DataStream%E3%80%81DataSet-%E5%92%8C-Table-%E4%B9%8B%E9%97%B4%E7%9A%84%E8%BD%AC%E6%8D%A2"><span class="nav-number">5.</span> <span class="nav-text">DataStream、DataSet 和 Table 之间的转换</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BD%AC%E6%8D%A2%E4%B8%BA-Table"><span class="nav-number">5.1.</span> <span class="nav-text">转换为 Table</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BD%AC%E6%8D%A2%E4%B8%BA-Data"><span class="nav-number">5.2.</span> <span class="nav-text">转换为 Data</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

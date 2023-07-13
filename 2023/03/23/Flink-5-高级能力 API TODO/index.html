@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="Flink 中提供了 4 种不同层次的 API：  低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。 核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。 Table API：一般与 DataSet 或者 DataS">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink 高级能力 API">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-5-%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B%20API%20TODO/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="Flink 中提供了 4 种不同层次的 API：  低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。 核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。 Table API：一般与 DataSet 或者 DataS">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-03-23T08:00:57.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.403Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-5-%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B%20API%20TODO/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink 高级能力 API | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-5-%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B%20API%20TODO/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink 高级能力 API
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 16:00:57" itemprop="dateCreated datePublished" datetime="2023-03-23T16:00:57+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Flink 中提供了 4 种不同层次的 API：</p>
+<ol>
+<li>低级 API：提供了对时间和状态的细粒度控制，简洁性和易用性较差，主要应用在对一些复杂事件的处理逻辑上。</li>
+<li>核心 API：主要提供了针对流数据和离线数据的处理，对低级 API 进行了一些封装，提供了 filter、sum、max、min 等高级函数，简单且易用，所以在工作中应用比较广泛。</li>
+<li>Table API：一般与 DataSet 或者 DataStream 紧密关联，首先通过一个 DataSet 或 DataStream 创建出一个 Table；然后用类似于 filter、join 或者 select 关系型转化操作来转化为一个新的 Table 对象；最后将一个 Table 对象转回一个 DataSet 或 DataStream。与 SQL 不同的是，Table API 的查询不是一个指定的 SQL 字符串，而是调用指定的 API 方法。</li>
+<li>SQL API：Flink 的 SQL 集成是基于 Apache Calcite 的，Apache Calcite 实现了标准的 SQL，使用起来比其他 API 更加灵活，因为可以直接使用 SQL 语句。Table API 和 SQL 可以很容易地结合在一块使用，它们都返回 Table 对象。<span id="more"></span>
+</li>
+</ol>
+<h1 id="高级能力"><a href="#高级能力" class="headerlink" title="高级能力"></a>高级能力</h1><h2 id="Flink-RichFunction"><a href="#Flink-RichFunction" class="headerlink" title="Flink RichFunction"></a>Flink RichFunction</h2><p>Flink 定义了一类提供处理函数生命周期及获取函数上下文能力的算子函数，即 RichFunction，其原型如下：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@Public  
+public interface RichFunction extends Function &#123;  
+	&#x2F;&#x2F; 自定义初始化函数
+    void open(Configuration parameters) throws Exception;  
+	&#x2F;&#x2F; 自定义销毁函数
+    void close() throws Exception;  
+	&#x2F;&#x2F; 上下文操作函数
+    RuntimeContext getRuntimeContext();  
+    
+    IterationRuntimeContext getIterationRuntimeContext();  
+    void setRuntimeContext(RuntimeContext t);  
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>其他算子函数实现了对应的版本，如 RichMapFunction、RichReduceFunction、RichJoinFunction 等。</p>
+<h2 id="Flink-Side-Output"><a href="#Flink-Side-Output" class="headerlink" title="Flink Side Output"></a>Flink Side Output</h2><p>在处理数据时，根据不同情况进行分流处理，如果使用 Filter 进行处理需要反复遍历整个流来处理相应数据，Side Output 提供了根据不同的 Tag 区别输出。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">private static final OutputTag&lt;AlertEvent&gt; middleware &#x3D; new OutputTag&lt;AlertEvent&gt;(&quot;MIDDLEWARE&quot;) &#123;  
+&#125;;  
+private static final OutputTag&lt;AlertEvent&gt; machine &#x3D; new OutputTag&lt;AlertEvent&gt;(&quot;MACHINE&quot;) &#123;  
+&#125;;  
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<p>然后呢，可以使用下面几种函数来处理数据，在处理数据的过程中，进行判断将不同种类型的数据存到不同的 OutputTag 中去。</p>
+<ul>
+<li>ProcessFunction</li>
+<li>KeyedProcessFunction</li>
+<li>CoProcessFunction</li>
+<li>ProcessWindowFunction</li>
+<li>ProcessAllWindowFunction</li>
+</ul>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;dataStream 是总的数据流  
+SingleOutputStreamOperator&lt;AlertEvent, AlertEvent&gt; outputStream &#x3D; dataStream.process(new ProcessFunction&lt;AlertEvent, AlertEvent&gt;() &#123;  
+    @Override  
+    public void processElement(AlertEvent value, Context ctx, Collector&lt;AlertEvent&gt; out) throws Exception &#123;  
+        if (&quot;MACHINE&quot;.equals(value.type)) &#123;  
+            ctx.output(machine, value);  
+        &#125; else if (&quot;MIDDLEWARE&quot;.equals(value.type)) &#123;  
+            ctx.output(middleware, value);  
+        &#125; else &#123;  
+            &#x2F;&#x2F;其他的业务逻辑  
+            out.collect(value);  
+        &#125;  
+    &#125;  
+&#125;)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>在将不同类型的数据进行放到不同的 OutputTag 后，可通过下面方式获取：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F;机器相关的告警&amp;恢复数据  
+outputStream.getSideOutput(machine).print();  
+
+&#x2F;&#x2F;中间件相关的告警&amp;恢复数据  
+outputStream.getSideOutput(middleware).print();<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Flink-Broadcast"><a href="#Flink-Broadcast" class="headerlink" title="Flink Broadcast"></a>Flink Broadcast</h2><p>广播变量允许编程人员在每台机器上保持一个只读的缓存变量，而不是传送变量的副本给 Task（这样会导致每台机器可能有多份副本）。广播变量创建后，它可以运行在集群中的任何 Function 上，而不需要多次传递给集群节点。另外请记住，不要修改广播变量，这样才能确保每个节点获取到的值都是一致的。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 初始化数据
+DataSet&lt;Integer&gt; toBroadcast &#x3D; env.fromElements(1, 2, 3)
+	&#x2F;&#x2F; 广播数据 
+	.withBroadcastSet(toBroadcast, &quot;broadcastSetName&quot;);
+&#x2F;&#x2F; 获取数据
+Collection&lt;Integer&gt;broadcastSet &#x3D; getRuntimeContext().getBroadcastVariable(&quot;broadcastSetName&quot;);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>注意事项：</p>
+<ol>
+<li>广播变量存在于每个节点的内存中，它的数据量不能太大，因为广播出去的数据常驻内存，除非程序执行结束。</li>
+<li>广播变量在初始化广播以后不支持修改，这样才能保证每个节点的数据都是一致的。</li>
+<li>如果多个算子需要使用同一份数据集，那么需要在对应的多个算子后面分别注册广播变量。广播变量只能在Flink批处理程序中才可以使用。</li>
+</ol>
+<h2 id="Flink-Accumulator"><a href="#Flink-Accumulator" class="headerlink" title="Flink Accumulator"></a>Flink Accumulator</h2><p>Accumulator 即累加器，与 MapReduce 中 Counter 的应用场景差不多，都能很好地观察 Task 在运行期间的数据变化。可以在 Flink Job 的算子函数中使用累加器，但是只有在任务执行结束之后才能获得累加器的最终结果。</p>
+<p>Counter 是一个具体的累加器实现，常用的 Counter 有 IntCounter、LongCounter 和 DoubleCounter。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 创建累加器
+private IntCounter numLines &#x3D; new IntCounter();
+&#x2F;&#x2F; 注册累加器
+getRuntimeContext().addAccumulator(&quot;num-lines&quot;, this.numLines);
+&#x2F;&#x2F; 使用累加器
+this.numLines.add(1);
+&#x2F;&#x2F; 获取累加器结果
+JobExecutionResult result &#x3D; env.execute(&quot;counter&quot;)
+result.getAccumulatorResult(&quot;num-lines&quot;)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Flink-Distribute-Cache"><a href="#Flink-Distribute-Cache" class="headerlink" title="Flink Distribute Cache"></a>Flink Distribute Cache</h2><p>Flink提供了一个分布式缓存（Distributed Cache），类似于 Hadoop，可以使用户在并行函数中很方便地读取本地文件。</p>
+<p>此缓存的工作机制为程序注册一个文件或者目录（本地或者远程文件系统，如HDFS或者S3），通过ExecutionEnvironment注册缓存文件并为它起一个名称。当程序执行时，Flink自动将文件或者目录复制到所有TaskManager节点的本地文件系统，用户可以通过这个指定的名称查找文件或者目录，然后从TaskManager节点的本地文件系统访问它。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 注册文件
+env.registerCachedFile(&quot;hdfs:&#x2F;&#x2F;&#x2F;path&#x2F;to&#x2F;your&#x2F;file&quot;, &quot;hdfsFile&quot;)
+&#x2F;&#x2F;访问数据
+File myFile &#x3D; getRuntimeContext().getDistributedCache().getFile(&quot;hdfsFile&quot;);
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<h2 id="Flink-Annotation"><a href="#Flink-Annotation" class="headerlink" title="Flink Annotation"></a>Flink Annotation</h2><blockquote>
+<p>仅支持 DataSet</p>
+</blockquote>
+<p>Flink 批处理引擎可以借助数据处理逻辑优化应用程序的物理执行计划，如 DataSet 的哪些部分参与算子函数的计算；哪些部分未经更改地发射到下一级节点，注解就是定义这类数据处理逻辑的工具。需要注意的是，和实际不一致的注解通常会导致应用程序得出错误的计算结果，因此在没有完全清楚所有数据处理逻辑时，不建议使用注解。</p>
+<p>下面介绍注解的三种形式：</p>
+<h3 id="直接转发"><a href="#直接转发" class="headerlink" title="直接转发"></a>直接转发</h3><p>直接转发的输入域（Forwarded Field）是指输入 DataSet 的某个属性未经算子修改而直接输出，可以是输入输出的相同位置，也可以是不同位置。</p>
+<p>直接转发方式有以下三种：</p>
+<ol>
+<li>相同位置直接转发。注解 <code>_2</code> 表示输入数据的第 3 个属性被算子直接转发到输出的第 3 个属性。</li>
+<li>不同位置直接转发。注解 <code>_0-&gt;_2</code> 表示输入数据的第  1  个属性的数据被直接转发到输出的第 3 个属性位置。此外，注解支持通配符 <code>*</code>，标识整个输入或输出，如 <code>_0-&gt;*</code> 表示输入数据的第 1 个属性的数据被直接转发到输出，即输出只有一个属性。</li>
+<li>多个位置直接转发。注解 <code>_0；_2-&gt;_1；_3-&gt;_2</code> 表示输入数据的第 1 个属性的数据被直接转发到输出的第 1 个属性位置，输入数据的第 3 个属性的数据被直接转发到输出的第 2 个属性位置，输入数据的第 4 个属性的数据被直接转发到输出的第 3 个属性位置。</li>
+</ol>
+<p>标注方式有以下两种：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 直接标注在算子函数实现类上
+@ForwardedFields(&quot;_1-&gt;_3&quot;)
+class MyApp extends MapFunction ....
+
+&#x2F;&#x2F; 使用 withForwardedFields 标注
+data.map(..).withForwardedFields(&quot;_1-&gt;_3&quot;)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="非直接转发"><a href="#非直接转发" class="headerlink" title="非直接转发"></a>非直接转发</h3><p>非直接转发的输入域（Non-Forwarded Field）指输入和输出某个相同位置的数据发生了变化，且其他位置的数据均未发生变化。因此，这类注解的语义更强，错误的注解将产生更严重的数据处理错误。</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">&#x2F;&#x2F; 直接标注在算子函数实现类上
+@NonForwardedFields(&quot;_1&quot;)
+class MyApp extends MapFunction ....
+<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h3 id="触达"><a href="#触达" class="headerlink" title="触达"></a>触达</h3><p>达的输入域（Read Field）指输入 DataSet 的某个属性被算子读取并参与计算。这类注解的语义较强，需要列出所有触达的输入域：</p>
+<pre class="line-numbers language-Java" data-language="Java"><code class="language-Java">@ReadFields(&quot;_1; _4&quot;)
+class MyMap extends MapFunction ....
+&#123;
+	if (value._1 &#x3D;&#x3D; 42) &#123;
+		return (value._1, value._2)
+	&#125; else &#123;
+		return (value._4 + 10, value._2)
+	&#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-4-SQL&Table%20API%20TODO/" rel="prev" title="Flink SQL&Table API">
+      <i class="fa fa-chevron-left"></i> Flink SQL&Table API
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-6-%E6%97%B6%E9%97%B4%E5%8F%8A%E7%AA%97%E5%8F%A3/" rel="next" title="Flink 时间与窗口">
+      Flink 时间与窗口 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%AB%98%E7%BA%A7%E8%83%BD%E5%8A%9B"><span class="nav-number">1.</span> <span class="nav-text">高级能力</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-RichFunction"><span class="nav-number">1.1.</span> <span class="nav-text">Flink RichFunction</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-Side-Output"><span class="nav-number">1.2.</span> <span class="nav-text">Flink Side Output</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-Broadcast"><span class="nav-number">1.3.</span> <span class="nav-text">Flink Broadcast</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-Accumulator"><span class="nav-number">1.4.</span> <span class="nav-text">Flink Accumulator</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-Distribute-Cache"><span class="nav-number">1.5.</span> <span class="nav-text">Flink Distribute Cache</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Flink-Annotation"><span class="nav-number">1.6.</span> <span class="nav-text">Flink Annotation</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E8%BD%AC%E5%8F%91"><span class="nav-number">1.6.1.</span> <span class="nav-text">直接转发</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9D%9E%E7%9B%B4%E6%8E%A5%E8%BD%AC%E5%8F%91"><span class="nav-number">1.6.2.</span> <span class="nav-text">非直接转发</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A6%E8%BE%BE"><span class="nav-number">1.6.3.</span> <span class="nav-text">触达</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

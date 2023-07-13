@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="本文主要对 Flink State（状态）进行分析，包含状态的管理和恢复，以及 Flink 中的任务重启策略。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink State管理与恢复">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-7-State%E7%AE%A1%E7%90%86%E4%B8%8E%E6%81%A2%E5%A4%8D/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="本文主要对 Flink State（状态）进行分析，包含状态的管理和恢复，以及 Flink 中的任务重启策略。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/生成快照.png">
+<meta property="og:image" content="http://example.com/images/SE/恢复快照.png">
+<meta property="article:published_time" content="2023-03-23T10:00:55.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.343Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/生成快照.png">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-7-State%E7%AE%A1%E7%90%86%E4%B8%8E%E6%81%A2%E5%A4%8D/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink State管理与恢复 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-7-State%E7%AE%A1%E7%90%86%E4%B8%8E%E6%81%A2%E5%A4%8D/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink State管理与恢复
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 18:00:55" itemprop="dateCreated datePublished" datetime="2023-03-23T18:00:55+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>本文主要对 Flink State（状态）进行分析，包含状态的管理和恢复，以及 Flink 中的任务重启策略。<br><span id="more"></span></p>
+<h2 id="State"><a href="#State" class="headerlink" title="State"></a>State</h2><p>State 一般指一个具体的 Task/Operator 的状态，State 数据默认保存在 Java 的堆内存中。而 CheckPoint（可以理解为 CheckPoint 是把 State 数据持久化存储了）则表示了一个 Flink Job 在一个特定时刻的一份全局状态快照，即包含了所有 Task/Operator 的状态。注意：Task 是 Flink 中执行的基本单位，Operator 是算子（Transformation）。State 可以被记录，在失败的情况下数据还可以恢复。</p>
+<p>Flink 中有两种基本类型的 State：Keyed State、Operator State。</p>
+<p>Keyed State 和 Operator State 以两种形式存在。</p>
+<ol>
+<li>原始状态（Raw State）：由用户自行管理状态具体的数据结构，框架在做 CheckPoint 的时候，使用 <code>byte[]</code> 读写状态内容，对其内部数据结构一无所知。</li>
+<li>托管状态（Managed State）：由Flink框架管理的状态。通常在 DataStream 上推荐使用托管状态，当实现一个用户自定义的 Operator 时使用到原始状态。</li>
+</ol>
+<h3 id="Keyed-State"><a href="#Keyed-State" class="headerlink" title="Keyed State"></a>Keyed State</h3><p>Keyed State，顾名思义就是基于 KeyedStream 上的状态，这个状态是跟特定的 Key 绑定的。KeyedStream 流上的每一个 Key，都对应一个 State。</p>
+<p>Flink 针对 Keyed State 提供了以下可以保存 State 的数据结构。</p>
+<ol>
+<li><code>ValueState&lt;T&gt;</code>：单值状态，可以通过 update 方法更新状态值，通过 value 方法获取状态值。</li>
+<li><code>ListState&lt;T&gt;</code>：List 状态，可以通过 add 方法往列表中附加值，也可以通过 get 方法返回一个 <code>Iterable&lt;T&gt;</code> 来遍历状态值。</li>
+<li><code>ReducingState&lt;T&gt;</code>：Reduce状态，每次调用 add 方法添加值的时候，会调用用户传入的 ReduceFunction，最后合并到一个单一的状态值。</li>
+<li><code>MapState&lt;UK, UV&gt;</code>：Map 状态，用户通过 put 或 putAll 方法添加元素。<br>需要注意的是，以上所述的State对象，仅仅用于与状态进行交互（更新、删除、清空等），而真正的状态值有可能存在于内存、磁盘或者其他分布式存储系统中，相当于我们只是持有了这个状态的句柄。</li>
+</ol>
+<h3 id="Operator-State"><a href="#Operator-State" class="headerlink" title="Operator State"></a>Operator State</h3><p>Operator State 与 Operator 绑定，整个 Operator 只对应一个 State。</p>
+<p>Flink 针对 Operator State 提供了 <code>ListState&lt;T&gt;</code>。</p>
+<h3 id="State-容错"><a href="#State-容错" class="headerlink" title="State 容错"></a>State 容错</h3><p>State 的容错需要依靠 CheckPoint 机制，这样才可以保证 Exactly-once 这种语义，但是注意，它只能保证 Flink 系统内的 Exactly-once，比如 Flink 内置支持的算子。针对 Source 和 Sink 组件，如果想要保证 Exactly-once 的话，则这些组件本身应支持这种语义。</p>
+<p><strong>1. 生成快照</strong></p>
+<p>Flink通过CheckPoint机制可以实现对Source中的数据和Task中的State数据进行存储。</p>
+<p><img src="/images/SE/生成快照.png" alt=""></p>
+<p><strong>2. 恢复快照</strong></p>
+<p>Flink 还可以通过 Restore 机制来恢复之前 CheckPoint 快照中保存的 Source 数据和 Task 中的 State 数据。</p>
+<p><img src="/images/SE/恢复快照.png" alt=""></p>
+<h2 id="CheckPoint"><a href="#CheckPoint" class="headerlink" title="CheckPoint"></a>CheckPoint</h2><p>为了保证 State 的容错性，Flink 需要对 State 进行 CheckPoint。CheckPoint 是 Flink 实现容错机制的核心功能，它能够根据配置周期性地基于 Stream 中各个 Operator/Task 的状态来生成快照，从而将这些状态数据定期持久化存储下来。Flink 程序一旦意外崩溃，重新运行程序时可以有选择地从这些快照进行恢复，从而修正因为故障带来的程序数据异常。</p>
+<p>Flink 的 CheckPoint 机制可以与 Stream 和 State 持久化存储交互的前提有以下两点。</p>
+<ol>
+<li>需要有持久化的 Source，它需要支持在一定时间内重放事件，这种 Source 的典型例子就是持久化的消息队列（如 Apache Kafka、RabbitMQ 等）或文件系统（如 HDFS、S3、GFS 等）。</li>
+<li>需要有用于 State 的持久化存储介质，比如分布式文件系统（如HDFS、S3、GFS等）。</li>
+</ol>
+<p>默认情况下，CheckPoint 功能是 Disabled（禁用）的，使用时需要先开启它。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">enableCheckpointing</span><span class="token punctuation">(</span><span class="token number">1000</span><span class="token punctuation">,</span> <span class="token class-name">CheckpointingMode</span><span class="token punctuation">.</span>EXACTLY_ONCE<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 其中 1000 设置了 CheckpointInterval</span>
+<span class="token comment">// EXACTLY_ONCE 设置了 CheckPointMode</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<p>其他配置项的设置方式为 <code>(StreamExecutionEnvironment) env.getCheckpointConfig().xxx</code>。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>含义</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CheckPointMode</td>
+<td>检查点模式</td>
+<td>EXACTLY_ONCE 确保一次，AT_LEAST_ONCE 至少一次</td>
+</tr>
+<tr>
+<td>CheckpointInterval</td>
+<td>检查点间隔</td>
+<td>间隔指定时间创建检查点</td>
+</tr>
+<tr>
+<td>MinPauseBetweenCheckpoints</td>
+<td>检查点最小间隔</td>
+<td></td>
+</tr>
+<tr>
+<td>CheckpointTimeout</td>
+<td>检查点超时时间</td>
+<td>检查点必须在指定时间内完成，或者被丢弃</td>
+</tr>
+<tr>
+<td>MaxConcurrentCheckpoints</td>
+<td>最大检查点并发数</td>
+<td>同一时间只允许操作指定个数的检查点</td>
+</tr>
+<tr>
+<td>ExternalizedCheckpointCleanup</td>
+<td>具体的检查点清理策略</td>
+<td>DELETE_ON_CANCELLATION JOB失败时保存检查点、取消时不保存, RETAIN_ON_CANCELLATION JOB失败或取消时均保存检查点, NO_EXTERNALIZED_CHECKPOINTS 不保存检查点</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="TODO"><a href="#TODO" class="headerlink" title="TODO"></a>TODO</h4><pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setTolerableCheckpointFailureNumber</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setAlignedCheckpointTimeout</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCheckpointStorage</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCheckpointIdOfIgnoredInFlightData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>   
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setForceUnalignedCheckpoints</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">enableApproximateLocalRecovery</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">enableUnalignedCheckpoints</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="设置检查点持久化"><a href="#设置检查点持久化" class="headerlink" title="设置检查点持久化"></a>设置检查点持久化</h3><p>默认情况下，State 会保存在 TaskManager 的内存中，CheckPoint 会存储在 JobManager 的内存中。State 和 CheckPoint 的存储位置取决于 StateBackend 的配置。Flink 提供了多种场景下的 StateBackend：</p>
+<ol>
+<li>内存存储 CheckPoint</li>
+</ol>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">setStateBackend</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">HashMapStateBackend</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCheckpointStorage</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">JobManagerCheckpointStorage</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<ol>
+<li>文件存储 CheckPoint</li>
+</ol>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 本地文件</span>
+env<span class="token punctuation">.</span><span class="token function">setStateBackend</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">HashMapStateBackend</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCheckpointStorage</span><span class="token punctuation">(</span><span class="token string">"file:///data/checkpoint.data"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// 分布式文件</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+<ol>
+<li>RocksDB CheckPoint</li>
+</ol>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">setStateBackend</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">EmbeddedRocksDBStateBackend</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+env<span class="token punctuation">.</span><span class="token function">getCheckpointConfig</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">setCheckpointStorage</span><span class="token punctuation">(</span><span class="token string">"hdfs:///flink-checkpoints"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p>以上只是在代码中修改配置，还可以通过 YAML 的方式设置 <code>state.backend</code>、<code>state.checkpoints.dir</code> 。另外，默认情况下，Flink 只保留最近成功生成的 1 个 CheckPoint，而当 Flink 程序失败时，可以通过最近的 CheckPoint 来进行恢复。但是，如果希望保留多个 CheckPoint，需要在 YAML<br>中进行配置 <code>state.checkpoints.num-retained</code>，并且能够根据实际需要选择其中一个进行恢复。</p>
+<h2 id="SavePoint"><a href="#SavePoint" class="headerlink" title="SavePoint"></a>SavePoint</h2><p>Flink 通过 SavePoint 功能可以升级程序，然后继续从升级前的那个点开始执行计算，保证数据不中断。SavePoint 可以生成全局、一致性的快照，也可以保存数据源、Offset、Operator 操作状态等信息，还可以从应用在过去任意做了 SavePoint 的时刻开始继续执行。</p>
+<blockquote>
+<p>与 CheckPoint 不同的是，CheckPoint 是定时触发，且会过期，在内部应用失败重启的时候使用。SavePoint 是用户手动触发，是指向 CheckPoint 的指针，其不会过期，一般在升级的情况下使用。</p>
+</blockquote>
+<p>注意：为了能够在作业的不同版本之间以及 Flink 的不同版本之间顺利升级，强烈推荐通过 UID （String）方法手动给算子赋予 ID，这些 ID 将用于确定每一个算子的状态范围。如果不手动给各算子指定 ID，则会由 Flink 自动给每个算子生成一个 ID。只要这些 ID 没有改变，就能从保存点（SavePoint）恢复程序。而这些自动生成的 ID 依赖于程序的结构，并且对代码的更改是很敏感的。因此，强烈建议用户手动设置 ID。</p>
+<ol>
+<li>设置 SavePoint 存储位置</li>
+</ol>
+<p>设置该配置项并不是必须的，但是在设置后，如果要创建指定 Job 的 SavePoint 可以不需要手动执行命令时指定 SavePoint 位置。<br><pre class="line-numbers language-yaml" data-language="yaml"><code class="language-yaml"><span class="token key atrule">state.savepoints.dir</span><span class="token punctuation">:</span> hdfs<span class="token punctuation">:</span>//hadoop100<span class="token punctuation">:</span>9000/Flink/savepoints<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<ol>
+<li>触发 SavePoint</li>
+</ol>
+<p>直接触发 SavePoint<br><pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">bin/flink savepoint jobId <span class="token punctuation">[</span>targetDirectory<span class="token punctuation">]</span> <span class="token punctuation">[</span>-yid yarnAppId<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<p>在调用 cancel 的时候触发 SavePoint<br><pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">bin/flink cancel -s <span class="token punctuation">[</span>targetDirectory<span class="token punctuation">]</span> jobId <span class="token punctuation">[</span>-yid yarnAppId<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<ol>
+<li>从指定的 SavePoint 启动Job</li>
+</ol>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash">bin/flink run -s savepointPath <span class="token punctuation">[</span>runArgs<span class="token punctuation">]</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<h2 id="Restart-Strategy"><a href="#Restart-Strategy" class="headerlink" title="Restart Strategy"></a>Restart Strategy</h2><p>集群在启动时会伴随一个默认的重启策略 ，在没有定义具体重启策略时会使用该默认策略；如果在任务提交时指定了一个重启策略，该策略会覆盖集群的默认策略。</p>
+<p>常用的策略如下。</p>
+<p><strong>1. 无重启</strong></p>
+<blockquote>
+<p>如果没有启用 CheckPoint，则使用无重启策略。</p>
+</blockquote>
+<p>YAML 全局配置<br><pre class="line-numbers language-yaml" data-language="yaml"><code class="language-yaml"><span class="token key atrule">restart-strategy</span><span class="token punctuation">:</span> none<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<p>任务独立配置<br><pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">setRestartStrategy</span><span class="token punctuation">(</span><span class="token class-name">RestartStrategies</span><span class="token punctuation">.</span><span class="token function">noRestart</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<p><strong>1. 固定间隔</strong></p>
+<blockquote>
+<p>如果启用了 CheckPoint，但没有配置重启策略，则使用固定间隔策略，其中 Integer.MAX_VALUE 参数是允许尝试重启的次数。</p>
+</blockquote>
+<p>YAML 全局配置<br><pre class="line-numbers language-yaml" data-language="yaml"><code class="language-yaml"><span class="token key atrule">restart-strategy</span><span class="token punctuation">:</span> fixed<span class="token punctuation">-</span>delay 
+<span class="token key atrule">restart-strategy.fixed-delay.attempts</span><span class="token punctuation">:</span> <span class="token number">3</span> 
+<span class="token key atrule">restart-strategy.fixed-delay.delay</span><span class="token punctuation">:</span> 10 s<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre></p>
+<p>任务独立配置<br><pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">setRestartStrategy</span><span class="token punctuation">(</span><span class="token class-name">RestartStrategies</span><span class="token punctuation">.</span><span class="token function">fixedDelayRestart</span><span class="token punctuation">(</span> 
+	<span class="token number">3</span><span class="token punctuation">,</span> <span class="token comment">// 尝试重启的次数</span>
+	<span class="token class-name">Time</span><span class="token punctuation">.</span><span class="token function">of</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>SECONDS<span class="token punctuation">)</span> <span class="token comment">// 间隔 </span>
+<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre></p>
+<p><strong>2. 失败率</strong></p>
+<p>YAML 全局配置<br><pre class="line-numbers language-yaml" data-language="yaml"><code class="language-yaml"><span class="token key atrule">restart-strategy</span><span class="token punctuation">:</span> failure<span class="token punctuation">-</span>rate 
+<span class="token key atrule">restart-strategy.failure-rate.max-failures-per-interval</span><span class="token punctuation">:</span> <span class="token number">3</span> 
+<span class="token key atrule">restart-strategy.failure-rate.failure-rate-interval</span><span class="token punctuation">:</span> 5 min 
+<span class="token key atrule">restart-strategy.failure-rate.delay</span><span class="token punctuation">:</span> 10 s<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre></p>
+<p>任务独立配置<br><pre class="line-numbers language-java" data-language="java"><code class="language-java">env<span class="token punctuation">.</span><span class="token function">setRestartStrategy</span><span class="token punctuation">(</span><span class="token class-name">RestartStrategies</span><span class="token punctuation">.</span><span class="token function">failureRateRestart</span><span class="token punctuation">(</span> 
+	<span class="token number">3</span><span class="token punctuation">,</span> <span class="token comment">// 一个时间段内的最大失败次数 </span>
+	<span class="token class-name">Time</span><span class="token punctuation">.</span><span class="token function">of</span><span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>MINUTES<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token comment">// 衡量失败次数的是时间段 </span>
+	<span class="token class-name">Time</span><span class="token punctuation">.</span><span class="token function">of</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token class-name">TimeUnit</span><span class="token punctuation">.</span>SECONDS<span class="token punctuation">)</span> <span class="token comment">// 间隔 </span>
+<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-6-%E6%97%B6%E9%97%B4%E5%8F%8A%E7%AA%97%E5%8F%A3/" rel="prev" title="Flink 时间与窗口">
+      <i class="fa fa-chevron-left"></i> Flink 时间与窗口
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-8-CEP%20%E5%A4%8D%E6%9D%82%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86/" rel="next" title="Flink CEP 复杂事件处理">
+      Flink CEP 复杂事件处理 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#State"><span class="nav-number">1.</span> <span class="nav-text">State</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Keyed-State"><span class="nav-number">1.1.</span> <span class="nav-text">Keyed State</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Operator-State"><span class="nav-number">1.2.</span> <span class="nav-text">Operator State</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#State-%E5%AE%B9%E9%94%99"><span class="nav-number">1.3.</span> <span class="nav-text">State 容错</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CheckPoint"><span class="nav-number">2.</span> <span class="nav-text">CheckPoint</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#TODO"><span class="nav-number">2.0.1.</span> <span class="nav-text">TODO</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BE%E7%BD%AE%E6%A3%80%E6%9F%A5%E7%82%B9%E6%8C%81%E4%B9%85%E5%8C%96"><span class="nav-number">2.1.</span> <span class="nav-text">设置检查点持久化</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SavePoint"><span class="nav-number">3.</span> <span class="nav-text">SavePoint</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Restart-Strategy"><span class="nav-number">4.</span> <span class="nav-text">Restart Strategy</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

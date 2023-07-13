@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="计算图是 Flink 组织流处理节点的架构形式，将复杂事件处理抽象成模式图的形式是这种思路的延续。类比计算图中的节点，模式图由基本模式构建，并以拼合、分组的方式形成复杂的处理模式。FlinkCEP（Complex Event Process for Flink）是以库的形式提供的，是一种全新的、定义在流式架构上的模式匹配 API，如复杂谓词、多种匹配模式、闭包。在 Maven 工程中需要加入 fl">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink CEP 复杂事件处理">
+<meta property="og:url" content="http://example.com/2023/03/23/Flink-8-CEP%20%E5%A4%8D%E6%9D%82%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="计算图是 Flink 组织流处理节点的架构形式，将复杂事件处理抽象成模式图的形式是这种思路的延续。类比计算图中的节点，模式图由基本模式构建，并以拼合、分组的方式形成复杂的处理模式。FlinkCEP（Complex Event Process for Flink）是以库的形式提供的，是一种全新的、定义在流式架构上的模式匹配 API，如复杂谓词、多种匹配模式、闭包。在 Maven 工程中需要加入 fl">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/NFA模型.png">
+<meta property="og:image" content="http://example.com/images/SE/NFAb模型.png">
+<meta property="article:published_time" content="2023-03-23T11:00:55.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.380Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/NFA模型.png">
+
+<link rel="canonical" href="http://example.com/2023/03/23/Flink-8-CEP%20%E5%A4%8D%E6%9D%82%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink CEP 复杂事件处理 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/03/23/Flink-8-CEP%20%E5%A4%8D%E6%9D%82%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink CEP 复杂事件处理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-03-23 19:00:55" itemprop="dateCreated datePublished" datetime="2023-03-23T19:00:55+08:00">2023-03-23</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>计算图是 Flink 组织流处理节点的架构形式，将复杂事件处理抽象成模式图的形式是这种思路的延续。类比计算图中的节点，模式图由基本模式构建，并以拼合、分组的方式形成复杂的处理模式。FlinkCEP（Complex Event Process for Flink）是以库的形式提供的，是一种全新的、定义在流式架构上的模式匹配 API，如复杂谓词、多种匹配模式、闭包。在 Maven 工程中需要加入 <code>flink-cep</code> 依赖。</p>
+<span id="more"></span>
+<h1 id="复杂事件处理的自动机理论"><a href="#复杂事件处理的自动机理论" class="headerlink" title="复杂事件处理的自动机理论"></a>复杂事件处理的自动机理论</h1><h2 id="有穷自动机模型-NFA"><a href="#有穷自动机模型-NFA" class="headerlink" title="有穷自动机模型 NFA"></a>有穷自动机模型 NFA</h2><p>有穷自动机是为计算机建模而引入的，因此在有穷自动机 M1 中我们假定状态机的输入是由 0 和 1 组成的字符串。有穷自动机 M1 有三个状态，记作 <code>q1</code>、<code>q2</code> 和 <code>q3</code>：用一个无出发点的箭头表示起始状态（如图 7-1 中起始状态 <code>q1</code> 左侧的箭头所示）；用双圈表示接受状态（如图 7-1 中的 <code>q3</code> 所示）；用从一个状态指向另一个状态的箭头表示转移，箭头上的数字表示状态转移的条件；这个机器处理接收的输入字符串，输出是接受或拒绝，即模式匹配中的匹配或不匹配。</p>
+<p>![[Pasted image 20230321093340.png]]</p>
+<p>当这个机器接收到字符串 110 时，状态的转移过程如下：</p>
+<ol>
+<li>初始状态为 <code>q1</code></li>
+<li>读入第一个字符 1，状态转移到 <code>q2</code></li>
+<li>读入字符 1，状态保持为 <code>q2</code></li>
+<li>读入字符 0，状态转移到 <code>q3</code></li>
+<li>最终状态为接受状态，因此输出为接受</li>
+</ol>
+<p>有穷状态机定义为一个五元组 <code>(Q, W, R, q0, F)</code>：</p>
+<ol>
+<li>称有穷集合 <code>Q</code> 为状态集</li>
+<li>称有穷集合 <code>W</code> 为字母表，即允许的输入符号的集合。在有穷自动机 M1 中，字母表中仅有 0 和 1 两个字符</li>
+<li>称 <code>R: Q ✖️ W -&gt; Q</code> 为转移函数。转移函数描述了有穷自动机状态图中所有的状态转移规则</li>
+<li><code>q0</code> 是初始状态</li>
+<li><code>F</code> 是接受状态集，有穷自动机允许有多个接受状态，也允许没有接受状态。</li>
+</ol>
+<p>在确定型有穷自动机（DFA，Deterministic Finite Automaton）M1 中，我们发现每一个状态的所有转移条件是互斥的，或者说，自动机每次读入一个符号时可以事先知道机器的下一个状态，如状态 <code>q1</code> 在转移条件为 0 时转移至 <code>q1</code>，在转移条件为 1 时转移至 <code>q2</code>。而在非确定型有穷自动机（NFA，Nondeterministic Finite Automaton）中，对于任何一个状态，要转移的下一个状态可能存在若干个非互斥的选择，下图所示为非确定型有穷自动机 M2。</p>
+<p><img src="/images/SE/NFA模型.png" alt=""></p>
+<p>状态 <code>q1</code> 对转移条件 1 有两个转移箭头，因此，当读入 1 时状态机分为两个过程，其中一个过程中的机器状态为 <code>q2</code>，另一个过程中的机器停留在 <code>q1</code> 状态，当再次读入 1 时，一个过程继续分为两个过程。因此，可以将一台 NFA 拆解成一台 DFA，即每一台非确定型有穷自动机都等价于某一台确定型有穷自动机，但是由于构造 NFA 通常比直接构造 DFA 更容易，且 NFA 的功能更易于理解，在基于自动机的构造设计中通常采用 NFA 形式论证，如接下来要分析的 NFA b 模型。</p>
+<h2 id="NFA-b-模型"><a href="#NFA-b-模型" class="headerlink" title="$NFA^b$ 模型"></a>$NFA^b$ 模型</h2><p>事件处理 $NFA^b$ 模型包括一台 NFA 和一个匹配缓冲区（match buffer），表示为 <code>A = (Q, E, θ, q1, F)</code>，其中 <code>Q</code> 为状态集，<code>E</code> 为有向边，<code>θ</code> 为状态转移条件，<code>q1</code> 为初始状态，<code>F</code> 为接受状态。下图所示为 Query 2 程序对应的自动机 $NFA^b$ 模型（以下简称为 Query 2 自动机）。</p>
+<p><img src="/images/SE/NFAb模型.png" alt=""></p>
+<p><strong>1. 状态</strong><br>在 Query 2 自动机中，以缓存名称命名状态，以起始状态 $a[1]$ 为例，自动机将初始事件存储在 $a[1]$ 中，这是 Kleene 闭包的起始点。后续匹配的事件将存储在 $a[i]$ 中，对应状态为 $a[i]$。在 Kleene 闭包匹配完成后，b 存储下一个匹配事件。</p>
+<p><strong>2. 边</strong><br>每一条边定义一种状态转移路径。有 4 类边：</p>
+<ol>
+<li><code>take</code> 表示事件匹配成功，用于当前状态到自身的转移，如 Query 2 自动机中的 $a[i]$ 状态，take 将当前事件存储在 $a[i]$ 中</li>
+<li><code>ignore</code> 表示事件匹配不成功，当前状态不转移，与 take 的区别是当前事件不存储在 $a[i]$ 中</li>
+<li><code>proceed</code> 表示转移下一个状态，当前事件不存储在当前状态对应的缓存中</li>
+<li><code>begin</code> 表示当前状态的开始，在 Query 2 自动机中，状态 $a[1]$ 匹配成功后，下一个事件将进入 $a[i]$ 状态</li>
+</ol>
+<p>边有三个转移属性：</p>
+<ol>
+<li>转移条件，用状态加转移类型表示，如 $θ_{a[i]_take}$</li>
+<li>对输入的操作，如消费当前事件（匹配当前事件，再读入新的事件）</li>
+<li>匹配缓存的操作，如将匹配的事件写入缓存。</li>
+</ol>
+<p>无界数据集上的 $NFA^b$ 模型是复杂的，因为无法定义自动机的匹配起点。因此，同一个窗口内的数据可能会对应多个并行的模式匹配过程。此外，非确定型有穷自动机在执行过程中也会存在多个分叉过程。这种并行模式匹配过程不仅导致运行时异常复杂，也会拉长执行时间。</p>
+<h1 id="FlinkCEP-API"><a href="#FlinkCEP-API" class="headerlink" title="FlinkCEP API"></a>FlinkCEP API</h1><p>计算图是 Flink 组织流处理节点的架构形式，将复杂事件处理抽象成模式图的形式是这种思路的延续。类比计算图中的节点，模式图由基本模式构建，并以拼合、分组的方式形成复杂的处理模式。</p>
+<blockquote>
+<p>FlinkCEP（Complex Event Process for Flink）是以库的形式提供的，需要加入 <code>flink-cep</code> 的 Maven 依赖。</p>
+</blockquote>
+<h2 id="模式API"><a href="#模式API" class="headerlink" title="模式API"></a>模式API</h2><p>模式 API 可以让你定义想从输入流中抽取的复杂模式序列。</p>
+<p>每个复杂的模式序列包括多个简单的模式，比如，寻找拥有相同属性事件序列的模式。从现在开始，我们把这些简单的模式称作 <code>patterns</code>， 把我们在数据流中最终寻找的复杂模式序列称作 <code>pattern sequence</code>，你可以把模式序列看作是这样的模式构成的图， 这些模式基于用户指定的条件从一个转换到另外一个。 一个 <code>match</code> 是输入事件的一个序列，这些事件通过一系列有效的模式转换，能够访问到复杂模式图中的所有模式。</p>
+<blockquote>
+<p>每个模式必须有一个独一无二的名字，你可以在后面使用它来识别匹配到的事件。</p>
+<p>模式的名字不能包含字符<code>&quot;:&quot;</code>。</p>
+</blockquote>
+<h3 id="单个模式"><a href="#单个模式" class="headerlink" title="单个模式"></a>单个模式</h3><p>一个 patterns 可以是一个单例或者循环模式。单例模式只接受一个事件，循环模式可以接受多个事件。 在模式匹配表达式中，模式<code>&quot;a b+ c? d&quot;</code>， <code>a</code>，<code>c?</code>，和 <code>d</code> 都是单例模式，<code>b+</code> 是一个循环模式。默认情况下，模式都是单例的，你可以通过使用量词把它们转换成循环模式。 每个模式可以有一个或者多个条件来决定它接受哪些事件。</p>
+<h4 id="量词"><a href="#量词" class="headerlink" title="量词"></a>量词</h4><p>在 FlinkCEP 中，你可以通过这些方法指定循环模式：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>描述</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>oneOrMore()</td>
+<td>指定模式期望匹配到的事件至少出现一次</td>
+<td>默认（在子事件间）使用松散的内部连续性。 关于内部连续性的更多信息可以参考<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/libs/cep/#consecutive_java">连续性</a></td>
+</tr>
+<tr>
+<td>times(<code>#ofTimes</code>)</td>
+<td>指定期望一个给定事件出现特定次数的模式</td>
+<td>start.times(4) 期望出现4次</td>
+</tr>
+<tr>
+<td>timesOrMore(<code>#times</code>)</td>
+<td>指定模式期望匹配到的事件至少出现 times 次</td>
+<td></td>
+</tr>
+<tr>
+<td>times(<code>#fromTimes</code>, <code>#toTimes</code>)</td>
+<td>指定期望一个给定事件出现次数在一个最小值和最大值中间的模式</td>
+<td>start.times(2, 4) 期望出现2、3或者4次</td>
+</tr>
+<tr>
+<td>greedy()</td>
+<td>让循环模式变成贪心的</td>
+<td>start.times(2, 4).greedy() 期望出现2、3或者4次，并且尽可能的重复次数多</td>
+</tr>
+<tr>
+<td>optional()</td>
+<td>让指定的模式变成可选的(可以不被匹配)，不管是否是循环模式</td>
+<td>start.times(4).optional() 期望出现0或者4次</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h4 id="条件"><a href="#条件" class="headerlink" title="条件"></a>条件</h4><p>对每个模式你可以指定一个条件来决定一个进来的事件是否被接受进入这个模式。 指定判断事件属性的条件可以通过下表方法。 这些可以是 <code>IterativeCondition</code> 或者 <code>SimpleCondition</code>。</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>描述</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pattern.where()</code></td>
+<td>为当前模式定义一个条件。为了匹配这个模式，一个事件必须满足某些条件。 多个连续的where()语句取与组成判断条件</td>
+<td></td>
+</tr>
+<tr>
+<td><code>pattern.or()</code></td>
+<td>增加一个新的判断，和当前的判断取或。一个事件只要满足至少一个判断条件就匹配到模式</td>
+<td></td>
+</tr>
+<tr>
+<td><code>pattern.until()</code></td>
+<td>为循环模式指定一个停止条件。意思是满足了给定的条件的事件出现后，就不会再有事件被接受进入模式了</td>
+<td>只适用于和 <code>oneOrMore()</code> 同时使用。在基于事件的条件中，它可用于清理对应模式的状态。</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h5 id="迭代条件"><a href="#迭代条件" class="headerlink" title="迭代条件"></a>迭代条件</h5><p>这是最普遍的条件类型。使用它可以获取当前事件，也可以根据上下文获取某个状态下对应的事件集合。通过上述事件代表的条件来决定是否接受时间序列的条件。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">middle<span class="token punctuation">.</span><span class="token function">oneOrMore</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">subtype</span><span class="token punctuation">(</span><span class="token class-name">SubEvent</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">IterativeCondition</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SubEvent</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token annotation punctuation">@Override</span>
+        <span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">filter</span><span class="token punctuation">(</span><span class="token class-name">SubEvent</span> value<span class="token punctuation">,</span> <span class="token class-name">Context</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">SubEvent</span><span class="token punctuation">></span></span> ctx<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span> <span class="token punctuation">&#123;</span>
+	        <span class="token comment">// 根据当前事件作出判断</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>value<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">startsWith</span><span class="token punctuation">(</span><span class="token string">"foo"</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+			
+            <span class="token keyword">double</span> sum <span class="token operator">=</span> value<span class="token punctuation">.</span><span class="token function">getPrice</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token comment">// 根据 middle 状态对应的事件集合来作出判断</span>
+            <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token class-name">Event</span> event <span class="token operator">:</span> ctx<span class="token punctuation">.</span><span class="token function">getEventsForPattern</span><span class="token punctuation">(</span><span class="token string">"middle"</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+                sum <span class="token operator">+=</span> event<span class="token punctuation">.</span><span class="token function">getPrice</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">&#125;</span>
+            <span class="token keyword">return</span> <span class="token class-name">Double</span><span class="token punctuation">.</span><span class="token function">compare</span><span class="token punctuation">(</span>sum<span class="token punctuation">,</span> <span class="token number">5.0</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+    <span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p>调用 <code>ctx.getEventsForPattern(...)</code> 可以获得所有前面已经接受作为可能匹配的事件。 调用这个操作的代价可能很小也可能很大，所以在实现你的条件时，尽量少使用它。</p>
+</blockquote>
+<p>描述的上下文提供了获取事件时间属性的方法。更多细节可以看<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/libs/cep/#%e6%97%b6%e9%97%b4%e4%b8%8a%e4%b8%8b%e6%96%87">时间上下文</a>。</p>
+<h5 id="简单条件"><a href="#简单条件" class="headerlink" title="简单条件"></a>简单条件</h5><p>这种类型的条件扩展了前面提到的 <code>IterativeCondition</code> 类，它决定是否接受一个事件只取决于事件自身的属性。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">start<span class="token punctuation">.</span><span class="token function">subtype</span><span class="token punctuation">(</span><span class="token class-name">SubEvent</span><span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">)</span>
+	 <span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SimpleCondition</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	    <span class="token annotation punctuation">@Override</span>
+	    <span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">filter</span><span class="token punctuation">(</span><span class="token class-name">Event</span> value<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+	        <span class="token keyword">return</span> value<span class="token punctuation">.</span><span class="token function">getName</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">startsWith</span><span class="token punctuation">(</span><span class="token string">"foo"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+	    <span class="token punctuation">&#125;</span>
+	<span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>最后，你可以通过 <code>pattern.subtype(subClass)</code> 方法限制接受的事件类型是初始事件的子类型。</p>
+<h5 id="组合条件"><a href="#组合条件" class="headerlink" title="组合条件"></a>组合条件</h5><p>你可以把 <code>subtype</code> 条件和其他的条件结合起来使用。这适用于任何条件，你可以通过依次调用 <code>where()</code> 来组合条件。 最终的结果是每个单一条件的结果的逻辑 AND。如果想使用 OR 来组合条件，你可以像下面这样使用 <code>or()</code> 方法。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java">pattern<span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SimpleCondition</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">filter</span><span class="token punctuation">(</span><span class="token class-name">Event</span> value<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span> <span class="token comment">// 一些判断条件</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">or</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">SimpleCondition</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">boolean</span> <span class="token function">filter</span><span class="token punctuation">(</span><span class="token class-name">Event</span> value<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+        <span class="token keyword">return</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span> <span class="token comment">// 一些判断条件</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h5 id="停止条件"><a href="#停止条件" class="headerlink" title="停止条件"></a>停止条件</h5><p>如果使用循环模式（<code>oneOrMore()</code> 和 <code>oneOrMore().optional()</code>），你可以指定一个停止条件，例如，接受事件的值大于 5 直到值的和小于 50。</p>
+<p>为了更好的理解它，看下面的例子。给定</p>
+<ul>
+<li><p>模式如<code>&quot;(a+ until b)&quot;</code> (一个或者更多的<code>&quot;a&quot;</code>直到<code>&quot;b&quot;</code>)</p>
+</li>
+<li><p>到来的事件序列<code>&quot;a1&quot; &quot;c&quot; &quot;a2&quot; &quot;b&quot; &quot;a3&quot;</code></p>
+</li>
+<li><p>输出结果会是： <code>&#123;a1 a2&#125; &#123;a1&#125; &#123;a2&#125; &#123;a3&#125;</code>.</p>
+</li>
+</ul>
+<p>你可以看到<code>&#123;a1 a2 a3&#125;</code>和<code>&#123;a2 a3&#125;</code>由于停止条件没有被输出。</p>
+<h3 id="组合模式"><a href="#组合模式" class="headerlink" title="组合模式"></a>组合模式</h3><p>组合模式是将单个模式连接起来组成一个完整的模式序列。</p>
+<p>模式序列由一个初始模式作为开头，如下所示：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> start <span class="token operator">=</span> <span class="token class-name">Pattern</span><span class="token punctuation">.</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span><span class="token function">begin</span><span class="token punctuation">(</span><span class="token string">"start"</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>接下来，你可以增加更多的模式到模式序列中并指定它们之间所需的连续条件。FlinkCEP 支持事件之间如下形式的连续策略：</p>
+<ol>
+<li><strong>严格连续</strong>: 期望所有匹配的事件严格的一个接一个出现，中间没有任何不匹配的事件。</li>
+<li><strong>松散连续</strong>: 忽略匹配的事件之间的不匹配的事件。</li>
+<li><strong>不确定的松散连续</strong>: 更进一步的松散连续，允许忽略掉一些匹配事件的附加匹配。</li>
+</ol>
+<p>可以使用下面的方法来指定模式之间的连续策略：</p>
+<ol>
+<li><code>next()</code>，指定严格连续，匹配的事件必须直接跟在前面匹配到的事件后面</li>
+<li><code>followedBy()</code>，指定松散连续，可以有其他事件出现在匹配的事件和之前匹配到的事件中间（松散连续）</li>
+<li><code>followedByAny()</code>，指定不确定的松散连续，可以有其他事件出现在匹配的事件和之前匹配到的事件中间， 每个可选的匹配事件都会作为可选的匹配结果输出（不确定的松散连续）</li>
+</ol>
+<p>或者</p>
+<ol>
+<li><code>notNext()</code>，增加一个新的否定模式。匹配的（否定）事件必须直接跟在前面匹配到的事件之后（严格连续）来丢弃这些部分匹配</li>
+<li><code>notFollowedBy()</code>，增加一个新的否定模式。即使有其他事件在匹配的（否定）事件和之前匹配的事件之间发生， 部分匹配的事件序列也会被丢弃（松散连续）</li>
+</ol>
+<blockquote>
+<p>模式序列不能以 <code>notFollowedBy()</code> 结尾。</p>
+<p>一个 <strong>NOT</strong> 模式前面不能是可选的模式。</p>
+</blockquote>
+<p>可以使用 within 定义一个有效时间约束，事件必须在指定时间完成。如果未完成的事件序列超过了这个事件，就会被丢弃。需要注意的是，一个模式序列只能有一个时间限制。如果限制了多个时间在不同的单个模式上，会使用最小的那个时间限制。 </p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token comment">// 严格连续</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> strict <span class="token operator">=</span> start<span class="token punctuation">.</span><span class="token function">next</span><span class="token punctuation">(</span><span class="token string">"middle"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 松散连续</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> relaxed <span class="token operator">=</span> start<span class="token punctuation">.</span><span class="token function">followedBy</span><span class="token punctuation">(</span><span class="token string">"middle"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 不确定的松散连续</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> nonDetermin <span class="token operator">=</span> start<span class="token punctuation">.</span><span class="token function">followedByAny</span><span class="token punctuation">(</span><span class="token string">"middle"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 严格连续的NOT模式</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> strictNot <span class="token operator">=</span> start<span class="token punctuation">.</span><span class="token function">notNext</span><span class="token punctuation">(</span><span class="token string">"not"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 松散连续的NOT模式</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> relaxedNot <span class="token operator">=</span> start<span class="token punctuation">.</span><span class="token function">notFollowedBy</span><span class="token punctuation">(</span><span class="token string">"not"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">where</span><span class="token punctuation">(</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>松散连续意味着跟着的事件中，只有第一个可匹配的事件会被匹配上，而不确定的松散连接情况下，有着同样起始的多个匹配会被输出。 举例来说，模式<code>&quot;a b&quot;</code>，给定事件序列 <code>&quot;a&quot;，&quot;c&quot;，&quot;b1&quot;，&quot;b2&quot;</code>，会产生如下的结果：</p>
+<ol>
+<li><code>&quot;a&quot;</code> 和 <code>&quot;b&quot;</code>之间严格连续： <code>&#123;&#125;</code> （没有匹配），<code>&quot;a&quot;</code> 之后的 <code>&quot;c&quot;</code> 导致 <code>&quot;a&quot;</code> 被丢弃。</li>
+<li><code>&quot;a&quot;</code> 和 <code>&quot;b&quot;</code> 之间松散连续： <code>&#123;a b1&#125;</code>，松散连续会”跳过不匹配的事件直到匹配上的事件”。</li>
+<li><code>&quot;a&quot;</code> 和 <code>&quot;b&quot;</code> 之间不确定的松散连续： <code>&#123;a b1&#125;</code>, <code>&#123;a b2&#125;</code>，这是最常见的情况。</li>
+</ol>
+<p>也可以为模式定义一个有效时间约束。 例如，你可以通过 <code>pattern.within()</code> 方法指定一个模式应该在 10 秒内发生。 这种时间模式支持<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/concepts/time/">处理时间和事件时间</a>。</p>
+<blockquote>
+<p>一个模式序列只能有一个时间限制。如果限制了多个时间在不同的单个模式上，会使用最小的那个时间限制。</p>
+</blockquote>
+<h3 id="循环模式中的连续性"><a href="#循环模式中的连续性" class="headerlink" title="循环模式中的连续性"></a>循环模式中的连续性</h3><p>你可以在循环模式中使用和前面<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/libs/cep/#%e7%bb%84%e5%90%88%e6%a8%a1%e5%bc%8f">章节</a>讲过的同样的连续性。 连续性会被运用在被接受进入模式的事件之间。 用这个例子来说明上面所说的连续性，一个模式序列<code>&quot;a b+ c&quot;</code>（<code>&quot;a&quot;</code>后面跟着一个或者多个（不确定连续的）<code>&quot;b&quot;</code>，然后跟着一个<code>&quot;c&quot;</code>） 输入为<code>&quot;a&quot;，&quot;b1&quot;，&quot;d1&quot;，&quot;b2&quot;，&quot;d2&quot;，&quot;b3&quot;，&quot;c&quot;</code>，输出结果如下：</p>
+<ol>
+<li><strong>严格连续</strong>: <code>&#123;a b1 c&#125;</code>, <code>&#123;a b2 c&#125;</code>, <code>&#123;a b3 c&#125;</code> - 没有相邻的 <code>&quot;b&quot;</code> 。</li>
+<li><strong>松散连续</strong>: <code>&#123;a b1 c&#125;</code>，<code>&#123;a b1 b2 c&#125;</code>，<code>&#123;a b1 b2 b3 c&#125;</code>，<code>&#123;a b2 c&#125;</code>，<code>&#123;a b2 b3 c&#125;</code>，<code>&#123;a b3 c&#125;</code> - <code>&quot;d&quot;</code>都被忽略了。</li>
+<li><strong>不确定松散连续</strong>: <code>&#123;a b1 c&#125;</code>，<code>&#123;a b1 b2 c&#125;</code>，<code>&#123;a b1 b3 c&#125;</code>，<code>&#123;a b1 b2 b3 c&#125;</code>，<code>&#123;a b2 c&#125;</code>，<code>&#123;a b2 b3 c&#125;</code>，<code>&#123;a b3 c&#125;</code> - 注意<code>&#123;a b1 b3 c&#125;</code>，这是因为<code>&quot;b&quot;</code>之间是不确定松散连续产生的。</li>
+</ol>
+<p>对于循环模式（例如 <code>oneOrMore()</code> 和 <code>times()</code>)），默认是松散连续。如果想使用严格连续，你需要使用 <code>consecutive()</code> 方法明确指定， 如果想使用不确定松散连续，你可以使用 <code>allowCombinations()</code> 方法。</p>
+<h3 id="匹配后跳过策略"><a href="#匹配后跳过策略" class="headerlink" title="匹配后跳过策略"></a>匹配后跳过策略</h3><p>对于一个给定的模式，同一个事件可能会分配到多个成功的匹配上。为了控制一个事件会分配到多少个匹配上，你需要指定跳过策略<code>AfterMatchSkipStrategy</code>。 有五种跳过策略，如下：</p>
+<ul>
+<li>NO_SKIP: 每个成功的匹配都会被输出。</li>
+<li>SKIP_TO_NEXT: 丢弃以相同事件开始的所有部分匹配。</li>
+<li>SKIP_PAST_LAST_EVENT: 丢弃起始在这个匹配的开始和结束之间的所有部分匹配。</li>
+<li>SKIP_TO_FIRST: 丢弃起始在这个匹配的开始和第一个出现的名称为 PatternName 事件之间的所有部分匹配。</li>
+<li>SKIP_TO_LAST: 丢弃起始在这个匹配的开始和最后一个出现的名称为 PatternName 事件之间的所有部分匹配。</li>
+</ul>
+<p>注意当使用 SKIP_TO_FIRST 和 SKIP_TO_LAST 策略时，需要指定一个合法的 PatternName。</p>
+<p>例如，给定一个模式 <code>b+ c</code> 和一个数据流 <code>b1 b2 b3 c</code>，不同跳过策略之间的不同如下：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>跳过策略</th>
+<th>结果</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NO_SKIP</td>
+<td><code>b1 b2 b3 c</code><br/><code>b2 b3 c</code><br/><code>b3 c</code></td>
+<td>找到匹配<code>b1 b2 b3 c</code>之后，不会丢弃任何结果。</td>
+</tr>
+<tr>
+<td>SKIP_TO_NEXT</td>
+<td><code>b1 b2 b3 c</code><br/><code>b2 b3 c</code><br/><code>b3 c</code></td>
+<td>找到匹配<code>b1 b2 b3 c</code>之后，不会丢弃任何结果，因为没有以<code>b1</code>开始的其他匹配</td>
+</tr>
+<tr>
+<td>SKIP_PAST_LAST_EVENT</td>
+<td><code>b1 b2 b3 c</code></td>
+<td>找到匹配<code>b1 b2 b3 c</code>之后，会丢弃其他所有的部分匹配</td>
+</tr>
+<tr>
+<td>SKIP_TO_FIRST</td>
+<td><code>b1 b2 b3 c</code><br/><code>b2 b3 c</code><br/><code>b3 c</code></td>
+<td>找到匹配<code>b1 b2 b3 c</code>之后，会尝试丢弃所有在<code>b1</code>之前开始的部分匹配，但没有这样的匹配，所以没有任何匹配被丢弃</td>
+</tr>
+<tr>
+<td>SKIP_TO_LAST</td>
+<td><code>b1 b2 b3 c</code><br/><code>b3 c</code></td>
+<td>找到匹配<code>b1 b2 b3 c</code>之后，会尝试丢弃所有在<code>b3</code>之前开始的部分匹配，有一个这样的<code>b2 b3 c</code>被丢弃。</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>再看另外一个例子来说明 NO_SKIP 和 SKIP_TO_FIRST 之间的差别： 模式： <code>(a | b | c) (b | c) c+.greedy d</code>，输入：<code>a b c1 c2 c3 d</code>，结果将会是：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>跳过策略</th>
+<th>结果</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NO_SKIP</td>
+<td><code>a b c1 c2 c3 d</code> <br/><code>b c1 c2 c3 d</code> <br/><code>c1 c2 c3 d</code></td>
+<td>找到匹配<code>a b c1 c2 c3 d</code>之后，不会丢弃任何结果</td>
+</tr>
+<tr>
+<td>SKIP_TO_FIRST</td>
+<td><code>a b c1 c2 c3 d</code> <br/><code>c1 c2 c3 d</code></td>
+<td>找到匹配<code>a b c1 c2 c3 d</code>之后，会丢弃所有在<code>c1</code>之前开始的部分匹配，有一个这样的<code>b c1 c2 c3 d</code>被丢弃</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>为了更好的理解 NO_SKIP 和 SKIP_TO_NEXT 之间的差别，看下面的例子： 模式：<code>a b+</code>，输入：<code>a b1 b2 b3</code>，结果将会是：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>跳过策略</th>
+<th>结果</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NO_SKIP</td>
+<td><code>a b1</code> <br/><code>a b1 b2</code><br/><code>a b1 b2 b3</code></td>
+<td>找到匹配<code>a b1</code>之后，不会丢弃任何结果</td>
+</tr>
+<tr>
+<td>SKIP_TO_NEXT</td>
+<td><code>a b1</code></td>
+<td>找到匹配<code>a b1</code>之后，会丢弃所有以<code>a</code>开始的部分匹配。这意味着不会产生<code>a b1 b2</code>和<code>a b1 b2 b3</code>了</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>想指定要使用的跳过策略，只需要调用下面的方法创建 <code>AfterMatchSkipStrategy</code>：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AfterMatchSkipStrategy.noSkip()</code></td>
+<td>创建 NO_SKIP 策略</td>
+</tr>
+<tr>
+<td><code>AfterMatchSkipStrategy.skipToNext()</code></td>
+<td>创建 SKIP_TO_NEXT 策略</td>
+</tr>
+<tr>
+<td><code>AfterMatchSkipStrategy.skipPastLastEvent()</code></td>
+<td>创建 SKIP_PAST_LAST_EVENT 策略</td>
+</tr>
+<tr>
+<td><code>AfterMatchSkipStrategy.skipToFirst(patternName)</code></td>
+<td>创建引用模式名称为 patternName 的 SKIP_TO_FIRST 策略</td>
+</tr>
+<tr>
+<td><code>AfterMatchSkipStrategy.skipToLast(patternName)</code></td>
+<td>创建引用模式名称为patternName的 SKIP_TO_LAST 策略</td>
+</tr>
+<tr>
+<td></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>可以通过调用下面方法将跳过策略应用到模式上：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">AfterMatchSkipStrategy</span> skipStrategy <span class="token operator">=</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span>
+<span class="token class-name">Pattern</span><span class="token punctuation">.</span><span class="token function">begin</span><span class="token punctuation">(</span><span class="token string">"patternName"</span><span class="token punctuation">,</span> skipStrategy<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span></span></code></pre>
+<p>使用 SKIP_TO_FIRST/LAST 时，有两个选项可以用来处理没有事件可以映射到对应的变量名上的情况。 默认情况下会使用 NO_SKIP 策略，另外一个选项是抛出异常。 可以使用如下的选项：<br><pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">AfterMatchSkipStrategy</span><span class="token punctuation">.</span><span class="token function">skipToFirst</span><span class="token punctuation">(</span>patternName<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">throwExceptionOnMiss</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre></p>
+<h2 id="检测模式"><a href="#检测模式" class="headerlink" title="检测模式"></a>检测模式</h2><p>在指定了要寻找的模式后，该把它们应用到输入流上来发现可能的匹配了。为了在事件流上运行你的模式，需要创建一个 <code>PatternStream</code>。 给定一个输入流 <code>input</code>，一个模式 <code>pattern</code> 和一个可选的用来对使用事件时间时有同样时间戳或者同时到达的事件进行排序的比较器 <code>comparator</code>， 你可以通过调用如下方法来创建 <code>PatternStream</code>：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">DataStream</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span> input <span class="token operator">=</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span>
+<span class="token class-name">Pattern</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token operator">?</span><span class="token punctuation">></span></span> pattern <span class="token operator">=</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span>
+<span class="token class-name">EventComparator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span> comparator <span class="token operator">=</span> <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">;</span> <span class="token comment">// 可选的</span>
+
+<span class="token class-name">PatternStream</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span> patternStream <span class="token operator">=</span> CEP<span class="token punctuation">.</span><span class="token function">pattern</span><span class="token punctuation">(</span>input<span class="token punctuation">,</span> pattern<span class="token punctuation">,</span> comparator<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>输入流根据你的使用场景可以是 keyed 或者 non-keyed。</p>
+<blockquote>
+<p>在 <em>non-keyed</em> 流上使用模式将会使你的作业并发度被设为1。</p>
+</blockquote>
+<h3 id="从模式中选取"><a href="#从模式中选取" class="headerlink" title="从模式中选取"></a>从模式中选取</h3><p>在获得到一个 <code>PatternStream</code> 之后，你可以应用各种转换来发现事件序列。推荐使用 <code>PatternProcessFunction</code>。</p>
+<p><code>PatternProcessFunction</code> 有一个 <code>processMatch</code> 的方法在每找到一个匹配的事件序列时都会被调用。 它按照 <code>Map&lt;String, List&lt;IN&gt;&gt;</code> 的格式接收一个匹配，映射的键是你的模式序列中的每个模式的名称，值是被接受的事件列表（<code>IN</code> 是输入事件的类型）。 模式的输入事件按照时间戳进行排序。为每个模式返回一个接受的事件列表的原因是当使用循环模式（比如 <code>oneToMany()</code> 和 <code>times()</code> ）时， 对一个模式会有不止一个事件被接受。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">class</span> <span class="token class-name">MyPatternProcessFunction</span><span class="token generics"><span class="token punctuation">&lt;</span>IN<span class="token punctuation">,</span> OUT<span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">PatternProcessFunction</span><span class="token generics"><span class="token punctuation">&lt;</span>IN<span class="token punctuation">,</span> OUT<span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">processMatch</span><span class="token punctuation">(</span><span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span>IN<span class="token punctuation">></span><span class="token punctuation">></span></span> match<span class="token punctuation">,</span> <span class="token class-name">Context</span> ctx<span class="token punctuation">,</span> <span class="token class-name">Collector</span><span class="token generics"><span class="token punctuation">&lt;</span>OUT<span class="token punctuation">></span></span> out<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+        <span class="token class-name">IN</span> startEvent <span class="token operator">=</span> match<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">"start"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">IN</span> endEvent <span class="token operator">=</span> match<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">"end"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        out<span class="token punctuation">.</span><span class="token function">collect</span><span class="token punctuation">(</span><span class="token function">OUT</span><span class="token punctuation">(</span>startEvent<span class="token punctuation">,</span> endEvent<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p><code>PatternProcessFunction</code> 可以访问 <code>Context</code> 对象。有了它之后，你可以访问时间属性，比如 <code>currentProcessingTime</code> 或者当前匹配的 <code>timestamp</code> （最新分配到匹配上的事件的时间戳）。 更多信息可以看<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/libs/cep/#%e6%97%b6%e9%97%b4%e4%b8%8a%e4%b8%8b%e6%96%87">时间上下文</a>。 通过这个上下文也可以将结果输出到<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/dev/datastream/side_output/">侧输出</a>.</p>
+<h4 id="处理超时的部分匹配"><a href="#处理超时的部分匹配" class="headerlink" title="处理超时的部分匹配"></a>处理超时的部分匹配</h4><p>当一个模式上通过 <code>within</code> 加上窗口长度后，部分匹配的事件序列就可能因为超过窗口长度而被丢弃。可以使用 <code>TimedOutPartialMatchHandler</code> 接口来处理超时的部分匹配。这个接口可以和其它的混合使用。也就是说你可以在自己的 <code>PatternProcessFunction</code> 里另外实现这个接口。 </p>
+<p><code>TimedOutPartialMatchHandler</code> 提供了另外的 <code>processTimedOutMatch</code> 方法，这个方法对每个超时的部分匹配都会调用。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">class</span> <span class="token class-name">MyPatternProcessFunction</span><span class="token generics"><span class="token punctuation">&lt;</span>IN<span class="token punctuation">,</span> OUT<span class="token punctuation">></span></span> <span class="token keyword">extends</span> <span class="token class-name">PatternProcessFunction</span><span class="token generics"><span class="token punctuation">&lt;</span>IN<span class="token punctuation">,</span> OUT<span class="token punctuation">></span></span> <span class="token keyword">implements</span> <span class="token class-name">TimedOutPartialMatchHandler</span><span class="token generics"><span class="token punctuation">&lt;</span>IN<span class="token punctuation">></span></span> <span class="token punctuation">&#123;</span>
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">processMatch</span><span class="token punctuation">(</span><span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span>IN<span class="token punctuation">></span><span class="token punctuation">></span></span> match<span class="token punctuation">,</span> <span class="token class-name">Context</span> ctx<span class="token punctuation">,</span> <span class="token class-name">Collector</span><span class="token generics"><span class="token punctuation">&lt;</span>OUT<span class="token punctuation">></span></span> out<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+        <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+    <span class="token punctuation">&#125;</span>
+
+    <span class="token annotation punctuation">@Override</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">processTimedOutMatch</span><span class="token punctuation">(</span><span class="token class-name">Map</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">,</span> <span class="token class-name">List</span><span class="token punctuation">&lt;</span>IN<span class="token punctuation">></span><span class="token punctuation">></span></span> match<span class="token punctuation">,</span> <span class="token class-name">Context</span> ctx<span class="token punctuation">)</span> <span class="token keyword">throws</span> <span class="token class-name">Exception</span><span class="token punctuation">;</span>
+        <span class="token class-name">IN</span> startEvent <span class="token operator">=</span> match<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">"start"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        ctx<span class="token punctuation">.</span><span class="token function">output</span><span class="token punctuation">(</span>outputTag<span class="token punctuation">,</span> <span class="token class-name">T</span><span class="token punctuation">(</span>startEvent<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<blockquote>
+<p><code>processTimedOutMatch</code> 不能访问主输出。 但你可以通过 <code>Context</code> 对象把结果输出到<a target="_blank" rel="noopener" href="https://nightlies.apache.org/flink/flink-docs-release-1.15/zh/docs/dev/datastream/side_output/">侧输出</a>。</p>
+</blockquote>
+<h4 id="按照事件时间处理迟到事件"><a href="#按照事件时间处理迟到事件" class="headerlink" title="按照事件时间处理迟到事件"></a>按照事件时间处理迟到事件</h4><p>在 CEP 中，事件的处理顺序很重要。在使用事件时间时，为了保证事件按照正确的顺序被处理，一个事件到来后会先被放到一个缓冲区中， 在缓冲区里事件都按照时间戳从小到大排序，当水位线到达后，缓冲区中所有小于水位线的事件被处理。这意味着水位线之间的数据都按照时间戳被顺序处理。</p>
+<blockquote>
+<p>这个库假定按照事件时间时水位线一定是正确的。</p>
+</blockquote>
+<p>为了保证跨水位线的事件按照事件时间处理，Flink CEP 库假定水位线一定是正确的，并且把时间戳小于最新水位线的事件看作是晚到的。 晚到的事件不会被处理。你也可以指定一个侧输出标志来收集比最新水位线晚到的事件。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token class-name">PatternStream</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">></span></span> patternStream <span class="token operator">=</span> CEP<span class="token punctuation">.</span><span class="token function">pattern</span><span class="token punctuation">(</span>input<span class="token punctuation">,</span> pattern<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token class-name">OutputTag</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> lateDataOutputTag <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">OutputTag</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token string">"late-data"</span><span class="token punctuation">)</span><span class="token punctuation">&#123;</span><span class="token punctuation">&#125;</span><span class="token punctuation">;</span>
+
+<span class="token class-name">SingleOutputStreamOperator</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">ComplexEvent</span><span class="token punctuation">></span></span> result <span class="token operator">=</span> patternStream
+    <span class="token punctuation">.</span><span class="token function">sideOutputLateData</span><span class="token punctuation">(</span>lateDataOutputTag<span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">select</span><span class="token punctuation">(</span>
+        <span class="token keyword">new</span> <span class="token class-name">PatternSelectFunction</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">Event</span><span class="token punctuation">,</span> <span class="token class-name">ComplexEvent</span><span class="token punctuation">></span></span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">&#125;</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token class-name">DataStream</span><span class="token generics"><span class="token punctuation">&lt;</span><span class="token class-name">String</span><span class="token punctuation">></span></span> lateData <span class="token operator">=</span> result<span class="token punctuation">.</span><span class="token function">getSideOutput</span><span class="token punctuation">(</span>lateDataOutputTag<span class="token punctuation">)</span><span class="token punctuation">;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/03/23/Flink-7-State%E7%AE%A1%E7%90%86%E4%B8%8E%E6%81%A2%E5%A4%8D/" rel="prev" title="Flink State管理与恢复">
+      <i class="fa fa-chevron-left"></i> Flink State管理与恢复
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/05/19/Linux-FTP%E5%8D%8F%E8%AE%AE/" rel="next" title="Linux FTP协议">
+      Linux FTP协议 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A4%8D%E6%9D%82%E4%BA%8B%E4%BB%B6%E5%A4%84%E7%90%86%E7%9A%84%E8%87%AA%E5%8A%A8%E6%9C%BA%E7%90%86%E8%AE%BA"><span class="nav-number">1.</span> <span class="nav-text">复杂事件处理的自动机理论</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%89%E7%A9%B7%E8%87%AA%E5%8A%A8%E6%9C%BA%E6%A8%A1%E5%9E%8B-NFA"><span class="nav-number">1.1.</span> <span class="nav-text">有穷自动机模型 NFA</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NFA-b-%E6%A8%A1%E5%9E%8B"><span class="nav-number">1.2.</span> <span class="nav-text">$NFA^b$ 模型</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#FlinkCEP-API"><span class="nav-number">2.</span> <span class="nav-text">FlinkCEP API</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E5%BC%8FAPI"><span class="nav-number">2.1.</span> <span class="nav-text">模式API</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E4%B8%AA%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.1.1.</span> <span class="nav-text">单个模式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%87%8F%E8%AF%8D"><span class="nav-number">2.1.1.1.</span> <span class="nav-text">量词</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.1.2.</span> <span class="nav-text">条件</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%BF%AD%E4%BB%A3%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.1.2.1.</span> <span class="nav-text">迭代条件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.1.2.2.</span> <span class="nav-text">简单条件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%BB%84%E5%90%88%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.1.2.3.</span> <span class="nav-text">组合条件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%81%9C%E6%AD%A2%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.1.1.2.4.</span> <span class="nav-text">停止条件</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BB%84%E5%90%88%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.1.2.</span> <span class="nav-text">组合模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BE%AA%E7%8E%AF%E6%A8%A1%E5%BC%8F%E4%B8%AD%E7%9A%84%E8%BF%9E%E7%BB%AD%E6%80%A7"><span class="nav-number">2.1.3.</span> <span class="nav-text">循环模式中的连续性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8C%B9%E9%85%8D%E5%90%8E%E8%B7%B3%E8%BF%87%E7%AD%96%E7%95%A5"><span class="nav-number">2.1.4.</span> <span class="nav-text">匹配后跳过策略</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A3%80%E6%B5%8B%E6%A8%A1%E5%BC%8F"><span class="nav-number">2.2.</span> <span class="nav-text">检测模式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%8E%E6%A8%A1%E5%BC%8F%E4%B8%AD%E9%80%89%E5%8F%96"><span class="nav-number">2.2.1.</span> <span class="nav-text">从模式中选取</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%A4%84%E7%90%86%E8%B6%85%E6%97%B6%E7%9A%84%E9%83%A8%E5%88%86%E5%8C%B9%E9%85%8D"><span class="nav-number">2.2.1.1.</span> <span class="nav-text">处理超时的部分匹配</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%8C%89%E7%85%A7%E4%BA%8B%E4%BB%B6%E6%97%B6%E9%97%B4%E5%A4%84%E7%90%86%E8%BF%9F%E5%88%B0%E4%BA%8B%E4%BB%B6"><span class="nav-number">2.2.1.2.</span> <span class="nav-text">按照事件时间处理迟到事件</span></a></li></ol></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

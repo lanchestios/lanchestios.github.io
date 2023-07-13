@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="支付的两大核心能力一是收款（入金），二是付款（出金），收款是把 C 端客户在购买商品时候的资金收到了三方支付机构备付金账户中，付款是三方支付机构把备付金账户中的资金付给售卖商品的商户。清结算系统是三方支付系统按照与商户的协议，将一个结算周期内的收付款项轧差汇总生成待结算金额，并将待结算金额结算给商户的一个功能模块，是支付体系中负责付款模块的一个子系统。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 支付清结算系统">
+<meta property="og:url" content="http://example.com/2023/06/26/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-1-%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="支付的两大核心能力一是收款（入金），二是付款（出金），收款是把 C 端客户在购买商品时候的资金收到了三方支付机构备付金账户中，付款是三方支付机构把备付金账户中的资金付给售卖商品的商户。清结算系统是三方支付系统按照与商户的协议，将一个结算周期内的收付款项轧差汇总生成待结算金额，并将待结算金额结算给商户的一个功能模块，是支付体系中负责付款模块的一个子系统。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/清结算系统架构.png">
+<meta property="article:published_time" content="2023-06-26T05:13:20.000Z">
+<meta property="article:modified_time" content="2023-07-13T09:17:44.294Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="Pay">
+<meta property="article:tag" content="清算">
+<meta property="article:tag" content="结算">
+<meta property="article:tag" content="账单">
+<meta property="article:tag" content="对账">
+<meta property="article:tag" content="计费">
+<meta property="article:tag" content="账户">
+<meta property="article:tag" content="会计">
+<meta property="article:tag" content="财务">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/清结算系统架构.png">
+
+<link rel="canonical" href="http://example.com/2023/06/26/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-1-%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 支付清结算系统 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/06/26/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-1-%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 支付清结算系统
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-06-26 13:13:20" itemprop="dateCreated datePublished" datetime="2023-06-26T13:13:20+08:00">2023-06-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-07-13 17:17:44" itemprop="dateModified" datetime="2023-07-13T17:17:44+08:00">2023-07-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">支付系统</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>支付的两大核心能力一是收款（入金），二是付款（出金），收款是把 C 端客户在购买商品时候的资金收到了三方支付机构备付金账户中，付款是三方支付机构把备付金账户中的资金付给售卖商品的商户。清结算系统是三方支付系统按照与商户的协议，将一个结算周期内的收付款项轧差汇总生成待结算金额，并将待结算金额结算给商户的一个功能模块，是支付体系中负责付款模块的一个子系统。</p>
+<span id="more"></span>
+<h1 id="业务简介"><a href="#业务简介" class="headerlink" title="业务简介"></a>业务简介</h1><p>三方支付机构的清结算系统与央行的支付清算体系并不处在同一层级，后者负责完成银行与银行之间的资金清算，而前者仅服务于一个三方支付机构，完成对三方支付机构的商户的资金结算。</p>
+<p>清算是各清算中心的工作内容，包括清分和资金划拨两个步骤，清分用于登记流水和轧差汇总，资金划拨则是在各个银行之间进行资金调动，即该扣哪个银行多少资金就扣掉，该付给哪个银行多少资金就给它增加余额；结算是指银行按照结算周期对其直连商户的资金核算了结。三方支付机构的清结算系统虽然包含清结算三个字，但“清”仅仅是清分，没有清算中心那样进行资金划拨的权利，结算倒是名副其实的结算，与银行对其直连商户的结算概念等同。</p>
+<p><strong>1. 清分</strong></p>
+<p>清分（clearing）是清算的数据准备阶段，主要是将当日的全部网络交易数据按照本代他、他代本、贷记、借记、笔数、金额、轧差净顺等进行汇总、整理、分类。总结来看，“清分”就是将支付交易数据分门别类地记录、整理、汇总的过程。</p>
+<p><strong>2. 清算</strong></p>
+<p>清算（settlement）不涉及债权债务关系的转移，而结算（settlement of accounts）是债权债务关系的转移。一般而言支付活动的过程包括交易、清算和结算。其中，清算和结算均是清偿收付双方债权债务关系的过程及手段。在支付活动中，同行内账户资金往来直接结算便可，而涉及不同行之间账户资金的往来，需先清算再结算。</p>
+<p>清算主要是指不同银行间的货币收付，可以认为是在进行结算之前，发起行和接收行对支付指令的发送、接收、核对确认，其结果是全面交换结算工具和支付信息，并建立最终结算头寸。</p>
+<p> “清算”具有以下几个特点：</p>
+<ul>
+<li>清算是用于不同行之间账户资金往来的，同行之间的资金往来无须清算，直接结算即可。</li>
+<li>清算就是清清楚楚地计算，不同行之间谁付谁多少钱，谁欠谁多少钱，最后再一轧差，得出一个最终谁该付谁多少钱的计算过程。</li>
+<li>清算包括发起行和接收行对支付指令的发送、接收、核对确认等动作，即最后付款之前的一个核对确认动作，确保结算无误。</li>
+<li>清算不涉及债券债务关系的转移。</li>
+</ul>
+<p><strong>3. 结算</strong></p>
+<p>结算是指将清算过程中产生的待结算头寸分别在发起行、接收行进行相应的会计处理，完成资金转移，并通知收付双方的过程。我们从“结算”和“清算”的英文也可以看出来，“结算”是涉及账户的结算，而“清算”仅仅是算，并没涉及账户。因此可以这么理解：清算不涉及债权债务关系的转移，而结算涉及。所以，在《中国银联银行卡联网联合技术规范V2.1》中，对结算的定义是完成客户账户间资金划拨的过程。</p>
+<h1 id="系统设计"><a href="#系统设计" class="headerlink" title="系统设计"></a>系统设计</h1><p>清结算系统的数据来源是支付核心和计费系统，支付核心完成支付后会发送消息到清结算系统，清结算系统收到消息后会解析消息并把对应的信息当作待清分数据落入数据库，同样计费系统也会监听支付成功消息，把每笔交易应该收取的手续费以消息的形式通知清结算系统、清结算同样会把信息当作待清分数据落入数据库。</p>
+<p>清结算系统的架构如图所示：</p>
+<p><img src="/images/SE/清结算系统架构.png" alt=""></p>
+<p>清结算系统监听到支付成功消息和计费消息之后会落清分记录，落清分记录时会根据支付单号、计费单号进行幂等判断，避免出现一单多结算的情况，清分流水需要保存到数据库中，以备后续的查询。定时任务触发清算任务，清算一般会在日切的时候进行，对商户的单笔订单进行轧差，比如一笔订单支付金额是 100 元，手续费是 0.6 元，那么经过清算之后的金额是 99.4元，清算的日切发生在凌晨，也是由定时任务来驱动的，计算商户订单的日终余额，然后对商户下的所有订单进行轧差，计算出商户当日应该结算的金额，再进行轧差计算，并且落轧差记录。最后根据商户配置的结算类型把计算好的余额结算到商户的余额账户或者银行卡账户中。所以常规的清结算会经历四步：清分→清算→轧差→结算。</p>
+<p><strong>1. 清结算系统的实现</strong></p>
+<p>后台服务型系统的设计一般都包含业务流程、管理页面、接口三个方面，清结算系统也是如此，清结算系统的业务流程存在自动化的业务处理逻辑，而且清结算系统不一定是纯后台服务型系统，因为它需要给商户提供后台查看结算单信息及下载对账单的功能。</p>
+<p><strong>2. 清结算系统的运营管理能力</strong></p>
+<p>清结算系统的管理页面主要包含商户结算信息管理、清分明细管理和结算单管理三部分。商户的结算信息是在商户入驻支付平台的时候通过协议确定的，协议中包含如下用于结算的关键信息：</p>
+<ul>
+<li>结算周期：既可以是 D+0 日结算、D+1 日结算，也可以是 T+1 日、T+2 日……T+N 日（D 代表自然日、T 代表工作日）结算。D+0 日结算通常是设置某些时间段结算一次，比如可以设置 0 点到 16 点的交易在 16 点之后结算一次，16 点到 24 点的交易在 24 点之后结算一次。</li>
+<li>结算方式：资金既可以结算到商户的银行账户，也可以结算到商户在三方支付机构开设的可用余额账户。</li>
+<li>银行账户信息：包括银行账户名、联行行号、银行账号等。</li>
+</ul>
+<p>商户结算信息管理功能中的结算信息基本上都是在商户入驻的时候登记的，而且要在这个功能里提供后期的维护能力，如更换商户的结算周期、修改结算方式、更换银行账户信息、修改结算信息的有效性等。</p>
+<p>清分明细管理是对成功消费的订单生成的清分明细的管理，之所以称之为明细，是因为这条记录中会包含交易金额、商户手续费，甚至可能会有渠道成本、代理商分润金额等信息，明细清晰地表明了各部分金额的归属。</p>
+<p>清分明细管理的数据来源于支付核心，在一笔消费订单支付成功之后，支付核心把订单的数据通过调用清结算接口的方式或者发送消息的方式推送到清结算系统。当然其中也可能有退款产生的清分明细，这个时候就要看退款是从哪个账户退的，如果从可用余额账户退，那么既可以考虑不登记，也可以登记但不计入结算，如果从待结算账户退，则要登记并参与结算。</p>
+<p>结算单管理是对商户的结算管理，结算单是一种外在表现形式，其记录了商户一个结算周期内的所有清分记录的汇总轧差的结果。结算单是由系统依据商户的结算周期设置自动汇总清分记录而生成的。</p>
+<p><strong>3. 清结算系统对对账的依赖</strong></p>
+<p>清结算系统与对账系统产生关联，主要是考虑要不要在与渠道对账结束之后，再将资金结算给商户的问题，涉及下面两种情形：</p>
+<ul>
+<li>如果是先对账，再结算，则是以渠道的流水记录为准，核对了流水之后再进行结算。</li>
+<li>如果是不管对账结果，直接结算，则是以支付系统的流水记录为准进行结算。</li>
+</ul>
+<p>然而，渠道对账单里的流水可能只是用户充值到支付平台账户，并不需要结算给哪个商户，而结算给商户的资金也不一定发生了银行卡支付，比如余额支付（支付宝、花呗支付等）这种，支付记录不需要与渠道对账，但也要结算给商户。</p>
+<p><strong>4. 清结算的自动化业务流程</strong></p>
+<p>清结算的自动化业务流程分为三步：自动生成结算单、自动结算、自动生成对账单。</p>
+<p>自动生成结算单，即按照三方支付机构与商户的协议，将一个结算周期内的收付款项汇总轧差生成待结算金额，形成一条结算单数据。</p>
+<p>自动结算，即按照设定的结算方式，在生成结算单之后，或者指定某个具体的时间点，自动将结算单中的金额结算给商户的银行账户或者商户在三方支付机构的余额账户，但在结算前，需要进行记账操作。</p>
+<ul>
+<li>结算到银行账户<ul>
+<li>借：应付账款一商户一待结算账户 XXX 元</li>
+<li>贷：银行存款 XXX 元</li>
+</ul>
+</li>
+<li>结算到商户在支付机构的余额账户<ul>
+<li>应付账款一商户一待结算账户 XXX 元</li>
+<li>应付账款一商户一余额账户 XXX 元</li>
+</ul>
+</li>
+</ul>
+<p>当然也可以没有自动结算这个功能，由人工在管理页面操作来进行结算。</p>
+<p>结算到银行账户也可以分成两步，先结算到支付机构余额账户，再自动帮助商户提现到银行账户，这个逻辑可以在不能使用代付渠道的情况下，将资金结算到商户的支付机构余额账户。不过，是否要按照应急状况进行这种逻辑的设定要看业务方的考虑，如果机制完善，则可以不采用这种方式，毕竟对于资金问题，自动化程度太高可能并不让人放心。</p>
+<p>自动生成对账单，即在对商户结算之后，提供商户核对结算金额是否正确的依据，而对账生成的依据是清分明细。生成对账单之后的一个问题就是怎样让商户获取对账单，一般有如下几种方式：</p>
+<ul>
+<li>在商户后台提供下载入口</li>
+<li>提供获取对账单的接口，由商户进行系统对接</li>
+<li>将对账单放到支付机构的 FTP 上，允许商户访问获取</li>
+<li>将对账单推送到商户的 FTP 上</li>
+</ul>
+<p>清结算系统完成对商户的结算之后，要将这个结算周期的清分记录生成一个对账文件（商户对账单），供商户对账使用。可能有人认为提供商户对账单供商户对账应该在对账系统中实现，但由于商户对账单的生成要依据清分记录，所以商户对账单是在清结算系统中生成的。</p>
+<p><strong>5. 清结算的数据来源</strong></p>
+<p>结算的数据来源主要有支付核心和计费系统，一笔订单支付成功后，告知清结算登记一条清分记录，用于在一个结算周期之后对商户进行结算。</p>
+<h1 id="模块拆分"><a href="#模块拆分" class="headerlink" title="模块拆分"></a>模块拆分</h1><h2 id="账单模块"><a href="#账单模块" class="headerlink" title="账单模块"></a>账单模块</h2><p>账单模块主要有下面这4个职能。</p>
+<ol>
+<li>落地交易单数据。商户发起交易，当支付状态流转至终态时（无论成功还是失败），系统会将终态订单推送至账单模块，账单模块记录下该支付数据（涵盖商户、交易单、通道单、交易金额、支付方式、交易类型、支付产品等数据）。</li>
+<li>获取支付通道对账单。根据与支付通道的约定，支付平台通过各种形式获取支付通道对账单，如支付通道的邮件推送、FTP下载与推送，自己通过后台下载等。</li>
+<li>生成并推送商户对账单。根据与商户的约定，通过各种形式让商户获取商户对账单，如邮件推送、FTP下载与推送、让商户自己通过后台下载等。</li>
+<li>生成通道对账单。对账单包括商户对账单和支付通道对账单。账单服务分别对商户维度的业务订单和支付通道维度的通道流水进一步处理，调用计费模块获取商户和支付通道手续费，生成对账单，并将账单按照分类推送：将商户对账单推送至商户；将支付通道对账单推送至对账模块，进行通道交易对账和通道资金对账。</li>
+</ol>
+<h2 id="计费模块"><a href="#计费模块" class="headerlink" title="计费模块"></a>计费模块</h2><p>计费模块主要负责商户手续费和通道成本的配置（可由商户合同系统或者路由配置推送至计费模块，生成数据），以及计算并返回费用结算方式、币种、金额及结算日期。</p>
+<blockquote>
+<p>详细设计见计费系统小节</p>
+</blockquote>
+<h2 id="对账模块"><a href="#对账模块" class="headerlink" title="对账模块"></a>对账模块</h2><p>对账既包括自身支付平台与上游支付通道（如第三方支付公司或银行）对账，也包括自身各个服务间（比如账单与会计）对账，其作用是保证自身各个应用之间记录一致。我们将前者叫作单向对账，将后者叫作双向对账。</p>
+<p>与上游支付通道的对账过程分为交易流水对账和到账凭证、到账实际资金的对账。我们把前者叫作账账对账，将后者叫作账证对账、账实对账。</p>
+<p>对账用来将账单核算对平，对于不能核对匹配的交易进行补单或者退款等差账处理，最终实现账单对平。我们将这个过程称为轧账和平账。</p>
+<blockquote>
+<p>详细设计见对账模块</p>
+</blockquote>
+<h2 id="账户模块"><a href="#账户模块" class="headerlink" title="账户模块"></a>账户模块</h2><p>账户模块用来进行资产的账户分类，并根据交易和对账情况进行账户的记账及资金信息流变动。常见的账户有余额账户、冻结账户、礼品卡账户等。</p>
+<h2 id="会计模块"><a href="#会计模块" class="headerlink" title="会计模块"></a>会计模块</h2><p>会计模块根据账户模块的请求进行会计的日间记账，并进行日终处理和财务并账。本书中不会详细阐述会计模块，原因如下：</p>
+<ol>
+<li>会计借贷及科目分录需要有专业财务人员参与，在此不作为产品经理必备技能。</li>
+<li>会计模块在清结算中并非必需模块，很多公司用流水账单汇总代替公司对账，并不采用会计模块。</li>
+</ol>
+<h2 id="财务模块"><a href="#财务模块" class="headerlink" title="财务模块"></a>财务模块</h2><p>财务模块根据对账情况进行账证对账（核实对账结果与银行打款凭证是否匹配）、账实对账（核实对账结果与银行实际打款是否匹配），以及按照结算方式和账期进行结算处理。</p>
+<h2 id="模块流转"><a href="#模块流转" class="headerlink" title="模块流转"></a>模块流转</h2><ol>
+<li>支付订单推送。支付核心模块将有效的支付订单（包括支付订单、退款订单、风险订单等）推送至账单模块。注意，这里说的是“有效”而不是“成功”，因为在有些类型的交易中（如外卡交易），有的交易不管成不成功都要支付风控手续费，也就是说即使支付失败，也是要记录并且收费的。</li>
+<li>支付通道流水推送。支付核心模块将成功和失败的支付通道流水（包括支付、退款等）推送至账单模块。</li>
+<li>请求商户计费。账单模块根据支付订单交易信息，请求计费模块计算商户手续费。</li>
+<li>返回商户计费结果。计费模块返回商户手续费的计算结果、收费模式及收费日期。</li>
+<li>请求通道成本计算。账单模块根据通道流水请求计费模块计算通道成本。</li>
+<li>返回通道成本。计费模块返回通道成本的计算结果、收费模式及收费日期。</li>
+<li>推送账单数据并记账。账单模块完成商户账单计费，生成商户账单后，将账单推送至商户账户并请求账户模块记账，变动资金信息流。</li>
+<li>请求会计记账。账户模块记账成功后均请求会计模块进行会计记账。</li>
+<li>支付通道流水对账。账单模块在支付通道流水成本计算完成后，将其推送至对账差错模块进行交易对账：解析支付通道订单格式，进行两边账单的账账对账；针对对不平的账单进行差账处理；根据对账结果推送给财务模块或者会计模块。</li>
+<li>请求账户记账。对账差错模块将对账结果推送至账户进行记账。</li>
+<li>对账差错处理。针对对账的长短款，对账差错模块请求支付核心模块进行补单和退款处理。</li>
+<li>财务并账。每日将科目发生额和余额进行映射并自动推送到财务系统，每月进行核对。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/Pay/" rel="tag"># Pay</a>
+              <a href="/tags/%E6%B8%85%E7%AE%97/" rel="tag"># 清算</a>
+              <a href="/tags/%E7%BB%93%E7%AE%97/" rel="tag"># 结算</a>
+              <a href="/tags/%E8%B4%A6%E5%8D%95/" rel="tag"># 账单</a>
+              <a href="/tags/%E5%AF%B9%E8%B4%A6/" rel="tag"># 对账</a>
+              <a href="/tags/%E8%AE%A1%E8%B4%B9/" rel="tag"># 计费</a>
+              <a href="/tags/%E8%B4%A6%E6%88%B7/" rel="tag"># 账户</a>
+              <a href="/tags/%E4%BC%9A%E8%AE%A1/" rel="tag"># 会计</a>
+              <a href="/tags/%E8%B4%A2%E5%8A%A1/" rel="tag"># 财务</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/06/01/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-2-%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83/" rel="prev" title="架构设计 支付系统核心">
+      <i class="fa fa-chevron-left"></i> 架构设计 支付系统核心
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/06/26/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-2-%E8%AE%A1%E8%B4%B9%E7%B3%BB%E7%BB%9F/" rel="next" title="架构设计 支付清结算系统 计费系统">
+      架构设计 支付清结算系统 计费系统 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">业务简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.</span> <span class="nav-text">系统设计</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A8%A1%E5%9D%97%E6%8B%86%E5%88%86"><span class="nav-number">3.</span> <span class="nav-text">模块拆分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B4%A6%E5%8D%95%E6%A8%A1%E5%9D%97"><span class="nav-number">3.1.</span> <span class="nav-text">账单模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A1%E8%B4%B9%E6%A8%A1%E5%9D%97"><span class="nav-number">3.2.</span> <span class="nav-text">计费模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9%E8%B4%A6%E6%A8%A1%E5%9D%97"><span class="nav-number">3.3.</span> <span class="nav-text">对账模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B4%A6%E6%88%B7%E6%A8%A1%E5%9D%97"><span class="nav-number">3.4.</span> <span class="nav-text">账户模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%9A%E8%AE%A1%E6%A8%A1%E5%9D%97"><span class="nav-number">3.5.</span> <span class="nav-text">会计模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B4%A2%E5%8A%A1%E6%A8%A1%E5%9D%97"><span class="nav-number">3.6.</span> <span class="nav-text">财务模块</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E5%9D%97%E6%B5%81%E8%BD%AC"><span class="nav-number">3.7.</span> <span class="nav-text">模块流转</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">162</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">310</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
