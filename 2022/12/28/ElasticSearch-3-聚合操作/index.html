@@ -28,7 +28,7 @@
 <meta property="og:description" content="ElasticSearch 提供的聚合分析功能有指标聚合（metrics aggregations）、桶聚合（bucket aggregations）、管道聚合（pipeline aggregations）和矩阵聚合（matrix aggregations）四大类。">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-12-28T04:11:20.000Z">
-<meta property="article:modified_time" content="2023-08-07T06:52:51.945Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:32.049Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="ElasticSearch">
 <meta property="article:tag" content="Aggregation">
@@ -226,7 +226,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2023-08-07 14:52:51" itemprop="dateModified" datetime="2023-08-07T14:52:51+08:00">2023-08-07</time>
+                <time title="Modified: 2023-11-17 18:24:32" itemprop="dateModified" datetime="2023-11-17T18:24:32+08:00">2023-11-17</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -320,34 +320,44 @@
 	    &#125;
 	&#125;
 &#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<h1 id="指标聚合操作"><a href="#指标聚合操作" class="headerlink" title="指标聚合操作"></a>指标聚合操作</h1><h2 id="统计值聚合"><a href="#统计值聚合" class="headerlink" title="统计值聚合"></a>统计值聚合</h2><div class="table-container">
+<h1 id="指标聚合"><a href="#指标聚合" class="headerlink" title="指标聚合"></a>指标聚合</h1><h2 id="输出单值聚合"><a href="#输出单值聚合" class="headerlink" title="输出单值聚合"></a>输出单值聚合</h2><div class="table-container">
 <table>
 <thead>
 <tr>
 <th>计算值</th>
 <th>说明</th>
+<th>注意</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>avg</td>
 <td>计算平均值</td>
+<td></td>
 </tr>
 <tr>
 <td>max</td>
 <td>计算最大值</td>
+<td></td>
 </tr>
 <tr>
 <td>min</td>
 <td>计算最小值</td>
+<td></td>
 </tr>
 <tr>
 <td>sum</td>
 <td>计算加和值</td>
+<td></td>
 </tr>
 <tr>
-<td>state</td>
-<td>计算最大值、最小值、平均值及加和值</td>
+<td>value_count</td>
+<td>统计某字段有值的文档数</td>
+<td>如果判断的字段是数组类型，则 value_count 统计的是符合条件的所有文档中该字段数组中非空元素个数的总和，而不是数组的个数总和。因此在遇到 price 数组中有两个非空值元素时，count 值加 2。</td>
+</tr>
+<tr>
+<td>cardinality</td>
+<td>某字段值去重计数</td>
 </tr>
 </tbody>
 </table>
@@ -361,22 +371,33 @@
 	    	&quot;avg&quot;: &#123; 
 		      	&quot;field&quot;: &quot;price&quot; &#x2F;&#x2F;计算文档的平均价格  
 			&#125;
-	    &#125;
+	  &#125;
 	&#125;
 &#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<h2 id="非空值聚合"><a href="#非空值聚合" class="headerlink" title="非空值聚合"></a>非空值聚合</h2><p>统计字段非空值的个数</p>
-<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
-&#123;
-	&quot;size&quot;: 0,
-	&quot;aggs&quot;: &#123; 
-	  	&quot;my_agg&quot;: &#123;  
-	    	&quot;value_count&quot;: &#123;                &#x2F;&#x2F;统计price字段中非空值的个数         
-	    		&quot;field&quot;: &quot;price&quot;
-	      &#125;
-	    &#125;
-	&#125;
-&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<p>需要指出的是，如果判断的字段是数组类型，则 value_count 统计的是符合条件的所有文档中该字段数组中非空元素个数的总和，而不是数组的个数总和。因此在遇到 price 数组中有两个非空值元素时，count 值加 2。</p>
+<h2 id="输出多值聚合"><a href="#输出多值聚合" class="headerlink" title="输出多值聚合"></a>输出多值聚合</h2><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>计算值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stats</td>
+<td>计算平均值、最小值、最大值</td>
+</tr>
+<tr>
+<td>percentiles</td>
+<td>根据百分比位数查询对应的数据信息，默认情况下会按照 [ 1, 5, 25, 50, 75, 95, 99 ] 进行返回</td>
+</tr>
+<tr>
+<td>percentile_ranks</td>
+<td>根据数据信息查询其对应的百分比位数</td>
+</tr>
+</tbody>
+</table>
+</div>
 <h1 id="桶聚合"><a href="#桶聚合" class="headerlink" title="桶聚合"></a>桶聚合</h1><h2 id="聚合方式-1"><a href="#聚合方式-1" class="headerlink" title="聚合方式"></a>聚合方式</h2><h3 id="单维度桶聚合"><a href="#单维度桶聚合" class="headerlink" title="单维度桶聚合"></a>单维度桶聚合</h3><p>最简单的桶聚合是单维度桶聚合，指的是按照一个维度对文档进行分组聚合。在桶聚合时，聚合的桶也需要匹配，匹配的方式有 terms、filter、ranges 等。</p>
 <pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
 &#123; 
@@ -761,7 +782,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E8%81%9A%E5%90%88"><span class="nav-number">1.1.</span> <span class="nav-text">直接聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%88%E6%9F%A5%E8%AF%A2%E5%90%8E%E8%81%9A%E5%90%88"><span class="nav-number">1.2.</span> <span class="nav-text">先查询后聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.3.</span> <span class="nav-text">前过滤器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8E%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.4.</span> <span class="nav-text">后过滤器</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8C%87%E6%A0%87%E8%81%9A%E5%90%88%E6%93%8D%E4%BD%9C"><span class="nav-number">2.</span> <span class="nav-text">指标聚合操作</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%9F%E8%AE%A1%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.1.</span> <span class="nav-text">统计值聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%9E%E7%A9%BA%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.2.</span> <span class="nav-text">非空值聚合</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.</span> <span class="nav-text">桶聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F-1"><span class="nav-number">3.1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E7%BB%B4%E5%BA%A6%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.1.1.</span> <span class="nav-text">单维度桶聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E7%BB%B4%E5%BA%A6%E6%A1%B6%E5%B5%8C%E5%A5%97%E8%81%9A%E5%90%88"><span class="nav-number">3.1.2.</span> <span class="nav-text">多维度桶嵌套聚合</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E7%B1%BB%E5%9E%8B"><span class="nav-number">3.2.</span> <span class="nav-text">聚合类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#terms-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.1.</span> <span class="nav-text">terms 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ranges-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.2.</span> <span class="nav-text">ranges 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#histogram-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.</span> <span class="nav-text">histogram 聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#histogram-%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.1.</span> <span class="nav-text">histogram 直方图聚合</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#date-histogram-%E6%97%B6%E9%97%B4%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.2.</span> <span class="nav-text">date_histogram 时间直方图聚合</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E8%81%9A%E5%90%88"><span class="nav-number">3.2.4.</span> <span class="nav-text">地理距离聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IP-%E8%8C%83%E5%9B%B4%E8%81%9A%E5%90%88"><span class="nav-number">3.2.5.</span> <span class="nav-text">IP 范围聚合</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%8E%92%E5%BA%8F"><span class="nav-number">4.</span> <span class="nav-text">聚合排序</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%96%87%E6%A1%A3%E8%AE%A1%E6%95%B0%E6%8E%92%E5%BA%8F"><span class="nav-number">4.1.</span> <span class="nav-text">按文档计数排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E8%81%9A%E5%90%88%E6%8C%87%E6%A0%87%E6%8E%92%E5%BA%8F"><span class="nav-number">4.2.</span> <span class="nav-text">按聚合指标排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E5%88%86%E7%BB%84Key%E6%8E%92%E5%BA%8F"><span class="nav-number">4.3.</span> <span class="nav-text">按分组Key排序</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E5%88%86%E9%A1%B5"><span class="nav-number">5.</span> <span class="nav-text">聚合分页</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Top-hits-%E8%81%9A%E5%90%88"><span class="nav-number">5.1.</span> <span class="nav-text">Top hits 聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Collapse-%E8%81%9A%E5%90%88"><span class="nav-number">5.2.</span> <span class="nav-text">Collapse 聚合</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F"><span class="nav-number">1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%B4%E6%8E%A5%E8%81%9A%E5%90%88"><span class="nav-number">1.1.</span> <span class="nav-text">直接聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%88%E6%9F%A5%E8%AF%A2%E5%90%8E%E8%81%9A%E5%90%88"><span class="nav-number">1.2.</span> <span class="nav-text">先查询后聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.3.</span> <span class="nav-text">前过滤器</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8E%E8%BF%87%E6%BB%A4%E5%99%A8"><span class="nav-number">1.4.</span> <span class="nav-text">后过滤器</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8C%87%E6%A0%87%E8%81%9A%E5%90%88"><span class="nav-number">2.</span> <span class="nav-text">指标聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%8D%95%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.1.</span> <span class="nav-text">输出单值聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BE%93%E5%87%BA%E5%A4%9A%E5%80%BC%E8%81%9A%E5%90%88"><span class="nav-number">2.2.</span> <span class="nav-text">输出多值聚合</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.</span> <span class="nav-text">桶聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%96%B9%E5%BC%8F-1"><span class="nav-number">3.1.</span> <span class="nav-text">聚合方式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%95%E7%BB%B4%E5%BA%A6%E6%A1%B6%E8%81%9A%E5%90%88"><span class="nav-number">3.1.1.</span> <span class="nav-text">单维度桶聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E7%BB%B4%E5%BA%A6%E6%A1%B6%E5%B5%8C%E5%A5%97%E8%81%9A%E5%90%88"><span class="nav-number">3.1.2.</span> <span class="nav-text">多维度桶嵌套聚合</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E7%B1%BB%E5%9E%8B"><span class="nav-number">3.2.</span> <span class="nav-text">聚合类型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#terms-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.1.</span> <span class="nav-text">terms 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ranges-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.2.</span> <span class="nav-text">ranges 聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#histogram-%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.</span> <span class="nav-text">histogram 聚合</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#histogram-%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.1.</span> <span class="nav-text">histogram 直方图聚合</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#date-histogram-%E6%97%B6%E9%97%B4%E7%9B%B4%E6%96%B9%E5%9B%BE%E8%81%9A%E5%90%88"><span class="nav-number">3.2.3.2.</span> <span class="nav-text">date_histogram 时间直方图聚合</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E8%81%9A%E5%90%88"><span class="nav-number">3.2.4.</span> <span class="nav-text">地理距离聚合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#IP-%E8%8C%83%E5%9B%B4%E8%81%9A%E5%90%88"><span class="nav-number">3.2.5.</span> <span class="nav-text">IP 范围聚合</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E6%8E%92%E5%BA%8F"><span class="nav-number">4.</span> <span class="nav-text">聚合排序</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E6%96%87%E6%A1%A3%E8%AE%A1%E6%95%B0%E6%8E%92%E5%BA%8F"><span class="nav-number">4.1.</span> <span class="nav-text">按文档计数排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E8%81%9A%E5%90%88%E6%8C%87%E6%A0%87%E6%8E%92%E5%BA%8F"><span class="nav-number">4.2.</span> <span class="nav-text">按聚合指标排序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8C%89%E5%88%86%E7%BB%84Key%E6%8E%92%E5%BA%8F"><span class="nav-number">4.3.</span> <span class="nav-text">按分组Key排序</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E5%88%86%E9%A1%B5"><span class="nav-number">5.</span> <span class="nav-text">聚合分页</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Top-hits-%E8%81%9A%E5%90%88"><span class="nav-number">5.1.</span> <span class="nav-text">Top hits 聚合</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Collapse-%E8%81%9A%E5%90%88"><span class="nav-number">5.2.</span> <span class="nav-text">Collapse 聚合</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -775,20 +796,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">163</span>
+          <span class="site-state-item-count">166</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-count">32</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">311</span>
+        <span class="site-state-item-count">314</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

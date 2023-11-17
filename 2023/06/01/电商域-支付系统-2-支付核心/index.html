@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="支付系统核心主要分为三大块：支付网关、支付核心、支付路由。支付网关主要负责通用的业务处理、资源隔离以及限流、熔断、降级。支付核心提供主要的支付服务。而支付路由则负责整体的支付渠道调度。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="电商域 支付系统核心">
+<meta property="og:url" content="http://example.com/2023/06/01/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-2-%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="支付系统核心主要分为三大块：支付网关、支付核心、支付路由。支付网关主要负责通用的业务处理、资源隔离以及限流、熔断、降级。支付核心提供主要的支付服务。而支付路由则负责整体的支付渠道调度。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/支付网关业务处理.jpg">
+<meta property="og:image" content="http://example.com/images/SE/支付网关资源隔离.jpg">
+<meta property="og:image" content="http://example.com/images/SE/支付核心业务处理.png">
+<meta property="og:image" content="http://example.com/images/SE/交易路由.png">
+<meta property="og:image" content="http://example.com/images/SE/基础路由.png">
+<meta property="og:image" content="http://example.com/images/SE/短路路由跳转.png">
+<meta property="og:image" content="http://example.com/images/SE/短路路由未跳转.png">
+<meta property="og:image" content="http://example.com/images/SE/风险路由.png">
+<meta property="og:image" content="http://example.com/images/SE/分组路由.png">
+<meta property="og:image" content="http://example.com/images/SE/出金路由.png">
+<meta property="og:image" content="http://example.com/images/SE/渠道切换系统.png">
+<meta property="og:image" content="http://example.com/images/SE/收银台支付交互流程.png">
+<meta property="article:published_time" content="2023-06-01T08:38:20.000Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:32.063Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="Pay">
+<meta property="article:tag" content="支付网关">
+<meta property="article:tag" content="支付核心">
+<meta property="article:tag" content="支付路由">
+<meta property="article:tag" content="交易路由">
+<meta property="article:tag" content="引导路由">
+<meta property="article:tag" content="入金路由">
+<meta property="article:tag" content="出金路由">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/支付网关业务处理.jpg">
+
+<link rel="canonical" href="http://example.com/2023/06/01/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-2-%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>电商域 支付系统核心 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/06/01/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-2-%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          电商域 支付系统核心
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-06-01 16:38:20" itemprop="dateCreated datePublished" datetime="2023-06-01T16:38:20+08:00">2023-06-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-11-17 18:24:32" itemprop="dateModified" datetime="2023-11-17T18:24:32+08:00">2023-11-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">支付系统</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>支付系统核心主要分为三大块：支付网关、支付核心、支付路由。支付网关主要负责通用的业务处理、资源隔离以及限流、熔断、降级。支付核心提供主要的支付服务。而支付路由则负责整体的支付渠道调度。</p>
+<span id="more"></span>
+<h1 id="支付网关"><a href="#支付网关" class="headerlink" title="支付网关"></a>支付网关</h1><p>支付网关是支付机构的“关口”，所有的支付交易都需要经过支付网关的过滤再分发给各个支付系统，并经由支付渠道转发给银联或者网联。作为一家现代的支付机构，需要支持微信支付、支付宝支付、协议支付等各式各样的支付方式，每种支付方式的后端接入接口都是不一样的。如果不同的支付方式都要不同的接口接入非常耗费资源，支付网关就是支付机构为商户提供的统一接入方式。</p>
+<h2 id="业务处理"><a href="#业务处理" class="headerlink" title="业务处理"></a>业务处理</h2><p>支付网关分为交互层、业务处理层、协议转发层三层。</p>
+<p><strong>交互层</strong></p>
+<p>交互层对外提供统一的 API 接口，主要有支付接口、退款接口、结果查询接口等。</p>
+<p><strong>数据处理层</strong></p>
+<p>数据处理层收到报文后会对数据进行解密、验签、参数校验，然后组装成内部系统需要的报文格式，通过协议转发层转发给支付业务内部系统。经过内部系统处理后的结果，会被参数校验、加签、加密，最终经过交互层返回给用户。验签和参数校验将不符合标准的请求都挡在网关层外，对恶意刷单、恶意攻击的行为有一定的防控作用。只把网关这一层暴露给外部服务，避免支付核心系统的 IP 地址等信息的泄露。</p>
+<p>说明下加/解密、加/验签、参数校验的作用：</p>
+<p>加/解密：互联网支付涉及隐私信息，比如银行卡号、密码、身份证号等，所以协议传输的过程中需要加密，收到的协议也需要解密后才能处理，返回给上游的报文也需要加密后才能返回。</p>
+<blockquote>
+<p>加密算法优缺点：</p>
+<p>RSA 加密算法安全性高，但计算效率低，高并发场景下有性能问题。</p>
+<p>AES 加密算法虽然性能较好，但密钥 Key 在网络传输中有被拦截的风险。</p>
+<p>通常是使用 RSA 算法加密 AES 密钥，使用 AES 对报文进行加密。</p>
+</blockquote>
+<p>加/验签：通过验证签名可以验证服务的上游是不是支付机构签约的客户，一来为资金安全提供保障，二来避免收到不良攻击，另外返回给上游的结果也需要加签。</p>
+<blockquote>
+<p>常见签名规则：</p>
+<ol>
+<li><p>参数名需要按一定顺序排序</p>
+</li>
+<li><p>参数值为空不参与签名</p>
+</li>
+<li><p>为了增加安全系数最好采用加盐的方式提升破解难度</p>
+</li>
+<li><p>提供的接口可能会增加字段，验签时必须支持增加扩展字段</p>
+</li>
+</ol>
+</blockquote>
+<p>参数校验：支付网关收到上游的报文之后需要校验基础参数的合法性，如果参数不合法需要及时丢弃，避免给下游造成压力。而业务系统只需要对业务参数进行校验即可。</p>
+<p><strong>协议转发层</strong></p>
+<p>协议转发层封装相应的交互协议，通常采用基于 HTTP 协议的 Protobuf 和 JSON。然后将请求根据不同的路由规则转发到对应的业务服务群中，在支付内部系统处理完成后，通过相反的路径将结果通过支付网关反馈给商户或 C 端消费者。</p>
+<p><img src="/images/SE/支付网关业务处理.jpg" alt=""></p>
+<h2 id="资源隔离"><a href="#资源隔离" class="headerlink" title="资源隔离"></a>资源隔离</h2><p>所有的订单交易都会经过支付网关，支付网关的稳定性很大程度上取决于下游支付业务系统的稳定性，并且存在很多不稳定性的因素，比如网络连接缓慢、资源繁忙、服务脱机等。当依赖阻塞时，大多数服务器的线程池就出现阻塞（BLOCK），影响整个线上服务的稳定性。在复杂的分布式架构下，应用程序有很多的依赖，都会不可避免地在某些时候失败。高并发的依赖失败时如果没有隔离措施，那么当前应用服务就有被拖垮的风险。例如，所有的交易都共用支付网关的资源，如果有人恶意攻击，同时发起很多退款，或者预支付，把支付网关所有的资源都消耗掉，那么正常的支付业务就无法进行了。如果一个支付应用服务宕机，或者有其他的异常导致同步调用的返回耗时非常长，那么支付网关的链接也无法释放，很容易把支付网关也拖垮。针对这些不稳定的因素，可以根据依赖的服务把支付网关的资源进行隔离，实现一个服务有问题不会影响支付网关其他业务的目的。</p>
+<p><img src="/images/SE/支付网关资源隔离.jpg" alt=""></p>
+<blockquote>
+<p>当支付业务服务因实现机制调整等原因造成性能出现很大的变化，线程池的监控指标信息应能反映出对应变化，第一时间感知风险从而进行相应调整，实时动态刷新自身应用对于依赖服务的阈值进行调整以适应依赖方的改变。</p>
+</blockquote>
+<h2 id="限流、熔断、降级"><a href="#限流、熔断、降级" class="headerlink" title="限流、熔断、降级"></a>限流、熔断、降级</h2><p>依赖隔离解决了服务之间相互影响造成雪崩的现象，但每个支付业务服务所能承受的并发量是有限的，如果请求量超过服务的阙值就会给业务系统造成很大的压力，如果业务系统没有限流能力，则可能造成业务系统的“假死”。所以作为支付门户的网关系统要具备限流的能力。如果请求量超过阙值，则将请求排队或者丢弃，减轻对业务系统的压力。</p>
+<p>当网关依赖的支付服务出现大量超时时，则意味着服务出现了异常，再让新的请求去访问支付服务根本没有意义，只会无谓地消耗现有资源。这个时候就应该使用熔断器避免资源浪费。</p>
+<p>有服务熔断，必然要有服务降级。所谓降级，就是当某个服务熔断之后，服务将不再被调用，此时客户端可以自己准备一个本地的 fallback(回退) 回调，返回一个默认值。这样做虽然服务水平下降但可用，当然这也要看适合的业务场景，针对支付业务会返回支付失败，让客户稍后重试。</p>
+<h1 id="支付核心"><a href="#支付核心" class="headerlink" title="支付核心"></a>支付核心</h1><p>支付核心提供支付服务，对后端支付系统的接口进行业务包装，除了提供常规的支付能力，还实现了使用多个支付方式进行组合支付的功能。支付核心对各支付类型的支付服务流程进行定义，方便商户的接入，具体定义为支付、退款、充值、提现、转账等原子类型，并实现对基础服务的流程编排。</p>
+<p>支付核心通过支付网关暴露接口给外部商户使用。与支付网关的侧重点不同，支付网关负责数据的安全性校验以及字段的必填性校验，而支付核心负责业务属性的合法性校验。例如：对于商户号是否为空，是否被篡改是由支付网关进行校验的，而对于商户号是否存在是由支付核心进行校验的。</p>
+<p>支付核心除了汇总业务流程，还有一个核心的能力就是所有的支付订单、退款订单等都会存储在支付核心系统中，给接入支付机构的商户提供对账文件，商户想要查看的本店的订单信息、退款信息等数据的来源都是支付核心。</p>
+<p><img src="/images/SE/支付核心业务处理.png" alt=""></p>
+<h1 id="支付路由"><a href="#支付路由" class="headerlink" title="支付路由"></a>支付路由</h1><p>在支付领域，我们这么定义路由：路由系统是支付核心系统，对商户支付页面进行管理与输出、根据商户需求及通道特性基础对交易进行处理，并在此基础上对支付中的异常情况进行支付灾备处理。路由系统在满足用户支付交易需求的前提下，从下单到支付，进行了多处细节及系统处理，是一种以提升用户需求体验满意度、支付成功率、收益率指标和支付安全度为目的，实现效益最大化的收益管理机制。</p>
+<p>路由系统的机制主要通过引导路由和交易路由运作。引导路由用来决定用户看得到的，每个商户展示哪些支付品牌以及这些支付品牌的排序；交易路由用来决定用户看不到的，每笔交易走什么支付通道。</p>
+<p>交易订单经过引导路由系统时，系统会向支付平台返回支付引导方案，具体包括以下方案。</p>
+<ol>
+<li>推荐支付方式：支付平台高亮推荐给用户支付方式。</li>
+<li>生成支付品牌列表：生成在支付产品下各个支付品牌的排列次序。</li>
+<li>推荐常用卡策略：向客户推荐常用卡的策略，如上次使用或成本优先。</li>
+</ol>
+<p>交易订单经过交易路由系统时，系统会向支付平台返回支付品牌所支持的支付通道方案，决策过程如下。</p>
+<ol>
+<li>计算交易手续费。交易路由系统调用计费模块，计算当前交易在每个可用通道中所需的手续费，并将通道按此次交易成本从低到高排序。</li>
+<li>匹配路由规则。交易路由系统根据交易请求，将可用通道按照路由算法优先级进行匹配，与规则匹配的目标通道会进行交易转发。</li>
+<li>匹配分流策略。如果交易需要分流，那么按分流策略进行转发。</li>
+</ol>
+<p>引导路由和交易路由的相关配置均需要通过运营管理平台进行配置，需要在运营平台配置好相关内容后，依次执行快照生成、发布审核、快照发布、数据同步四步，随后真正生效。由于路由的配置直接影响着实际交易，所以需要版本回退机制保证问题发生时可回滚，问题发生后可回溯。</p>
+<h2 id="交易路由"><a href="#交易路由" class="headerlink" title="交易路由"></a>交易路由</h2><p>三方支付机构提供的支付能力主要有银行卡支付、微信支付、支付宝支付等，具体使用哪种支付方式由 C 端消费者自己选择，每种支付方式会衍生出多种玩法，比如分期付款、先用后付等，交易路由解决的核心问题在于如何选择合适的渠道，选择渠道时需要考虑的因素如下：</p>
+<ol>
+<li>渠道稳定性（根据支付成功率评判）</li>
+<li>成本因素（不同渠道、不同行业收取的手续费费率不同）</li>
+</ol>
+<h3 id="业务架构"><a href="#业务架构" class="headerlink" title="业务架构"></a>业务架构</h3><p>交易路由需要解决两个问题：</p>
+<ol>
+<li>选择合适的支付渠道</li>
+<li>与支付渠道进行交互</li>
+</ol>
+<p><img src="/images/SE/交易路由.png" alt=""></p>
+<p>应用层：主要分为鉴权、出金、入金三大功能模块。</p>
+<p>路由层：路由层负责筛选合适的路由渠道，根据业务类型区分为入金路由、出金路由、鉴权路由等。入金路由筛选渠道的因素有支付工具、渠道机构、支付方式、子商户号等。出金路由主要根据业务属性、渠道属性等因素来筛选渠道。鉴权路由考虑成本因素，优先使用本地鉴权，如果本地鉴权无法检测出鉴权结果才会选择低成本鉴权渠道，如果低成本也无法检测出鉴权结果才会使用高成本鉴权渠道。</p>
+<p>网关层：网关层封装常用的加签/验签算法、加密/解密算法、并且统一管理相关算法的密钥信息。另外，网关层还需要负责组装报文，根据不同支付渠道确定使用哪种通信协议。</p>
+<p>网络层：网络层负责公网配置、网络安全、IP 地址白名单等业务，是报文安全的重要保证。</p>
+<h3 id="入金路由"><a href="#入金路由" class="headerlink" title="入金路由"></a>入金路由</h3><p>入金是指把 C 端客户的资金收到三方支付机构的备付金账户中。C 端客户选择的支付方式有银行卡支付、微信支付、支付宝支付等，每种支付方式都有自己的路由规则，根据路由规则筛选出最优的渠道。</p>
+<p>支付平台或者网关系统向服务请求可用通道，服务根据通道信息配置及规则优先级进行决策，向支付平台或者网关返回最优支付通道方案，这个服务被称为交易路由（也可称为入金路由）。交易路由具体分为路由算法优先级维度和路由调用节点维度。在路由调用的节点按照路由算法优先级做出最优支付选择，实现对交易决策的最优解，达到对支付成功率、支付体验满足度、支付收益、支付安全度等方面的收益管理。</p>
+<h4 id="路由算法优先级维度"><a href="#路由算法优先级维度" class="headerlink" title="路由算法优先级维度"></a>路由算法优先级维度</h4><p>支付关注成本、风险、成功率、体验、通道自身特性、保量等。在交易路由中，有不同算法来处理这些收益或者关注点，具体分为基础路由算法、短路路由算法、风险路由算法和分组路由算法。同时，还有一些用于支持整个系统的基础或辅助服务，如通道健康度系统、通道信息配置。</p>
+<h5 id="基础路由"><a href="#基础路由" class="headerlink" title="基础路由"></a>基础路由</h5><p>基础路由算法是指根据配置规则匹配可用逻辑通道。配置的规则是根据同一物理通道不同属性的具体内容进行配置，如不同支付品牌、交易类型、交易金额、限额、商户、计费方式和费率等。这样的配置规则是与物理通道相对的，我们将其称为“逻辑通道”。</p>
+<p>基础路由的主要职能如下：</p>
+<ul>
+<li>建立查询主键。逻辑通道规则号会作为后续问题定位、数据交易查询的依据。比如后续交易记录需要查询时，会直接在日志中查询逻辑通道的规则号，通过规则号定位当时配置情况或者问题。因为逻辑通道是颗粒度最细的维度，所以内部查询一般都用逻辑通道。</li>
+<li>匹配通道可用性。根据支付场景（线上、线下）、支付工具（微信、支付宝、银行卡）、渠道机构（银联、网联、微信、支付宝）、支付模式（小程序、H5、WAP、JS、协议支付、无卡支付）、用户验证要素等条件匹配支持交易的逻辑通道。</li>
+<li>通道熔断自动上下线处理。可以设置固定维护时间、临时维护时间，进行自动上下线。</li>
+</ul>
+<p><img src="/images/SE/基础路由.png" alt=""></p>
+<h5 id="短路路由"><a href="#短路路由" class="headerlink" title="短路路由"></a>短路路由</h5><p>“短路”顾名思义是最短的路。短路路由算法是指有多个物理通道或逻辑通道可用时，匹配规则优先级最高的通道，不看费率，不看分组，忽略其他规则。短路路由中的匹配条件有行业、商户号、交易类型、支付品牌、交易金额、卡号段、有效时间段等。注意，短路路由中的规则是优先原则，如果短路中的通道不可用，还是会按照基础路由和分组路由规则分配交易量。</p>
+<p>短路路由一般作用于以下3种情形：</p>
+<ol>
+<li>某通道不占优势，但是贴补营销费用后，用户或平台的整体体验或者收益反而最高。</li>
+<li>某新通道上线，通道质量未知，所以不能全量放开，需要进行测试。</li>
+<li>某通道不占优势，但却是重点战略合作客户和流量场景，需要在其流量场景里优先使用它的通道。</li>
+</ol>
+<p><img src="/images/SE/短路路由跳转.png" alt=""></p>
+<p><img src="/images/SE/短路路由未跳转.png" alt=""></p>
+<h5 id="风险路由"><a href="#风险路由" class="headerlink" title="风险路由"></a>风险路由</h5><p>风险路由，顾名思义，就是处理风险交易的路由机制。路由与风控的交互在交易前和交易中进行。</p>
+<p>在交易前，能够获取到用户信息、地理位置、设备信息、交易商户等信息，风控系统能够对人识别交易风险并处理。路由机制的依据是通道信息中划分的通道风险等级、通道协议是否包赔、通道要素（如是否支持验证短信验证码）、有没有可选要素。总之，思路就是要么让风险交易的客户进行更多要素的验证，要么进行风险转移，将交易路由到通道服务商包赔通道。</p>
+<p>在交易中，通过卡BIN识别，路由系统与风控系统进行卡信息交互。比如风控系统识别用户没风险，但卡存在风险，这个时候除了上述交易处理办法外，系统会进行交易拦截，然后让人工介入。</p>
+<p><img src="/images/SE/风险路由.png" alt=""></p>
+<h5 id="分组路由"><a href="#分组路由" class="headerlink" title="分组路由"></a>分组路由</h5><p>分组路由算法是指有多个物理通道或者逻辑通道可用，根据分组规则中保量金额或者权重比例进行路由计算，分配交易至目标通道。</p>
+<p>在分组路由中，将多个物理通道或逻辑通道分成一组，在组内可以按照固定金额进行限额，比如按照每日或每月进行限额；也可以在多个通道之间按照权重进行分配，比如某两个通道按照3:5的比率进行分配；还可以同时采用这两种方式，即先保证每个通道的最低量，再按照比率进行分配。</p>
+<blockquote>
+<p>注意，如果有多个通道可用，且既存在组内通道也存在组外通道，那么路由服务需要再按照基础路由将筛选出的组内最优通道与组外通道进行成本比较，从而得出最终的最优通道。</p>
+</blockquote>
+<p><img src="/images/SE/分组路由.png" alt=""></p>
+<h4 id="路由调用节点维度"><a href="#路由调用节点维度" class="headerlink" title="路由调用节点维度"></a>路由调用节点维度</h4><p>整个交易过程中有很多节点，有交易系统提交请求给支付系统，收银台暂时还未展示的节点；有在收银台界面输入支付要素的节点；有输入完成支付要素，提交整个订单的节点。在这些节点，支付系统前端都会与路由系统进行交互，以保证支付的高可用，从而不断提高支付成功率。我们将这些不同节点与调用路由的关系分别称为事前路由、事中路由和事后路由。</p>
+<h5 id="事前路由"><a href="#事前路由" class="headerlink" title="事前路由"></a>事前路由</h5><p>事前路由是用户发起支付，支付平台为了向用户展示支付方式、银行、输入要素而向路由系统发起请求的过程。</p>
+<h5 id="事中路由"><a href="#事中路由" class="headerlink" title="事中路由"></a>事中路由</h5><p>事中路由是指在支付交易过程中，用户输入卡号、护照等支付要素，支付平台根据输入要素进行判定，若事前路由下发的最优通道不支持此交易（如不支持此卡BIN或者证件类型），会再次请求路由服务，获得支持此要素的支付通道的处理机制。绝大多数公司只做了事前路由，甚至只做了路由中的基础路由，这样仅仅能够解决能用的问题，要想不断提高支付成功率，就需要做事中路由。收银台会展示平台支持的支付品牌，选择后会进一步展示需要的支付要素。但因为每个通道支持的卡BIN不一致，支持的证件类型也不一样，如果只有事前一次路由，就会出现问题。比如用户输入卡号后，若最初下发的通道不支持用户所输入卡号的卡BIN；又如最初下发的最优通道只支持身份证，而用户要使用护照；这些场景都会造成支付失败。</p>
+<p>对于上述情况，大致有三种可能的应对方式：</p>
+<ol>
+<li>提示用户换卡（支付时间变长，影响用户体验）</li>
+<li>不管不问，直接将交易提交到支付通道。最终结果就是产生大量的支付失败和报错提示。用户自己根据报错提示，了解到要换卡；或者不停打电话给平台或银行的客服，询问为什么支付会失败。这样不仅会影响用户体验，支付成功率也会下降，而且用户还可能陷入死循环，比如用户一直输入护照号码尝试支付，虽然每次输入的要素都对，但系统一直报错“卡信息有误”。</li>
+<li>将交易转移到支持此支付要素的通道。在支付过程中，如果已经识别卡号不支持或者证件类型不支持，那么最好的办法就是找到支持的通道，并且在用户无感知的前提下替换掉原有通道。至于实现，这就是事中路由要做的。</li>
+</ol>
+<h5 id="事后路由"><a href="#事后路由" class="headerlink" title="事后路由"></a>事后路由</h5><p>事后路由事后路由是指在支付交易过程中，识别通道方返回的交易码，将一些因为通道方原因（如通道超限）造成的交易失败进行重试以挽回交易。这需要根据返回码进行精确筛选、区分，每个通道的返回码都不一样，这里不一一举例说明。</p>
+<h3 id="出金路由"><a href="#出金路由" class="headerlink" title="出金路由"></a>出金路由</h3><p>出金是指从三方支付机构的备付金账户结算资金到商户的银行账户中。商户需要绑定接收资金的银行卡，因此需要对其正确性进行校验。入金路由的设计思路是根据入参筛选出可用的渠道，再使用漏斗模式筛选出最优的渠道。</p>
+<p><img src="/images/SE/出金路由.png" alt=""></p>
+<ol>
+<li>支付内部系统发起结算，结算一般于 T+1 日开始，会由定时任务触发。</li>
+<li>渠道系统收到请求报文后会进行参数校验，每一笔出金请求都会落库记录，以备后续对账。</li>
+<li>业务路由负责过滤商户，如果有些商户被风控或者有洗钱嫌疑则会暂停出金，每个商户针对不同的银行会有额度次数的限制。</li>
+<li>渠道路由会选择可用的渠道，每个渠道支持的银行也不一样，如果渠道内支持的某家银行正在维护系统，那么在系统维护期间会暂停过滤该银行通道。</li>
+<li>出金渠道调用银联、网联出金成功之后，会通过异步消息通知支付内部系统，在支付内部系统收到消息后会更新对应订单的支付状态。</li>
+<li>三方支付机构在银联的出金需要映射备付金账户，如果资金不足，则需要及时告警，清结算人员需要向备付金账户及时备款。</li>
+</ol>
+<h3 id="渠道切换"><a href="#渠道切换" class="headerlink" title="渠道切换"></a>渠道切换</h3><p>三方支付机构对接的渠道有银联和网联，银联和网联对接银行、支付宝、微信等，微信和支付宝又区分线上和线下。通常一家三方支付机构对接银联或者网联会有多条专线，防止网络异常。如果一条专线有问题则要及时切换到另一条专线；如果银联出现异常，那么也需要及时把交易切换到网联，实现专线与专线之间、渠道与渠道之间的自动切换。</p>
+<p>渠道会根据网络和业务成功率来自动切换，专线会根据网络的可用性来切换，通常每 5 秒发起一次网络监测，如果网络异常，则会及时切换专线。切换专线分为四个步骤，即数据收集→数据计算→数据分析→网络切换。根据渠道单位时间内的业务成功率来完成业务切换。</p>
+<p>异常类型如下表：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>渠道\机构</th>
+<th>网联异常类型</th>
+<th>银联异常类型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全部渠道</td>
+<td>网联全部渠道异常</td>
+<td>银联全部渠道异常</td>
+</tr>
+<tr>
+<td>微信渠道</td>
+<td>网联-微信渠道异常</td>
+<td>银联-微信渠道异常</td>
+</tr>
+<tr>
+<td>支付宝渠道</td>
+<td>网联-支付宝渠道异常</td>
+<td>银联-支付宝渠道异常</td>
+</tr>
+<tr>
+<td>银行卡渠道</td>
+<td>网联-银行卡渠道异常</td>
+<td>银联-银行卡渠道</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><img src="/images/SE/渠道切换系统.png" alt=""></p>
+<ol>
+<li><p>数据获取</p>
+<p> 数据分为网络监测数据和业务渠道数据。网络监测数据需要由定时任务驱动，每5秒（可以根据具体情况来设定时间）发起一起网络监测，无论监测到网络是否畅通，都需要把数据存储起来。业务渠道数据的来源是每条业务数据的记录，渠道系统收到外部渠道返回的结果后会把结果信息存储在数据库中，并把相关的数据推送至渠道切换系统，渠道切换系统摘取关键信息进行存储。</p>
+</li>
+<li><p>数据分析</p>
+<p> 数据分析也由定时任务驱动，分为网络数据分析和业务渠道数据分析。网络数据分析会拉取网络数据，网络数据根据专线的条数来区分，通常银联最少有两条专线（银联专线 1 和银联专线 2 ），网联最少也有两条专线（网联专线 1 和网联专线 2 ），如果每条专线在单位时间（通常是 20 秒）内的网络监测成功率低于 95%，则需要及时生成关闭该专线的指令。<br> 不同的业务渠道有不同的切换要求，根据渠道业务成功率，成功率低于某个阈值时需要生成切换指令。以银联-银行卡为例，如果支付成功率在单位时间（通常是 1 分钟）内低于 95%，则需要生成关闭该渠道的指令。</p>
+</li>
+<li>结果通知<br> 切换专线或者网络的指令生成之后，会通过 MQ 消息发送到各个业务方，通常渠道路由需要监听消息来完成实际的切换操作。</li>
+<li>渠道切换<br> 渠道路由收到切换专线的指令之后，会把当前的专线置为关闭状态，交易处理的过程中渠道路由就不会路由到当前的专线，相关的交易也不会再经过当前专线，达到了切换专线的目的。 业务渠道切换也是相同的机理，比如某渠道支付成功率低于阈值之后，渠道路由监听切换的指令会关闭该渠道，交易处理的过程中就不会再路由到该渠道， 而是路由到备用渠道。</li>
+<li>渠道回切<br> 由于异常原因，专线、业务渠道被关闭之后，过一段时间可能会恢复正常，三方支付机构需要检测专线和业务渠道是否恢复正常，如果恢复正常，则需要及时恢复专线和渠道承接的业务。专线的恢复流程和关闭流程是逆向的，每 5 秒监测一次网络，如果在单位时间内网络监测的成功率大于 95％ 就可以恢复专线。业务渠道的恢复流程和关闭流程也是逆向的，只不过不会通过实际的交易来验证，通常会使用已经有结果的交易进行验证，比如通过查询交易状态的接口来验证渠道是否正常，因为查询类交易不影响正常业务。</li>
+</ol>
+<h2 id="收银台"><a href="#收银台" class="headerlink" title="收银台"></a>收银台</h2><p>线下收单业务可以通过 POS 机终端实现刷卡支付、扫码支付，线上业务通过 PC 机、手机购买商品，需要针对各端制作收银台，给消费者提供支付的入口。</p>
+<p>收银台按照展示方式分为弹层收银台、内嵌收银台。弹层收银台使用的最多，我们在选好商品之后，在下单页面点击支付会弹出支付方式供我们选择，这就是弹层收银台。内嵌收银台通常在做活动时使用，比如一个广告页下提供了支付方式供客户选择，省去了客户提交的操作，能够快速促成客户下单。</p>
+<p>收银台按照载体可以分为移动收银台、PC收银台，按照使用群体可以分为 B 端收银台、C 端收银台，按照支付对象可以分为对公收银台和对私收银台。</p>
+<h3 id="业务架构-1"><a href="#业务架构-1" class="headerlink" title="业务架构"></a>业务架构</h3><p>收银台是直接与客户交互的系统，对用户体验的要求非常高，用户体验包括收银台的 UI 设计、收银台的高效性等。收银台提供的支付方式有支付宝支付、微信支付、银行卡支付、分期支付等，每种支付方式又封装了很多支付能力，比如银行卡支付有快捷支付、协议支付等，微信支付有小程序支付、H5 支付等。这些支付能力对于消费者来说是无感知的，消费者只需要知道使用哪种支付方式完成了支付即可。同时三方支付机构还会与金融公司一起开通一些金融业务，比如分期支付、先用后付等，这些都可以作为支付方式展示在收银台页面上。</p>
+<p>收银台分前端和后端，前端负责展示支付方式，后端实现数据转发、支付方式存储、支付方式路由等能力。</p>
+<p>收银台前端可以判断出支付环境，根据支付环境可以判断使用哪些支付方式，比如商城在微信小程序中，支付的时候也在微信小程序环境中，收银台前端可以根据微信小程序环境这一信息第一时间判断出可以支持微信小程序支付，所以前端承担了部分筛选支付方式的职责。收银台前端另一个非常重要的职责是对收银台进行分类，根据分类能够判断出应该使用哪一个收银台，比如在 PC 端就要使用 PC 收银台，在移动端就要使用移动收银台，收银台第一时间感知到这些信息，所以需要放到收银台前端来判断。</p>
+<p>前端和后端需要有信息的交互，前端需要把收集到的信息上传给后端。通常后端会提供四个接口：预下单接口、支付列表查询接口、预支付接口和支付结果查询接口。前端需要通过预下单接口上送订单信息到后端，然后拉起收银台，拉起收银台的同时需要后端返回可用的支付列表供前端展示，前端根据自身的判断和后端的返回结果最终筛选出向客户展示的支付方式列表，客户选择支付方式后点击支付，通过后端的预支付接口上送相关的支付信息。微信、支付宝有可能会返回 Deeplink 给前端，前端拉起微信、支付宝的客户端进行实际的支付，支付完成之后，微信、支付宝会异步通知支付结果给三方支付机构。至此，一个完成的支付流程结束，收银台前端的任务也完成了。</p>
+<p><img src="/images/SE/收银台支付交互流程.png" alt=""></p>
+<h3 id="引导路由"><a href="#引导路由" class="headerlink" title="引导路由"></a>引导路由</h3><p>三方支付机构的支付能力是通用的，如果有新增的支付方式，则需要快速支持，所以收银台可配置化非常重要。收银台的可配置维度如下：</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th>收银台可配置维度</th>
+<th>维度举例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>业务场景</td>
+<td>支付、充值</td>
+</tr>
+<tr>
+<td>渠道维度</td>
+<td>渠道限额、渠道是否维护</td>
+</tr>
+<tr>
+<td>商户维度</td>
+<td>商户签约支付方式、商户已开启支付方式</td>
+</tr>
+<tr>
+<td>用户维度</td>
+<td>是否开通该支付方式、各支付方式余额是否充足</td>
+</tr>
+<tr>
+<td>商品维度</td>
+<td>商品类目、商品ID</td>
+</tr>
+<tr>
+<td>支付环境</td>
+<td>微信小程序、支付小程序、H5支付、浏览器环境</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ol>
+<li><p>业务场景</p>
+<p> 业务场景分为支付、充值等，不同的场景对应的支付方式不一样，比如支付可以使用信用卡，而充值不可以使用信用卡，所以在展示银行卡列表时，充值场景需要过滤信用卡。</p>
+</li>
+<li><p>渠道维度</p>
+<p> 不同渠道都有自己的规则，比如银联支持银行卡、微信、支付宝，但网联只支持银行，微信，而没有对接支付宝的扫码支付等能力，并且每个渠道可能有不同的限额和维护时间，比如银联渠道在某个时间段内对某一个银行进行维护，那么在维护的时间段内不可以通过银联渠道进行该银行的银行卡支付；又比如客户使用的支付金额大于单笔或者单日限额。</p>
+</li>
+<li><p>商户维度</p>
+<p> 商户可以签约不同的支付方式，比如微信支付能力，需要商户上送相关的资质信息，申请对应的特约商户号，然后对特约商户号进行实名授权才可进行支付交易。另外，商户习惯使用付宝提现，如果有多种支付方式，那么可以开启常用的支付方式，关闭不常用的支付方式。</p>
+</li>
+<li><p>用户维度</p>
+<p> 用户在完成支付操作的时候，如果没有开通对应的支付方式，那么是不可以支付的，比如用户没有支付宝账号，就不可以选择支付宝支付。另外，余额也是限制支付的重要因素，使用微信零钱支付时，如果余额不足以购买选择的商品，就无法完成支付。</p>
+</li>
+<li><p>商品维度</p>
+<p> 有些商品只能用特定的支付方式完成支付，比如商户做促销活动，使用储值卡充值送余额，规定促销的商品只能使用储值卡支付。</p>
+</li>
+<li><p>支付环境</p>
+<p> 不同的支付环境支持的支付方式也不一样，微信小程序下只能支持微信支付，支付宝小程序下只能支持支付宝支付。</p>
+</li>
+</ol>
+<p>在抽象收银台的可配置维度后，提供支付平台或者网关系统向服务请求获得所支持支付方式及品牌展示，然后服务对这个请求做出处理，并向商户返回涵盖支付方式及品牌、营销文案、推荐支付方式、常用支付习惯等信息的一揽子方案，被称为引导路由。</p>
+<p>引导路由筛选支付方式需要经过几个阶段：支付方式初始化阶段、支付方式过滤筛选阶段、支付方式结果输出阶段。查询支付列表的时候，首先要根据支付的业务场景查询支持的支付列表有哪些完成的初始化动作，然后根据支付环境进行筛选，支付环境只有前端知道，是 PC 端环境、小程序环境，还是手机 WAP 环境等，所以前端需要把环境信息上送到收银台后端，收银台后端根据上送的环境信息及收银台配置的维度信息筛选出支持的支付列表。再根据支付方式优先级的策略输出对应的支付方式结果。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/Pay/" rel="tag"># Pay</a>
+              <a href="/tags/%E6%94%AF%E4%BB%98%E7%BD%91%E5%85%B3/" rel="tag"># 支付网关</a>
+              <a href="/tags/%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83/" rel="tag"># 支付核心</a>
+              <a href="/tags/%E6%94%AF%E4%BB%98%E8%B7%AF%E7%94%B1/" rel="tag"># 支付路由</a>
+              <a href="/tags/%E4%BA%A4%E6%98%93%E8%B7%AF%E7%94%B1/" rel="tag"># 交易路由</a>
+              <a href="/tags/%E5%BC%95%E5%AF%BC%E8%B7%AF%E7%94%B1/" rel="tag"># 引导路由</a>
+              <a href="/tags/%E5%85%A5%E9%87%91%E8%B7%AF%E7%94%B1/" rel="tag"># 入金路由</a>
+              <a href="/tags/%E5%87%BA%E9%87%91%E8%B7%AF%E7%94%B1/" rel="tag"># 出金路由</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/06/01/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-1-%E6%9E%B6%E6%9E%84/" rel="prev" title="电商域 支付系统架构">
+      <i class="fa fa-chevron-left"></i> 电商域 支付系统架构
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-1-%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1/" rel="next" title="电商域 支付清结算系统 架构">
+      电商域 支付清结算系统 架构 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%94%AF%E4%BB%98%E7%BD%91%E5%85%B3"><span class="nav-number">1.</span> <span class="nav-text">支付网关</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E5%A4%84%E7%90%86"><span class="nav-number">1.1.</span> <span class="nav-text">业务处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%B5%84%E6%BA%90%E9%9A%94%E7%A6%BB"><span class="nav-number">1.2.</span> <span class="nav-text">资源隔离</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%90%E6%B5%81%E3%80%81%E7%86%94%E6%96%AD%E3%80%81%E9%99%8D%E7%BA%A7"><span class="nav-number">1.3.</span> <span class="nav-text">限流、熔断、降级</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%94%AF%E4%BB%98%E6%A0%B8%E5%BF%83"><span class="nav-number">2.</span> <span class="nav-text">支付核心</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%94%AF%E4%BB%98%E8%B7%AF%E7%94%B1"><span class="nav-number">3.</span> <span class="nav-text">支付路由</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%A4%E6%98%93%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.</span> <span class="nav-text">交易路由</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%9E%B6%E6%9E%84"><span class="nav-number">3.1.1.</span> <span class="nav-text">业务架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%A5%E9%87%91%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.</span> <span class="nav-text">入金路由</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%B7%AF%E7%94%B1%E7%AE%97%E6%B3%95%E4%BC%98%E5%85%88%E7%BA%A7%E7%BB%B4%E5%BA%A6"><span class="nav-number">3.1.2.1.</span> <span class="nav-text">路由算法优先级维度</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.1.1.</span> <span class="nav-text">基础路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%9F%AD%E8%B7%AF%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.1.2.</span> <span class="nav-text">短路路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%A3%8E%E9%99%A9%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.1.3.</span> <span class="nav-text">风险路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%86%E7%BB%84%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.1.4.</span> <span class="nav-text">分组路由</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%B7%AF%E7%94%B1%E8%B0%83%E7%94%A8%E8%8A%82%E7%82%B9%E7%BB%B4%E5%BA%A6"><span class="nav-number">3.1.2.2.</span> <span class="nav-text">路由调用节点维度</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E4%BA%8B%E5%89%8D%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.2.1.</span> <span class="nav-text">事前路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E4%BA%8B%E4%B8%AD%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.2.2.</span> <span class="nav-text">事中路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E4%BA%8B%E5%90%8E%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.2.2.3.</span> <span class="nav-text">事后路由</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%87%BA%E9%87%91%E8%B7%AF%E7%94%B1"><span class="nav-number">3.1.3.</span> <span class="nav-text">出金路由</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B8%A0%E9%81%93%E5%88%87%E6%8D%A2"><span class="nav-number">3.1.4.</span> <span class="nav-text">渠道切换</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%94%B6%E9%93%B6%E5%8F%B0"><span class="nav-number">3.2.</span> <span class="nav-text">收银台</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E6%9E%B6%E6%9E%84-1"><span class="nav-number">3.2.1.</span> <span class="nav-text">业务架构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BC%95%E5%AF%BC%E8%B7%AF%E7%94%B1"><span class="nav-number">3.2.2.</span> <span class="nav-text">引导路由</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">166</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">32</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">314</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

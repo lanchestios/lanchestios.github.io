@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="计费系统是三方支付机构重要的子系统，三方支付机构最核心的收入来源是赚取手续费差值（手续费差值&#x3D;收取的商户手续费-渠道收取的手续费），合理收取商户的手续费是支付机构得以存活的保障。要保证收取商户的手续费比渠道收取的手续费略高，但也不能太高，太高会给商户造成资金上的压力，在行业内失去党争力。所以计费系统要解决的核心问题是，既要保证收取的手续费能够让支付机构很好的活下去，又要保证不能给商户造成太大的压力">
+<meta property="og:type" content="article">
+<meta property="og:title" content="电商域 支付清结算系统 计费系统">
+<meta property="og:url" content="http://example.com/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-2-%E8%AE%A1%E8%B4%B9%E7%B3%BB%E7%BB%9F/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="计费系统是三方支付机构重要的子系统，三方支付机构最核心的收入来源是赚取手续费差值（手续费差值&#x3D;收取的商户手续费-渠道收取的手续费），合理收取商户的手续费是支付机构得以存活的保障。要保证收取商户的手续费比渠道收取的手续费略高，但也不能太高，太高会给商户造成资金上的压力，在行业内失去党争力。所以计费系统要解决的核心问题是，既要保证收取的手续费能够让支付机构很好的活下去，又要保证不能给商户造成太大的压力">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/计费系统架构设计.png">
+<meta property="article:published_time" content="2023-06-26T05:13:21.000Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:32.075Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="SE (Software Engineering)">
+<meta property="article:tag" content="Pay">
+<meta property="article:tag" content="计费">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/计费系统架构设计.png">
+
+<link rel="canonical" href="http://example.com/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-2-%E8%AE%A1%E8%B4%B9%E7%B3%BB%E7%BB%9F/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>电商域 支付清结算系统 计费系统 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-2-%E8%AE%A1%E8%B4%B9%E7%B3%BB%E7%BB%9F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          电商域 支付清结算系统 计费系统
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-06-26 13:13:21" itemprop="dateCreated datePublished" datetime="2023-06-26T13:13:21+08:00">2023-06-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-11-17 18:24:32" itemprop="dateModified" datetime="2023-11-17T18:24:32+08:00">2023-11-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F/" itemprop="url" rel="index"><span itemprop="name">支付系统</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>计费系统是三方支付机构重要的子系统，三方支付机构最核心的收入来源是赚取手续费差值（手续费差值=收取的商户手续费-渠道收取的手续费），合理收取商户的手续费是支付机构得以存活的保障。要保证收取商户的手续费比渠道收取的手续费略高，但也不能太高，太高会给商户造成资金上的压力，在行业内失去党争力。所以计费系统要解决的核心问题是，既要保证收取的手续费能够让支付机构很好的活下去，又要保证不能给商户造成太大的压力，失去价格的竞争优势。但大部分支付机构初期的计费规则都较为简单，通常按百分比收取交易手续费。</p>
+<span id="more"></span>
+<h1 id="业务简介"><a href="#业务简介" class="headerlink" title="业务简介"></a>业务简介</h1><p>在支付机构成立之初，更多的工作重心放在了如何引流，如何留存商户，要保证支付的高效、结算的快速，所以大部分支付机构在系统建设初期都未对计费系统的整体规划足够重视。后期由于业务模式的演变、产品线的扩大，计费策略越来越复杂。例如，市场营销活动、合作商户个性化需求等，导致只能不停对计费系统打补丁。计费系统的先天不足导致记账、成本板算、分账、分润等诸多重要业务根本上的混乱。银行、基金等传统金融机构对计费系统的要求较低，计费策略都较为简单。而三方支付偏互联网的服务属性，要求其支付机构支持各种灵活的计费策略。</p>
+<p>设计好的计费系统首先要弄清楚两个概念：渠道手续费和支付机构手续费。</p>
+<ol>
+<li>渠道手续费</li>
+</ol>
+<p>三方支付机构通过银联／网联与银行进行交互，每一笔支付订单，只要经过银联／网联，都会收取相应的手续费，我们称之为渠道手续费。渠道手续费通常根据行业的不同会收取不同的手续费，比如教育、医疗这些服务行业通常按照 0.2％ 的费率进行收取，像电商、游戏这些行业通常按照 0.6％ 的费率来收取。</p>
+<p>2．支付机构手续费</p>
+<p>商户通过支付机构进行交易，支付机构也会收取相应的手续费，这部分费用我们称之为支付机构手续费。支付机构的收入大多来自收取的手续费，但是渠道也会收取支付机构的手续费，所以支付机构的利润主要是支付机构收取的手续费和渠道手续费的差值。例如一笔交易的金额为1000元，支付机构按照0.6％的费率收取手续费，这笔订单会收取 6 元的手续费，渠道按照 0.2％ 的费率进行收取，这笔订单会收取 2 元的手续费，最终支付机构的利润为 6元—2元＝4元。</p>
+<p>支付机构无法控制渠道手续费，所以这部分不在支付机构计费系统的考虑范围之内。支付现构能够决定的是收取商户的手续费，所以主要针对支付机构手续费来设计计费系统。</p>
+<p>我们先总结一下三方支付计费子系统架构设计方法论。采用 5W1H 框架来思考计费子系统的架构。</p>
+<ol>
+<li><p>Why：为何收费？</p>
+<p> 我们开车经过高速公路时要收取一定的高速费，高速费用于高速公路的日常维护，从而保证行车的安全与便捷。三方支付机构提供的支付渠道和高速公路是一个概念，交易通过支付渠道顺利完成支付动作，也要缴纳一定的渠道维护费，有了渠道维护费，支付机构可以更好地提供支付能力，接入更多的银行，兼容更多的支付方式，保证支付的便捷与安全。</p>
+</li>
+<li><p>What：什么费用？</p>
+<p> 除了收取渠道的手续费，支付机构根据自身的特点可以给商户提供相应的服务，然后赚取对应的服务费，比如利用支付机构的收银台能力提供广告服务以收取广告费，还可以给商户提供一些营销策略，收取营销服务费。以广告费为例，商户在三方支付平台的 PC 端和手机 APP 上发布宣传广告，三方支付机构会收取一定的广告费用。而此笔广告费用的多少取决于三方支付机构的知名度和使用客户的覆盖度，在三方支付机构收益中占据较低的比例。三方支付机构期用还有另一个重要盈利点——服务费，主要包括理财相关业务的服务费、代缴费业务中与三方支付机构以外的三方合作商户收取部分的服务费用两种表现形式，即三方支付机构为客户解决不同的支付方案，除了提供支付业务，还有其他一系列的增值业务。而这种模式已经渐渐成为各个三方支付机构的核心利润点。</p>
+</li>
+<li><p>When：何时收费？</p>
+<p> 收费的模式有很多种，可以定义多样的计费策略，比如先用后付、先付后用、实时收费、周期计费等。还以高速费类比，我们每次上高速的时候是不会收费的，下高速的时候根据路程计算费用，把高速费交给收费人员，这就是一种典型的实时计费的模式。实时收费的特点就是实时计算费用、收取费用。后来发现人工收费很耗费时间和资源，并且容易造成交通拥堵，随着科技的发展， ETC 就应运而生，可以先把钱充在 ETC 相关的银行卡里，经过收费站后不需要人工介入，直接从 ETC 相关的银行卡预存的费用中扣除即可，这就是先付后用的计费方式。在计费体系里还有类似京东商城的先用后付，可以先让商户使用支付渠道进行交易，在结算的时候收取相应的费用。</p>
+</li>
+<li><p>Who：谁来收/付费？</p>
+<p> 收付问题是三方支付机构解决的最核心的问题，同样计费也绕不开这个问题，手续费谁来收、谁来付要提前定义清楚，收取的手续费应该从哪个账户出、到哪个账户去，在设计系统的时候也是重中之重。付费的主体是商户，收费的主体是三方支付机构，在账户体系中，三方支付机构有自己的账户，商户也会有自己的各类账户，在收取费用的时候通常将费用从商户的余额账户流转到三方支付机构的余额账户。</p>
+</li>
+<li><p>Where：在哪儿收费？</p>
+<p> 我们经过高速路口收费站的时候收费员或 ETC 收取的费用是根据行驶里程来计算的，我们需要缴纳根据行驶里程计算得出的费用。同样三方支付机构手续费的收取也要经历两步：计算+收取。在订单支付完成之后，需要计算应该收取的费用是多少，在结算的时候按照计算的费用收取即可。广告费、营销费通常是在活动之前预存相关的费用，实际活动的时候使用的费用在预存账户中扣除即可。</p>
+</li>
+<li><p>How：如何计费？</p>
+<p> 计算费用需要有相关的依据，通常商户入驻三方支付机构的时候会签订对应的计费包，根据商户的从业类目签订不同的计费包。例如，从事教育行业的商户可以签订费率为0.38%的计费包，从事电商行业的商户可以签订费率为0.6%的计费包，一个商户可以签订多个计费包。收取费用的时候根据交易的类型来确定计费包（比如教育产品可以使用教育计费包），然后根据计费包的费率来计算应收费用。另外，三方支付机构为了吸引商户，通常也会做一些优惠活动，计算费用的时候也需要考虑相关优惠活动。</p>
+</li>
+</ol>
+<h1 id="系统设计"><a href="#系统设计" class="headerlink" title="系统设计"></a>系统设计</h1><h2 id="设计原则"><a href="#设计原则" class="headerlink" title="设计原则"></a>设计原则</h2><p>根据计费系统的业务特点，设计计费系统的时候可以考虑按以下几方面的因素。</p>
+<p>非核心功能解耦：非核心功能解耦指的是不在核心流程中的功能单独处理，避免影响主流程，如工具类、查询类等旁支功能。解耦带来的好处多种多样，首先是故障异常的解耦，解耦出来的模块其稳定性、性能甚至逻辑问题都不会干扰核心流程，其次是当真正的故障来临时，这些非核心功能都可以做到一键降级。计费系统不在支付主链路上，三方支付机构首要的任务是保证支付的高效，所以计费系统的数据可以通过消息队列的形式来获取，做到异步化，不耦合在支付流程中。</p>
+<p>防御性编程：防御性编程是一种系统设计思想，它是为了保证对程序的不可预见的使用不会造成程序功能上的损坏。具体在日常系统设计上有两部分，首先对所有外部依赖保持高度不信任，所有三方依赖都需要有降级兜底方案，尤其是涉及核心功能的依赖，如数据库。在计费时，我们对大量的核心依赖都有降级兜底方案，如计费规则的存储有三层降级兜底方案，从内存到缓存再到数据库。其次是在日常的编码过程中，需要确保每个函数的健壮性，对于入参，不能做预设时应及时返回错误。墨菲定律告诉我们不应该心存侥幸，对于日常的编码工作，要将稳定性时常放在心上。</p>
+<h2 id="计费策略"><a href="#计费策略" class="headerlink" title="计费策略"></a>计费策略</h2><p>电商通常会有很多营销玩法，以吸引客户，比如满减、打折等。三方支付机构同样会采取一些计费策略来吸引商户入驻和留存商户。这里介绍两种计费策略：阶梯计费和预付费。</p>
+<p>阶梯计费就是对费率划分一些等级，达到某个等级就享受什么样的费率折扣。阶梯计费会根据交易额设置费率，比如月支付金额在100万元以下享受的手续费费率是0.65％，100万元到500万元享受的手续费费率是0.6％，500万元以上享受的费率是0.38％。</p>
+<p>预付费是让商户提前缴存一定的费用到三方支付机构，三方支付机构给商户开设专门的计费账户，商户缴存的费用统一保存在计费账户中，之后的每笔交易产生的手续费都会从计费帐户中扣除。针对预存手续费，三方支付机构会给予一定的优惠策略，以吸引商户预存资金。这样样做对三方支付机构来说，一来可以提前变现，二来可以留存商户。</p>
+<h2 id="架构设计"><a href="#架构设计" class="headerlink" title="架构设计"></a>架构设计</h2><p>设计原则中提到计费系统并不在支付主链路中，所以尽量做到和支付解耦，如果计费系统出现问题，则不影响客户正常支付交易的完成。</p>
+<p><img src="/images/SE/计费系统架构设计.png" alt=""></p>
+<p>计费系统的数据来源主要是支付核心和结算系统，支付核心完成支付交易后，会发送支付成功消息给计费系统。发送支付成功消息就是为了和支付业务解耦，计费系统通过监听异步消息来计算应该收取的手续费，这样实现了异步化，极大地提升了支付效率。同时计费系统也要提供 RPC 接口供清结算系统调用，在计算广告费、营销费的时候由清结算系统和计费系统直接交互，目的是防止超出预算，涉及实时资金处理的业务不能做成异步消息处理。</p>
+<p>计费系统提供消费消息的功能，获取计费消息之后，会进行参数校验等操作，如果操作的过程中由于系统异常导致流程无法进行，则会把消息重新放入消息队列，等待下次重试。同时为了防止一笔支付单重复收费，计费系统也要进行幂等判断，通常根据支付单号来进行幂等判断。一笔支付单号只能收取一笔手续费。同时计费系统提供计费规则的维护、费用的计算、费用计算结果通知的功能。计费规则在商户入驻的时候进行签约，然后生成计费包供商户使用，计费规则的管理包括计费产品的定义、计费协议的定义、计算手续费规则的定义和存储等。计费系统收到支付消息之后会根据商户签订的计费规则计算手续费，计算费用是计费系统最核心的功能，根据规则计算好费用之后，需要通知清结算系统费用计算的结果，以便后续进行正常的结算。手续费计算的结果也会被记录起来，以便后续查询时使用。</p>
+<p>三方支付机构针对每一笔订单收取的手续费并不是真正的收益，因为三方支付机构还需要给渠道支付相应的费用。如果要计算三方支付机构具体通过手续费盈利的情况，则可以把渠道给的对账单中的费用和三方支付机构收取的费用进行核对，这样就能够知道单笔支付交易的盈利情况，进而分析出针对商户的盈利情况，最终得出通过手续费实现盈利的情况。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SE-Software-Engineering/" rel="tag"># SE (Software Engineering)</a>
+              <a href="/tags/Pay/" rel="tag"># Pay</a>
+              <a href="/tags/%E8%AE%A1%E8%B4%B9/" rel="tag"># 计费</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-1-%E6%95%B4%E4%BD%93%E8%AE%BE%E8%AE%A1/" rel="prev" title="电商域 支付清结算系统 架构">
+      <i class="fa fa-chevron-left"></i> 电商域 支付清结算系统 架构
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/06/26/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-3-%E8%B4%A6%E5%8A%A1%E7%B3%BB%E7%BB%9F/" rel="next" title="电商域 支付清结算系统 账务系统">
+      电商域 支付清结算系统 账务系统 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%9A%E5%8A%A1%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">业务简介</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.</span> <span class="nav-text">系统设计</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%BE%E8%AE%A1%E5%8E%9F%E5%88%99"><span class="nav-number">2.1.</span> <span class="nav-text">设计原则</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A1%E8%B4%B9%E7%AD%96%E7%95%A5"><span class="nav-number">2.2.</span> <span class="nav-text">计费策略</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1"><span class="nav-number">2.3.</span> <span class="nav-text">架构设计</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">166</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">32</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">314</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

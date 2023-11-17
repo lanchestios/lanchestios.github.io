@@ -28,7 +28,7 @@
 <meta property="og:description" content="ElasticSearch 提供的搜索功能有单条件查询、复合查询、全文查询、地理位置查询四大类，而且提供了搜索建议和一些辅助功能。">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-12-30T06:55:30.000Z">
-<meta property="article:modified_time" content="2023-08-07T06:52:51.967Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:32.071Z">
 <meta property="article:author" content="Wang Zihao">
 <meta property="article:tag" content="ElasticSearch">
 <meta property="article:tag" content="Search">
@@ -226,7 +226,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2023-08-07 14:52:51" itemprop="dateModified" datetime="2023-08-07T14:52:51+08:00">2023-08-07</time>
+                <time title="Modified: 2023-11-17 18:24:32" itemprop="dateModified" datetime="2023-11-17T18:24:32+08:00">2023-11-17</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -272,9 +272,10 @@
 <blockquote>
 <p>FIELD 的数据类型可以是数值型、布尔型、日期型、数组型及关键字等</p>
 </blockquote>
+<p>需要了解的是，term 是包含（contains） 操作，而非 等值（equals）判断。使用 term 要确定的是这个字段是否“被分析”(analyzed)，默认的 String 类型是 <code>analyzed</code>，但也可以设置 <code>not_analyzed</code>。</p>
+<p>例如：现有一个 <code>analyzed</code> 的 String 类型和 <code>not_analyzed</code> 的 String 类型，内容在存储时都为 <code>Quick Foxes!</code>，在 term 查询时，由于 <code>analyzed</code> 类型的 String 类型在被分词后没有 <code>Quick Foxes!</code> 这个词，因此无法查询到数据。</p>
 <h2 id="Terms-查询"><a href="#Terms-查询" class="headerlink" title="Terms 查询"></a>Terms 查询</h2><p>terms 查询是 term 查询的扩展形式，用于查询一个或多个值与待查字段是否完全匹配。</p>
-<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET  &#x2F;$&#123;index_name&#125;&#x2F;_search  
-
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET  &#x2F;$&#123;index_name&#125;&#x2F;_search
 &#123;   
 	&quot;query&quot;: &#123;  
   	&quot;terms&quot;: &#123;
@@ -282,7 +283,7 @@
     	&quot;FIELD&quot;: [&quot;VALUE1&quot;,&quot;VALUE2&quot;, … ]     
     &#125;
   &#125;
-&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <h2 id="Range-查询"><a href="#Range-查询" class="headerlink" title="Range 查询"></a>Range 查询</h2><p>range 查询用于范围查询，一般是对数值型和日期型数据的查询。使用 range 进行范围查询时，用户可以按照需求中是否包含边界数值进行选项设置，可供组合的选项如下：</p>
 <ul>
 <li>gt：大于</li>
@@ -291,7 +292,6 @@
 <li>lte：小于或等于</li>
 </ul>
 <pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /$&#123;index_name&#125;/_search 
-
 &#123;   
 	"query": &#123;    
 		"range": &#123;        
@@ -301,7 +301,7 @@
 			&#125;
 	    &#125;
 	&#125;
-&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+&#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <h2 id="Exists-查询"><a href="#Exists-查询" class="headerlink" title="Exists 查询"></a>Exists 查询</h2><p>在某些场景下，我们希望找到某个字段不为空的文档，则可以用 exists 搜索。</p>
 <p>字段不为空的条件有：</p>
 <ul>
@@ -330,7 +330,25 @@
 	    &#125;
 	&#125;
 &#125; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<h2 id="模糊查询"><a href="#模糊查询" class="headerlink" title="模糊查询"></a>模糊查询</h2><p>用来模糊查询含有指定关键字的文档。</p>
+<h2 id="模糊查询"><a href="#模糊查询" class="headerlink" title="模糊查询"></a>模糊查询</h2><h3 id="Wildcard-查询"><a href="#Wildcard-查询" class="headerlink" title="Wildcard 查询"></a>Wildcard 查询</h3><p>通配符索引。<code>*</code> 表示全匹配，<code>？</code> 表示单一匹配。扫描所有倒排索引，性能较差。</p>
+<pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /$&#123;index_name&#125;/_search
+&#123; 
+  "query": &#123; 
+    "wildcard": &#123; 
+      "companyName": "*京东*" 
+    &#125; 
+  &#125; 
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="Regexp-查询"><a href="#Regexp-查询" class="headerlink" title="Regexp 查询"></a>Regexp 查询</h3><p>正则索引。扫描所有倒排索引，性能较差。</p>
+<pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /$&#123;index_name&#125;/_search
+&#123; 
+    "query": &#123; 
+        "regexp": &#123; 
+            "postcode": "W[0-9].+" 
+        &#125; 
+    &#125; 
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="Fuzzy-查询"><a href="#Fuzzy-查询" class="headerlink" title="Fuzzy 查询"></a>Fuzzy 查询</h3><p>用来模糊查询含有指定关键字的文档。</p>
 <pre class="line-numbers language-http" data-language="http"><code class="language-http">GET /$&#123;index_name&#125;/_search 
 &#123;   
 	"query": &#123;    
@@ -550,6 +568,9 @@
 <h1 id="全文查询"><a href="#全文查询" class="headerlink" title="全文查询"></a>全文查询</h1><p>不同于结构化查询，全文搜索首先对查询词进行分析，然后根据查询词的分词结果构建查询。这里所说的全文指的是文本类型数据（text类型）。结构化搜索关注的是数据是否匹配，全文搜索关注的是匹配的程度；结构化搜索一般用于精确匹配，而全文搜索用于部分匹配。</p>
 <h2 id="Match-查询"><a href="#Match-查询" class="headerlink" title="Match 查询"></a>Match 查询</h2><p>match 查询是全文搜索的主要代表。对于最基本的 match 搜索来说，只要分词中的一个或者多个在文档中存在即可。</p>
 <p>在默认情况下，match 查询使用的是标准分词器。该分词器比较适用于英文，如果是中文则按照字进行切分，因此默认的分词器不适合做中文搜索。例如搜索“金都酒店”，查询词先被分词器切分为“金”“都”“酒”“店”，因此，只要文档中包含这 4 个字中的任何一个字，都会被搜索到。</p>
+<blockquote>
+<p>注意：如果 match 查询数字，日期，布尔值或者 not_analyzed 的字符串时，会精确匹配搜索值，不做分词解析；如果 match 查询全文本，会对查询词做分词解析，然后搜索。</p>
+</blockquote>
 <pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
 &#123;   
 	&quot;query&quot;: &#123;     
@@ -794,7 +815,7 @@
 		&#125;
 	&#125;
 &#125;  <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
-<h2 id="结果分页"><a href="#结果分页" class="headerlink" title="结果分页"></a>结果分页</h2><p>在默认情况下，ES 返回前 10 个搜索匹配的文档。用户可以通过设置 from 和 size 来定义搜索位置和每页显示的文档数量，from 表示查询结果的起始下标，默认值为 0，size 表示从起始下标开始返回的文档个数，默认值为 10。</p>
+<h2 id="结果分页"><a href="#结果分页" class="headerlink" title="结果分页"></a>结果分页</h2><h3 id="普通分页"><a href="#普通分页" class="headerlink" title="普通分页"></a>普通分页</h3><p>在默认情况下，ES 返回前 10 个搜索匹配的文档。用户可以通过设置 from 和 size 来定义搜索位置和每页显示的文档数量，from 表示查询结果的起始下标，默认值为 0，size 表示从起始下标开始返回的文档个数，默认值为 10。</p>
 <pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
 &#123;  
 	&quot;from&quot;: 0,  &#x2F;&#x2F;设置搜索的起始位置  
@@ -820,10 +841,117 @@
 <span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <p>对于普通的搜索应用来说，size 设为 10000 已经足够用了。如果确实需要返回多于 10000 条的数据，可以适当修改 <code>max_result_window</code> 的值。</p>
 <blockquote>
-<p><strong>ES 为什么不适合深翻页？</strong></p>
+<p><strong>ES 为什么不适合深分页？</strong></p>
 <p>作为一个分布式搜索引擎，一个 ES 索引的数据分布在多个分片中，而这些分片又分配在不同的节点上。一个带有分页的搜索请求往往会跨越多个分片，每个分片必须在内存中构建一个长度为 <code>from+size</code> 的、按照得分排序的有序队列，用以存储命中的文档。然后这些分片对应的队列数据都会传递给协调节点，协调节点将各个队列的数据进行汇总，需要提供一个长度为 <code>number_of_shards *（from+size）</code> 的队列用以进行全局排序，然后再按照用户的请求从 from 位置开始查找，找到 size 个文档后进行返回。</p>
 <p>当深翻页的请求过多时会增加各个分片所在节点的内存和 CPU 消耗。尤其是协调节点，随着页码的增加和并发请求的增多，该节点需要对这些请求涉及的分片数据进行汇总和排序，过多的数据会导致协调节点资源耗尽而停止服务。</p>
 </blockquote>
+<h3 id="Scroll-分页"><a href="#Scroll-分页" class="headerlink" title="Scroll 分页"></a>Scroll 分页</h3><p>适用于从单个搜索请求中检索大量结果，其方式和传统数据库中的游标 Cursor 类似。在第一次查询时会缓存对应的结果快照并返回客户端读取到的位置参数 <code>scroll_id</code>，后续每次请求都会通过位置参数访问快照实现快速查询。</p>
+<blockquote>
+<p><strong>执行过程</strong></p>
+<p>Scroll 分页方式在 Query 阶段同样也是 Coordinating Node 广播查询请求，获取、合并、排序其他 shard 返回的数据 id 集合，不同的是 Scroll 分页方式会将返回数据 id 的集合生成快照保存到 Coordinating Node 上。Fetch 阶段以游标的方式从生成的快照中获取 size 条数据的 id，并去其他 shard 获取数据详情返回给客户端，同时将下一次游标开始的位置标识 scroll_id 也返回。这样下次客户端发送获取下一页请求时带上 scroll_id 标识，Coordinating Node 会从 scroll_id 标记的位置获取接下来 size 条数据，同时再次返回新的游标位置标识 scroll_id，这样依次类推直到取完所有数据。</p>
+</blockquote>
+<p>优点：</p>
+<ol>
+<li>可以处理大量数据，且结果的一致性优于 Search After</li>
+<li>允许在不重新执行搜索的情况下获取后续的结果</li>
+</ol>
+<p>缺点：</p>
+<ol>
+<li>需要保持搜索上下文，因此会对 Elasticsearch 集群产生一定的资源压力</li>
+<li>不适用于实时结果检索（结果可能不是最新的，因为它保持搜索上下文，而在滚动过程中索引可能发生变化）</li>
+</ol>
+<p>以下是 Scroll 分页的使用方法：</p>
+<pre class="line-numbers language-none"><code class="language-none"># 指定检索语句同时设置 scroll 上下文保留时间
+POST kibana_sample_data_logs&#x2F;_search?scroll&#x3D;3m
+&#123;
+  &quot;size&quot;: 100,
+  &quot;query&quot;: &#123;
+    &quot;match&quot;: &#123;
+      &quot;host&quot;: &quot;elastic&quot;
+    &#125;
+  &#125;
+&#125;
+
+# 向后翻页继续获取数据，直到没有要返回的结果为止
+POST _search&#x2F;scroll                                   
+&#123;
+  &quot;scroll&quot; : &quot;3m&quot;,
+  &quot;scroll_id&quot;:&quot;FGluY2x1ZGVfY29udGV4dF91d&quot; 
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="PIT-分页"><a href="#PIT-分页" class="headerlink" title="PIT 分页"></a>PIT 分页</h3><p>PIT（Point In Time）是基于索引状态的。它通过创建时间点 Point In Time（PIT）来保存搜索过程中的索引状态，允许你在特定时间点上执行搜索操作。这个时间点之后对索引的变化不会影响 PIT。</p>
+<blockquote>
+<p><strong>执行过程</strong></p>
+</blockquote>
+<p>优点：</p>
+<ol>
+<li>PIT 占用的资源较少，因为它是基于索引状态的快照，不需要保持资源上下文</li>
+<li>保证结果在创建 PIT 时的索引状态下执行搜索，因此结果一致性较好</li>
+</ol>
+<p>缺点：</p>
+<ol>
+<li>数据由于是基于索引快照，因此没有最新数据</li>
+</ol>
+<p>以下是 PIT 分页的使用方法：</p>
+<pre class="line-numbers language-none"><code class="language-none"># 创建 PIT
+POST kibana_sample_data_logs&#x2F;_pit?keep_alive&#x3D;1m
+&#123;
+  &quot;id&quot; : &quot;48myAwEXa2liYW5hX3&quot;
+&#125;
+
+# 获取数据量 14074
+POST kibana_sample_data_logs&#x2F;_count
+
+# 新增一条数据
+POST kibana_sample_data_logs&#x2F;_doc&#x2F;14075
+&#123;
+  &quot;test&quot;:&quot;just testing&quot;
+&#125;
+
+# 数据总量为 14075
+POST kibana_sample_data_logs&#x2F;_count
+
+
+# 查询 PIT，数据依然是14074，说明走的是之前时间点的视图的统计。
+POST &#x2F;_search
+&#123;
+  &quot;track_total_hits&quot;: true, 
+  &quot;query&quot;: &#123;
+    &quot;match_all&quot;: &#123;&#125;
+  &#125;, 
+   &quot;pit&quot;: &#123;
+    &quot;id&quot;: &quot;48myAwEXa2liYW5hX3NhbXBs&quot;
+  &#125;
+&#125;
+
+# 释放 PIT
+POST &#x2F;_pit&#x2F;PIT_ID&#x2F;_close<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<h3 id="SearchAfter-分页"><a href="#SearchAfter-分页" class="headerlink" title="SearchAfter 分页"></a>SearchAfter 分页</h3><p>SearchAfter 是一种基于排序字段的分页方法。它允许你从一个特定的排序字段值开始获取结果，以获得后续的分页数据。</p>
+<blockquote>
+<p><strong>执行过程</strong></p>
+<p>Search After 方式也不支持跳页功能，每次查询一页数据。第一次每个 shard 返回一页数据（size 条），Coordinating Node 一共获取到 shard 数 * size 条数据 ， 接下来 Coordinating Node 在内存中进行排序，取出前 size 条数据作为第一页搜索结果返回。当拉取第二页时，不同于 Scroll 分页方式，Search After 方式会找到第一页数据被拉取的最大值，作为第二页数据拉取的查询条件。</p>
+<p>这样每个 shard 还是返回一页数据（size 条），Coordinating Node 获取到 shard 数 * size 条数据进行内存排序，取得前 size 条数据作为全局的第二页搜索结果。<br>后续分页查询以此类推…</p>
+</blockquote>
+<p>优点：</p>
+<ol>
+<li>不会对 Elasticsearch 集群产生大量资源压力</li>
+<li>适用于实时结果检索</li>
+</ol>
+<p>缺点：</p>
+<ol>
+<li>可能在高并发环境中存在问题，如果有多个文档具有相同的排序字段值，可能会产生重复结果或遗漏结果。</li>
+</ol>
+<p>以下是 SearchAfter 分页的使用方法：</p>
+<pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">POST &#x2F;your_index&#x2F;_search
+&#123;
+  &quot;size&quot;: 10,
+  &quot;query&quot;: &#123;
+    &quot;match_all&quot;: &#123;&#125;
+  &#125;,
+  &quot;sort&quot;: [
+    &#123;&quot;your_sort_field&quot;: &quot;asc&quot;&#125;
+  ],
+  &quot;search_after&quot;: [last_sort_value]  &#x2F;&#x2F; 使用上一页结果的排序字段值作为 search_after 参数
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
 <h2 id="结果排序"><a href="#结果排序" class="headerlink" title="结果排序"></a>结果排序</h2><p>ES 提供了 sort 子句可以对数据进行排序。使用 sort 子句一般是按照字段信息进行排序，不受相关性影响，而且打分步骤需要耗费一定的硬件资源和时间，因此默认情况下，不对文档进行打分。使用 sort 排序分为两种类别，一种是按照字段值的大小进行排序，另一种是按照给定地理坐标的距离远近进行排序。</p>
 <h3 id="按普通字段值排序"><a href="#按普通字段值排序" class="headerlink" title="按普通字段值排序"></a>按普通字段值排序</h3><p>使用 sort 子句对字段值进行排序时需要指定排序的字段。ES 默认是按照字段值进行升序排序，可以设置 order 参数为 asc 或 desc，指定按照字段值进行升序或者降序排序。</p>
 <pre class="line-numbers language-HTTP" data-language="HTTP"><code class="language-HTTP">GET &#x2F;hotel&#x2F;_search 
@@ -999,7 +1127,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%A8%E9%83%A8"><span class="nav-number">1.</span> <span class="nav-text">查询全部</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%95%E6%9D%A1%E4%BB%B6%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.</span> <span class="nav-text">单条件查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Term-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.1.</span> <span class="nav-text">Term 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Terms-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.2.</span> <span class="nav-text">Terms 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Range-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.3.</span> <span class="nav-text">Range 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exists-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.4.</span> <span class="nav-text">Exists 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Prefix-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.5.</span> <span class="nav-text">Prefix 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E7%B3%8A%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.</span> <span class="nav-text">模糊查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A4%8D%E5%90%88%E6%9F%A5%E8%AF%A2%EF%BC%88Bool-%E6%9F%A5%E8%AF%A2%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">复合查询（Bool 查询）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.1.</span> <span class="nav-text">Must 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Should-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.2.</span> <span class="nav-text">Should 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-Not-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.3.</span> <span class="nav-text">Must Not 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Filter-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.4.</span> <span class="nav-text">Filter 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%A8%E6%96%87%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.</span> <span class="nav-text">全文查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Match-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.</span> <span class="nav-text">Match 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MultiMatch-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.2.</span> <span class="nav-text">MultiMatch 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MatchPharse-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.3.</span> <span class="nav-text">MatchPharse 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E4%BD%8D%E7%BD%AE%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.</span> <span class="nav-text">地理位置查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoDistance-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.1.</span> <span class="nav-text">GeoDistance 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoBoundingBox-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.2.</span> <span class="nav-text">GeoBoundingBox 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoPolygon-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.3.</span> <span class="nav-text">GeoPolygon 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%90%9C%E7%B4%A2%E5%BB%BA%E8%AE%AE"><span class="nav-number">6.</span> <span class="nav-text">搜索建议</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8C%B9%E9%85%8D%E6%89%93%E5%88%86"><span class="nav-number">7.</span> <span class="nav-text">匹配打分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Constant-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.1.</span> <span class="nav-text">Constant Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Function-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.2.</span> <span class="nav-text">Function Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E6%AC%A1%E6%89%93%E5%88%86"><span class="nav-number">7.3.</span> <span class="nav-text">二次打分</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BE%85%E5%8A%A9%E5%8A%9F%E8%83%BD"><span class="nav-number">8.</span> <span class="nav-text">辅助功能</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%94%E5%9B%9E%E6%8C%87%E5%AE%9A%E5%AD%97%E6%AE%B5"><span class="nav-number">8.1.</span> <span class="nav-text">返回指定字段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E8%AE%A1%E6%95%B0"><span class="nav-number">8.2.</span> <span class="nav-text">结果计数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.</span> <span class="nav-text">结果分页</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.</span> <span class="nav-text">结果排序</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E6%99%AE%E9%80%9A%E5%AD%97%E6%AE%B5%E5%80%BC%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.1.</span> <span class="nav-text">按普通字段值排序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.2.</span> <span class="nav-text">按地理距离排序</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E6%97%B6%E8%AE%BE%E7%BD%AE%E6%9D%83%E9%87%8D"><span class="nav-number">8.5.</span> <span class="nav-text">查询时设置权重</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#boost"><span class="nav-number">8.5.1.</span> <span class="nav-text">boost</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#boosting"><span class="nav-number">8.5.2.</span> <span class="nav-text">boosting</span></a></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%A8%E9%83%A8"><span class="nav-number">1.</span> <span class="nav-text">查询全部</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%95%E6%9D%A1%E4%BB%B6%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.</span> <span class="nav-text">单条件查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Term-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.1.</span> <span class="nav-text">Term 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Terms-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.2.</span> <span class="nav-text">Terms 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Range-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.3.</span> <span class="nav-text">Range 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Exists-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.4.</span> <span class="nav-text">Exists 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Prefix-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.5.</span> <span class="nav-text">Prefix 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E7%B3%8A%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.</span> <span class="nav-text">模糊查询</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Wildcard-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.1.</span> <span class="nav-text">Wildcard 查询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Regexp-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.2.</span> <span class="nav-text">Regexp 查询</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Fuzzy-%E6%9F%A5%E8%AF%A2"><span class="nav-number">2.6.3.</span> <span class="nav-text">Fuzzy 查询</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A4%8D%E5%90%88%E6%9F%A5%E8%AF%A2%EF%BC%88Bool-%E6%9F%A5%E8%AF%A2%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">复合查询（Bool 查询）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.1.</span> <span class="nav-text">Must 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Should-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.2.</span> <span class="nav-text">Should 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Must-Not-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.3.</span> <span class="nav-text">Must Not 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Filter-%E6%9F%A5%E8%AF%A2"><span class="nav-number">3.4.</span> <span class="nav-text">Filter 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%A8%E6%96%87%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.</span> <span class="nav-text">全文查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Match-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.1.</span> <span class="nav-text">Match 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MultiMatch-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.2.</span> <span class="nav-text">MultiMatch 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MatchPharse-%E6%9F%A5%E8%AF%A2"><span class="nav-number">4.3.</span> <span class="nav-text">MatchPharse 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%9C%B0%E7%90%86%E4%BD%8D%E7%BD%AE%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.</span> <span class="nav-text">地理位置查询</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoDistance-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.1.</span> <span class="nav-text">GeoDistance 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoBoundingBox-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.2.</span> <span class="nav-text">GeoBoundingBox 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#GeoPolygon-%E6%9F%A5%E8%AF%A2"><span class="nav-number">5.3.</span> <span class="nav-text">GeoPolygon 查询</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%90%9C%E7%B4%A2%E5%BB%BA%E8%AE%AE"><span class="nav-number">6.</span> <span class="nav-text">搜索建议</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8C%B9%E9%85%8D%E6%89%93%E5%88%86"><span class="nav-number">7.</span> <span class="nav-text">匹配打分</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Constant-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.1.</span> <span class="nav-text">Constant Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Function-Score-%E6%9F%A5%E8%AF%A2"><span class="nav-number">7.2.</span> <span class="nav-text">Function Score 查询</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E6%AC%A1%E6%89%93%E5%88%86"><span class="nav-number">7.3.</span> <span class="nav-text">二次打分</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BE%85%E5%8A%A9%E5%8A%9F%E8%83%BD"><span class="nav-number">8.</span> <span class="nav-text">辅助功能</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%BF%94%E5%9B%9E%E6%8C%87%E5%AE%9A%E5%AD%97%E6%AE%B5"><span class="nav-number">8.1.</span> <span class="nav-text">返回指定字段</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E8%AE%A1%E6%95%B0"><span class="nav-number">8.2.</span> <span class="nav-text">结果计数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.</span> <span class="nav-text">结果分页</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%99%AE%E9%80%9A%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.1.</span> <span class="nav-text">普通分页</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Scroll-%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.2.</span> <span class="nav-text">Scroll 分页</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PIT-%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.3.</span> <span class="nav-text">PIT 分页</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#SearchAfter-%E5%88%86%E9%A1%B5"><span class="nav-number">8.3.4.</span> <span class="nav-text">SearchAfter 分页</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E6%9E%9C%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.</span> <span class="nav-text">结果排序</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E6%99%AE%E9%80%9A%E5%AD%97%E6%AE%B5%E5%80%BC%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.1.</span> <span class="nav-text">按普通字段值排序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%89%E5%9C%B0%E7%90%86%E8%B7%9D%E7%A6%BB%E6%8E%92%E5%BA%8F"><span class="nav-number">8.4.2.</span> <span class="nav-text">按地理距离排序</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E6%97%B6%E8%AE%BE%E7%BD%AE%E6%9D%83%E9%87%8D"><span class="nav-number">8.5.</span> <span class="nav-text">查询时设置权重</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#boost"><span class="nav-number">8.5.1.</span> <span class="nav-text">boost</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#boosting"><span class="nav-number">8.5.2.</span> <span class="nav-text">boosting</span></a></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -1013,20 +1141,20 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">163</span>
+          <span class="site-state-item-count">166</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">31</span>
+        <span class="site-state-item-count">32</span>
         <span class="site-state-item-name">categories</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">311</span>
+        <span class="site-state-item-count">314</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

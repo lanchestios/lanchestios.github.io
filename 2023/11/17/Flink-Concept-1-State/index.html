@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="在实际的流处理场景下，Operation（也叫算子）可根据 State 分为两类：  无状态 Operation：一次只处理一个独立的 Event， 有状态 Operation：需要合并&#x2F;引用多个 Events 并加以处理  Flink 应用的可用性及扩展性，都建立在围绕 State 的特性当中。在实际的使用场景中，通常会通过 Checkpoints 和 Savepoints 来实现容错（Faul">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink 概念 State">
+<meta property="og:url" content="http://example.com/2023/11/17/Flink-Concept-1-State/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="在实际的流处理场景下，Operation（也叫算子）可根据 State 分为两类：  无状态 Operation：一次只处理一个独立的 Event， 有状态 Operation：需要合并&#x2F;引用多个 Events 并加以处理  Flink 应用的可用性及扩展性，都建立在围绕 State 的特性当中。在实际的使用场景中，通常会通过 Checkpoints 和 Savepoints 来实现容错（Faul">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/Flink/state_partitioning.svg">
+<meta property="og:image" content="http://example.com/images/Flink/stream_barriers.svg">
+<meta property="og:image" content="http://example.com/images/Flink/stream_aligning.svg">
+<meta property="og:image" content="http://example.com/images/Flink/checkpointing.svg">
+<meta property="og:image" content="http://example.com/images/Flink/stream_unaligning.svg">
+<meta property="og:image" content="http://example.com/images/Flink//checkpoints.svg">
+<meta property="article:published_time" content="2023-11-17T10:19:53.000Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:31.981Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="Flink">
+<meta property="article:tag" content="Concept">
+<meta property="article:tag" content="State">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/Flink/state_partitioning.svg">
+
+<link rel="canonical" href="http://example.com/2023/11/17/Flink-Concept-1-State/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>Flink 概念 State | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/11/17/Flink-Concept-1-State/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Flink 概念 State
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-11-17 18:19:53 / Modified: 18:24:31" itemprop="dateCreated datePublished" datetime="2023-11-17T18:19:53+08:00">2023-11-17</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink/" itemprop="url" rel="index"><span itemprop="name">Flink</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>在实际的流处理场景下，Operation（也叫算子）可根据 State 分为两类：</p>
+<ul>
+<li>无状态 Operation：一次只处理一个独立的 Event，</li>
+<li>有状态 Operation：需要合并/引用多个 Events 并加以处理</li>
+</ul>
+<p>Flink 应用的可用性及扩展性，都建立在围绕 State 的特性当中。在实际的使用场景中，通常会通过 Checkpoints 和 Savepoints 来实现容错（Fault Tolerant），配置 StateBackends 满足对 State 持久化的需要。此外，Flink 还支持跨并行实例重分配 State，以便进行横向扩展 。</p>
+<span id="more"></span>
+<h1 id="Keyed-State"><a href="#Keyed-State" class="headerlink" title="Keyed State"></a>Keyed State</h1><p>Keyed State 是通过键值对（embedded key/value store）的形式存储，并且根据 Key 进行分片的 State 与被有状态 Operation 读取的数据流严格的分布在一起。资源对齐（alignment）的好处显而易见，一方面，全部的状态更新均在 Local Operations，无需事务来保证数据一致性；另一方面，允许 Flink 透明地调整 Stream 的分片，同时重分配 State。</p>
+<p><img src="/images/Flink/state_partitioning.svg" alt="State and Partitioning"></p>
+<p>Keyed State 被进一步定义为 Key Groups。其是 Flink 操作重分配 Keyed State 的最小单元。在执行期间，一个 Keyed Operator 对应的并行实例都会依赖一个或多个 Key Groups，而 Key Groups 数量与定义的最大并行度相同（maximum parallelism）。</p>
+<h1 id="State-Persistence"><a href="#State-Persistence" class="headerlink" title="State Persistence"></a>State Persistence</h1><p>Flink 通过流重放（Stream Replay）和检查点（Checkpointing）实现容错。</p>
+<p>检查点（Checkpointing）标记了每一个输入流（Input Stream）中的<strong>特定点</strong>以及每个算子（Operators）的<strong>特定状态</strong>。通过 Checkpoints，Flink 可通过恢复 Operator 的 State 以及重放（Replay）Checkpoints 中的记录来维持数据的一致性（仅处理一次的语义）。</p>
+<p>检查点（Checkpointing）间隔是一种权衡容错机制开销的方法，其影响到系统由故障到恢复的时间，而时间的长短主要由重放的数据记录条数决定。</p>
+<p>容错机制（The fault tolerance mechanism）需要不断地绘制分布式数据流的快照，快照可根据需要自定义存储位置。</p>
+<p>如果发生程序故障（由于机器、网络或软件故障），Flink 会暂停处理数据流，重置算子（Operators）到最新的检查点（Checkpointing）；重置输入流到状态快照点。任何数据流都不会影响已经生成的检查点状态。</p>
+<blockquote>
+<p>为了使该机制实现其完全保证，数据流源（例如消息队列或代理）需要能够将流倒回到定义的最近点。Apache Kafka 具有这种能力，Flink 的 Kafka 连接器利用了这一点。</p>
+</blockquote>
+<h1 id="Checkpointing"><a href="#Checkpointing" class="headerlink" title="Checkpointing"></a>Checkpointing</h1><p>Flink 容错机制的核心是绘制分布式数据流（Data Stream）和算子状态（Operator State）的快照。</p>
+<blockquote>
+<p>论文描述：<a target="_blank" rel="noopener" href="http://arxiv.org/abs/1506.08603">Lightweight Asynchronous Snapshots for Distributed Dataflows</a><br>理论基础：<a target="_blank" rel="noopener" href="http://research.microsoft.com/en-us/um/people/lamport/pubs/chandy.pdf">Chandy-Lamport algorithm</a></p>
+</blockquote>
+<p>注意：与检查点（Checkpoints）相关的所有操作都可以异步完成。检查点可以在对齐和非对齐的情况下进行。</p>
+<h2 id="Barries"><a href="#Barries" class="headerlink" title="Barries"></a>Barries</h2><p>流屏障（Stream Barries）是 Flink 分布式快照中的核心概念之一。这些屏障被注入数据流中（Data Stream）并且随着其中的数据，遵循严格线性的规则顺序流动。屏障将数据流分隔为块，每一块数据均被记录为一个快照，每个屏障都携带了推送到它前面的记录快照的 ID。来自不同快照的多个屏障可以同时在流中，这意味着各种快照可能并发发生。</p>
+<p><img src="/images/Flink/stream_barriers.svg" alt="Checkpoint barriers in data streams"></p>
+<p>流屏障（Stream Barries）通过数据流源（Data Stream Sources）注入到并发的数据中，快照 <em>n</em> 的屏障被注入的点（我们称之为 <em>Sn</em>）是源流（Source Stream）中快照覆盖数据的位置。例如，在 Apache Kafka 中，这个位置将是分区中最后一条记录的偏移量。需要注意的是，快照 <em>n</em> 的屏障会在并行 Data Stream 的每个流中存在，且只会存在于快照 <em>n</em> 包含的数据记录之后。</p>
+<h2 id="Aligned-Checkpointing"><a href="#Aligned-Checkpointing" class="headerlink" title="Aligned Checkpointing"></a>Aligned Checkpointing</h2><p>随后，屏障会向下游流动。当一个中间算子（Intermediate Operator）从其所有输入流中接收到针对快照 <em>n</em> 的屏障时，它会向所有的输出流中发出一个针对快照 <em>n</em> 的屏障。一旦 Sink Operator（流处理 DAG 的结尾）从所有输入流中接收到屏障 <em>n</em>，它就向检查点协调器（Checkpoint Coordinator）确认快照 <em>n</em>。在所有 Sink Operator 都确认了快照之后，就认为快照已经完成。</p>
+<p>一旦快照 <em>n</em> 完成，作业将不再向源请求 <em>Sn</em> 之前的记录，因为在那时这些记录（及其后代记录）将通过整个数据流拓扑。</p>
+<p><img src="/images/Flink/stream_aligning.svg" alt="Aligning data streams at operators with multiple inputs"></p>
+<p>Operators 如果接收多于一个的输入流需要对齐输入流的快照屏障。上述图标说明了这个：</p>
+<ul>
+<li>当 Operator 从某一个输入流（incoming stream）接收到了 Barrier <em>n</em> 后，它必须得等待其他所有的输入流都接收 Barrier <em>n</em> 后才能继续处理 Barrier <em>n+1</em> 的数据。</li>
+<li>一旦最后一个输入流接收到了 Barrier <em>n</em>，Operator 会发出全部 pending 的输出记录，然后发出快照 Barrier <em>n</em> 本身。</li>
+<li><p>它对 State 进行快照，并从所有输入流中恢复处理记录，在处理来自流的记录之前处理来自输入缓冲区的记录。</p>
+</li>
+<li><p>最后，Operator 会异步将 State 写入 State Backend。</p>
+</li>
+</ul>
+<h3 id="Snapshotting-Operator-State"><a href="#Snapshotting-Operator-State" class="headerlink" title="Snapshotting Operator State"></a>Snapshotting Operator State</h3><p>当 Operator 包含任何形式的 State，必须建立相应的快照。</p>
+<p>Operator 会在从全部输入流接收到所有 Snapshot Barriers 后，并且在向输出流生成 Barriers 前，绘制 State 的快照。此时，全部的更新基于快照屏障前的记录所得，且快照屏障后的记录不会被 Operator 处理导致数据更新。因为快照可能比较大，因此它被储存在一个可配置的 State Backend，默认储存在 JobManager 的内存中。在 State 被存储后，Operator 确认 Checkpoint，随后将快照屏障发射进输出流并且继续处理后续内容。</p>
+<p>生成的快照包含：</p>
+<ul>
+<li>对于每个parallel stream data source，快照启动时流中的偏移量/位置</li>
+<li>对于每个 Operator，指向作为快照一部分存储的状态的指针</li>
+</ul>
+<p><img src="/images/Flink/checkpointing.svg" alt="Illustration of the Checkpointing Mechanism"></p>
+<h3 id="Recovery"><a href="#Recovery" class="headerlink" title="Recovery"></a>Recovery</h3><p>这种机制下，Recovery 很简单：失败后，Flink 选择最新的 Checkpoint <em>k</em>。系统随后重新部署整个分布式数据流，并将 Checkpoint <em>k</em> 的快照状态同步给每一个 Operator，然后数据源被设置到 <em>Sk</em> 对应的流读取位置。以 Kafka 为例，这意味着让 Consumer 从 <em>Sk</em> 偏移量拉取数据。</p>
+<p>如果 State 是增量快照，Operator 会从最新的一个完整快照开始，然后对该状态应用一系列增量快照更新。</p>
+<h2 id="Unaligned-Checkpointing"><a href="#Unaligned-Checkpointing" class="headerlink" title="Unaligned Checkpointing"></a>Unaligned Checkpointing</h2><p>Checkpoint 也可以在不对齐的情况下执行。Operator 会持续处理全部的输入流，即使在 Checkpoint <em>n</em> 到达一部分 Checkpoint Barrier 也不会影响。这样，即使在处理 checkpoint <em>n</em> 的 State 快照之前也可能处理 checkpoint <em>n+1</em> 的数据。</p>
+<p>注意，这种方式与 Chandy-Lamport algorithm 更加接近，但 Flink 仍然向数据源中插入了 Barriers 避免 Checkpoint Coordinator 过载。</p>
+<p><img src="/images/Flink/stream_unaligning.svg" alt="Unaligned checkpointing"></p>
+<p>上述描述了 Operator 处理 Unaligned Checkpoint Barries 的过程：</p>
+<ul>
+<li>Operator 对存储在其输入缓冲区中的第一个 Barrier 作出反应</li>
+<li>通过将 Barrier 添加到输出缓冲区的末尾，它立即将 Barrier 转发给下游 Operator</li>
+<li>Operator 将所有已超越的记录标记为异步存储，并创建自己状态的快照</li>
+</ul>
+<p>因此，Operator 只是短暂的停止处理，去标记 Buffer、转发 Barrier 以及创建其他 State 的快照。</p>
+<p>Unaligned checkpointing 保证 Barrier 尽可能快地到达 Sink。它特别适合对齐数据时长达到小时级的程序（数据处理时间分布不均导致的某条路径处理时间远远超过其他路径）。然而，由于它增加了额外的 I/O 压力，如果 State Backend 的 I/O 到达瓶颈的时候，它并不能起到优化的作用。</p>
+<blockquote>
+<p>注意：保存点总是对齐的</p>
+</blockquote>
+<p>Alignment happens only for operators with multiple predecessors (joins) as well as operators with multiple senders (after a stream repartitioning/shuffle). Because of that, dataflows with only embarrassingly parallel streaming operations (<code>map()</code>, <code>flatMap()</code>, <code>filter()</code>, …) actually give <em>exactly once</em> guarantees even in <em>at least once</em> mode.</p>
+<h3 id="Unaligned-Recovery"><a href="#Unaligned-Recovery" class="headerlink" title="Unaligned Recovery"></a>Unaligned Recovery</h3><p>在 unaligned checkpointing 中，未对齐的记录以副本的形式存在（它们包含在 checkpoint <em>n</em> 的 State 快照中）。Operators 会首先恢复 in-flight 数据，随后开始重放未对齐的记录，最后继续处理上游 Operator 传递下来的数据。除此之外，它和 aligned checkpoints 操作的 recovery 步骤相同。</p>
+<h2 id="State-Backends"><a href="#State-Backends" class="headerlink" title="State Backends"></a>State Backends</h2><p>KV 索引的存储依赖选择的 State Backend。除了定义数据结构保存 State，State Backend 也实现了获取某时间点内 KV 格式的 State，并把它们作为快照的一部分进行存储。</p>
+<p><img src="/images/Flink//checkpoints.svg" alt="checkpoints and snapshots"></p>
+<h2 id="Savepoints"><a href="#Savepoints" class="headerlink" title="Savepoints"></a>Savepoints</h2><p>所有使用 Checkpoint 的程序都可以通过 Savepoint 恢复执行。Savepoint 允许在不丢失任何状态的条件下更新程序和集群。</p>
+<p>Savepoint 是手动触发的 Checkpoint，它获取程序的快照并将其写入 State Backend，这些都依赖 Checkpoint 机制。Savepoint 和 Checkpoint 类似，但 Savepoint 是用户手动触发的，并且在新的快照生成前不能自动过期。</p>
+<h1 id="State-and-Fault-Tolerance-in-Batch-Programs"><a href="#State-and-Fault-Tolerance-in-Batch-Programs" class="headerlink" title="State and Fault Tolerance in Batch Programs"></a>State and Fault Tolerance in Batch Programs</h1><p>Flink 在 batch ExecutionMode 下执行批处理程序作为流程序的特殊情况，其中流是有界的(有限数量的元素)。因此，上述概念以同样的方式适用于批处理程序，也适用于流媒体程序，只有少数例外:</p>
+<ul>
+<li>批处理程序 Fault Tolerance 不使用检查点。恢复是通过完全重放流来实现的。因为输入是有界的，这将更多的成本推到 Recovery 上。由于没使用检查点，使得常规处理成本非常低。</li>
+<li>批处理模式下的状态后端使用简化的内存/核外数据结构，而不是键/值索引。</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Flink/" rel="tag"># Flink</a>
+              <a href="/tags/Concept/" rel="tag"># Concept</a>
+              <a href="/tags/State/" rel="tag"># State</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/09/11/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-4-%E5%AF%B9%E8%B4%A6%E7%B3%BB%E7%BB%9F/" rel="prev" title="架构设计 支付清结算系统 对账系统">
+      <i class="fa fa-chevron-left"></i> 架构设计 支付清结算系统 对账系统
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Keyed-State"><span class="nav-number">1.</span> <span class="nav-text">Keyed State</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#State-Persistence"><span class="nav-number">2.</span> <span class="nav-text">State Persistence</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#Checkpointing"><span class="nav-number">3.</span> <span class="nav-text">Checkpointing</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Barries"><span class="nav-number">3.1.</span> <span class="nav-text">Barries</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Aligned-Checkpointing"><span class="nav-number">3.2.</span> <span class="nav-text">Aligned Checkpointing</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Snapshotting-Operator-State"><span class="nav-number">3.2.1.</span> <span class="nav-text">Snapshotting Operator State</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Recovery"><span class="nav-number">3.2.2.</span> <span class="nav-text">Recovery</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Unaligned-Checkpointing"><span class="nav-number">3.3.</span> <span class="nav-text">Unaligned Checkpointing</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Unaligned-Recovery"><span class="nav-number">3.3.1.</span> <span class="nav-text">Unaligned Recovery</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#State-Backends"><span class="nav-number">3.4.</span> <span class="nav-text">State Backends</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Savepoints"><span class="nav-number">3.5.</span> <span class="nav-text">Savepoints</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#State-and-Fault-Tolerance-in-Batch-Programs"><span class="nav-number">4.</span> <span class="nav-text">State and Fault Tolerance in Batch Programs</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">166</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">32</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">314</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>

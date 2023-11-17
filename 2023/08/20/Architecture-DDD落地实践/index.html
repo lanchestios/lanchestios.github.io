@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.2.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":-1,"unescape":true,"preload":true},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="常见的 DDD 实现架构有很多种，如经典四层架构、六边形（适配器端口）架构、整洁架构（Clean Architecture）、CQRS 架构等。架构无优劣高下之分，只要熟练掌握就都是合适的架构。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="架构设计 DDD落地实践">
+<meta property="og:url" content="http://example.com/2023/08/20/Architecture-DDD%E8%90%BD%E5%9C%B0%E5%AE%9E%E8%B7%B5/index.html">
+<meta property="og:site_name" content="Lanchester Blog">
+<meta property="og:description" content="常见的 DDD 实现架构有很多种，如经典四层架构、六边形（适配器端口）架构、整洁架构（Clean Architecture）、CQRS 架构等。架构无优劣高下之分，只要熟练掌握就都是合适的架构。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/images/SE/DDD落地实践1.png">
+<meta property="og:image" content="http://example.com/images/SE/DDD落地实践2.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD落地实践3.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD落地实践4.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD落地实践5.webp">
+<meta property="og:image" content="https://ucc.alicdn.com/pic/developer-ecology/6ibaby6qg4ku4_54e8a3cf3bda4431b6334128c96b5f50.png">
+<meta property="og:image" content="https://ucc.alicdn.com/pic/developer-ecology/6ibaby6qg4ku4_daa6995b59fb4ff99062843273680285.png">
+<meta property="og:image" content="http://example.com/images/SE/DDD建模过程1.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD建模过程2.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD建模过程3.webp">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例1.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例2.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例3.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例4.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例5.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例6.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例7.jpeg">
+<meta property="og:image" content="http://example.com/images/SE/DDD实践案例8.png">
+<meta property="article:published_time" content="2023-08-20T06:22:51.000Z">
+<meta property="article:modified_time" content="2023-11-17T10:24:31.996Z">
+<meta property="article:author" content="Wang Zihao">
+<meta property="article:tag" content="DDD">
+<meta property="article:tag" content="Architecture">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/SE/DDD落地实践1.png">
+
+<link rel="canonical" href="http://example.com/2023/08/20/Architecture-DDD%E8%90%BD%E5%9C%B0%E5%AE%9E%E8%B7%B5/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title>架构设计 DDD落地实践 | Lanchester Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Lanchester Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Leave a leaf</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>Search
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="Searching..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2023/08/20/Architecture-DDD%E8%90%BD%E5%9C%B0%E5%AE%9E%E8%B7%B5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Wang Zihao">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Lanchester Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          架构设计 DDD落地实践
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2023-08-20 14:22:51" itemprop="dateCreated datePublished" datetime="2023-08-20T14:22:51+08:00">2023-08-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-11-17 18:24:31" itemprop="dateModified" datetime="2023-11-17T18:24:31+08:00">2023-11-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Architecture/" itemprop="url" rel="index"><span itemprop="name">Architecture</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>常见的 DDD 实现架构有很多种，如经典四层架构、六边形（适配器端口）架构、整洁架构（Clean Architecture）、CQRS 架构等。架构无优劣高下之分，只要熟练掌握就都是合适的架构。</p>
+<span id="more"></span>
+<h1 id="制定参考工程架构"><a href="#制定参考工程架构" class="headerlink" title="制定参考工程架构"></a>制定参考工程架构</h1><h2 id="为什么要制定参考工程架构"><a href="#为什么要制定参考工程架构" class="headerlink" title="为什么要制定参考工程架构"></a>为什么要制定参考工程架构</h2><p>不同团队落地 DDD 所采取的应用架构风格可能不同，并没有统一的、标准的 DDD 工程架构。有些团队可能遵循经典的 DDD 四层架构，或改进的 DDD 四层架构，有些团队可能综合考虑分层架构、整洁架构、六边形架构等多种架构风格，有些在实践中可能引入 CQRS 解决读模型与写模型的差异化等等。即使无法制定通用的、标准的工程应用架构，但为团队制定一个遵循领域驱动设计思想的参考架构依然有价值。</p>
+<p>基于以下原因：</p>
+<ul>
+<li>为团队实践 DDD 的战术设计提供可以快速开始的工程参考</li>
+<li>参考工程大量的命名和结构决策，显式的体现 DDD 的相关理念，有利于团队对 DDD 的战术实现达成一致认知</li>
+<li>参考架构有助于沉淀团队对领域驱动设计的一些思考和最佳实践</li>
+</ul>
+<h2 id="参考架构的考量因素"><a href="#参考架构的考量因素" class="headerlink" title="参考架构的考量因素"></a>参考架构的考量因素</h2><p>虽然无法制定完全通用的 DDD 参考架构，但制定某个特定上下文下的参考架构却具有可行性和实践价值。针对于上下文的选择要尽量贴合实际的工程实践场景并考虑多维度的因素。</p>
+<p>本文所述参考工程架构遵循以下原则：</p>
+<ul>
+<li>遵循领域驱动设计的本质思想</li>
+<li>充分考虑业务系统建设特点</li>
+<li>依赖最小化，保持轻量</li>
+</ul>
+<p>希望工程参考架构能涵盖以下范围</p>
+<ul>
+<li><p>分离业务域与技术域：参考架构要遵循技术和业务隔离的特性，可以参考多种架构风格。业务与技术关注点的分离并不是 DDD 独有的特点，在六边形、整洁架构、洋葱架构中都遵循了这一重要原则。</p>
+</li>
+<li><p>多限界上下文场景：大多数团队基于 DDD 进行微服务拆分的时候，特别是系统建设初期，对单个微服务应用内的限界上下文的粒度需要权衡。由于团队组织架构因素及微服务成本问题，单个应用容纳的限界上下文一般是多个 (理想情况下是 1:1)。这些限界上下文随着后续的逐步迭代有可能会迁移至独立应用。因此，参考架构将多上下文的应用场景作为重要考量因素。</p>
+</li>
+<li><p>明确的组件、职责边界及依赖关系</p>
+</li>
+<li>支持领域报表场景：报表场景在业务系统较为常见，DDD 并没有体现该场景的处理方式。作为工程参考架构，还是希望能够从实际业务出发，体现对写模型和报表模型的显示支持</li>
+<li>外部依赖最小化：需要排除不必要的依赖，保持工程架构的轻量化</li>
+</ul>
+<h1 id="应用架构演化"><a href="#应用架构演化" class="headerlink" title="应用架构演化"></a>应用架构演化</h1><p>我们很多项目是基于三层架构的，其结构如图：</p>
+<p><img src="/images/SE/DDD落地实践1.png" alt=""></p>
+<p>我们说三层架构，为什么还画了一层 Model 呢？因为 Model 只是简单的 Java Bean，里面只有数据库表对应的属性，有的应用会将其单独拎出来作为一个 Maven Module，但实际上可以合并到 DAO 层。</p>
+<h2 id="数据模型与-DAO-层合并"><a href="#数据模型与-DAO-层合并" class="headerlink" title="数据模型与 DAO 层合并"></a>数据模型与 DAO 层合并</h2><p>数据模型是贫血模型，其并不包含业务逻辑，只做为装载模型属性的容器。在当前所指的 Model 中其字段与数据库表结构一一对应，最主要的应用场景就是 DAO 层用来进行 ORM，给 Service 层返回封装好的数据模型，供 Service 获取模型属性以执行业务。</p>
+<p>在实际使用当中，数据模型的 Class 或者属性字段上，通常带有 ORM 框架的一些注解，跟 DAO 层联系非常紧密，可以认为数据模型就是 DAO 层拿来查询或者持久化数据的，数据模型脱离了 DAO 层，意义不大。</p>
+<h2 id="Service-层抽取业务逻辑"><a href="#Service-层抽取业务逻辑" class="headerlink" title="Service 层抽取业务逻辑"></a>Service 层抽取业务逻辑</h2><p>下面是一个常见的 Service 方法的伪代码，既有缓存、数据库的调用，也有实际的业务逻辑，整体过于臃肿，要进行单元测试更是无从下手。</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Service</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token annotation punctuation">@Transactional</span>
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">bizLogic</span><span class="token punctuation">(</span><span class="token class-name">Param</span> param<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token function">checkParam</span><span class="token punctuation">(</span>param<span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//校验不通过则抛出自定义的运行时异常</span>
+
+        <span class="token class-name">Data</span> data <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Data</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token comment">//或者是mapper.queryOne(param);</span>
+
+        data<span class="token punctuation">.</span><span class="token function">setId</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>condition1 <span class="token operator">==</span> <span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            biz1 <span class="token operator">=</span> <span class="token function">biz1</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            data<span class="token punctuation">.</span><span class="token function">setProperty1</span><span class="token punctuation">(</span>biz1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            biz1 <span class="token operator">=</span> <span class="token function">biz11</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            data<span class="token punctuation">.</span><span class="token function">setProperty1</span><span class="token punctuation">(</span>biz1<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>condition2 <span class="token operator">==</span> <span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+            biz2 <span class="token operator">=</span> <span class="token function">biz2</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty2</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            data<span class="token punctuation">.</span><span class="token function">setProperty2</span><span class="token punctuation">(</span>biz2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span> <span class="token keyword">else</span> <span class="token punctuation">&#123;</span>
+            biz2 <span class="token operator">=</span> <span class="token function">biz22</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty2</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            data<span class="token punctuation">.</span><span class="token function">setProperty2</span><span class="token punctuation">(</span>biz2<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">&#125;</span>
+
+        <span class="token comment">//省略一堆set方法</span>
+        mapper<span class="token punctuation">.</span><span class="token function">updateXXXById</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>这是典型的事务脚本的代码：先做参数校验，然后通过 biz1、biz2 等子方法做业务，并将其结果通过一堆 Set 方法设置到数据模型中，再将数据模型更新到数据库。</p>
+<p>由于所有的业务逻辑都在 Service 方法中，造成 Service 方法非常臃肿，Service 需要了解所有的业务规则，并且要清楚如何将基础设施串起来。同样的一条规则，例如 if (condition1=true)，很有可能在每个方法里面都出现。</p>
+<p>专业的事情就该让专业的人干，既然业务逻辑是跟具体的业务场景相关的，我们想办法把业务逻辑提取出来，形成一个模型，让这个模型的对象去执行具体的业务逻辑。这样 Service 方法就不用再关心里面的 if/else 业务规则，只需要通过业务模型执行业务逻辑，并提供基础设施完成用例即可。</p>
+<p>将业务逻辑抽象成模型，这样的模型就是领域模型。</p>
+<p>要操作领域模型，必须先获得领域模型，但此时我们先不管领域模型怎么得到，假设是通过 <code>loadDomain</code> 方法获得的。通过 Service 方法的入参，我们调用 <code>loadDomain</code> 方法得到一个模型，我们让这个模型去做业务逻辑，最后执行的结果也都在模型里，我们再将模型回写数据库。当然，怎么写数据库的我们也先不管，假设是通过 <code>saveDomain</code> 方法。</p>
+<p>Service 层的方法经过抽取之后，将得到如下的伪代码：</p>
+<pre class="line-numbers language-java" data-language="java"><code class="language-java"><span class="token keyword">public</span> <span class="token keyword">class</span> <span class="token class-name">Service</span> <span class="token punctuation">&#123;</span>
+
+    <span class="token keyword">public</span> <span class="token keyword">void</span> <span class="token function">bizLogic</span><span class="token punctuation">(</span><span class="token class-name">Param</span> param<span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+        <span class="token comment">//如果校验不通过，则抛一个运行时异常</span>
+        <span class="token function">checkParam</span><span class="token punctuation">(</span>param<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//加载模型</span>
+        <span class="token class-name">Domain</span> domain <span class="token operator">=</span> <span class="token function">loadDomain</span><span class="token punctuation">(</span>param<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//调用外部服务取值</span>
+	      <span class="token class-name">SomeValue</span> someValue <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getSomeValueFromOtherService</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty2</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//模型自己去做业务逻辑，Service不关心模型内部的业务规则</span>
+        domain<span class="token punctuation">.</span><span class="token function">doBusinessLogic</span><span class="token punctuation">(</span>param<span class="token punctuation">.</span><span class="token function">getProperty1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> someValue<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">//保存模型</span>
+        <span class="token function">saveDomain</span><span class="token punctuation">(</span>domain<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">&#125;</span>
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>根据代码，我们已经将业务逻辑抽取出来了，领域相关的业务规则封闭在领域模型内部。此时 Service 方法非常直观，就是获取模型、执行业务逻辑、保存模型，再协调基础设施完成其余的操作。</p>
+<p>抽取完领域模型后，我们工程的结构如下图：</p>
+<p><img src="/images/SE/DDD落地实践2.webp" alt=""></p>
+<h2 id="维护领域对象生命周期"><a href="#维护领域对象生命周期" class="headerlink" title="维护领域对象生命周期"></a>维护领域对象生命周期</h2><p>在上一步中，<code>loadDomain</code>、<code>saveDomain</code> 这两个方法还没有得到讨论，这两个方法跟领域对象的生命周期息息相关。</p>
+<p>不管是 loadDomain 还是 saveDomain，我们一般都要依赖于数据库，所以这两个方法对应的逻辑，肯定是要跟 DAO 产生联系的。</p>
+<p>保存或者加载领域模型，我们可以抽象成一种组件，通过这种组件进行封装模型加载、保存的操作，这种组件就是 Repository。</p>
+<p>注意，Repository 是对加载或者保存领域模型（这里指的是聚合根，因为只有聚合根才会有 Repository）的抽象，必须对上层屏蔽领域模型持久化的细节，因此其方法的入参或者出参，一定是基本数据类型或者领域模型，不能是数据库表对应的数据模型。</p>
+<p>以下是 Repository 的伪代码：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">public interface DomainRepository &#123;
+
+    void save(AggregateRoot root);
+
+    AggregateRoot load(EntityId id);
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+<p>接下来我们要考虑在哪里实现 <code>DomainRepository</code>。既然 DomainRepository 与底层数据库有关联，但是我们现在 DAO 层并没有引入 Domain 这个包，DAO 层自然无法提供 DomainRepository 的实现，我们初步考虑是不是可以将 DomainRepository 实现在 Service 层。</p>
+<p>但是，如果我们在 Service 中实现 DomainRepository，势必需要在 Service 层操作数据模型：查询出来数据模型再封装为领域模型、或者将领域模型转为数据模型再通过 ORM 保存，这个过程不该是 Service 层关心的。</p>
+<p>因此，我们决定在 DAO 层直接引入 Domain 包，并在 DAO 层提供 DomainRepository 接口的实现，DAO 层查询出数据模型之后，封装成领域模型供 DomainRepository 返回。</p>
+<p>这样调整之后， DAO 层不再向 Service 返回数据模型，而是返回领域模型，这就隐藏了数据库交互的细节，我们也把 DAO 层换个名字称之为 Repository。</p>
+<p>现在，我们项目的架构图是这样的了：</p>
+<p><img src="/images/SE/DDD落地实践3.webp" alt=""></p>
+<blockquote>
+<p>由于数据模型属于贫血模型，自身没有业务逻辑，并且只有 Repository 这个包会用到，因此我们将之合并到 Repository 中，接下来不再单独列举。</p>
+</blockquote>
+<h2 id="泛化抽象"><a href="#泛化抽象" class="headerlink" title="泛化抽象"></a>泛化抽象</h2><p>在第三步中，我们的架构图已经跟经典四层架构非常相似了，我们再对某些层进行泛化抽象。</p>
+<h3 id="Infrastructure"><a href="#Infrastructure" class="headerlink" title="Infrastructure"></a>Infrastructure</h3><p>Repository 仓储层其实属于基础设施层，只不过其职责是持久化和加载聚合。由于 Infrastructure 可能会有很多的包，分别提供不同的基础设施支持，因此统一采用 <code>infrastructure-XXX</code> 的格式进行命名。</p>
+<p>对于内部中间件的调用，如数据库及缓存中间件的调用的命名如下：</p>
+<ul>
+<li><code>infrastructure-persistence</code>：基础设施层持久化包</li>
+<li><code>infrastructure-cache</code>：基础设施层持久化包</li>
+</ul>
+<p>对于外部的调用，DDD 中有防腐层的概念，将外部模型通过防腐层进行隔离，避免污染本地上下文的领域模型。我们使用入口（Gateway）来封装对外部系统或资源的访问，因此将对外调用这一层称之为 <code>infrastructure-gateway</code>。</p>
+<blockquote>
+<p>注意：Infrastructure 层的门面接口都应先在 Domain 层定义，其方法的入参、出参，都应该是领域模型（实体、值对象）或者基本类型。</p>
+</blockquote>
+<h3 id="User-Interface"><a href="#User-Interface" class="headerlink" title="User Interface"></a>User Interface</h3><p>Controller 层其实就是用户接口层，即 User Interface 层，我们在项目简称 ui。当然了可能很多开发者会觉得叫 UI 好像很别扭，认为 UI 就是 UI 设计师设计的图形界面。</p>
+<p>Controller 层的名字有很多，有的叫 Rest，有的叫 Resource，考虑到我们这一层不只是有 Rest 接口，还可能还有一系列 Web 相关的拦截器，所以我一般称之为 Web。因此，我们将其改名为 ui-web，即用户接口层的 Web 包。</p>
+<p>同样，我们可能会有很多的用户接口，但是他们通过不同的协议对外提供服务，因而被划分到不同的包中。</p>
+<p>我们如果有对外提供的 RPC 服务，那么其服务实现类所在的包就可以命名为 <code>ui-provider</code>。</p>
+<p>有时候引入某个中间件会同时增加 Infrastructure 和 User Interface。</p>
+<p>例如，如果引入 Kafka 就需要考虑一下，如果是给 Service 层提供调用的，例如逻辑执行完发送消息通知下游，那么我们再加一个包 <code>infrastructure-publisher</code>；如果是消费 Kafka 的消息，然后调用 Service 层执行业务逻辑的，那么就可以命名为 <code>ui-subscriber</code>。</p>
+<h3 id="Application"><a href="#Application" class="headerlink" title="Application"></a>Application</h3><p>至此，Service 层目前已经没有业务逻辑了，业务逻辑都在 Domain 层去执行了，Service 只是协调领域模型、基础设施层完成业务逻辑。</p>
+<p>所以，我们把 Service 层改名为 <code>Application Service</code> 层。</p>
+<p>经过第四步的抽象，其架构图为：</p>
+<p><img src="/images/SE/DDD落地实践4.webp" alt=""></p>
+<h2 id="完整的包结构"><a href="#完整的包结构" class="headerlink" title="完整的包结构"></a>完整的包结构</h2><p>我们继续对第四步中出现的包进行整理，此时还需要考虑一个问题，我们的启动类应该放在哪里？</p>
+<p>由于有很多的 User Interface，所以启动类放在任意一个 User Interface 中都不合适，放置在 Application Service 中也不合适，因此，启动类应该存放在单独的模块中。又因为 application 这个名字被应用层占用了，所以将启动类所在的模块命名为 launcher，一个项目可以存在多个 launcher，按需引用 User Interface。</p>
+<p>加入启动包，我们就得到了完整的 maven 包结构。</p>
+<p>包结构如图所示：</p>
+<p><img src="/images/SE/DDD落地实践5.webp" alt=""></p>
+<h1 id="DDD-领域建模"><a href="#DDD-领域建模" class="headerlink" title="DDD 领域建模"></a>DDD 领域建模</h1><h2 id="核心概念"><a href="#核心概念" class="headerlink" title="核心概念"></a>核心概念</h2><h3 id="领域模型（Domain-Model）"><a href="#领域模型（Domain-Model）" class="headerlink" title="领域模型（Domain Model）"></a>领域模型（Domain Model）</h3><ul>
+<li>领域（战略）：业务范围，范围就是边界。</li>
+<li>子领域：领域可大可小，我们将一个领域进行拆解形成子领域，子领域还可以进行拆解。当一个领域太大的时候需要进行细化拆解。</li>
+<li>模型（战术）：基于某个业务领域识别出这个业务领域的聚合，聚合根，界限上下文，实体，值对象。</li>
+</ul>
+<h4 id="核心域"><a href="#核心域" class="headerlink" title="核心域"></a>核心域</h4><p>决定产品和公司核心竞争力的子域是核心域，它是业务成功的主要因素和公司的核心竞争力。<strong>直接对业务产生价值。</strong></p>
+<h4 id="通用域"><a href="#通用域" class="headerlink" title="通用域"></a>通用域</h4><p>没有太多个性化的诉求，同时被多个子域使用的通用功能子域是通用域。例如，权限，登陆等等。<strong>间接对业务产生价值。</strong></p>
+<h4 id="支撑域"><a href="#支撑域" class="headerlink" title="支撑域"></a>支撑域</h4><p>支撑其他领域业务，具有企业特性，但不具有通用性。<strong>间接对业务产生价值。</strong></p>
+<h3 id="限界上下文（Boundry-Context）"><a href="#限界上下文（Boundry-Context）" class="headerlink" title="限界上下文（Boundry Context）"></a>限界上下文（Boundry Context）</h3><p>业务的边界的划分，这个边界可以是一个领域或者多个领域的集合。复杂业务需要多个域编排完成一个复杂业务流程。限界上下文可以作为微服务划分的方法。其本质还是高内聚低耦合，只是限界上下文只是站在更高的层面来进行划分。如何进行划分，我的方法是一个界限上下文必须支持一个完整的业务流程，保证这个业务流程所涉及的领域都在一个限界上下文中。</p>
+<h3 id="实体（Entity）"><a href="#实体（Entity）" class="headerlink" title="实体（Entity）"></a>实体（Entity）</h3><p>实体有唯一的标识，有生命周期且具有延续性。例如一个交易订单，从创建订单我们会给他一个订单编号并且是唯一的这就是实体唯一标识。同时订单实体会从创建，支付，发货等过程最终走到终态这就是实体的生命周期。订单实体在这个过程中属性发生了变化，但订单还是那个订单，不会因为属性的变化而变化，这就是实体的延续性。</p>
+<p><strong>实体的业务形态：</strong>实体能够反映业务的真实形态，实体是从用例提取出来的。领域模型中的实体是多个属性、操作或行为的载体。</p>
+<p><strong>实体的代码形态：</strong>我们要保证实体代码形态与业务形态的一致性。那么实体的代码应该也有属性和行为，也就是我们说的充血模型，但实际情况下我们使用的是贫血模型。贫血模型缺点是业务逻辑分散，更像数据库模型，充血模型能够反映业务，但过重依赖数据库操作，而且复杂场景下需要编排领域服务，会导致事务过长，影响性能。所以我们使用充血模型，但行为里面只涉及业务逻辑的内存操作。</p>
+<p><strong>实体的运行形态：</strong>实体有唯一ID，当我们在流程中对实体属性进行修改，但ID不会变，实体还是那个实体。</p>
+<p><strong>实体的数据库形态：</strong>实体在映射数据库模型时，一般是一对一，也有一对多的情况。</p>
+<h3 id="值对象（Value-Object）"><a href="#值对象（Value-Object）" class="headerlink" title="值对象（Value Object）"></a>值对象（Value Object）</h3><p>通过对象属性值来识别的对象，它将多个相关属性组合为一个概念整体。在 DDD 中用来描述领域的特定方面，并且是一个没有标识符的对象，叫作值对象。值对象没有唯一标识，没有生命周期，不可修改，当值对象发生改变时只能替换。</p>
+<p><strong>值对象的业务形态</strong>：值对象是描述实体的特征，大多数情况一个实体有很多属性，一般都是平铺，这些数据进行分类和聚合后能够表达一个业务含义，方便沟通而不关注细节。</p>
+<p><strong>值对象的代码形态：</strong>实体的单一属性是值对象，例如：字符串，整型，枚举。多个属性的集合也是值对象，这个时候我们把这个集合设计为一个 CLASS，但没有 ID。例如商品实体下的航段就是一个值对象。航段是描述商品的特征，航段不需要 ID，可以直接整体替换。商品为什么是一个实体，而不是描述订单特征，因为需要表达谁买了什么商品，所以我们需要知道哪一个商品，因此需要 ID 来标识唯一性。</p>
+<p><strong>值对象的运行形态：</strong>值对象创建后就不允许修改了，只能用另外一个值对象来整体替换。当我们修改地址时，从页面传入一个新的地址对象替换调用 Person 对象的地址即可。如果我们把 Address 设计成实体，必然存在 ID，那么我们需要从页面传入的地址对象的 ID 与 Person 里面的地址对像的 ID 进行比较，如果相同就更新，如果不同先删除数据库在新增数据。</p>
+<p><strong>值对象的数据库形态：</strong>有两种方式嵌入式和序列化大对象。</p>
+<p>案例 1：以属性嵌入的方式形成的人员实体对象，地址值对象直接以属性值嵌入人员实体中。当我们只有一个地址的时候使用嵌入式比较好，如果多个地址必须有序列化大对象，同时可以支持搜索。</p>
+<p><img src="https://ucc.alicdn.com/pic/developer-ecology/6ibaby6qg4ku4_54e8a3cf3bda4431b6334128c96b5f50.png" alt="image"></p>
+<p>案例 2：以序列化大对象的方式形成的人员实体对象，地址值对象被序列化成大对象Json串后，嵌入人员实体中。</p>
+<p><img src="https://ucc.alicdn.com/pic/developer-ecology/6ibaby6qg4ku4_daa6995b59fb4ff99062843273680285.png" alt="image"></p>
+<p>支持多个地址存储，不支持搜索。</p>
+<h3 id="聚合和聚合根（Aggregate-Root）"><a href="#聚合和聚合根（Aggregate-Root）" class="headerlink" title="聚合和聚合根（Aggregate Root）"></a>聚合和聚合根（Aggregate Root）</h3><p>多个实体和值对象组成的我们叫<strong>聚合</strong>，聚合的内部一定的高内聚。这个聚合里面一定有一个实体是<strong>聚合根</strong>。</p>
+<p>聚合与领域的关系：聚合也是范围的划分，领域也是范围的划分。领域与聚合可以是一对一，也可以是一对多的关系。聚合根的作用是保证内部的实体的一致性，对外只需要对聚合根进行操作。</p>
+<h3 id="限界上下文，域，聚合，实体，值对象的关系"><a href="#限界上下文，域，聚合，实体，值对象的关系" class="headerlink" title="限界上下文，域，聚合，实体，值对象的关系"></a>限界上下文，域，聚合，实体，值对象的关系</h3><p>领域包含限界上下文，限界上下文包含子域，子域包含聚合，聚合包含实体和值对象。</p>
+<h2 id="建模过程"><a href="#建模过程" class="headerlink" title="建模过程"></a>建模过程</h2><p>领域太复杂，只有在分割的上下文内才可能形成统一语言。同一对象在不同上下文中的概念可能是不同的。</p>
+<p>在 UML 作为建模主流的时代，软件设计被明确分为面向对象分析（OOA），面向对象设计（OOD）和面向对象编码（OOP）阶段。实际操作中 OOD 的工作往往被 OOA 和 OOP 各自承担一部分，并同时存在分析模型和设计模型两个割裂的模型。</p>
+<pre class="line-numbers language-none"><code class="language-none">领域 --&gt; (分析师) --&gt; 分析模型 --&gt; (设计师) --&gt; 设计模型 --&gt; (程序员) --&gt; 实现模型<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>而领域驱动设计的核心是建立统一的领域模型。领域模型在软件架构中处于核心地位，软件开发过程中，必须以建立领域模型为中心，以保障领域模型的忠实体现。</p>
+<pre class="line-numbers language-none"><code class="language-none">领域  --&gt; (团队所有成员) --&gt; 领域模型 &lt;-- (设计师、程序员) --&gt; 实现 <span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+<p>简单理解起来的话，也就是把业务人员和开发人员的语言统一起来，用代码来感受一下大概就是：</p>
+<pre class="line-numbers language-text" data-language="text"><code class="language-text">userService.love(Jack, Rose) => Jack.love(Rose)
+companyService.hire(company,employee) => 
+Company.hire(employee)<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span></span></code></pre>
+<h3 id="领域事件风暴"><a href="#领域事件风暴" class="headerlink" title="领域事件风暴"></a>领域事件风暴</h3><p>领域事件风暴的关注点是在领域建模的过程中，需要重点关注的业务语言和业务行为。一个领域事件是业务人员所关注的，有助于形成完整的业务闭环的事件，也即一个领域事件将导致进一步的业务操作。</p>
+<p>领域事件风暴的参与者除了领域专家，事件风暴的其他参与者可以是 DDD 专家、架构师、产品经理、项目经理、开发人员和测试人员等项目团队成员。</p>
+<p>在领域事件风暴过后，通常会进入到战略设计及战术设计中。战略设计会控制和分解战术设计的边界与粒度，战术设计则以实证角度验证领域模型的有效性、完整性与一致性，进而以演进的方式对之前的战略设计阶段进行迭代，从而形成一种螺旋式上升的迭代设计过程。</p>
+<h3 id="战略设计"><a href="#战略设计" class="headerlink" title="战略设计"></a>战略设计</h3><p>领域驱动开发强调维护应⽤程序模型的概念完整性。但如果不对模型的概念完整性进行妥协的话，传统的 DDD ⽅法不能盲目地应用在⼀个⽆限大的领域模型中。真正让模型得以最大程度地扩展，并且不必牺牲其概念完整性的⽅法叫做 “上下文”。</p>
+<p>限界上下文明确地定义模型所应⽤的上下文。根据团队的组织、软件系统的各个部分的⽤法以及物理理表现（代码和数据库模式等）来设置模型的边界。在这些边界中严格保持模型的⼀致性，⽽不要受到边界之外问题的干扰和混淆。通过定义不同上下文之间的关系，中创建的一个所有模型上下文的全局视图。</p>
+<p><img src="/images/SE/DDD建模过程1.webp" alt=""></p>
+<h3 id="战术设计"><a href="#战术设计" class="headerlink" title="战术设计"></a>战术设计</h3><p>在领域驱动设计中，聚合是⼀组相关领域对象，其目的是要确保业务规则在领域对象的各个⽣命周期都得以执行</p>
+<ul>
+<li>聚合边界内保证业务不变性</li>
+<li>聚合根有全局标识，只能通过聚合根修改边界内的对象</li>
+</ul>
+<p><img src="/images/SE/DDD建模过程2.webp" alt=""></p>
+<h3 id="全景视图操作流程"><a href="#全景视图操作流程" class="headerlink" title="全景视图操作流程"></a>全景视图操作流程</h3><p><img src="/images/SE/DDD建模过程3.webp" alt=""></p>
+<p>两个不同阶段的设计目标是保持一致的，它们是一个连贯的过程，彼此之间又相互指导与规范，并最终保证一个有效的领域模型和一个富有表达力的实现同时演进。</p>
+<h2 id="领域模型"><a href="#领域模型" class="headerlink" title="领域模型"></a>领域模型</h2><p>DDD 革命性在于：领域模型准确反映了业务语言，而传统 J2EE 或 Spring+Hibernate 等事务性编程模型只关心数据，这些数据对象除了简单 setter/getter 方法外，没有任何业务方法，被比喻成失血模型。</p>
+<h3 id="失血模型"><a href="#失血模型" class="headerlink" title="失血模型"></a>失血模型</h3><p>模型仅仅包含数据的定义和 getter/setter 方法，业务逻辑和应用逻辑都放到服务层中。这种类在 Java 中叫 POJO。</p>
+<h3 id="贫血模型"><a href="#贫血模型" class="headerlink" title="贫血模型"></a>贫血模型</h3><p>贫血模型中包含了一些业务逻辑，但不包含依赖持久层的业务逻辑。这部分依赖于持久层的业务逻辑将会放到服务层中。可以看出，贫血模型中的领域对象是不依赖于持久层的。</p>
+<p><strong>优点</strong></p>
+<ol>
+<li>各层单向依赖，结构清楚，易于实现和维护</li>
+<li>设计简单易行，底层模型非常稳定</li>
+</ol>
+<p><strong>缺点</strong></p>
+<ol>
+<li>domain object 的部分比较紧密依赖的持久化 domain logic 被分离到 Service 层，显得不够</li>
+<li>Service 层过于厚重</li>
+</ol>
+<h3 id="充血模型"><a href="#充血模型" class="headerlink" title="充血模型"></a>充血模型</h3><p>充血模型中包含了所有的业务逻辑，包括依赖于持久层的业务逻辑。所以，使用充血模型的领域层是依赖于持久层，简单表示就是 UI 层 -&gt; 服务层 -&gt; 领域层↔持久层。</p>
+<p><strong>优点</strong></p>
+<ol>
+<li>更加符合 OO 的原则</li>
+<li>Service 层很薄，只充当 Facade 的角色，不和 DAO 打交道</li>
+</ol>
+<p><strong>缺点</strong></p>
+<ol>
+<li>DAO 和 domain object 形成了双向依赖，复杂的双向依赖会导致很多潜在的问题</li>
+</ol>
+<h3 id="胀血模型"><a href="#胀血模型" class="headerlink" title="胀血模型"></a>胀血模型</h3><p>胀血模型就是把和业务逻辑不想关的其他应用逻辑（如授权、事务等）都放到领域模型中。我感觉胀血模型反而是另外一种的失血模型，因为服务层消失了，领域层干了服务层的事，到头来还是什么都没变。</p>
+<p><strong>优点</strong></p>
+<ol>
+<li>简化了分层</li>
+<li>也算符合 OO 该模型</li>
+</ol>
+<p><strong>缺点</strong></p>
+<ol>
+<li>很多不是 domain logic 的 service 逻辑也被强行放入 domain object ，引起了 domain ojbect 模型的不稳定</li>
+<li>domain object 暴露给 web 层过多的信息，可能引起意想不到的副作用。</li>
+</ol>
+<h2 id="实际案例"><a href="#实际案例" class="headerlink" title="实际案例"></a>实际案例</h2><h3 id="领域划分沟通"><a href="#领域划分沟通" class="headerlink" title="领域划分沟通"></a>领域划分沟通</h3><p>领域划分沟通的过程就是推导和验证模型的过程。</p>
+<p>我们需要把系统自动化失败转人工订单自动分配给小二，避免人工挑单和抢单，通过自动分配提升整体履约处理效率。</p>
+<ul>
+<li>产品小A：把需求读了一遍…….。</li>
+<li>开发小B：那就是将履约单分配给个小二对吧？</li>
+<li>产品小A：不对，我们还需要根据一个规则自动分单，例如退票订单分给退票的小二</li>
+<li>开发小B：恩，那我们可以做一个分单规则管理。例如：新增一个退票分单规则，在里面添加一批小二工号。履约单基于自身属性去匹配分单规则并找到一个规则，然后从分单规则里面选择一个小二工号，履约单写入小二工号即可。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例1.jpeg" alt=""></p>
+<ul>
+<li>产品小A：分单规则还需要有优先级，其中小二如果上班了才分配，如果下班了就不分配。</li>
+<li>开发小B：优先级没有问题，在匹配分单规则方法里面按照优先级排序即可，不影响模型。而小二就不是简单一个工号维护在分单规则中，小二有状态了。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例2.jpeg" alt=""></p>
+<ul>
+<li>产品小A：分单规则里面添加小二操作太麻烦了，例如：每次新增一个规则都要去挑人，人也不一定记得住，实际客服在管理小二的时候是按照技能组管理的。</li>
+<li>开发小B：恩，懂了，那就是通过新增一个技能组管理模块来管理小二。然后在通过分单规则来配置1个技能组即可。获取一个小二工号就在技能组里面了。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例3.jpeg" alt=""></p>
+<ul>
+<li>开发小B：总感觉不对，因为新增一个自动化分单需求，履约单就依赖了分单规则，履约单应该是一个独立的域，分单不是履约的能力，履约单实际只需要知道处理人是谁，至于怎么分配的他不太关心。应该由分单规则基于履约单属性找匹配一个规则，然后基于这个规则找到一个小二。<strong>履约单与分单逻辑解耦。</strong></li>
+</ul>
+<p><img src="/images/SE/DDD实践案例4.jpeg" alt=""></p>
+<ul>
+<li>产品小A：分单要轮流分配或者能者多劳分配，小二之前处理过的订单和航司优先分配。</li>
+<li>开发小B：获取小二的逻辑越来越复杂了，实际技能组才是找小二的核心，分单规则核心是通过履约单特征得到一个规则结果（技能组ID，分单策略，特征规则）。技能组基于分单规则的结果获得小二工号。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例5.jpeg" alt=""></p>
+<ul>
+<li>产品小A：还漏了一个信息，就是履约单会被多次分配的情况，每一个履约环节都可能转人工，客服需要知道履约单被处理多次的情况</li>
+<li>开发小B：那用履约单无法表达了，我们需要新增一个概念叫协同单，协同单是为了协同履约单，通过协同推进履约单的进度。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例6.jpeg" alt=""></p>
+<ul>
+<li>产品小A：协同单概念很好，小二下班后，如果没有处理完，还可以转交给别人。</li>
+<li>开发小B：恩，那只需要在协同单上增加行为即可。</li>
+</ul>
+<p><img src="/images/SE/DDD实践案例7.jpeg" alt=""></p>
+<h3 id="领域划分结果"><a href="#领域划分结果" class="headerlink" title="领域划分结果"></a>领域划分结果</h3><p><img src="/images/SE/DDD实践案例8.png" alt=""></p>
+<h1 id="文档引用"><a href="#文档引用" class="headerlink" title="文档引用"></a>文档引用</h1><p><a target="_blank" rel="noopener" href="https://github.com/feiniaojin/ddd-example-cms.git">DDD 示例项目</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/DDD/" rel="tag"># DDD</a>
+              <a href="/tags/Architecture/" rel="tag"># Architecture</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/08/07/Architecture-%E6%B8%85%E6%99%B0%E6%9E%B6%E6%9E%84/" rel="prev" title="架构设计 清晰架构">
+      <i class="fa fa-chevron-left"></i> 架构设计 清晰架构
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2023/09/11/%E7%94%B5%E5%95%86%E5%9F%9F-%E6%94%AF%E4%BB%98%E7%B3%BB%E7%BB%9F-3-%E6%B8%85%E7%BB%93%E7%AE%97-4-%E5%AF%B9%E8%B4%A6%E7%B3%BB%E7%BB%9F/" rel="next" title="架构设计 支付清结算系统 对账系统">
+      架构设计 支付清结算系统 对账系统 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%88%B6%E5%AE%9A%E5%8F%82%E8%80%83%E5%B7%A5%E7%A8%8B%E6%9E%B6%E6%9E%84"><span class="nav-number">1.</span> <span class="nav-text">制定参考工程架构</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%88%B6%E5%AE%9A%E5%8F%82%E8%80%83%E5%B7%A5%E7%A8%8B%E6%9E%B6%E6%9E%84"><span class="nav-number">1.1.</span> <span class="nav-text">为什么要制定参考工程架构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%82%E8%80%83%E6%9E%B6%E6%9E%84%E7%9A%84%E8%80%83%E9%87%8F%E5%9B%A0%E7%B4%A0"><span class="nav-number">1.2.</span> <span class="nav-text">参考架构的考量因素</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BA%94%E7%94%A8%E6%9E%B6%E6%9E%84%E6%BC%94%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">应用架构演化</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%A8%A1%E5%9E%8B%E4%B8%8E-DAO-%E5%B1%82%E5%90%88%E5%B9%B6"><span class="nav-number">2.1.</span> <span class="nav-text">数据模型与 DAO 层合并</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Service-%E5%B1%82%E6%8A%BD%E5%8F%96%E4%B8%9A%E5%8A%A1%E9%80%BB%E8%BE%91"><span class="nav-number">2.2.</span> <span class="nav-text">Service 层抽取业务逻辑</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%B4%E6%8A%A4%E9%A2%86%E5%9F%9F%E5%AF%B9%E8%B1%A1%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F"><span class="nav-number">2.3.</span> <span class="nav-text">维护领域对象生命周期</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B3%9B%E5%8C%96%E6%8A%BD%E8%B1%A1"><span class="nav-number">2.4.</span> <span class="nav-text">泛化抽象</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Infrastructure"><span class="nav-number">2.4.1.</span> <span class="nav-text">Infrastructure</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#User-Interface"><span class="nav-number">2.4.2.</span> <span class="nav-text">User Interface</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Application"><span class="nav-number">2.4.3.</span> <span class="nav-text">Application</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E7%9A%84%E5%8C%85%E7%BB%93%E6%9E%84"><span class="nav-number">2.5.</span> <span class="nav-text">完整的包结构</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#DDD-%E9%A2%86%E5%9F%9F%E5%BB%BA%E6%A8%A1"><span class="nav-number">3.</span> <span class="nav-text">DDD 领域建模</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5"><span class="nav-number">3.1.</span> <span class="nav-text">核心概念</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%86%E5%9F%9F%E6%A8%A1%E5%9E%8B%EF%BC%88Domain-Model%EF%BC%89"><span class="nav-number">3.1.1.</span> <span class="nav-text">领域模型（Domain Model）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E5%9F%9F"><span class="nav-number">3.1.1.1.</span> <span class="nav-text">核心域</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%80%9A%E7%94%A8%E5%9F%9F"><span class="nav-number">3.1.1.2.</span> <span class="nav-text">通用域</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%94%AF%E6%92%91%E5%9F%9F"><span class="nav-number">3.1.1.3.</span> <span class="nav-text">支撑域</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%99%90%E7%95%8C%E4%B8%8A%E4%B8%8B%E6%96%87%EF%BC%88Boundry-Context%EF%BC%89"><span class="nav-number">3.1.2.</span> <span class="nav-text">限界上下文（Boundry Context）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E4%BD%93%EF%BC%88Entity%EF%BC%89"><span class="nav-number">3.1.3.</span> <span class="nav-text">实体（Entity）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%80%BC%E5%AF%B9%E8%B1%A1%EF%BC%88Value-Object%EF%BC%89"><span class="nav-number">3.1.4.</span> <span class="nav-text">值对象（Value Object）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%81%9A%E5%90%88%E5%92%8C%E8%81%9A%E5%90%88%E6%A0%B9%EF%BC%88Aggregate-Root%EF%BC%89"><span class="nav-number">3.1.5.</span> <span class="nav-text">聚合和聚合根（Aggregate Root）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%99%90%E7%95%8C%E4%B8%8A%E4%B8%8B%E6%96%87%EF%BC%8C%E5%9F%9F%EF%BC%8C%E8%81%9A%E5%90%88%EF%BC%8C%E5%AE%9E%E4%BD%93%EF%BC%8C%E5%80%BC%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">3.1.6.</span> <span class="nav-text">限界上下文，域，聚合，实体，值对象的关系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BB%BA%E6%A8%A1%E8%BF%87%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">建模过程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%86%E5%9F%9F%E4%BA%8B%E4%BB%B6%E9%A3%8E%E6%9A%B4"><span class="nav-number">3.2.1.</span> <span class="nav-text">领域事件风暴</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%98%E7%95%A5%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.2.2.</span> <span class="nav-text">战略设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%88%98%E6%9C%AF%E8%AE%BE%E8%AE%A1"><span class="nav-number">3.2.3.</span> <span class="nav-text">战术设计</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%A8%E6%99%AF%E8%A7%86%E5%9B%BE%E6%93%8D%E4%BD%9C%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.4.</span> <span class="nav-text">全景视图操作流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A2%86%E5%9F%9F%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.3.</span> <span class="nav-text">领域模型</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%B1%E8%A1%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.3.1.</span> <span class="nav-text">失血模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B4%AB%E8%A1%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.3.2.</span> <span class="nav-text">贫血模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%85%E8%A1%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.3.3.</span> <span class="nav-text">充血模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%83%80%E8%A1%80%E6%A8%A1%E5%9E%8B"><span class="nav-number">3.3.4.</span> <span class="nav-text">胀血模型</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E9%99%85%E6%A1%88%E4%BE%8B"><span class="nav-number">3.4.</span> <span class="nav-text">实际案例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%86%E5%9F%9F%E5%88%92%E5%88%86%E6%B2%9F%E9%80%9A"><span class="nav-number">3.4.1.</span> <span class="nav-text">领域划分沟通</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%A2%86%E5%9F%9F%E5%88%92%E5%88%86%E7%BB%93%E6%9E%9C"><span class="nav-number">3.4.2.</span> <span class="nav-text">领域划分结果</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%96%87%E6%A1%A3%E5%BC%95%E7%94%A8"><span class="nav-number">4.</span> <span class="nav-text">文档引用</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Wang Zihao</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">166</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">32</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">314</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Wang Zihao</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
